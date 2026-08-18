@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { useAuthStore } from '../../store/authStore';
 import { walletService } from '../../services/wallet';
@@ -22,7 +23,12 @@ export function DashboardPage() {
       </div>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <Card className="col-span-1">
-          <p className="text-sm text-gray-400 mb-1">Available Balance</p>
+          <div className="flex justify-between items-start">
+            <p className="text-sm text-gray-400 mb-1">Available Balance</p>
+            <Link to="/deposit" className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-3 py-1 rounded">
+              Deposit
+            </Link>
+          </div>
           {loading ? <Loader size="sm" /> : (
             <p className="text-4xl font-extrabold text-white">₹{wallet?.balance_inr ?? '0.00'}</p>
           )}

@@ -1,9 +1,11 @@
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
+from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from slowapi.errors import RateLimitExceeded
 from slowapi import _rate_limit_exceeded_handler
+from pathlib import Path
 
 from .config import settings
 from .utils.exceptions import http_exception_handler, validation_exception_handler
@@ -46,7 +48,13 @@ app.include_router(withdrawals.router, prefix=PREFIX)
 app.include_router(payments.router, prefix=PREFIX)
 app.include_router(admin.router, prefix=PREFIX)
 
+# Static file serving — QR code uploads only
+QR_UPLOAD_DIR = Path(__file__).resolve().parent.parent / "uploads" / "qr"
+QR_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+app.mount("/uploads/qr", StaticFiles(directory=str(QR_UPLOAD_DIR)), name="qr_uploads")
+
 
 @app.get("/api/v1/health", tags=["Health"])
 async def health_check():
     return {"success": True, "data": {"status": "ok", "environment": settings.ENVIRONMENT}}
+

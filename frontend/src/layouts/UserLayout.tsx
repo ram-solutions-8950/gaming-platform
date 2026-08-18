@@ -5,6 +5,7 @@ import { authService } from '../services/auth';
 const navItems = [
   { to: '/dashboard', label: 'Dashboard', icon: '⌂' },
   { to: '/wallet', label: 'Wallet', icon: '◈' },
+  { to: '/deposit', label: 'Deposit', icon: '⬇' },
   { to: '/transactions', label: 'Transactions', icon: '⇄' },
   { to: '/profile', label: 'Profile', icon: '◌' },
 ];

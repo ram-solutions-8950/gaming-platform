@@ -13,3 +13,7 @@ argon2-cffi
 redis
 slowapi
 python-multipart
+opencv-python-headless
+numpy
+qrcode
+pillow

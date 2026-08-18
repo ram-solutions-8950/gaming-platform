@@ -11,6 +11,7 @@ import { DashboardPage } from './pages/user/Dashboard';
 import { ProfilePage } from './pages/user/Profile';
 import { WalletPage } from './pages/user/Wallet';
 import { TransactionsPage } from './pages/user/Transactions';
+import { DepositPage } from './pages/user/Deposit';
 import { AdminDashboardPage } from './pages/admin/AdminDashboard';
 import { AdminUsersPage } from './pages/admin/AdminUsers';
 import { AdminTransactionsPage } from './pages/admin/AdminTransactions';
@@ -71,6 +72,7 @@ function App() {
             <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/wallet" element={<WalletPage />} />
             <Route path="/transactions" element={<TransactionsPage />} />
+            <Route path="/deposit" element={<DepositPage />} />
             <Route path="/profile" element={<ProfilePage />} />
           </Route>
         </Route>

@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime, timezone
-from sqlalchemy import Column, String, Boolean, BigInteger, DateTime, JSON, UniqueConstraint
+from sqlalchemy import Column, String, Boolean, BigInteger, DateTime, JSON, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from ..database import Base
 
@@ -17,6 +17,7 @@ class PaymentConfiguration(Base):
     qr_code_reference = Column(String(500))
     minimum_deposit = Column(BigInteger, nullable=False, default=10000)   # paisa = ₹100
     maximum_deposit = Column(BigInteger, nullable=False, default=1000000) # paisa = ₹10,000
+    deposit_instructions = Column(Text)
     enabled = Column(Boolean, nullable=False, default=False)
     created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime(timezone=True), onupdate=lambda: datetime.now(timezone.utc))
