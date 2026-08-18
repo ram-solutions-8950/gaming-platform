@@ -1,0 +1,34 @@
+@import "tailwindcss";
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+@theme {
+  --font-sans: 'Inter', system-ui, sans-serif;
+  --color-brand-500: oklch(60% 0.22 264);
+  --color-brand-600: oklch(52% 0.22 264);
+  --color-brand-400: oklch(68% 0.20 264);
+  --color-gold-400: oklch(80% 0.17 85);
+  --color-gold-500: oklch(72% 0.18 85);
+  --color-dark-950: oklch(12% 0.01 260);
+  --color-dark-900: oklch(15% 0.015 260);
+  --color-dark-800: oklch(20% 0.015 260);
+  --color-dark-700: oklch(26% 0.015 260);
+  --color-dark-600: oklch(34% 0.012 260);
+  --color-success: oklch(65% 0.17 150);
+  --color-danger: oklch(60% 0.22 25);
+  --color-warn: oklch(78% 0.17 85);
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--color-dark-950);
+  color: #e2e8f0;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: var(--color-dark-900); }
+::-webkit-scrollbar-thumb { background: var(--color-dark-600); border-radius: 3px; }
