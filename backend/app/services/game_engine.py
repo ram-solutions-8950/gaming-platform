@@ -9,17 +9,12 @@ only mirrors the countdown.
 import asyncio
 from datetime import datetime, timezone
 from ..database import SessionLocal
-from ..services.game_service import (
-    create_round,
-    lock_round_for_calculation,
-    settle_round,
-    get_current_round,
-    ROUND_DURATION_SECONDS,
-    BETTING_WINDOW_SECONDS,
-)
+from ..services.game_service import ROUND_DURATION_SECONDS, BETTING_WINDOW_SECONDS
+from ..services.game_engines import get_engine
 from ..utils.logging import get_logger
 
 logger = get_logger("game_engine")
+colour_engine = get_engine("colour-prediction")
 
 # Global reference to the engine task
 _engine_task: asyncio.Task | None = None
@@ -39,7 +34,7 @@ async def _run_engine(broadcast_fn=None):
         db = SessionLocal()
         try:
             # Create a new round
-            game_round = create_round(db)
+            game_round = colour_engine.create_round(db)
             round_id = game_round.id
             logger.info("Round %s started", round_id)
 
@@ -61,7 +56,7 @@ async def _run_engine(broadcast_fn=None):
         # Transition to CALCULATING
         db = SessionLocal()
         try:
-            lock_round_for_calculation(db, round_id)
+            colour_engine.lock_round_for_calculation(db, round_id)
             if broadcast_fn:
                 await broadcast_fn({
                     "type": "betting_locked",
@@ -78,7 +73,7 @@ async def _run_engine(broadcast_fn=None):
         # Settle the round
         db = SessionLocal()
         try:
-            settled = settle_round(db, round_id)
+            settled = colour_engine.settle_round(db, round_id)
             if broadcast_fn:
                 await broadcast_fn({
                     "type": "round_result",

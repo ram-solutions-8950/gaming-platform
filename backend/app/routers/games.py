@@ -8,12 +8,14 @@ from ..schemas.game import PlaceBetIn, GameBetOut, GameRoundOut, GameStateOut
 from ..schemas.game_catalog import GameCreate, GameUpdate, GameOut
 from ..services import game_service, game_catalog_service
 from ..services.game_service import ROUND_DURATION_SECONDS
+from ..services.game_engines import get_engine
 from ..security.permissions import require_user, require_admin, require_super_admin
 from ..utils.responses import success_response, error_response
 from ..models.user import User
 from ..websocket.manager import game_ws_manager
 
 router = APIRouter(tags=["Games"])
+colour_engine = get_engine("colour-prediction")
 
 
 # ── User endpoints ──────────────────────────────────────────────────
@@ -31,7 +33,7 @@ def get_current_round(
     current_user: User = Depends(require_user),
     db: Session = Depends(get_db),
 ):
-    game_round = game_service.get_current_round(db)
+    game_round = colour_engine.get_current_round(db)
     now = datetime.now(timezone.utc)
     if game_round:
         remaining = max(0, (game_round.betting_closes_at - now).total_seconds())
@@ -55,7 +57,7 @@ def get_round_history(
     db: Session = Depends(get_db),
     limit: int = Query(default=20, ge=1, le=100),
 ):
-    rounds = game_service.get_round_history(db, limit=limit)
+    rounds = colour_engine.get_round_history(db, limit=limit)
     items = [GameRoundOut.model_validate(r).model_dump() for r in rounds]
     return success_response(items)
 
@@ -67,11 +69,12 @@ def place_bet(
     db: Session = Depends(get_db),
 ):
     try:
-        bet = game_service.place_bet(
+        bet = colour_engine.place_bet(
             db,
             user_id=current_user.id,
             round_id=data.round_id,
-            prediction_str=data.prediction,
+            game_id=data.game_id,
+            prediction=data.prediction,
             amount=data.amount,
         )
         return success_response(GameBetOut.model_validate(bet).model_dump(), status_code=201)

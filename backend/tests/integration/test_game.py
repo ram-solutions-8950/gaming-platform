@@ -9,6 +9,7 @@ from app.models.user import User, UserRole, UserStatus
 from app.models.wallet import Wallet
 from app.models.transaction import WalletTransaction, WalletTransactionType
 from app.models.game import GameRound, GameRoundStatus, GameColor, GamePrediction, GameBet, GameBetStatus
+from app.models.game_catalog import Game, GameStatus
 from app.models.fee_configuration import FeeConfiguration
 
 from app.services.game_service import (
@@ -73,21 +74,43 @@ def fee_config(db: Session):
     db.commit()
     return config
 
+
+@pytest.fixture
+def colour_game(db: Session):
+    game = db.query(Game).filter(Game.slug == "colour-prediction").first()
+    if not game:
+        game = Game(
+            name="Colour Prediction",
+            slug="colour-prediction",
+            game_type="COLOUR_PREDICTION",
+            description="Colour prediction game",
+            status=GameStatus.ACTIVE,
+            min_bet=1000,
+            max_bet=100000,
+        )
+        db.add(game)
+    game.status = GameStatus.ACTIVE
+    db.commit()
+    db.refresh(game)
+    return game
+
 # ── ROUND TESTS ──────────────────────────────────────────────────
 
-def test_create_round(db: Session):
+def test_create_round(db: Session, colour_game):
     round1 = create_round(db)
+    assert round1.game_id == colour_game.id
     assert round1.status == GameRoundStatus.BETTING
     assert round1.id is not None
     assert round1.started_at is not None
     assert round1.betting_closes_at is not None
     assert round1.betting_closes_at > round1.started_at
 
-def test_bets_accepted_during_betting(db: Session, auth_headers):
+def test_bets_accepted_during_betting(db: Session, auth_headers, colour_game):
     headers, user, wallet = auth_headers
     round1 = create_round(db)
     
     bet = place_bet(db, user.id, round1.id, "RED", 10000)
+    assert bet.game_id == colour_game.id
     assert bet.status == GameBetStatus.PENDING
     assert bet.amount == 10000
 
@@ -107,6 +130,48 @@ def test_completed_round_cannot_accept_bet(db: Session, auth_headers):
     
     with pytest.raises(ValueError, match="Betting is closed for this round"):
         place_bet(db, user.id, round1.id, "RED", 10000)
+
+
+def test_bet_rejected_after_betting_window_closes(db: Session, auth_headers):
+    headers, user, wallet = auth_headers
+    round1 = create_round(db)
+    round1.betting_closes_at = datetime.now(timezone.utc) - timedelta(seconds=1)
+    db.commit()
+
+    with pytest.raises(ValueError, match="Betting window has expired"):
+        place_bet(db, user.id, round1.id, "RED", 10000)
+
+
+def test_inactive_game_rejects_bet(db: Session, auth_headers, colour_game):
+    headers, user, wallet = auth_headers
+    round1 = create_round(db)
+    colour_game.status = GameStatus.INACTIVE
+    db.commit()
+
+    with pytest.raises(ValueError, match="Game is not active"):
+        place_bet(db, user.id, round1.id, "RED", 10000)
+    colour_game.status = GameStatus.ACTIVE
+    db.commit()
+
+
+def test_round_from_another_game_cannot_be_used(db: Session, auth_headers):
+    headers, user, wallet = auth_headers
+    other_game = Game(
+        name="Future Game",
+        slug=f"future-game-{uuid4().hex[:6]}",
+        game_type="FUTURE",
+        description="Future game",
+        status=GameStatus.ACTIVE,
+        min_bet=1000,
+        max_bet=100000,
+    )
+    db.add(other_game)
+    db.commit()
+    db.refresh(other_game)
+
+    round1 = create_round(db)
+    with pytest.raises(ValueError, match="Selected round does not belong to selected game"):
+        place_bet(db, user.id, round1.id, "RED", 10000, game_id=other_game.id)
 
 def test_completed_round_cannot_be_settled_again(db: Session):
     round1 = create_round(db)
@@ -325,3 +390,14 @@ def test_financial_invariants(db: Session, auth_headers, fee_config):
                 assert tx.balance_after == tx.balance_before + tx.amount
     finally:
         secrets.randbelow = original_rand
+
+
+def test_existing_rounds_and_bets_with_game_id_remain_valid(db: Session, auth_headers, colour_game):
+    headers, user, wallet = auth_headers
+    round1 = create_round(db)
+    bet = place_bet(db, user.id, round1.id, "RED", 10000)
+
+    fetched_round = db.query(GameRound).filter(GameRound.id == round1.id).first()
+    fetched_bet = db.query(GameBet).filter(GameBet.id == bet.id).first()
+    assert fetched_round is not None and fetched_round.game_id == colour_game.id
+    assert fetched_bet is not None and fetched_bet.game_id == colour_game.id

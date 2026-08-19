@@ -17,6 +17,7 @@ from sqlalchemy import select, func
 from ..models.game import (
     GameRound, GameRoundStatus, GameColor, GamePrediction, GameBetStatus, GameBet,
 )
+from ..models.game_catalog import Game, GameStatus
 from ..models.fee_configuration import FeeConfiguration
 from ..models.transaction import WalletTransactionType
 from ..services.wallet_service import debit_wallet, credit_wallet
@@ -26,6 +27,7 @@ logger = get_logger("game")
 
 ROUND_DURATION_SECONDS = 60
 BETTING_WINDOW_SECONDS = 50
+COLOUR_PREDICTION_SLUG = "colour-prediction"
 
 # ── Colour-prediction payout rules ──────────────────────────────────
 # Each number 0-9 maps to one or more colors. Payouts are based on stake.
@@ -107,12 +109,41 @@ def _calc_winning_fee(gross_win: int, pct: Decimal) -> Tuple[int, int]:
     return fee_int, gross_win - fee_int
 
 
+def _get_or_create_colour_prediction_game(db: Session) -> Game:
+    game = db.query(Game).filter(Game.slug == COLOUR_PREDICTION_SLUG).first()
+    if game:
+        return game
+
+    game = Game(
+        name="Colour Prediction",
+        slug=COLOUR_PREDICTION_SLUG,
+        game_type="COLOUR_PREDICTION",
+        description="Colour prediction game",
+        status=GameStatus.ACTIVE,
+        min_bet=1000,
+        max_bet=100000,
+    )
+    db.add(game)
+    db.commit()
+    db.refresh(game)
+    return game
+
+
+def _get_game_or_raise(db: Session, game_id: UUID) -> Game:
+    game = db.query(Game).filter(Game.id == game_id).first()
+    if not game:
+        raise ValueError("Game not found")
+    return game
+
+
 # ── Public API ──────────────────────────────────────────────────────
 
-def create_round(db: Session) -> GameRound:
+def create_round(db: Session, game_id: Optional[UUID] = None) -> GameRound:
     """Create a new round with BETTING status."""
+    game = _get_or_create_colour_prediction_game(db) if game_id is None else _get_game_or_raise(db, game_id)
     now = datetime.now(timezone.utc)
     game_round = GameRound(
+        game_id=game.id,
         status=GameRoundStatus.BETTING,
         started_at=now,
         betting_closes_at=now + timedelta(seconds=BETTING_WINDOW_SECONDS),
@@ -124,21 +155,26 @@ def create_round(db: Session) -> GameRound:
     return game_round
 
 
-def get_current_round(db: Session) -> Optional[GameRound]:
+def get_current_round(db: Session, game_id: Optional[UUID] = None) -> Optional[GameRound]:
     """Return the most recent non-COMPLETED round, or the latest completed one as fallback."""
+    game = _get_or_create_colour_prediction_game(db) if game_id is None else _get_game_or_raise(db, game_id)
     game_round = (
         db.query(GameRound)
-        .filter(GameRound.status.in_([GameRoundStatus.BETTING, GameRoundStatus.CALCULATING]))
+        .filter(
+            GameRound.game_id == game.id,
+            GameRound.status.in_([GameRoundStatus.BETTING, GameRoundStatus.CALCULATING]),
+        )
         .order_by(GameRound.started_at.desc())
         .first()
     )
     return game_round
 
 
-def get_round_history(db: Session, limit: int = 20) -> list:
+def get_round_history(db: Session, limit: int = 20, game_id: Optional[UUID] = None) -> list:
+    game = _get_or_create_colour_prediction_game(db) if game_id is None else _get_game_or_raise(db, game_id)
     return (
         db.query(GameRound)
-        .filter(GameRound.status == GameRoundStatus.COMPLETED)
+        .filter(GameRound.game_id == game.id, GameRound.status == GameRoundStatus.COMPLETED)
         .order_by(GameRound.ended_at.desc())
         .limit(limit)
         .all()
@@ -151,6 +187,7 @@ def place_bet(
     round_id: UUID,
     prediction_str: str,
     amount: int,
+    game_id: Optional[UUID] = None,
 ) -> GameBet:
     """Atomically validate, calculate fees, debit wallet, and insert the bet.
 
@@ -173,6 +210,15 @@ def place_bet(
     )
     if not game_round:
         raise ValueError("Round not found")
+
+    selected_game_id = game_id or game_round.game_id
+    if game_round.game_id != selected_game_id:
+        raise ValueError("Selected round does not belong to selected game")
+
+    game = _get_game_or_raise(db, selected_game_id)
+    if game.status != GameStatus.ACTIVE:
+        raise ValueError("Game is not active")
+
     if game_round.status != GameRoundStatus.BETTING:
         raise ValueError("Betting is closed for this round")
 
@@ -204,6 +250,7 @@ def place_bet(
     bet = GameBet(
         id=bet_id,
         user_id=user_id,
+        game_id=selected_game_id,
         round_id=round_id,
         prediction=prediction,
         amount=amount,
@@ -319,8 +366,10 @@ def lock_round_for_calculation(db: Session, round_id: UUID) -> GameRound:
     return game_round
 
 
-def get_user_bets(db: Session, user_id: UUID, page: int = 1, page_size: int = 20) -> dict:
+def get_user_bets(db: Session, user_id: UUID, page: int = 1, page_size: int = 20, game_id: Optional[UUID] = None) -> dict:
     query = db.query(GameBet).filter(GameBet.user_id == user_id)
+    if game_id:
+        query = query.filter(GameBet.game_id == game_id)
     total = query.count()
     items = query.order_by(GameBet.created_at.desc()).offset((page - 1) * page_size).limit(page_size).all()
     return {"total": total, "page": page, "page_size": page_size, "items": items}
@@ -334,14 +383,16 @@ def get_round_bets_summary(db: Session, round_id: UUID) -> dict:
 
 
 def get_admin_rounds(db: Session, page: int = 1, page_size: int = 20) -> dict:
-    query = db.query(GameRound)
+    game = _get_or_create_colour_prediction_game(db)
+    query = db.query(GameRound).filter(GameRound.game_id == game.id)
     total = query.count()
     items = query.order_by(GameRound.started_at.desc()).offset((page - 1) * page_size).limit(page_size).all()
     return {"total": total, "page": page, "page_size": page_size, "items": items}
 
 
 def get_admin_bets(db: Session, round_id: Optional[UUID] = None, page: int = 1, page_size: int = 20) -> dict:
-    query = db.query(GameBet)
+    game = _get_or_create_colour_prediction_game(db)
+    query = db.query(GameBet).filter(GameBet.game_id == game.id)
     if round_id:
         query = query.filter(GameBet.round_id == round_id)
     total = query.count()

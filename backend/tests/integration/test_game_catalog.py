@@ -164,7 +164,8 @@ def test_colour_prediction_record_exists(client, db: Session):
             max_bet=100000
         )
         db.add(cp)
-        db.commit()
+    cp.status = GameStatus.ACTIVE
+    db.commit()
 
     # Check catalog for initial seed
     res = client.get("/api/v1/games/catalog")

@@ -40,6 +40,7 @@ class GameRound(Base):
     __tablename__ = "game_rounds"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    game_id = Column(UUID(as_uuid=True), ForeignKey("games.id", ondelete="RESTRICT"), nullable=False, index=True)
     status = Column(SAEnum(GameRoundStatus, name="game_round_status"), nullable=False, default=GameRoundStatus.BETTING)
     result_color = Column(SAEnum(GameColor, name="game_color"), nullable=True)
     result_number = Column(String(1), nullable=True) # "0"-"9"
@@ -47,6 +48,7 @@ class GameRound(Base):
     betting_closes_at = Column(DateTime(timezone=True), nullable=False)
     ended_at = Column(DateTime(timezone=True), nullable=True)
 
+    game = relationship("Game")
     bets = relationship("GameBet", back_populates="round")
 
 class GameBet(Base):
@@ -54,6 +56,7 @@ class GameBet(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"), nullable=False, index=True)
+    game_id = Column(UUID(as_uuid=True), ForeignKey("games.id", ondelete="RESTRICT"), nullable=False, index=True)
     round_id = Column(UUID(as_uuid=True), ForeignKey("game_rounds.id", ondelete="RESTRICT"), nullable=False, index=True)
     prediction = Column(SAEnum(GamePrediction, name="game_prediction"), nullable=False)
     
@@ -71,4 +74,5 @@ class GameBet(Base):
     settled_at = Column(DateTime(timezone=True), nullable=True)
     
     user = relationship("User")
+    game = relationship("Game")
     round = relationship("GameRound", back_populates="bets")

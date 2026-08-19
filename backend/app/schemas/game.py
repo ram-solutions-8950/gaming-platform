@@ -5,6 +5,7 @@ from uuid import UUID
 
 
 class PlaceBetIn(BaseModel):
+    game_id: Optional[UUID] = None
     round_id: UUID
     prediction: str = Field(..., description="RED, GREEN, VIOLET, or 0-9")
     amount: int = Field(..., gt=0, description="Bet amount in paisa")
@@ -13,6 +14,7 @@ class PlaceBetIn(BaseModel):
 class GameBetOut(BaseModel):
     id: UUID
     user_id: UUID
+    game_id: UUID
     round_id: UUID
     prediction: str
     amount: int
@@ -30,6 +32,7 @@ class GameBetOut(BaseModel):
 
 class GameRoundOut(BaseModel):
     id: UUID
+    game_id: UUID
     status: str
     result_color: Optional[str] = None
     result_number: Optional[str] = None
