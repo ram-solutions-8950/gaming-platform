@@ -3,13 +3,14 @@ import { useAuthStore } from '../store/authStore';
 import { authService } from '../services/auth';
 
 const adminNav = [
-  { to: '/admin/dashboard', label: 'Dashboard', icon: '⌂' },
+  { to: '/admin/dashboard', label: 'Dashboard', icon: '📊' },
+  { to: '/admin/catalog', label: 'Game Catalog', icon: '🎰' },
   { to: '/admin/games', label: 'Game Control', icon: '🎮' },
   { to: '/admin/users', label: 'Users', icon: '👥' },
-  { to: '/admin/transactions', label: 'Transactions', icon: '⇄' },
-  { to: '/admin/deposits', label: 'Deposits', icon: '⬇' },
-  { to: '/admin/withdrawals', label: 'Withdrawals', icon: '⬆' },
-  { to: '/admin/payment-settings', label: 'Payment Settings', icon: '⚙' },
+  { to: '/admin/transactions', label: 'Transactions', icon: '💸' },
+  { to: '/admin/deposits', label: 'Deposits', icon: '📥' },
+  { to: '/admin/withdrawals', label: 'Withdrawals', icon: '📤' },
+  { to: '/admin/payment-settings', label: 'Payment Settings', icon: '⚙️' },
   { to: '/admin/fees', label: 'Platform Fees', icon: '💰' },
 ];
 

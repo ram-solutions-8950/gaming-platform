@@ -111,3 +111,21 @@ export interface GameRoundAdmin extends GameRound {
   total_amount: number;
 }
 
+
+export type CatalogGameStatus = 'ACTIVE' | 'INACTIVE';
+
+export interface CatalogGame {
+  id: string;
+  name: string;
+  slug: string;
+  game_type: string;
+  description: string;
+  icon_url: string;
+  status: CatalogGameStatus;
+  min_bet: number;
+  max_bet: number;
+  config: Record<string, any>;
+  created_at: string;
+  updated_at?: string;
+}
+

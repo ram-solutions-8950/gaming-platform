@@ -34,4 +34,33 @@ export const gameService = {
     const res = await api.get('/admin/games/bets', { params });
     return res.data.data;
   },
+
+  // Catalog
+  async getCatalog(): Promise<import('../types').CatalogGame[]> {
+    const res = await api.get('/games/catalog');
+    return res.data.data;
+  },
+
+  async getAdminCatalog(): Promise<import('../types').CatalogGame[]> {
+    const res = await api.get('/admin/games');
+    return res.data.data;
+  },
+
+  async createCatalogGame(data: Partial<import('../types').CatalogGame>): Promise<import('../types').CatalogGame> {
+    const res = await api.post('/admin/games', data);
+    return res.data.data;
+  },
+
+  async updateCatalogGame(id: string, data: Partial<import('../types').CatalogGame>): Promise<import('../types').CatalogGame> {
+    const res = await api.patch(`/admin/games/${id}`, data);
+    return res.data.data;
+  },
+
+  async activateCatalogGame(id: string): Promise<void> {
+    await api.post(`/admin/games/${id}/activate`);
+  },
+
+  async deactivateCatalogGame(id: string): Promise<void> {
+    await api.post(`/admin/games/${id}/deactivate`);
+  },
 };
