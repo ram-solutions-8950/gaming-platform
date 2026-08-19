@@ -9,6 +9,7 @@ from .refresh_token import RefreshToken
 from .idempotency import IdempotencyKey
 from .fee_configuration import FeeConfiguration
 from .game import GameRound, GameBet, GameRoundStatus, GameColor, GamePrediction, GameBetStatus
+from .game_catalog import Game, GameStatus
 
 __all__ = [
     "User", "UserRole", "UserStatus",
@@ -22,4 +23,5 @@ __all__ = [
     "IdempotencyKey",
     "FeeConfiguration",
     "GameRound", "GameBet", "GameRoundStatus", "GameColor", "GamePrediction", "GameBetStatus",
+    "Game", "GameStatus",
 ]
