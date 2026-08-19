@@ -12,12 +12,16 @@ import { ProfilePage } from './pages/user/Profile';
 import { WalletPage } from './pages/user/Wallet';
 import { TransactionsPage } from './pages/user/Transactions';
 import { DepositPage } from './pages/user/Deposit';
+import { WithdrawalPage } from './pages/user/Withdrawal';
+import { GamePlayPage } from './pages/user/GamePlay';
 import { AdminDashboardPage } from './pages/admin/AdminDashboard';
 import { AdminUsersPage } from './pages/admin/AdminUsers';
 import { AdminTransactionsPage } from './pages/admin/AdminTransactions';
 import { AdminDepositsPage } from './pages/admin/AdminDeposits';
 import { AdminWithdrawalsPage } from './pages/admin/AdminWithdrawals';
 import { AdminPaymentSettingsPage } from './pages/admin/AdminPaymentSettings';
+import { AdminFeesPage } from './pages/admin/Fees';
+import { AdminGameControlPage } from './pages/admin/AdminGameControl';
 import { useAuthStore } from './store/authStore';
 import { authService } from './services/auth';
 
@@ -70,9 +74,11 @@ function App() {
         <Route element={<ProtectedRoute />}>
           <Route element={<UserLayout />}>
             <Route path="/dashboard" element={<DashboardPage />} />
+            <Route path="/games" element={<GamePlayPage />} />
             <Route path="/wallet" element={<WalletPage />} />
             <Route path="/transactions" element={<TransactionsPage />} />
             <Route path="/deposit" element={<DepositPage />} />
+            <Route path="/withdrawal" element={<WithdrawalPage />} />
             <Route path="/profile" element={<ProfilePage />} />
           </Route>
         </Route>
@@ -80,11 +86,13 @@ function App() {
         <Route element={<ProtectedRoute adminOnly />}>
           <Route element={<AdminLayout />}>
             <Route path="/admin/dashboard" element={<AdminDashboardPage />} />
+            <Route path="/admin/games" element={<AdminGameControlPage />} />
             <Route path="/admin/users" element={<AdminUsersPage />} />
             <Route path="/admin/transactions" element={<AdminTransactionsPage />} />
             <Route path="/admin/deposits" element={<AdminDepositsPage />} />
             <Route path="/admin/withdrawals" element={<AdminWithdrawalsPage />} />
             <Route path="/admin/payment-settings" element={<AdminPaymentSettingsPage />} />
+            <Route path="/admin/fees" element={<AdminFeesPage />} />
           </Route>
         </Route>
 

@@ -5,7 +5,7 @@ from typing import Optional
 from ..dependencies.database import get_db
 from ..schemas.user import UserOut, AdminUserStatusUpdateIn
 from ..schemas.deposit import DepositOut
-from ..schemas.withdrawal import WithdrawalOut
+from ..schemas.withdrawal import WithdrawalOut, WithdrawalActionIn
 from ..schemas.wallet import WalletTransactionOut
 from ..schemas.payment import PaymentConfigOut, PaymentConfigUpdateIn, PaymentConfigCreateIn
 from ..models.user import User, UserRole, UserStatus
@@ -13,7 +13,7 @@ from ..models.deposit import Deposit
 from ..models.withdrawal import Withdrawal
 from ..models.transaction import WalletTransaction
 from ..models.payment import PaymentConfiguration
-from ..services import wallet_service, audit_service
+from ..services import wallet_service, audit_service, withdrawal_service
 from ..models.transaction import WalletTransactionType
 from ..security.permissions import require_admin, require_super_admin
 from ..utils.responses import success_response, error_response
@@ -105,13 +105,125 @@ def list_all_deposits(admin: User = Depends(require_admin), db: Session = Depend
 
 # -- Withdrawals ----------------------------------------------------------------
 @router.get("/withdrawals")
-def list_all_withdrawals(admin: User = Depends(require_admin), db: Session = Depends(get_db), page: int = 1, page_size: int = 20):
-    total = db.query(Withdrawal).count()
-    items = db.query(Withdrawal).order_by(Withdrawal.created_at.desc()).offset((page-1)*page_size).limit(page_size).all()
+def list_all_withdrawals(
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, ge=1, le=100),
+    status: Optional[str] = Query(default=None),
+):
+    query = db.query(Withdrawal)
+    if status:
+        query = query.filter(Withdrawal.status == status)
+    total = query.count()
+    items = query.order_by(Withdrawal.created_at.desc()).offset((page - 1) * page_size).limit(page_size).all()
     return success_response({
-        "total": total, "page": page, "page_size": page_size,
+        "total": total,
+        "page": page,
+        "page_size": page_size,
         "items": [WithdrawalOut.model_validate(w).model_dump() for w in items],
     })
+
+
+@router.post("/withdrawals/{withdrawal_id}/approve")
+def approve_withdrawal_endpoint(
+    withdrawal_id: UUID,
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    try:
+        w = withdrawal_service.approve_withdrawal(db, withdrawal_id, admin.id)
+        audit_service.log_action(
+            db, action="WITHDRAWAL_APPROVE", actor_id=admin.id,
+            entity_type="withdrawal", entity_id=str(withdrawal_id),
+            metadata={"status": w.status.value},
+        )
+        db.commit()
+        return success_response(WithdrawalOut.model_validate(w).model_dump())
+    except ValueError as e:
+        return error_response("WITHDRAWAL_ACTION_ERROR", str(e), status_code=400)
+
+
+@router.post("/withdrawals/{withdrawal_id}/processing")
+def mark_payment_processing_endpoint(
+    withdrawal_id: UUID,
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    try:
+        w = withdrawal_service.mark_payment_processing(db, withdrawal_id, admin.id)
+        audit_service.log_action(
+            db, action="WITHDRAWAL_PROCESSING", actor_id=admin.id,
+            entity_type="withdrawal", entity_id=str(withdrawal_id),
+            metadata={"status": w.status.value},
+        )
+        db.commit()
+        return success_response(WithdrawalOut.model_validate(w).model_dump())
+    except ValueError as e:
+        return error_response("WITHDRAWAL_ACTION_ERROR", str(e), status_code=400)
+
+
+@router.post("/withdrawals/{withdrawal_id}/complete")
+def complete_withdrawal_endpoint(
+    withdrawal_id: UUID,
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    try:
+        w = withdrawal_service.complete_withdrawal(db, withdrawal_id, admin.id)
+        audit_service.log_action(
+            db, action="WITHDRAWAL_COMPLETE", actor_id=admin.id,
+            entity_type="withdrawal", entity_id=str(withdrawal_id),
+            metadata={"status": w.status.value},
+        )
+        db.commit()
+        return success_response(WithdrawalOut.model_validate(w).model_dump())
+    except ValueError as e:
+        return error_response("WITHDRAWAL_ACTION_ERROR", str(e), status_code=400)
+
+
+@router.post("/withdrawals/{withdrawal_id}/reject")
+def reject_withdrawal_endpoint(
+    withdrawal_id: UUID,
+    body: Optional[WithdrawalActionIn] = None,
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    try:
+        reason = body.reason if body else None
+        w = withdrawal_service.reject_withdrawal(db, withdrawal_id, admin.id, reason=reason)
+        audit_service.log_action(
+            db, action="WITHDRAWAL_REJECT", actor_id=admin.id,
+            entity_type="withdrawal", entity_id=str(withdrawal_id),
+            metadata={"status": w.status.value, "reason": reason},
+        )
+        db.commit()
+        return success_response(WithdrawalOut.model_validate(w).model_dump())
+    except ValueError as e:
+        return error_response("WITHDRAWAL_ACTION_ERROR", str(e), status_code=400)
+
+
+@router.post("/withdrawals/{withdrawal_id}/fail")
+def fail_withdrawal_endpoint(
+    withdrawal_id: UUID,
+    body: Optional[WithdrawalActionIn] = None,
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    try:
+        reason = body.reason if body else None
+        w = withdrawal_service.fail_withdrawal(db, withdrawal_id, admin.id, reason=reason)
+        audit_service.log_action(
+            db, action="WITHDRAWAL_FAIL", actor_id=admin.id,
+            entity_type="withdrawal", entity_id=str(withdrawal_id),
+            metadata={"status": w.status.value, "reason": reason},
+        )
+        db.commit()
+        return success_response(WithdrawalOut.model_validate(w).model_dump())
+    except ValueError as e:
+        return error_response("WITHDRAWAL_ACTION_ERROR", str(e), status_code=400)
+
+
 
 
 # -- Payment Settings -----------------------------------------------------------

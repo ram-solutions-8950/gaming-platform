@@ -1,190 +1,365 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Card } from '../../components/common/Card';
-import { Loader } from '../../components/common/Loader';
 import api from '../../services/api';
 
-interface ActiveConfig {
-  display_name: string;
-  upi_id: string;
-  qr_code_url: string | null;
-  minimum_deposit: number;
-  maximum_deposit: number;
-  deposit_instructions: string | null;
+declare global {
+  interface Window {
+    Razorpay: new (options: RazorpayOptions) => RazorpayInstance;
+  }
+}
+
+interface RazorpayOptions {
+  key: string;
+  amount: number;
+  currency: string;
+  name: string;
+  description: string;
+  order_id: string;
+  handler: (response: RazorpayResponse) => void;
+  modal?: {
+    ondismiss?: () => void;
+  };
+  theme?: {
+    color?: string;
+  };
+}
+
+interface RazorpayResponse {
+  razorpay_payment_id: string;
+  razorpay_order_id: string;
+  razorpay_signature: string;
+}
+
+interface RazorpayInstance {
+  open: () => void;
+  close: () => void;
+}
+
+interface DepositResponse {
+  id: string;
+  user_id: string;
+  amount: number;
+  status: string;
+  provider: string;
+  provider_order_id: string;
+  currency: string;
+  key_id: string;
+  created_at: string;
+}
+
+function loadRazorpayScript(): Promise<boolean> {
+  return new Promise((resolve) => {
+    if (window.Razorpay) {
+      resolve(true);
+      return;
+    }
+
+    const existingScript = document.querySelector(
+      'script[src="https://checkout.razorpay.com/v1/checkout.js"]',
+    );
+
+    if (existingScript) {
+      existingScript.addEventListener('load', () => resolve(true));
+      existingScript.addEventListener('error', () => resolve(false));
+      return;
+    }
+
+    const script = document.createElement('script');
+
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    script.async = true;
+
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+
+    document.body.appendChild(script);
+  });
 }
 
 export function DepositPage() {
-  const [config, setConfig] = useState<ActiveConfig | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [errorMsg, setErrorMsg] = useState<string>('');
-  const [amount, setAmount] = useState<string>('');
-  const [amountError, setAmountError] = useState<string>('');
-  const [depositPending, setDepositPending] = useState(false);
-  const [depositSuccess, setDepositSuccess] = useState(false);
+  const [amount, setAmount] = useState('');
+  const [amountError, setAmountError] = useState('');
+  const [errorMsg, setErrorMsg] = useState('');
+  const [processing, setProcessing] = useState(false);
+  const [paymentStatus, setPaymentStatus] = useState('');
+  const [deposit, setDeposit] = useState<DepositResponse | null>(null);
 
-  useEffect(() => {
-    api.get('/payments/config/active')
-      .then(r => setConfig(r.data.data))
-      .catch(e => {
-        if (e.response?.status === 404) {
-          setErrorMsg('No active deposit method is currently available. Please try again later.');
-        } else {
-          setErrorMsg('Failed to load deposit information.');
-        }
-      })
-      .finally(() => setLoading(false));
-  }, []);
+  const minimumDeposit = 100;
+  const maximumDeposit = 10000;
 
-  if (loading) return <Loader />;
-
-  const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAmountChange = (
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) => {
     setAmount(e.target.value);
     setAmountError('');
+    setErrorMsg('');
+    setPaymentStatus('');
   };
 
   const handleDepositSubmit = async () => {
-    if (!config) return;
-    
-    const numAmount = parseFloat(amount);
-    if (isNaN(numAmount) || numAmount <= 0) {
-      setAmountError('Please enter a valid numeric amount greater than 0.');
-      return;
-    }
-    
-    const amountInPaise = Math.round(numAmount * 100);
-    
-    if (amountInPaise < config.minimum_deposit) {
-      setAmountError(`Minimum deposit is ₹${(config.minimum_deposit / 100).toFixed(2)}`);
-      return;
-    }
-    
-    if (amountInPaise > config.maximum_deposit) {
-      setAmountError(`Maximum deposit is ₹${(config.maximum_deposit / 100).toFixed(2)}`);
+    setAmountError('');
+    setErrorMsg('');
+    setPaymentStatus('');
+
+    const numericAmount = Number(amount);
+
+    if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
+      setAmountError(
+        'Please enter a valid amount greater than ₹0.',
+      );
       return;
     }
 
-    setDepositPending(true);
-    setAmountError('');
-    
+    const amountInPaise = Math.round(
+      numericAmount * 100,
+    );
+
+    if (amountInPaise < minimumDeposit * 100) {
+      setAmountError(
+        `Minimum deposit is ₹${minimumDeposit}.`,
+      );
+      return;
+    }
+
+    if (amountInPaise > maximumDeposit * 100) {
+      setAmountError(
+        `Maximum deposit is ₹${maximumDeposit}.`,
+      );
+      return;
+    }
+
+    setProcessing(true);
+
     try {
-      await api.post('/deposits', {
-        amount: amountInPaise,
-        provider: 'upi'
-      });
-      setDepositSuccess(true);
-    } catch (e: any) {
-      setAmountError(e.response?.data?.error?.message || 'Failed to submit deposit.');
-    } finally {
-      setDepositPending(false);
+      // 1. Load Razorpay Checkout.
+      const scriptLoaded =
+        await loadRazorpayScript();
+
+      if (!scriptLoaded) {
+        throw new Error(
+          'Unable to load Razorpay Checkout.',
+        );
+      }
+
+      // 2. Create server-side deposit/order.
+      const response = await api.post(
+        '/deposits',
+        {
+          amount: amountInPaise,
+          provider: 'razorpay',
+        },
+      );
+
+      const depositData =
+        response.data.data as DepositResponse;
+
+      setDeposit(depositData);
+      setPaymentStatus(
+        'Opening secure Razorpay Checkout...',
+      );
+
+      // 3. Open Razorpay Checkout.
+      const options: RazorpayOptions = {
+        key: depositData.key_id,
+        amount: depositData.amount,
+        currency: depositData.currency,
+        name: 'Gaming Platform',
+        description: 'Wallet Deposit',
+        order_id:
+          depositData.provider_order_id,
+
+        handler: async (
+          paymentResponse: RazorpayResponse,
+        ) => {
+          setProcessing(true);
+          setPaymentStatus(
+            'Payment received. Verifying with server...',
+          );
+          setErrorMsg('');
+
+          try {
+            // 4. Server-side verification.
+            const verifyResponse =
+              await api.post(
+                `/deposits/${depositData.id}/verify`,
+                {
+                  provider_order_id:
+                    paymentResponse.razorpay_order_id,
+                  provider_payment_id:
+                    paymentResponse.razorpay_payment_id,
+                  signature:
+                    paymentResponse.razorpay_signature,
+                },
+              );
+
+            const verifiedDeposit =
+              verifyResponse.data.data;
+
+            setDeposit(verifiedDeposit);
+
+            if (
+              verifiedDeposit.status ===
+              'SUCCESS'
+            ) {
+              setPaymentStatus(
+                'Payment successful. Your wallet has been credited.',
+              );
+            } else {
+              setPaymentStatus(
+                `Payment status: ${verifiedDeposit.status}`,
+              );
+            }
+          } catch (error: any) {
+            setErrorMsg(
+              error.response?.data?.error?.message ||
+                'Payment verification failed. Please contact support.',
+            );
+
+            setPaymentStatus('');
+          } finally {
+            setProcessing(false);
+          }
+        },
+
+        modal: {
+          ondismiss: () => {
+            if (
+              deposit?.status !== 'SUCCESS'
+            ) {
+              setProcessing(false);
+              setPaymentStatus(
+                'Payment window closed. If you completed the payment, verification may still be processed by the server.',
+              );
+            }
+          },
+        },
+
+        theme: {
+          color: '#4f46e5',
+        },
+      };
+
+      const razorpay =
+        new window.Razorpay(options);
+
+      razorpay.open();
+    } catch (error: any) {
+      setErrorMsg(
+        error.response?.data?.error?.message ||
+          error.message ||
+          'Failed to start payment.',
+      );
+      setPaymentStatus('');
+      setProcessing(false);
     }
   };
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
-      <h1 className="text-3xl font-extrabold text-white text-center">Deposit Funds</h1>
-      
-      {errorMsg ? (
-        <Card>
-          <div className="text-center py-8 text-gray-400">
-            <svg className="mx-auto h-12 w-12 text-gray-500 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <p>{errorMsg}</p>
-          </div>
-        </Card>
-      ) : config ? (
-        <div className="space-y-6">
-          <Card title="Step 1: Enter Deposit Amount">
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-400 mb-1">Amount</label>
-                <div className="relative rounded-md shadow-sm">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <span className="text-gray-500 sm:text-lg">₹</span>
-                  </div>
-                  <input
-                    type="number"
-                    value={amount}
-                    onChange={handleAmountChange}
-                    className="bg-gray-800 border border-gray-700 text-white rounded-md pl-8 py-3 w-full focus:ring-indigo-500 focus:border-indigo-500 text-lg"
-                    placeholder="Enter amount"
-                    disabled={depositSuccess || depositPending}
-                  />
-                </div>
-                <div className="mt-2 text-xs text-gray-500 flex justify-between">
-                  <span>Minimum: ₹{(config.minimum_deposit / 100).toFixed(2)}</span>
-                  <span>Maximum: ₹{(config.maximum_deposit / 100).toFixed(2)}</span>
-                </div>
-                {amountError && (
-                  <p className="mt-2 text-sm text-red-500">{amountError}</p>
-                )}
+      <h1 className="text-3xl font-extrabold text-white text-center">
+        Deposit Funds
+      </h1>
+
+      <Card title="Razorpay Deposit">
+        <div className="space-y-5">
+          <div>
+            <label className="block text-sm font-medium text-gray-400 mb-2">
+              Amount
+            </label>
+
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <span className="text-gray-500 text-lg">
+                  ₹
+                </span>
               </div>
-              
-              {!depositSuccess && (
-                <button
-                  onClick={handleDepositSubmit}
-                  disabled={depositPending || !amount}
-                  className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-700 disabled:text-gray-500 text-white font-bold py-3 px-4 rounded transition-colors"
-                >
-                  {depositPending ? 'Processing...' : 'Confirm Amount'}
-                </button>
-              )}
+
+              <input
+                type="number"
+                min="100"
+                max="10000"
+                step="1"
+                value={amount}
+                onChange={handleAmountChange}
+                disabled={processing}
+                className="bg-gray-800 border border-gray-700 text-white rounded-md pl-8 py-3 w-full focus:ring-indigo-500 focus:border-indigo-500 text-lg"
+                placeholder="Enter amount"
+              />
             </div>
-          </Card>
 
-          {depositSuccess && (
-            <>
-              <Card title="Step 2: Scan & Pay">
-                <div className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-gray-700 rounded-xl bg-gray-800/50">
-                  {config.qr_code_url ? (
-                    <div className="bg-white p-2 rounded-lg shadow-lg mb-6">
-                      <img src={`http://localhost:8000${config.qr_code_url}`} alt="Payment QR Code" className="w-64 h-64 object-contain" />
-                    </div>
-                  ) : (
-                    <div className="w-64 h-64 bg-gray-800 rounded-lg flex items-center justify-center mb-6">
-                      <span className="text-gray-500 text-sm">No QR Code available</span>
-                    </div>
-                  )}
-                  
-                  <div className="text-center w-full">
-                    <p className="text-sm text-gray-400 mb-2">UPI ID</p>
-                    <div className="flex items-center justify-center space-x-2">
-                      <p className="text-xl font-bold text-white font-mono bg-gray-900 px-4 py-2 rounded border border-gray-700">
-                        {config.upi_id}
-                      </p>
-                      <button 
-                        onClick={() => { navigator.clipboard.writeText(config.upi_id); alert('UPI ID copied!'); }}
-                        className="p-2 bg-gray-700 hover:bg-gray-600 rounded text-white transition-colors"
-                        title="Copy UPI ID"
-                      >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
-                        </svg>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </Card>
+            <div className="mt-2 text-xs text-gray-500 flex justify-between">
+              <span>
+                Minimum: ₹100.00
+              </span>
 
-              <Card title="Step 3: Payment Instructions">
-                <div className="bg-indigo-900/20 border border-indigo-500/20 rounded p-5 text-indigo-200">
-                  <p className="whitespace-pre-wrap text-sm mb-4">
-                    {config.deposit_instructions || "Please transfer the amount to the UPI ID provided."}
-                  </p>
-                  <div className="bg-yellow-900/30 border border-yellow-700/50 rounded p-3 text-yellow-300 text-sm">
-                    <span className="font-bold flex items-center mb-1">
-                      <svg className="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                      Important Note:
-                    </span>
-                    Your payment verification will happen after the payment is successfully received. Please do not refresh this page immediately after payment. The admin team or automated system will process your pending request.
-                  </div>
-                </div>
-              </Card>
-            </>
+              <span>
+                Maximum: ₹10,000.00
+              </span>
+            </div>
+
+            {amountError && (
+              <p className="mt-2 text-sm text-red-500">
+                {amountError}
+              </p>
+            )}
+          </div>
+
+          {errorMsg && (
+            <div className="bg-red-900/20 border border-red-500/30 rounded p-4 text-red-300 text-sm">
+              {errorMsg}
+            </div>
           )}
+
+          {paymentStatus && (
+            <div className="bg-indigo-900/20 border border-indigo-500/30 rounded p-4 text-indigo-200 text-sm">
+              {paymentStatus}
+            </div>
+          )}
+
+          {deposit && (
+            <div className="bg-gray-800 rounded p-4 text-sm space-y-2">
+              <div className="flex justify-between">
+                <span className="text-gray-400">
+                  Deposit
+                </span>
+                <span className="text-white font-mono">
+                  {deposit.id}
+                </span>
+              </div>
+
+              <div className="flex justify-between">
+                <span className="text-gray-400">
+                  Amount
+                </span>
+                <span className="text-white">
+                  ₹{(deposit.amount / 100).toFixed(2)}
+                </span>
+              </div>
+
+              <div className="flex justify-between">
+                <span className="text-gray-400">
+                  Status
+                </span>
+                <span className="text-white">
+                  {deposit.status}
+                </span>
+              </div>
+            </div>
+          )}
+
+          <button
+            onClick={handleDepositSubmit}
+            disabled={
+              processing || !amount
+            }
+            className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-700 disabled:text-gray-500 text-white font-bold py-3 px-4 rounded transition-colors"
+          >
+            {processing
+              ? 'Processing...'
+              : 'Pay with Razorpay'}
+          </button>
         </div>
-      ) : null}
+      </Card>
     </div>
   );
 }

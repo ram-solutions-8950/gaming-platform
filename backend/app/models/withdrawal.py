@@ -13,6 +13,7 @@ class WithdrawalStatus(str, enum.Enum):
     REJECTED = "REJECTED"
     FAILED = "FAILED"
     CANCELLED = "CANCELLED"
+    COMPLETED = "COMPLETED"
 
 
 class Withdrawal(Base):
@@ -24,7 +25,9 @@ class Withdrawal(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"), nullable=False, index=True)
     wallet_id = Column(UUID(as_uuid=True), ForeignKey("wallets.id", ondelete="RESTRICT"), nullable=False)
-    amount = Column(BigInteger, nullable=False)  # paisa
+    amount = Column(BigInteger, nullable=False)  # paisa (gross amount debited from wallet)
+    fee_amount = Column(BigInteger, nullable=False, default=0) # paisa
+    net_amount = Column(BigInteger, nullable=False) # paisa (amount paid to user)
     status = Column(SAEnum(WithdrawalStatus, name="withdrawal_status"), nullable=False, default=WithdrawalStatus.PENDING)
     method = Column(String(100))
     destination = Column(String(500))

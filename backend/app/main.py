@@ -1,3 +1,4 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
@@ -10,7 +11,18 @@ from pathlib import Path
 from .config import settings
 from .utils.exceptions import http_exception_handler, validation_exception_handler
 from .middleware.rate_limiter import limiter
-from .routers import auth, users, wallet, transactions, deposits, withdrawals, payments, admin
+from .routers import auth, users, wallet, transactions, deposits, withdrawals, payments, admin, fees, games
+from .services.game_engine import start_engine, stop_engine
+from .websocket.manager import game_ws_manager
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Startup: launch the game engine.  Shutdown: cancel it."""
+    start_engine(broadcast_fn=game_ws_manager.broadcast)
+    yield
+    stop_engine()
+
 
 app = FastAPI(
     title="Gaming Platform API",
@@ -18,6 +30,7 @@ app = FastAPI(
     openapi_url="/api/v1/openapi.json",
     docs_url="/api/v1/docs",
     redoc_url="/api/v1/redoc",
+    lifespan=lifespan,
 )
 
 # Rate limiter state
@@ -47,6 +60,8 @@ app.include_router(deposits.router, prefix=PREFIX)
 app.include_router(withdrawals.router, prefix=PREFIX)
 app.include_router(payments.router, prefix=PREFIX)
 app.include_router(admin.router, prefix=PREFIX)
+app.include_router(fees.router, prefix=PREFIX)
+app.include_router(games.router, prefix=PREFIX)
 
 # Static file serving — QR code uploads only
 QR_UPLOAD_DIR = Path(__file__).resolve().parent.parent / "uploads" / "qr"

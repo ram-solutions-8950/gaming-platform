@@ -3,10 +3,15 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+from dotenv import load_dotenv
+from pathlib import Path
 from app.main import app
 from app.database import Base
 from app.dependencies.database import get_db
 from app.middleware.rate_limiter import limiter
+
+# Load .env from project root
+load_dotenv(Path(__file__).resolve().parents[3] / ".env")
 
 TEST_DB_URL = os.getenv("TEST_DATABASE_URL", "postgresql://postgres@localhost:5432/gaming_test_db")
 

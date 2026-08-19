@@ -62,11 +62,6 @@ class PaymentConfigCreateIn(BaseModel):
             raise ValueError("Maximum deposit must be >= minimum deposit")
         return self
 
-    @model_validator(mode="after")
-    def upi_required_when_enabled(self):
-        if self.enabled and not self.upi_id:
-            raise ValueError("UPI ID is required when configuration is enabled")
-        return self
 
 
 class PaymentConfigUpdateIn(BaseModel):

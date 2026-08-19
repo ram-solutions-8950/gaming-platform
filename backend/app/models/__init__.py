@@ -7,6 +7,8 @@ from .payment import PaymentConfiguration, PaymentEvent
 from .audit_log import AuditLog
 from .refresh_token import RefreshToken
 from .idempotency import IdempotencyKey
+from .fee_configuration import FeeConfiguration
+from .game import GameRound, GameBet, GameRoundStatus, GameColor, GamePrediction, GameBetStatus
 
 __all__ = [
     "User", "UserRole", "UserStatus",
@@ -18,4 +20,6 @@ __all__ = [
     "AuditLog",
     "RefreshToken",
     "IdempotencyKey",
+    "FeeConfiguration",
+    "GameRound", "GameBet", "GameRoundStatus", "GameColor", "GamePrediction", "GameBetStatus",
 ]
