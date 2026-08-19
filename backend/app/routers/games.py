@@ -7,15 +7,24 @@ from ..dependencies.database import get_db
 from ..schemas.game import PlaceBetIn, GameBetOut, GameRoundOut, GameStateOut
 from ..schemas.game_catalog import GameCreate, GameUpdate, GameOut
 from ..services import game_service, game_catalog_service
-from ..services.game_service import ROUND_DURATION_SECONDS
 from ..services.game_engines import get_engine
 from ..security.permissions import require_user, require_admin, require_super_admin
 from ..utils.responses import success_response, error_response
 from ..models.user import User
+from ..models.game_catalog import Game
 from ..websocket.manager import game_ws_manager
 
 router = APIRouter(tags=["Games"])
 colour_engine = get_engine("colour-prediction")
+
+def _resolve_engine(db: Session, game_id: _UUID | None = None, game_slug: str | None = None):
+    slug = game_slug or "colour-prediction"
+    if game_id is not None:
+        game = db.query(Game).filter(Game.id == game_id).first()
+        if not game:
+            raise ValueError("Game not found")
+        slug = game.slug
+    return get_engine(slug)
 
 
 # ── User endpoints ──────────────────────────────────────────────────
@@ -32,22 +41,32 @@ def get_catalog(db: Session = Depends(get_db)):
 def get_current_round(
     current_user: User = Depends(require_user),
     db: Session = Depends(get_db),
+    game_id: _UUID | None = Query(default=None),
+    game_slug: str | None = Query(default=None),
 ):
-    game_round = colour_engine.get_current_round(db)
+    try:
+        engine = _resolve_engine(db, game_id=game_id, game_slug=game_slug)
+    except ValueError as e:
+        return error_response("GAME_ERROR", str(e), status_code=404)
+
+    game_round = engine.get_current_round(db)
     now = datetime.now(timezone.utc)
+    game_row = db.query(Game).filter(Game.slug == engine.slug).first()
+    game_out = GameOut.model_validate(game_row) if game_row else None
     if game_round:
         remaining = max(0, (game_round.betting_closes_at - now).total_seconds())
         if game_round.status.value == "CALCULATING":
             started = game_round.started_at.replace(tzinfo=timezone.utc) if game_round.started_at.tzinfo is None else game_round.started_at
-            round_end = started + timedelta(seconds=ROUND_DURATION_SECONDS)
+            round_end = started + timedelta(seconds=engine.get_round_duration_seconds(db))
             remaining = max(0, (round_end - now).total_seconds())
         state = GameStateOut(
             round=GameRoundOut.model_validate(game_round),
             server_time=now,
             seconds_remaining=round(remaining, 1),
+            game=game_out,
         )
     else:
-        state = GameStateOut(round=None, server_time=now, seconds_remaining=0)
+        state = GameStateOut(round=None, server_time=now, seconds_remaining=0, game=game_out)
     return success_response(state.model_dump())
 
 
@@ -56,8 +75,14 @@ def get_round_history(
     current_user: User = Depends(require_user),
     db: Session = Depends(get_db),
     limit: int = Query(default=20, ge=1, le=100),
+    game_id: _UUID | None = Query(default=None),
+    game_slug: str | None = Query(default=None),
 ):
-    rounds = colour_engine.get_round_history(db, limit=limit)
+    try:
+        engine = _resolve_engine(db, game_id=game_id, game_slug=game_slug)
+    except ValueError as e:
+        return error_response("GAME_ERROR", str(e), status_code=404)
+    rounds = engine.get_round_history(db, limit=limit)
     items = [GameRoundOut.model_validate(r).model_dump() for r in rounds]
     return success_response(items)
 
@@ -69,7 +94,8 @@ def place_bet(
     db: Session = Depends(get_db),
 ):
     try:
-        bet = colour_engine.place_bet(
+        engine = _resolve_engine(db, game_id=data.game_id)
+        bet = engine.place_bet(
             db,
             user_id=current_user.id,
             round_id=data.round_id,
@@ -88,8 +114,16 @@ def get_my_bets(
     db: Session = Depends(get_db),
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
+    game_id: _UUID | None = Query(default=None),
+    game_slug: str | None = Query(default=None),
 ):
-    result = game_service.get_user_bets(db, current_user.id, page=page, page_size=page_size)
+    gid = game_id
+    if gid is None and game_slug is not None:
+        game = db.query(Game).filter(Game.slug == game_slug).first()
+        if not game:
+            return error_response("GAME_ERROR", "Game not found", status_code=404)
+        gid = game.id
+    result = game_service.get_user_bets(db, current_user.id, page=page, page_size=page_size, game_id=gid)
     items = [GameBetOut.model_validate(b).model_dump() for b in result["items"]]
     return success_response({
         "total": result["total"],
@@ -129,8 +163,9 @@ def admin_list_rounds(
     db: Session = Depends(get_db),
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
+    game_id: _UUID | None = Query(default=None),
 ):
-    result = game_service.get_admin_rounds(db, page=page, page_size=page_size)
+    result = game_service.get_admin_rounds(db, page=page, page_size=page_size, game_id=game_id)
     items = []
     for r in result["items"]:
         rd = GameRoundOut.model_validate(r).model_dump()
@@ -153,9 +188,10 @@ def admin_list_bets(
     round_id: str = Query(default=None),
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
+    game_id: _UUID | None = Query(default=None),
 ):
     rid = _UUID(round_id) if round_id else None
-    result = game_service.get_admin_bets(db, round_id=rid, page=page, page_size=page_size)
+    result = game_service.get_admin_bets(db, round_id=rid, page=page, page_size=page_size, game_id=game_id)
     items = [GameBetOut.model_validate(b).model_dump() for b in result["items"]]
     return success_response({
         "total": result["total"],

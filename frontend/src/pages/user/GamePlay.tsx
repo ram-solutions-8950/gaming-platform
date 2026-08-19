@@ -84,6 +84,9 @@ export function GamePlayPage() {
     ws.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
+        if (data.game_slug && data.game_slug !== 'colour-prediction') {
+          return;
+        }
         if (data.type === 'round_start') {
           setCountdown(data.seconds_remaining);
           fetchAll();

@@ -1,13 +1,15 @@
 from pydantic import BaseModel, Field
-from typing import Optional, List
+from typing import Optional, Dict, Any
 from datetime import datetime
 from uuid import UUID
+
+from .game_catalog import GameOut
 
 
 class PlaceBetIn(BaseModel):
     game_id: Optional[UUID] = None
     round_id: UUID
-    prediction: str = Field(..., description="RED, GREEN, VIOLET, or 0-9")
+    prediction: str = Field(..., description="Game-specific bet type, e.g. RED or DRAGON")
     amount: int = Field(..., gt=0, description="Bet amount in paisa")
 
 
@@ -36,6 +38,7 @@ class GameRoundOut(BaseModel):
     status: str
     result_color: Optional[str] = None
     result_number: Optional[str] = None
+    result_data: Optional[Dict[str, Any]] = None
     started_at: datetime
     betting_closes_at: datetime
     ended_at: Optional[datetime] = None
@@ -52,3 +55,4 @@ class GameStateOut(BaseModel):
     round: Optional[GameRoundOut] = None
     server_time: datetime
     seconds_remaining: float = 0.0
+    game: Optional[GameOut] = None

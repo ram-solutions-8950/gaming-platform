@@ -1,7 +1,7 @@
 import os
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from dotenv import load_dotenv
 from pathlib import Path
@@ -30,6 +30,10 @@ def override_get_db():
 @pytest.fixture(scope="session", autouse=True)
 def setup_database():
     Base.metadata.create_all(bind=engine)
+    with engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
+        for value in ("DRAGON", "TIGER", "TIE"):
+            conn.execute(text(f"ALTER TYPE game_prediction ADD VALUE IF NOT EXISTS '{value}'"))
+        conn.execute(text("ALTER TABLE game_rounds ADD COLUMN IF NOT EXISTS result_data JSON"))
     yield
     Base.metadata.drop_all(bind=engine)
 

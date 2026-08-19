@@ -43,3 +43,11 @@ class GameEngine(ABC):
     @abstractmethod
     def settle_round(self, db: Session, round_id: UUID) -> GameRound:
         raise NotImplementedError
+
+    @abstractmethod
+    def get_round_duration_seconds(self, db: Session) -> int:
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_betting_duration_seconds(self, db: Session) -> int:
+        raise NotImplementedError

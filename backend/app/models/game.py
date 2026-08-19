@@ -1,7 +1,7 @@
 import uuid
 import enum
 from datetime import datetime, timezone
-from sqlalchemy import Column, BigInteger, String, DateTime, Enum as SAEnum, ForeignKey, Numeric
+from sqlalchemy import Column, BigInteger, String, DateTime, Enum as SAEnum, ForeignKey, JSON
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from ..database import Base
@@ -30,6 +30,9 @@ class GamePrediction(str, enum.Enum):
     NUM_7 = "7"
     NUM_8 = "8"
     NUM_9 = "9"
+    DRAGON = "DRAGON"
+    TIGER = "TIGER"
+    TIE = "TIE"
 
 class GameBetStatus(str, enum.Enum):
     PENDING = "PENDING"
@@ -44,6 +47,7 @@ class GameRound(Base):
     status = Column(SAEnum(GameRoundStatus, name="game_round_status"), nullable=False, default=GameRoundStatus.BETTING)
     result_color = Column(SAEnum(GameColor, name="game_color"), nullable=True)
     result_number = Column(String(1), nullable=True) # "0"-"9"
+    result_data = Column(JSON, nullable=True)  # game-specific result payload
     started_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
     betting_closes_at = Column(DateTime(timezone=True), nullable=False)
     ended_at = Column(DateTime(timezone=True), nullable=True)

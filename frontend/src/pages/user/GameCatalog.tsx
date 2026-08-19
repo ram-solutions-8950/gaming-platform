@@ -27,10 +27,9 @@ export function GameCatalogPage() {
   const handlePlay = (slug: string) => {
     if (slug === 'colour-prediction') {
       navigate('/games');
-    } else {
-      // In the future, other games might route to /games/slug
-      navigate(`/games/${slug}`);
+      return;
     }
+    navigate(`/games/${slug}`);
   };
 
   if (loading) return <Loader />;

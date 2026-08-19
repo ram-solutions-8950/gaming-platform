@@ -42,3 +42,9 @@ class ColourPredictionEngine(GameEngine):
 
     def settle_round(self, db: Session, round_id: UUID) -> GameRound:
         return game_service.settle_round(db, round_id)
+
+    def get_round_duration_seconds(self, db: Session) -> int:
+        return game_service.ROUND_DURATION_SECONDS
+
+    def get_betting_duration_seconds(self, db: Session) -> int:
+        return game_service.BETTING_WINDOW_SECONDS

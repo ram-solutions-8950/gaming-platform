@@ -211,7 +211,8 @@ def place_bet(
     if not game_round:
         raise ValueError("Round not found")
 
-    selected_game_id = game_id or game_round.game_id
+    colour_game = _get_or_create_colour_prediction_game(db)
+    selected_game_id = game_id or colour_game.id
     if game_round.game_id != selected_game_id:
         raise ValueError("Selected round does not belong to selected game")
 
@@ -382,16 +383,18 @@ def get_round_bets_summary(db: Session, round_id: UUID) -> dict:
     return {"total_bets": total_bets, "total_amount": total_amount}
 
 
-def get_admin_rounds(db: Session, page: int = 1, page_size: int = 20) -> dict:
-    game = _get_or_create_colour_prediction_game(db)
+def get_admin_rounds(db: Session, page: int = 1, page_size: int = 20, game_id: Optional[UUID] = None) -> dict:
+    game = _get_or_create_colour_prediction_game(db) if game_id is None else _get_game_or_raise(db, game_id)
     query = db.query(GameRound).filter(GameRound.game_id == game.id)
     total = query.count()
     items = query.order_by(GameRound.started_at.desc()).offset((page - 1) * page_size).limit(page_size).all()
     return {"total": total, "page": page, "page_size": page_size, "items": items}
 
 
-def get_admin_bets(db: Session, round_id: Optional[UUID] = None, page: int = 1, page_size: int = 20) -> dict:
-    game = _get_or_create_colour_prediction_game(db)
+def get_admin_bets(
+    db: Session, round_id: Optional[UUID] = None, page: int = 1, page_size: int = 20, game_id: Optional[UUID] = None
+) -> dict:
+    game = _get_or_create_colour_prediction_game(db) if game_id is None else _get_game_or_raise(db, game_id)
     query = db.query(GameBet).filter(GameBet.game_id == game.id)
     if round_id:
         query = query.filter(GameBet.round_id == round_id)

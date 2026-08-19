@@ -14,6 +14,7 @@ import { TransactionsPage } from './pages/user/Transactions';
 import { DepositPage } from './pages/user/Deposit';
 import { WithdrawalPage } from './pages/user/Withdrawal';
 import { GamePlayPage } from './pages/user/GamePlay';
+import { DragonTigerPage } from './pages/user/DragonTiger';
 import { GameCatalogPage } from './pages/user/GameCatalog';
 import { AdminDashboardPage } from './pages/admin/AdminDashboard';
 import { AdminUsersPage } from './pages/admin/AdminUsers';
@@ -78,6 +79,8 @@ function App() {
             <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/games-catalog" element={<GameCatalogPage />} />
             <Route path="/games" element={<GamePlayPage />} />
+            <Route path="/games/colour-prediction" element={<GamePlayPage />} />
+            <Route path="/games/dragon-tiger" element={<DragonTigerPage />} />
             <Route path="/wallet" element={<WalletPage />} />
             <Route path="/transactions" element={<TransactionsPage />} />
             <Route path="/deposit" element={<DepositPage />} />

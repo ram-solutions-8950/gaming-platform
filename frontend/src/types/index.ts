@@ -71,14 +71,16 @@ export interface Withdrawal {
 
 // ── Game types ─────────────────────────────────────────────────────
 export type GameRoundStatus = 'BETTING' | 'CALCULATING' | 'COMPLETED';
-export type GamePrediction = 'RED' | 'GREEN' | 'VIOLET' | '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9';
+export type GamePrediction = 'RED' | 'GREEN' | 'VIOLET' | '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | 'DRAGON' | 'TIGER' | 'TIE';
 export type GameBetStatus = 'PENDING' | 'WON' | 'LOST';
 
 export interface GameRound {
   id: string;
+  game_id: string;
   status: GameRoundStatus;
   result_color: string | null;
   result_number: string | null;
+  result_data?: Record<string, any> | null;
   started_at: string;
   betting_closes_at: string;
   ended_at: string | null;
@@ -87,6 +89,7 @@ export interface GameRound {
 export interface GameBet {
   id: string;
   user_id: string;
+  game_id: string;
   round_id: string;
   prediction: string;
   amount: number;
@@ -104,6 +107,7 @@ export interface GameState {
   round: GameRound | null;
   server_time: string;
   seconds_remaining: number;
+  game?: CatalogGame | null;
 }
 
 export interface GameRoundAdmin extends GameRound {

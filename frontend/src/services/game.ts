@@ -2,23 +2,34 @@ import api from './api';
 import type { GameState, GameBet, GameRound, GameRoundAdmin, PaginatedResult } from '../types';
 
 export const gameService = {
-  async getCurrentRound(): Promise<GameState> {
-    const res = await api.get('/games/current');
+  async getCurrentRound(gameSlug?: string, gameId?: string): Promise<GameState> {
+    const params: Record<string, string> = {};
+    if (gameSlug) params.game_slug = gameSlug;
+    if (gameId) params.game_id = gameId;
+    const res = await api.get('/games/current', { params });
     return res.data.data;
   },
 
-  async getHistory(limit = 20): Promise<GameRound[]> {
-    const res = await api.get('/games/history', { params: { limit } });
+  async getHistory(limit = 20, gameSlug?: string, gameId?: string): Promise<GameRound[]> {
+    const params: Record<string, string | number> = { limit };
+    if (gameSlug) params.game_slug = gameSlug;
+    if (gameId) params.game_id = gameId;
+    const res = await api.get('/games/history', { params });
     return res.data.data;
   },
 
-  async placeBet(round_id: string, prediction: string, amount: number): Promise<GameBet> {
-    const res = await api.post('/games/bet', { round_id, prediction, amount });
+  async placeBet(round_id: string, prediction: string, amount: number, game_id?: string): Promise<GameBet> {
+    const payload: Record<string, string | number> = { round_id, prediction, amount };
+    if (game_id) payload.game_id = game_id;
+    const res = await api.post('/games/bet', payload);
     return res.data.data;
   },
 
-  async getMyBets(page = 1, page_size = 20): Promise<PaginatedResult<GameBet>> {
-    const res = await api.get('/games/my-bets', { params: { page, page_size } });
+  async getMyBets(page = 1, page_size = 20, gameSlug?: string, gameId?: string): Promise<PaginatedResult<GameBet>> {
+    const params: Record<string, string | number> = { page, page_size };
+    if (gameSlug) params.game_slug = gameSlug;
+    if (gameId) params.game_id = gameId;
+    const res = await api.get('/games/my-bets', { params });
     return res.data.data;
   },
 

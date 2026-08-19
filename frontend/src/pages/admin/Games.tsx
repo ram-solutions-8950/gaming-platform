@@ -17,6 +17,7 @@ export function AdminGamesPage() {
   const [description, setDescription] = useState('');
   const [minBet, setMinBet] = useState('1000');
   const [maxBet, setMaxBet] = useState('100000');
+  const [configText, setConfigText] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -46,6 +47,7 @@ export function AdminGamesPage() {
       setDescription(game.description || '');
       setMinBet(game.min_bet.toString());
       setMaxBet(game.max_bet.toString());
+      setConfigText(game.config ? JSON.stringify(game.config, null, 2) : '');
     } else {
       setEditingGame(null);
       setName('');
@@ -54,6 +56,7 @@ export function AdminGamesPage() {
       setDescription('');
       setMinBet('1000');
       setMaxBet('100000');
+      setConfigText('');
     }
     setShowModal(true);
   };
@@ -68,7 +71,7 @@ export function AdminGamesPage() {
     setErrorMsg('');
     setSubmitting(true);
     
-    const payload = {
+    const payload: Record<string, unknown> = {
       name,
       slug,
       game_type: gameType,
@@ -76,6 +79,15 @@ export function AdminGamesPage() {
       min_bet: parseInt(minBet, 10),
       max_bet: parseInt(maxBet, 10),
     };
+    if (configText.trim()) {
+      try {
+        payload.config = JSON.parse(configText);
+      } catch {
+        setErrorMsg('Config must be valid JSON');
+        setSubmitting(false);
+        return;
+      }
+    }
 
     try {
       if (editingGame) {
@@ -185,7 +197,7 @@ export function AdminGamesPage() {
 
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-dark-950/80 backdrop-blur-sm">
-          <div className="bg-dark-900 border border-dark-700 rounded-xl w-full max-w-md shadow-2xl p-6">
+          <div className="bg-dark-900 border border-dark-700 rounded-xl w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl p-6">
             <h2 className="text-xl font-bold text-white mb-4">
               {editingGame ? 'Edit Game' : 'Add New Game'}
             </h2>
@@ -251,6 +263,16 @@ export function AdminGamesPage() {
                     className="bg-dark-800 border border-dark-700 text-white rounded-md px-4 py-2 w-full focus:ring-brand-500 focus:border-brand-500"
                   />
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-400 mb-1">Config JSON (rules, payouts, durations)</label>
+                <textarea
+                  value={configText}
+                  onChange={(e) => setConfigText(e.target.value)}
+                  placeholder='{"round_duration_seconds":60,"payouts":{"dragon":1.0}}'
+                  className="bg-dark-800 border border-dark-700 text-white rounded-md px-4 py-2 w-full focus:ring-brand-500 focus:border-brand-500 h-28 font-mono text-xs"
+                />
               </div>
 
               {errorMsg && <p className="text-sm text-red-500">{errorMsg}</p>}
