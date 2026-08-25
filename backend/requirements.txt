@@ -17,3 +17,4 @@ opencv-python-headless
 numpy
 qrcode
 pillow
+razorpay
