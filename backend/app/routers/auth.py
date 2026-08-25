@@ -16,7 +16,7 @@ router = APIRouter(prefix="/auth", tags=["Auth"])
 @limiter.limit("10/minute")
 def register(request: Request, data: RegisterIn, db: Session = Depends(get_db)):
     try:
-        user = auth_service.register_user(db, data.name, data.username, data.email, data.password)
+        user = auth_service.register_user(db, data.name, data.username, data.email, data.password, data.referral_code)
         return success_response(UserOut.model_validate(user).model_dump(), status_code=201)
     except ValueError as e:
         return error_response("REGISTRATION_ERROR", str(e))

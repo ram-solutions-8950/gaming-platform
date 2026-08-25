@@ -1,0 +1,308 @@
+/* ───────────────────────────────────────────────────────────
+   777WIN CASINO LOGIN PAGE THEME
+   ─────────────────────────────────────────────────────────── */
+
+.auth-page-wrapper {
+  min-height: 100dvh;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  box-sizing: border-box;
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 50% 20%, rgba(126, 28, 190, 0.35), transparent 45%),
+    radial-gradient(circle at 20% 80%, rgba(70, 15, 110, 0.35), transparent 45%),
+    linear-gradient(135deg, #10031F 0%, #16052B 50%, #241044 100%);
+}
+
+.casino-login-card {
+  width: 100%;
+  max-width: 410px;
+  background: rgba(12, 7, 22, 0.92);
+  border: 1px solid rgba(255, 205, 55, 0.20);
+  border-radius: 20px;
+  box-shadow:
+    0 20px 60px rgba(0, 0, 0, 0.65),
+    0 0 30px rgba(126, 28, 190, 0.18);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  padding: 28px 24px;
+  box-sizing: border-box;
+  position: relative;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+/* Header */
+.casino-login-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.casino-login-subtitle {
+  color: #B7A9CA;
+  font-size: 13px;
+  font-weight: 500;
+  margin-top: 6px;
+  margin-bottom: 0;
+  letter-spacing: 0.2px;
+}
+
+/* Form Groups */
+.casino-login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+}
+
+.casino-input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+}
+
+.casino-input-label {
+  color: #FFFFFF;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  display: block;
+}
+
+/* Input Fields */
+.casino-input-field {
+  width: 100%;
+  height: 50px;
+  background: #0D0915;
+  border: 1px solid rgba(160, 90, 220, 0.35);
+  border-radius: 10px;
+  padding: 0 16px;
+  color: #FFFFFF;
+  font-size: 14px;
+  font-weight: 500;
+  box-sizing: border-box;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  outline: none;
+}
+
+.casino-input-field::placeholder {
+  color: #746A82;
+}
+
+.casino-input-field:focus {
+  border-color: #FFD83D;
+  box-shadow: 0 0 0 3px rgba(255, 216, 61, 0.12);
+}
+
+/* Password Input Wrapper with Eye Toggle */
+.password-input-wrapper {
+  position: relative;
+  width: 100%;
+  display: flex;
+  align-items: center;
+}
+
+.password-input-wrapper .casino-input-field {
+  padding-right: 48px;
+}
+
+.password-toggle-btn {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  min-height: 40px;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  color: #B7A9CA;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  margin: 0;
+  outline: none;
+  transition: color 0.2s ease, background 0.2s ease;
+  z-index: 2;
+}
+
+.password-toggle-btn:hover {
+  color: #FFD83D;
+  background: rgba(255, 216, 61, 0.08);
+}
+
+.password-toggle-btn:focus-visible {
+  outline: 2px solid #FFD83D;
+  outline-offset: 1px;
+}
+
+/* Error Notice */
+.casino-login-error {
+  padding: 10px 14px;
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 8px;
+  color: #F87171;
+  font-size: 12.5px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.casino-field-error {
+  color: #F87171;
+  font-size: 11.5px;
+  font-weight: 600;
+  margin: 2px 0 0 2px;
+}
+
+/* Casino Gold Submit Button */
+.casino-login-btn {
+  width: 100%;
+  height: 50px;
+  background: linear-gradient(135deg, #F5B51B, #FFD83D);
+  color: #241044;
+  font-size: 15px;
+  font-weight: 800;
+  border: none;
+  border-radius: 10px;
+  box-shadow: 0 6px 18px rgba(245, 181, 27, 0.25);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 6px;
+  outline: none;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;
+  letter-spacing: 0.3px;
+}
+
+.casino-login-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 22px rgba(245, 181, 27, 0.35);
+  filter: brightness(1.05);
+}
+
+.casino-login-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.casino-login-btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+/* Footer Link */
+.casino-login-footer {
+  text-align: center;
+  font-size: 13px;
+  color: #B7A9CA;
+  margin-top: 18px;
+  margin-bottom: 0;
+}
+
+.casino-login-link {
+  color: #FFD83D;
+  font-weight: 700;
+  text-decoration: none;
+  margin-left: 4px;
+  transition: color 0.15s ease;
+}
+
+.casino-login-link:hover {
+  color: #FFF0A0;
+  text-decoration: underline;
+}
+
+/* ───────────────────────────────────────────────────────────
+   MOBILE LANDSCAPE (844 × 390, 812 × 375, etc.)
+   ─────────────────────────────────────────────────────────── */
+@media (orientation: landscape) and (max-height: 500px) {
+  .auth-page-wrapper {
+    padding: 6px 12px !important;
+    min-height: 100dvh !important;
+  }
+
+  .casino-login-card {
+    max-width: 390px !important;
+    max-height: calc(100dvh - 12px) !important;
+    padding: 10px 18px !important;
+    border-radius: 14px !important;
+    overflow-y: auto !important;
+    scrollbar-width: none !important;
+  }
+
+  .casino-login-card::-webkit-scrollbar {
+    display: none !important;
+  }
+
+  .casino-login-header {
+    margin-bottom: 8px !important;
+  }
+
+  .casino-login-subtitle {
+    font-size: 11px !important;
+    margin-top: 2px !important;
+  }
+
+  .casino-login-form {
+    gap: 8px !important;
+  }
+
+  .casino-input-group {
+    gap: 3px !important;
+  }
+
+  .casino-input-label {
+    font-size: 11px !important;
+  }
+
+  .casino-input-field {
+    height: 38px !important;
+    font-size: 12.5px !important;
+    padding: 0 12px !important;
+    border-radius: 8px !important;
+  }
+
+  .password-input-wrapper .casino-input-field {
+    padding-right: 42px !important;
+  }
+
+  .password-toggle-btn {
+    width: 36px !important;
+    height: 36px !important;
+    min-width: 36px !important;
+    min-height: 36px !important;
+    right: 3px !important;
+  }
+
+  .casino-login-btn {
+    height: 40px !important;
+    font-size: 13.5px !important;
+    margin-top: 2px !important;
+    border-radius: 8px !important;
+  }
+
+  .casino-login-footer {
+    font-size: 11.5px !important;
+    margin-top: 8px !important;
+  }
+
+  .casino-login-error {
+    padding: 6px 10px !important;
+    font-size: 11px !important;
+  }
+}

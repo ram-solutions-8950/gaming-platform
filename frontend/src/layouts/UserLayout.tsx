@@ -1,20 +1,32 @@
-import { Outlet, NavLink, useNavigate } from 'react-router-dom';
+import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { authService } from '../services/auth';
+import { GlitterRain } from '../components/common/GlitterRain';
+import { useEffect, useState } from 'react';
+import { walletService } from '../services/wallet';
+import type { Wallet } from '../types';
+import { LobbyHeader } from '../components/lobby/LobbyHeader';
+import { LobbyBottomNav } from '../components/lobby/LobbyBottomNav';
+import { CasinoLogo } from '../components/common/CasinoLogo';
 
 const navItems = [
   { to: '/dashboard', label: 'Dashboard', icon: '📊' },
   { to: '/games-catalog', label: 'Games', icon: '🎮' },
   { to: '/wallet', label: 'Wallet', icon: '👛' },
-  { to: '/deposit', label: 'Deposit', icon: '📥' },
-  { to: '/withdrawal', label: 'Withdrawal', icon: '📤' },
-  { to: '/transactions', label: 'Transactions', icon: '💸' },
   { to: '/profile', label: 'Profile', icon: '👤' },
 ];
 
 export function UserLayout() {
   const { user, setUser } = useAuthStore();
   const navigate = useNavigate();
+  const location = useLocation();
+  const [wallet, setWallet] = useState<Wallet | null>(null);
+
+  const isLudo = location.pathname.startsWith('/games/ludo');
+
+  useEffect(() => {
+    walletService.getWallet().then(setWallet).catch(() => {});
+  }, []);
 
   const handleLogout = async () => {
     await authService.logout();
@@ -23,50 +35,85 @@ export function UserLayout() {
   };
 
   return (
-    <div className="min-h-screen flex bg-dark-950">
-      <aside className="w-64 bg-dark-900 border-r border-dark-700 flex flex-col">
+    <div className="h-dvh max-h-dvh min-h-dvh flex flex-col lg:flex-row bg-gradient-to-br from-[#2c085c] via-[#1b053c] to-[#0c021e] relative overflow-hidden">
+      <GlitterRain />
+
+      {/* ─── DESKTOP SIDEBAR (Large Desktop only) ─── */}
+      <aside className="hidden 2xl:flex w-64 shrink-0 bg-dark-900 border-r border-dark-700 flex-col z-10 shadow-2xl">
         <div className="p-6 border-b border-dark-700">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 bg-linear-to-br from-brand-500 to-gold-500 rounded-lg flex items-center justify-center text-lg text-white">G</div>
-            <span className="text-xl font-extrabold text-white">GameStack</span>
+          <CasinoLogo size="md" />
+        </div>
+        
+        <div className="p-4">
+          <div className="bg-dark-800 rounded-xl p-4 border border-dark-700 shadow-inner">
+             <p className="text-xs text-gray-400 mb-1">Total Balance</p>
+             <div className="flex items-center justify-between">
+               <span className="text-2xl font-extrabold text-gold-400">₹{wallet?.balance_inr ?? '0.00'}</span>
+               <button onClick={() => navigate('/deposit')} className="bg-gradient-to-br from-green-500 to-green-600 text-white text-xs px-4 py-1.5 rounded-lg font-bold shadow-md shadow-green-500/20 transition-transform active:scale-95">ADD</button>
+             </div>
           </div>
         </div>
-        <nav className="flex-1 p-4 space-y-1">
+
+        <nav className="flex-1 px-4 space-y-1 overflow-y-auto">
           {navItems.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
               className={({ isActive }) =>
-                `flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all duration-200 ${
-                  isActive ? 'bg-dark-800 text-white' : 'text-gray-400 hover:bg-dark-800 hover:text-gray-100'
+                `flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 ${
+                  isActive ? 'bg-gradient-to-r from-brand-500/20 to-transparent text-brand-400 border-l-2 border-brand-500' : 'text-gray-400 hover:bg-dark-800 hover:text-gray-100'
                 }`
               }
             >
-              <span>{item.icon}</span>
+              <span className="text-lg">{item.icon}</span>
               {item.label}
             </NavLink>
           ))}
+          <NavLink to="/deposit" className={({ isActive }) => `flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 ${isActive ? 'bg-gradient-to-r from-brand-500/20 to-transparent text-brand-400 border-l-2 border-brand-500' : 'text-gray-400 hover:bg-dark-800 hover:text-gray-100'}`}>
+            <span className="text-lg">📥</span> Deposit
+          </NavLink>
+          <NavLink to="/withdrawal" className={({ isActive }) => `flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 ${isActive ? 'bg-gradient-to-r from-brand-500/20 to-transparent text-brand-400 border-l-2 border-brand-500' : 'text-gray-400 hover:bg-dark-800 hover:text-gray-100'}`}>
+            <span className="text-lg">📤</span> Withdrawal
+          </NavLink>
+          <NavLink to="/transactions" className={({ isActive }) => `flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 ${isActive ? 'bg-gradient-to-r from-brand-500/20 to-transparent text-brand-400 border-l-2 border-brand-500' : 'text-gray-400 hover:bg-dark-800 hover:text-gray-100'}`}>
+            <span className="text-lg">💸</span> Transactions
+          </NavLink>
         </nav>
+        
         <div className="p-4 border-t border-dark-700">
           <div className="flex items-center gap-3 mb-3 px-2">
-            <div className="w-9 h-9 bg-dark-700 rounded-full flex items-center justify-center text-sm font-bold text-brand-400">
+            <div className="w-9 h-9 bg-gradient-to-br from-brand-500 to-gold-500 rounded-full flex items-center justify-center text-sm font-bold text-white shadow-inner">
               {user?.name?.charAt(0).toUpperCase()}
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold text-gray-100 truncate">{user?.name}</p>
-              <p className="text-xs text-gray-500 truncate">{user?.role}</p>
+              <p className="text-xs text-brand-400 truncate font-medium">{user?.role}</p>
             </div>
           </div>
-          <button onClick={handleLogout} className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-gray-400 hover:text-danger hover:bg-danger/10 rounded-lg transition-all duration-200">
-            ↩ Sign Out
+          <button onClick={handleLogout} className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-bold text-danger bg-danger/10 hover:bg-danger/20 rounded-xl transition-all duration-200">
+            Sign Out
           </button>
         </div>
       </aside>
-      <main className="flex-1 overflow-auto">
-        <div className="max-w-7xl mx-auto p-8">
-          <Outlet />
+
+      {/* ─── MOBILE SHELL & MAIN CONTENT ─── */}
+      <div className="flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden z-10 relative h-dvh max-h-dvh">
+        {/* Mobile Header */}
+        <div className="2xl:hidden shrink-0 z-30">
+          <LobbyHeader user={user} wallet={wallet} />
         </div>
-      </main>
+
+        <main className={isLudo ? "flex-1 min-h-0 min-w-0 relative overflow-hidden flex flex-col" : "flex-1 min-h-0 min-w-0 relative overflow-y-auto overflow-x-hidden"}>
+          <div className={isLudo ? "h-full w-full max-w-7xl mx-auto p-0 flex flex-col justify-center items-center overflow-hidden" : "min-h-full w-full max-w-7xl mx-auto p-3 sm:p-5 lg:p-8"}>
+            <Outlet />
+          </div>
+        </main>
+
+        {/* Mobile Bottom Navigation */}
+        <div className="2xl:hidden shrink-0 z-40 relative">
+          <LobbyBottomNav />
+        </div>
+      </div>
     </div>
   );
 }

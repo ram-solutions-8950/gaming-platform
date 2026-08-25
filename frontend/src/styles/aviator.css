@@ -1,0 +1,840 @@
+/* ──────────────────────────────────────────────────────────────
+   Aviator Crash Game Styles — Dark Aviation Theme
+────────────────────────────────────────────────────────────── */
+
+.aviator-game-wrapper {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  max-height: 100dvh;
+  width: 100dvw;
+  max-width: 100dvw;
+  background-color: #0b0e14;
+  color: #f1f5f9;
+  overflow: hidden;
+  position: relative;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  user-select: none;
+}
+
+/* Landscape Prompt for mobile portrait */
+.aviator-portrait-reminder {
+  display: none;
+}
+
+@media (max-width: 768px) and (orientation: portrait) {
+  .aviator-portrait-reminder {
+    display: flex;
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    background: rgba(11, 14, 20, 0.96);
+    backdrop-filter: blur(8px);
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 24px;
+    gap: 16px;
+  }
+  .rotate-icon {
+    font-size: 48px;
+    animation: rotatePhone 2s infinite ease-in-out;
+  }
+  @keyframes rotatePhone {
+    0%, 100% { transform: rotate(0deg); }
+    50% { transform: rotate(90deg); }
+  }
+}
+
+/* Top Navigation Bar */
+.aviator-top-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 48px;
+  min-height: 48px;
+  padding: 0 16px;
+  background: linear-gradient(180deg, #32105F, #21003F);
+  border-bottom: 1px solid rgba(255, 210, 26, 0.25);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+  z-index: 20;
+}
+
+.aviator-logo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 900;
+  font-size: 1.15rem;
+  letter-spacing: 1px;
+}
+
+.aviator-logo .plane-icon {
+  color: #ef4444;
+  font-size: 1.25rem;
+}
+
+.aviator-logo .logo-text {
+  background: linear-gradient(135deg, #ffffff 0%, #FFD21A 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.aviator-nav-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.aviator-wallet-pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: linear-gradient(180deg, #1A002E 0%, #0D0017 100%) !important;
+  border: 1px solid rgba(255, 210, 26, 0.45) !important;
+  box-shadow: 0 0 10px rgba(255, 210, 26, 0.2) !important;
+  border-radius: 9999px;
+  padding: 4px 12px;
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: #FFD21A !important;
+}
+
+.aviator-wallet-pill .wallet-amount {
+  color: #FFD21A !important;
+  font-weight: 800;
+}
+
+.aviator-btn-back {
+  background: rgba(255, 255, 255, 0.08);
+  border: none;
+  color: #94a3b8;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.aviator-btn-back:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: #ffffff;
+}
+
+/* History Bar */
+.aviator-history-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 36px;
+  min-height: 36px;
+  padding: 0 12px;
+  background: #0d121c;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  gap: 8px;
+  overflow: hidden;
+  z-index: 10;
+}
+
+.aviator-history-pills {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  flex: 1;
+}
+
+.aviator-history-pills::-webkit-scrollbar {
+  display: none;
+}
+
+.aviator-history-pill {
+  flex-shrink: 0;
+  font-size: 0.75rem;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  cursor: pointer;
+  transition: transform 0.15s;
+}
+
+.aviator-history-pill:hover {
+  transform: scale(1.08);
+}
+
+.pill-low {
+  background: rgba(56, 189, 248, 0.15);
+  color: #38bdf8;
+  border: 1px solid rgba(56, 189, 248, 0.3);
+}
+
+.pill-mid {
+  background: rgba(168, 85, 247, 0.15);
+  color: #c084fc;
+  border: 1px solid rgba(168, 85, 247, 0.3);
+}
+
+.pill-high {
+  background: rgba(234, 179, 8, 0.15);
+  color: #facc15;
+  border: 1px solid rgba(234, 179, 8, 0.3);
+}
+
+.aviator-fairness-btn {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #94a3b8;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  cursor: pointer;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.aviator-fairness-btn:hover {
+  border-color: rgba(255, 255, 255, 0.3);
+  color: #fff;
+}
+
+/* Main Layout Grid */
+.aviator-main-layout {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+@media (max-width: 850px) {
+  .aviator-main-layout {
+    grid-template-columns: 1fr;
+  }
+  .aviator-players-panel {
+    display: none !important;
+  }
+}
+
+/* Left Sidebar Players Panel */
+.aviator-players-panel {
+  background: #0e131f;
+  border-right: 1px solid rgba(255, 255, 255, 0.06);
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.aviator-players-tabs {
+  display: flex;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.aviator-players-tabs .tab-btn {
+  flex: 1;
+  padding: 8px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  background: transparent;
+  border: none;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.aviator-players-tabs .tab-btn.active {
+  color: #f87171;
+  border-bottom: 2px solid #ef4444;
+  background: rgba(239, 68, 68, 0.05);
+}
+
+.aviator-players-summary {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 12px;
+  background: rgba(0, 0, 0, 0.2);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.aviator-players-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px;
+}
+
+.players-table .table-header {
+  display: grid;
+  grid-template-columns: 2fr 1.5fr 1.5fr 2fr;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #64748b;
+  padding: 4px 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.player-row {
+  display: grid;
+  grid-template-columns: 2fr 1.5fr 1.5fr 2fr;
+  font-size: 0.75rem;
+  padding: 6px 8px;
+  border-radius: 4px;
+  margin-bottom: 2px;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.015);
+}
+
+.player-row.cashed-row {
+  background: rgba(34, 197, 94, 0.08);
+  border: 1px solid rgba(34, 197, 94, 0.2);
+}
+
+.player-row.my-row {
+  border-left: 3px solid #38bdf8;
+}
+
+.player-row .badge-mult {
+  background: rgba(34, 197, 94, 0.2);
+  color: #4ade80;
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-weight: 700;
+  font-size: 0.7rem;
+}
+
+.empty-players-msg {
+  text-align: center;
+  padding: 24px;
+  font-size: 0.75rem;
+  color: #64748b;
+}
+
+/* Center & Game Content Area */
+.aviator-center-area {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  background: #090c12;
+}
+
+/* Arena Canvas & Overlay */
+.aviator-arena {
+  flex: 1;
+  position: relative;
+  min-height: 160px;
+  overflow: hidden;
+  background: radial-gradient(circle at 50% 50%, #151a28 0%, #090c12 100%);
+}
+
+.aviator-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.aviator-center-display {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 10;
+}
+
+/* Betting Phase Countdown Banner */
+.aviator-betting-banner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  background: rgba(17, 24, 39, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 16px 28px;
+  border-radius: 12px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(6px);
+}
+
+.aviator-betting-spinner {
+  width: 24px;
+  height: 24px;
+  border: 3px solid rgba(239, 68, 68, 0.2);
+  border-top-color: #ef4444;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.aviator-betting-title {
+  font-weight: 800;
+  font-size: 0.95rem;
+  letter-spacing: 1px;
+  color: #e2e8f0;
+}
+
+.aviator-betting-bar-container {
+  width: 160px;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.aviator-betting-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #ef4444, #f97316);
+  transition: width 0.05s linear;
+}
+
+.aviator-betting-seconds {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #f87171;
+  font-family: monospace;
+}
+
+/* Flying Multiplier Display */
+.aviator-multiplier-display.flying {
+  display: flex;
+  align-items: baseline;
+  color: #ffffff;
+  text-shadow: 0 0 20px rgba(239, 68, 68, 0.5), 0 0 40px rgba(239, 68, 68, 0.3);
+  animation: multPulse 1s infinite alternate ease-in-out;
+}
+
+@keyframes multPulse {
+  0% { transform: scale(1); }
+  100% { transform: scale(1.03); }
+}
+
+.aviator-multiplier-display .mult-value {
+  font-size: clamp(3rem, 7vw, 5.5rem);
+  font-weight: 900;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.aviator-multiplier-display .mult-x {
+  font-size: clamp(1.8rem, 4vw, 3.2rem);
+  font-weight: 800;
+  color: #ef4444;
+  margin-left: 2px;
+}
+
+/* Crashed Display */
+.aviator-multiplier-display.crashed {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.crashed-header {
+  font-size: clamp(1rem, 2.5vw, 1.6rem);
+  font-weight: 900;
+  color: #ef4444;
+  letter-spacing: 2px;
+  margin-bottom: 2px;
+  text-shadow: 0 0 10px rgba(239, 68, 68, 0.8);
+}
+
+.crashed-value {
+  display: flex;
+  align-items: baseline;
+  font-size: clamp(2.5rem, 5vw, 4.5rem);
+  font-weight: 900;
+  color: #ef4444;
+  line-height: 1;
+}
+
+/* Bottom Betting Control Panels */
+.aviator-bet-panels-container {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  padding: 10px 14px;
+  background: #111622;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  min-height: 120px;
+}
+
+@media (max-width: 580px) {
+  .aviator-bet-panels-container {
+    grid-template-columns: 1fr;
+    gap: 8px;
+    padding: 8px;
+  }
+}
+
+.aviator-bet-card {
+  background: #171d2b;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: border-color 0.2s;
+}
+
+.aviator-bet-card.active-bet {
+  border-color: #22c55e;
+  box-shadow: 0 0 12px rgba(34, 197, 94, 0.15);
+}
+
+.aviator-bet-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.slot-badge {
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  background: rgba(255, 255, 255, 0.08);
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: #94a3b8;
+}
+
+.auto-cashout-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.auto-input-wrap {
+  display: flex;
+  align-items: center;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+  padding: 1px 4px;
+}
+
+.auto-mult-input {
+  width: 44px;
+  background: transparent;
+  border: none;
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-align: right;
+  outline: none;
+}
+
+.auto-x {
+  font-size: 0.75rem;
+  color: #94a3b8;
+  margin-left: 2px;
+}
+
+.aviator-bet-card-body {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.aviator-amount-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.amount-input-row {
+  display: flex;
+  align-items: center;
+  background: #0e121a;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  padding: 2px 8px;
+}
+
+.amount-input-row .currency-symbol {
+  color: #94a3b8;
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+.amount-input {
+  width: 100%;
+  background: transparent;
+  border: none;
+  color: #ffffff;
+  font-size: 1rem;
+  font-weight: 800;
+  padding: 4px;
+  outline: none;
+}
+
+.quick-chips-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.chip-btn {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #cbd5e1;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.chip-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.15);
+  color: #ffffff;
+}
+
+.chip-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.chip-btn.chip-action {
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+/* Action Buttons */
+.aviator-action-section {
+  display: flex;
+  flex-direction: column;
+}
+
+.aviator-btn-bet {
+  width: 100%;
+  height: 100%;
+  min-height: 52px;
+  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+  border: none;
+  border-radius: 8px;
+  color: #ffffff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(34, 197, 94, 0.3);
+  transition: all 0.2s;
+}
+
+.aviator-btn-bet:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(34, 197, 94, 0.45);
+}
+
+.aviator-btn-bet:disabled {
+  background: #334155;
+  color: #64748b;
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+.aviator-btn-cashout {
+  width: 100%;
+  height: 100%;
+  min-height: 52px;
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  border: none;
+  border-radius: 8px;
+  color: #ffffff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(245, 158, 11, 0.5);
+  transition: all 0.2s;
+}
+
+.aviator-btn-cashout:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(245, 158, 11, 0.7);
+}
+
+.btn-main-label {
+  font-size: 0.95rem;
+  font-weight: 900;
+  letter-spacing: 0.5px;
+}
+
+.btn-sub-label {
+  font-size: 0.8rem;
+  font-weight: 700;
+  opacity: 0.95;
+}
+
+.bet-placed-state,
+.waiting-next-round,
+.cashed-out-badge,
+.lost-badge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  min-height: 52px;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px dashed rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  text-align: center;
+  padding: 4px;
+}
+
+.cashed-out-badge {
+  background: rgba(34, 197, 94, 0.12);
+  border-color: #22c55e;
+}
+
+.lost-badge {
+  background: rgba(239, 68, 68, 0.12);
+  border-color: #ef4444;
+}
+
+/* Modal Overlay */
+.aviator-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  padding: 16px;
+}
+
+.aviator-modal {
+  background: #131825;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 12px;
+  width: 100%;
+  max-width: 500px;
+  overflow: hidden;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
+}
+
+.aviator-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  background: #182030;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.aviator-modal-close {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  font-size: 1.1rem;
+  cursor: pointer;
+}
+
+.aviator-modal-body {
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.aviator-info-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: rgba(0, 0, 0, 0.2);
+  padding: 8px 10px;
+  border-radius: 6px;
+}
+
+.aviator-info-row .label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+}
+
+.aviator-info-row .value {
+  font-size: 0.8rem;
+  color: #f1f5f9;
+}
+
+.aviator-fairness-note {
+  font-size: 0.75rem;
+  color: #94a3b8;
+  line-height: 1.4;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: 10px;
+}
+
+/* ─── Landscape Compact Optimization for Mobile ─── */
+@media (max-height: 520px) {
+  .aviator-top-nav {
+    height: 38px !important;
+    min-height: 38px !important;
+    padding: 0 10px !important;
+  }
+  .aviator-history-bar {
+    height: 28px !important;
+    min-height: 28px !important;
+  }
+  .aviator-bet-panels-container {
+    grid-template-columns: 1fr 1fr !important;
+    padding: 4px 8px !important;
+    gap: 6px !important;
+    min-height: 90px !important;
+    flex-shrink: 0 !important;
+  }
+  .aviator-bet-card {
+    padding: 5px 8px !important;
+    gap: 3px !important;
+    border-radius: 8px !important;
+  }
+  .aviator-btn-bet, .aviator-btn-cashout,
+  .bet-placed-state, .waiting-next-round, .cashed-out-badge, .lost-badge {
+    min-height: 38px !important;
+    height: 38px !important;
+  }
+  .btn-main-label {
+    font-size: 0.82rem !important;
+  }
+  .btn-sub-label {
+    font-size: 0.7rem !important;
+  }
+  .amount-input-row {
+    padding: 1px 6px !important;
+  }
+  .amount-input {
+    font-size: 0.85rem !important;
+    padding: 2px !important;
+  }
+  .quick-chips-row {
+    gap: 2px !important;
+  }
+  .chip-btn {
+    padding: 1px 4px !important;
+    font-size: 0.65rem !important;
+  }
+  .aviator-arena {
+    min-height: 90px !important;
+  }
+}
+

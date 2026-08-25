@@ -1,17 +1,18 @@
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { authService } from '../services/auth';
+import { CasinoLogo } from '../components/common/CasinoLogo';
 
 const adminNav = [
   { to: '/admin/dashboard', label: 'Dashboard', icon: '📊' },
-  { to: '/admin/catalog', label: 'Game Catalog', icon: '🎰' },
-  { to: '/admin/games', label: 'Game Control', icon: '🎮' },
-  { to: '/admin/users', label: 'Users', icon: '👥' },
+  { to: '/admin/catalog', label: 'Games Catalog', icon: '🎮' },
+  { to: '/admin/games', label: 'Live Game Control', icon: '🎲' },
+  { to: '/admin/users', label: 'User Management', icon: '👥' },
   { to: '/admin/transactions', label: 'Transactions', icon: '💸' },
   { to: '/admin/deposits', label: 'Deposits', icon: '📥' },
   { to: '/admin/withdrawals', label: 'Withdrawals', icon: '📤' },
   { to: '/admin/payment-settings', label: 'Payment Settings', icon: '⚙️' },
-  { to: '/admin/fees', label: 'Platform Fees', icon: '💰' },
+  { to: '/admin/fees', label: 'Fee Configuration', icon: '🏷️' },
 ];
 
 export function AdminLayout() {
@@ -23,13 +24,7 @@ export function AdminLayout() {
     <div className="min-h-screen flex bg-dark-950">
       <aside className="w-64 bg-dark-900 border-r border-dark-700 flex flex-col">
         <div className="p-6 border-b border-dark-700">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 bg-linear-to-br from-gold-500 to-brand-500 rounded-lg flex items-center justify-center text-lg text-white">G</div>
-            <div>
-              <span className="text-xl font-extrabold text-white">GameStack</span>
-              <p className="text-xs text-gold-400 font-semibold">Admin Panel</p>
-            </div>
-          </div>
+          <CasinoLogo size="md" subtitleText="ADMIN PANEL" />
         </div>
         <nav className="flex-1 p-4 space-y-1">
           {adminNav.map((item) => (

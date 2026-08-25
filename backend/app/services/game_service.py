@@ -25,8 +25,8 @@ from ..utils.logging import get_logger
 
 logger = get_logger("game")
 
-ROUND_DURATION_SECONDS = 60
-BETTING_WINDOW_SECONDS = 50
+ROUND_DURATION_SECONDS = 22
+BETTING_WINDOW_SECONDS = 15
 COLOUR_PREDICTION_SLUG = "colour-prediction"
 
 # ── Colour-prediction payout rules ──────────────────────────────────
@@ -47,7 +47,7 @@ NUMBER_COLORS = {
 # Multipliers applied to STAKE (not gross bet)
 COLOR_MULTIPLIER = Decimal("2")       # RED or GREEN
 VIOLET_MULTIPLIER = Decimal("4.5")    # VIOLET
-NUMBER_MULTIPLIER = Decimal("9")      # exact number 0-9
+NUMBER_MULTIPLIER = Decimal("10")      # total return for exact number (9:1 profit + stake)
 
 
 def _get_fee_config(db: Session) -> Tuple[Decimal, Decimal]:
@@ -237,7 +237,7 @@ def place_bet(
 
     bet_id = uuid.uuid4()
 
-    # Debit wallet (uses row lock + duplicate reference protection)
+    # Debit the wallet for the full bet amount at entry
     debit_wallet(
         db,
         user_id=user_id,

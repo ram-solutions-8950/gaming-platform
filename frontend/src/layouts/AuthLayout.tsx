@@ -2,18 +2,16 @@ import { Outlet } from 'react-router-dom';
 
 export function AuthLayout() {
   return (
-    <div className="min-h-screen bg-dark-950 flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 bg-linear-to-br from-brand-500 to-gold-500 rounded-xl flex items-center justify-center text-2xl text-white">G</div>
-            <span className="text-2xl font-extrabold text-white tracking-tight">GameStack</span>
-          </div>
-          <p className="text-gray-400 text-sm">Premium Gaming Platform</p>
-        </div>
-        <div className="bg-dark-900 border border-dark-700 rounded-2xl p-8 shadow-2xl">
-          <Outlet />
-        </div>
+    <div className="auth-layout min-h-screen bg-dark-950 flex flex-col items-center justify-center p-4 relative overflow-hidden">
+      {/* Dynamic Background */}
+      <div className="auth-bg absolute inset-0 z-0">
+        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCI+CjxwYXRoIGQ9Ik0wIDBoNDB2NDBIMHoiIGZpbGw9Im5vbmUiLz4KPHBhdGggZD0iTTAgMGg0MHY0MEgweiIgZmlsbD0icmdiYSgyNTUsIDI1NSwgMjU1LCAwLjAxKSIvPgo8Y2lyY2xlIGN4PSIyMCIgY3k9IjIwIiByPSIyIiBmaWxsPSJyZ2JhKDI1NSwgMjU1LCAyNTUsIDAuMDUpIi8+Cjwvc3ZnPg==')] opacity-30"></div>
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-brand-500/20 rounded-full blur-[100px] animate-pulse"></div>
+        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-gold-500/10 rounded-full blur-[100px] animate-pulse" style={{ animationDelay: '2s' }}></div>
+      </div>
+      
+      <div className="auth-content w-full flex justify-center z-10">
+        <Outlet />
       </div>
     </div>
   );

@@ -1,5 +1,5 @@
 import { BrowserRouter, Navigate, Outlet, Route, Routes } from 'react-router-dom';
-import { useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import './index.css';
 import { AuthLayout } from './layouts/AuthLayout';
 import { PublicLayout } from './layouts/PublicLayout';
@@ -15,6 +15,15 @@ import { DepositPage } from './pages/user/Deposit';
 import { WithdrawalPage } from './pages/user/Withdrawal';
 import { GamePlayPage } from './pages/user/GamePlay';
 import { DragonTigerPage } from './pages/user/DragonTiger';
+import { AndarBaharPage } from './pages/user/AndarBahar';
+import { RummyPage } from './pages/user/Rummy';
+import { TeenPatti } from './pages/user/TeenPatti';
+import { Ludo } from './pages/user/Ludo';
+import { AviatorPage } from './pages/user/Aviator';
+import { PokerPage } from './pages/user/Poker';
+import { RoulettePage } from './pages/user/Roulette';
+import { ChickenRoadPage } from './pages/user/ChickenRoad';
+import { Triple777Page } from './pages/user/Triple777';
 import { GameCatalogPage } from './pages/user/GameCatalog';
 import { AdminDashboardPage } from './pages/admin/AdminDashboard';
 import { AdminUsersPage } from './pages/admin/AdminUsers';
@@ -25,11 +34,14 @@ import { AdminPaymentSettingsPage } from './pages/admin/AdminPaymentSettings';
 import { AdminFeesPage } from './pages/admin/Fees';
 import { AdminGameControlPage } from './pages/admin/AdminGameControl';
 import { AdminGamesPage } from './pages/admin/Games';
+import { LoadingScreen } from './components/common/LoadingScreen';
 import { useAuthStore } from './store/authStore';
 import { authService } from './services/auth';
+import { soundManager } from './services/soundManager';
 
 function ProtectedRoute({ adminOnly = false }: { adminOnly?: boolean }) {
-  const user = useAuthStore((state) => state.user);
+  const { user, isLoading } = useAuthStore();
+  if (isLoading) return null;
   if (!user) return <Navigate to="/login" replace />;
   if (adminOnly && user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN') return <Navigate to="/dashboard" replace />;
   return <Outlet />;
@@ -37,6 +49,7 @@ function ProtectedRoute({ adminOnly = false }: { adminOnly?: boolean }) {
 
 function App() {
   const { user, setUser, isLoading, setLoading } = useAuthStore();
+  const [isSplashDone, setIsSplashDone] = useState(false);
 
   useEffect(() => {
     const token = localStorage.getItem('access_token');
@@ -56,16 +69,37 @@ function App() {
       .finally(() => setLoading(false));
   }, [setLoading, setUser]);
 
-  if (isLoading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-dark-950 text-gray-100">
-        <div className="h-10 w-10 animate-spin rounded-full border-2 border-dark-600 border-t-brand-500" />
-      </div>
-    );
-  }
+  useEffect(() => {
+    const handleFirstInteraction = () => {
+      soundManager.init();
+      document.removeEventListener('click', handleFirstInteraction);
+      document.removeEventListener('keydown', handleFirstInteraction);
+    };
+    document.addEventListener('click', handleFirstInteraction);
+    document.addEventListener('keydown', handleFirstInteraction);
+    
+    return () => {
+      document.removeEventListener('click', handleFirstInteraction);
+      document.removeEventListener('keydown', handleFirstInteraction);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!user) {
+      soundManager.stopMusic();
+    }
+  }, [user]);
 
   return (
-    <BrowserRouter>
+    <>
+      {!isSplashDone && (
+        <LoadingScreen
+          isReady={!isLoading}
+          minDurationMs={2400}
+          onFinish={() => setIsSplashDone(true)}
+        />
+      )}
+      <BrowserRouter>
       <Routes>
         <Route element={<PublicLayout />}>
           <Route element={<AuthLayout />}>
@@ -75,12 +109,25 @@ function App() {
         </Route>
 
         <Route element={<ProtectedRoute />}>
+          {/* Fullscreen games outside the dashboard layout */}
+          <Route path="/games/dragon-tiger" element={<DragonTigerPage />} />
+          <Route path="/games/andar-bahar" element={<AndarBaharPage />} />
+          <Route path="/games/rummy" element={<RummyPage />} />
+          <Route path="/games/rummy/:tableId" element={<RummyPage />} />
+          <Route path="/games/teen-patti" element={<TeenPatti />} />
+          <Route path="/games/teen-patti/:tableId" element={<TeenPatti />} />
+          <Route path="/games/aviator" element={<AviatorPage />} />
+          <Route path="/games/poker" element={<PokerPage />} />
+          <Route path="/games/poker/:tableId" element={<PokerPage />} />
+          <Route path="/games/roulette" element={<RoulettePage />} />
+          <Route path="/games/chicken-road" element={<ChickenRoadPage />} />
+          <Route path="/games/triple-777" element={<Triple777Page />} />
           <Route element={<UserLayout />}>
             <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/games-catalog" element={<GameCatalogPage />} />
             <Route path="/games" element={<GamePlayPage />} />
             <Route path="/games/colour-prediction" element={<GamePlayPage />} />
-            <Route path="/games/dragon-tiger" element={<DragonTigerPage />} />
+            <Route path="/games/ludo" element={<Ludo />} />
             <Route path="/wallet" element={<WalletPage />} />
             <Route path="/transactions" element={<TransactionsPage />} />
             <Route path="/deposit" element={<DepositPage />} />
@@ -107,6 +154,7 @@ function App() {
         <Route path="*" element={<Navigate to={user ? '/dashboard' : '/login'} replace />} />
       </Routes>
     </BrowserRouter>
+    </>
   );
 }
 

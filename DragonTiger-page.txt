@@ -1,0 +1,440 @@
+﻿import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { gameService } from '../../services/game';
+import { walletService } from '../../services/wallet';
+import { Loader } from '../../components/common/Loader';
+import type { CatalogGame, GameBet, GameRound, GameState, Wallet } from '../../types';
+import { DragonTigerArena, type ArenaPhase } from '../../components/dragonTiger/DragonTigerArena';
+
+const SLUG = 'dragon-tiger';
+
+function paiseToRupees(p: number): string {
+  return (p / 100).toFixed(2);
+}
+
+export function DragonTigerPage() {
+  /* â”€â”€ core data â”€â”€ */
+  const [gameState, setGameState] = useState<GameState | null>(null);
+  const [wallet, setWallet] = useState<Wallet | null>(null);
+  const [history, setHistory] = useState<GameRound[]>([]);
+  const [myBets, setMyBets] = useState<GameBet[]>([]);
+  const [catalogGame, setCatalogGame] = useState<CatalogGame | null>(null);
+  const [selected, setSelected] = useState<string | null>(null);
+  const [amount, setAmount] = useState(1000);
+  const [loading, setLoading] = useState(true);
+  const [betting, setBetting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+  const [countdown, setCountdown] = useState(0);
+
+  /* â”€â”€ animation state â”€â”€ */
+  const [phase, setPhase] = useState<ArenaPhase>('waiting');
+  const [dragonFlipped, setDragonFlipped] = useState(false);
+  const [tigerFlipped, setTigerFlipped] = useState(false);
+  const [showPlayer, setShowPlayer] = useState(false);
+
+  /**
+   * displayRound holds the completed round whose result is currently being
+   * animated. While this is set, all card data & result come from it â€” even
+   * if the backend already created a new BETTING round.
+   */
+  const [displayRound, setDisplayRound] = useState<GameRound | null>(null);
+  /** Ref tracks whether an animation sequence is in progress so we never
+   *  start a second one or let polling/ws clobber state mid-animation. */
+  const animatingRef = useRef(false);
+
+  const wsRef = useRef<WebSocket | null>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const game = gameState?.game || catalogGame;
+  const cfg = game?.config || {};
+  const payouts = cfg.payouts || { dragon: 1, tiger: 1, tie: 11 };
+  const allowed = cfg.allowed_bets || { dragon: true, tiger: true, tie: true };
+
+  /* â”€â”€ data fetching â”€â”€ */
+  const fetchAll = useCallback(async () => {
+    try {
+      const [gs, w, h, b, catalog] = await Promise.all([
+        gameService.getCurrentRound(SLUG),
+        walletService.getWallet(),
+        gameService.getHistory(12, SLUG),
+        gameService.getMyBets(1, 10, SLUG),
+        gameService.getCatalog(),
+      ]);
+      setGameState(gs);
+      setWallet(w);
+      setHistory(h);
+      setMyBets(b.items);
+      setCountdown(gs.seconds_remaining);
+      setCatalogGame(catalog.find((g) => g.slug === SLUG) || null);
+    } catch {
+      // keep last good state
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchAll();
+    const pollId = setInterval(fetchAll, 5000);
+    return () => clearInterval(pollId);
+  }, [fetchAll]);
+
+  /* â”€â”€ countdown timer â”€â”€ */
+  useEffect(() => {
+    if (timerRef.current) clearInterval(timerRef.current);
+    timerRef.current = setInterval(() => {
+      setCountdown((prev) => Math.max(0, prev - 1));
+    }, 1000);
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, [gameState?.round?.id, gameState?.round?.status]);
+
+  /* â”€â”€ WebSocket â”€â”€ */
+  useEffect(() => {
+    const wsProtocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+    const wsHost = import.meta.env.VITE_WS_URL || `${wsProtocol}://localhost:8000`;
+    const ws = new WebSocket(`${wsHost}/api/v1/ws/games`);
+    wsRef.current = ws;
+    ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.game_slug && data.game_slug !== SLUG) return;
+        if (data.type === 'round_start' || data.type === 'betting_locked' || data.type === 'round_result') {
+          if (data.seconds_remaining != null) setCountdown(data.seconds_remaining);
+          fetchAll();
+        }
+      } catch {
+        /* ignore */
+      }
+    };
+    return () => {
+      ws.close();
+      wsRef.current = null;
+    };
+  }, [fetchAll]);
+
+  /* â”€â”€ derived state â”€â”€ */
+  const round = gameState?.round;
+  const isBetting = round?.status === 'BETTING' && !displayRound;
+  const isCalculating = round?.status === 'CALCULATING';
+
+  // The round we use for display: the frozen completed round during animation,
+  // otherwise the live round.
+  const activeRound = displayRound || round;
+  const dragonCard = (activeRound?.result_data?.dragon_card as string) || undefined;
+  const tigerCard = (activeRound?.result_data?.tiger_card as string) || undefined;
+
+  /* â”€â”€ capture completed round & run animation â”€â”€ */
+  useEffect(() => {
+    // When the live round has result cards and we're NOT already animating,
+    // freeze this round and kick off the animation.
+    const rd = round?.result_data;
+    const hasCards = Boolean(rd?.dragon_card && rd?.tiger_card);
+
+    if (hasCards && !animatingRef.current && !displayRound) {
+      console.log('[DragonTiger] Capturing completed round for animation:', round?.id);
+      setDisplayRound(round!);
+    }
+  }, [round, displayRound]);
+
+  useEffect(() => {
+    if (!displayRound) {
+      // No round to animate â€” ensure idle state
+      if (!animatingRef.current) {
+        setPhase('waiting');
+        setDragonFlipped(false);
+        setTigerFlipped(false);
+        setShowPlayer(false);
+      }
+      return;
+    }
+
+    // Prevent re-entry
+    if (animatingRef.current) return;
+    animatingRef.current = true;
+
+    const rd = displayRound.result_data;
+    const resVal = rd?.result as string | undefined;
+    console.log('[DragonTiger] Starting animation sequence â€”', {
+      roundId: displayRound.id,
+      dragon: rd?.dragon_card,
+      tiger: rd?.tiger_card,
+      result: resVal,
+    });
+
+    let cancelled = false;
+    const delay = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
+    const run = async () => {
+      // 1. Cards deal in
+      setPhase('revealing');
+      setDragonFlipped(false);
+      setTigerFlipped(false);
+      setShowPlayer(false);
+
+      // Dragon card slide + flip
+      await delay(500);
+      if (cancelled) return;
+      setDragonFlipped(true);
+      console.log('[DragonTiger] Dragon flipped');
+
+      // Tiger card slide + flip
+      await delay(900);
+      if (cancelled) return;
+      setTigerFlipped(true);
+      console.log('[DragonTiger] Tiger flipped');
+
+      // Both cards visible â€” show winner
+      await delay(700);
+      if (cancelled) return;
+
+      if (resVal === 'DRAGON') setPhase('dragon-winning');
+      else if (resVal === 'TIGER') setPhase('tiger-winning');
+      else if (resVal === 'TIE') setPhase('tie-result');
+      console.log('[DragonTiger] Winner phase:', resVal);
+
+      // Winner animation plays for a moment, then show player result
+      await delay(1400);
+      if (cancelled) return;
+      setShowPlayer(true);
+      console.log('[DragonTiger] Showing player result');
+
+      // Hold everything on screen for 4 seconds
+      await delay(4000);
+      if (cancelled) return;
+
+      // Clear â€” next round takes over
+      console.log('[DragonTiger] Animation complete, releasing displayRound');
+      animatingRef.current = false;
+      setDisplayRound(null);
+      setPhase('waiting');
+      setDragonFlipped(false);
+      setTigerFlipped(false);
+      setShowPlayer(false);
+    };
+
+    run();
+    return () => {
+      cancelled = true;
+      animatingRef.current = false;
+    };
+  }, [displayRound]);
+
+  /* â”€â”€ bet matching â”€â”€ */
+  const displayRoundId = displayRound?.id || round?.id;
+  const roundBets = useMemo(
+    () => myBets.filter((b) => displayRoundId && b.round_id === displayRoundId),
+    [myBets, displayRoundId],
+  );
+  const wonThisRound = roundBets.some((b) => b.status === 'WON');
+  const lostThisRound = roundBets.some((b) => b.status === 'LOST') && !wonThisRound;
+
+  /* â”€â”€ place bet â”€â”€ */
+  const handleBet = async () => {
+    if (!selected || !round || !game) return;
+    setError(null);
+    setSuccess(null);
+    setBetting(true);
+    try {
+      await gameService.placeBet(round.id, selected, amount, game.id);
+      setSuccess(`Bet placed: \u20B9${paiseToRupees(amount)} on ${selected}`);
+      await fetchAll();
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { error?: { message?: string } } } };
+      setError(axiosErr?.response?.data?.error?.message || 'Failed to place bet');
+    } finally {
+      setBetting(false);
+    }
+  };
+
+  const options = [
+    { key: 'DRAGON', label: 'DRAGON \uD83D\uDC09', enabled: allowed.dragon !== false, payout: payouts.dragon, tone: 'from-red-700 to-red-500' },
+    { key: 'TIGER', label: 'TIGER \uD83D\uDC2F', enabled: allowed.tiger !== false, payout: payouts.tiger, tone: 'from-yellow-600 to-amber-400' },
+    { key: 'TIE', label: 'TIE', enabled: allowed.tie !== false, payout: payouts.tie, tone: 'from-emerald-700 to-green-500' },
+  ];
+
+  /* â”€â”€ countdown status label & styling â”€â”€ */
+  const isAnimating = Boolean(displayRound);
+  const countdownLabel = isAnimating
+    ? 'Revealing cards'
+    : isBetting
+      ? countdown <= 0
+        ? 'Betting closed'
+        : 'Betting open'
+      : isCalculating
+        ? 'Cards drawing'
+        : 'Waiting';
+
+  const countdownColor = isAnimating
+    ? 'text-yellow-300'
+    : isBetting
+      ? countdown <= 5
+        ? 'text-red-400 animate-pulse'
+        : countdown <= 10
+          ? 'text-orange-400'
+          : 'text-green-400'
+      : isCalculating
+        ? 'text-yellow-300'
+        : 'text-zinc-500';
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader size="lg" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="dragon-tiger-page space-y-5 w-full max-w-3xl mx-auto">
+      <div className="rounded-2xl border border-yellow-500/20 bg-gradient-to-br from-zinc-950 via-red-950/40 to-emerald-950/30 p-5">
+        <p className="text-xs uppercase tracking-[0.25em] text-yellow-400/80">Live table</p>
+        <h1 className="text-3xl sm:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-200 via-red-400 to-green-400">
+          Dragon Tiger
+        </h1>
+        <p className="text-sm text-zinc-400 mt-1">Higher rank wins. Suit does not count.</p>
+      </div>
+
+      {/* â”€â”€ Status bar â”€â”€ */}
+      <div className="rounded-2xl border border-zinc-800 bg-zinc-950/80 p-4 sm:p-5">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-xs text-zinc-500">Round</p>
+            <p className="font-mono text-xs text-zinc-400">{(displayRound?.id || round?.id)?.slice(0, 8) ?? '\u2014'}</p>
+          </div>
+          <div className="text-center">
+            <div className={`text-5xl font-black tabular-nums ${countdownColor}`}>
+              {isAnimating ? '\u2728' : `${Math.floor(countdown)}s`}
+            </div>
+            <p className="text-xs font-semibold mt-1 text-zinc-400">
+              {countdownLabel}
+            </p>
+          </div>
+          <div className="text-right">
+            <p className="text-xs text-zinc-500">Wallet</p>
+            <p className="text-xl font-bold text-yellow-300">{'\u20B9'}{wallet?.balance_inr ?? '0.00'}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* â”€â”€ Arena â”€â”€ */}
+      <DragonTigerArena
+        phase={phase}
+        dragonCard={dragonCard}
+        tigerCard={tigerCard}
+        dragonFlipped={dragonFlipped}
+        tigerFlipped={tigerFlipped}
+        showPlayer={showPlayer && (wonThisRound || lostThisRound)}
+        playerWon={wonThisRound ? true : lostThisRound ? false : null}
+        playerAmountLabel={wonThisRound ? `+\u20B9${paiseToRupees(roundBets.reduce((sum, b) => sum + (b.net_win_amount || 0), 0))}` : undefined}
+      />
+
+      {/* â”€â”€ Betting controls â”€â”€ */}
+      <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-4 sm:p-5 space-y-4">
+        <div className="flex items-center justify-between">
+          <p className="text-sm font-semibold text-zinc-300">Betting options</p>
+          <p className="text-xs text-zinc-500">
+            Selection: <span className="text-yellow-300">{selected ?? 'none'}</span>
+          </p>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {options.map((opt) => (
+            <button
+              key={opt.key}
+              disabled={!isBetting || countdown <= 0 || betting || !opt.enabled}
+              onClick={() => setSelected(opt.key)}
+              className={`rounded-xl py-4 px-3 font-black text-white bg-gradient-to-br ${opt.tone} ${
+                selected === opt.key ? 'ring-4 ring-yellow-300 scale-[1.02]' : 'opacity-90'
+              } ${!isBetting || countdown <= 0 || !opt.enabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}`}
+            >
+              {opt.label}
+              <span className="block text-xs font-semibold mt-1 opacity-90">{opt.payout}x payout</span>
+            </button>
+          ))}
+        </div>
+
+        <p className="text-sm text-zinc-400">Bet amount</p>
+        <div className="flex flex-wrap gap-2">
+          {[1000, 5000, 10000, 25000, 50000].map((p) => (
+            <button
+              key={p}
+              onClick={() => setAmount(p)}
+              className={`px-3 py-2 rounded-lg text-sm font-semibold ${
+                amount === p ? 'bg-yellow-500 text-zinc-950' : 'bg-zinc-800 text-zinc-200'
+              }`}
+            >
+              {'\u20B9'}{paiseToRupees(p)}
+            </button>
+          ))}
+        </div>
+
+        <button
+          onClick={handleBet}
+          disabled={!isBetting || countdown <= 0 || !selected || betting}
+          className="w-full py-4 rounded-xl font-black text-lg bg-gradient-to-r from-red-600 via-yellow-500 to-green-500 text-zinc-950 disabled:from-zinc-700 disabled:via-zinc-700 disabled:to-zinc-700 disabled:text-zinc-500"
+        >
+          {betting ? 'Placing\u2026' : selected ? `Place bet \u20B9${paiseToRupees(amount)} on ${selected}` : 'Select Dragon, Tiger, or Tie'}
+        </button>
+        {error && <p className="text-sm text-red-400 text-center">{error}</p>}
+        {success && <p className="text-sm text-green-400 text-center">{success}</p>}
+      </div>
+
+      {/* â”€â”€ Recent results â”€â”€ */}
+      <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-4">
+        <p className="text-sm font-semibold text-zinc-300 mb-3">Recent results</p>
+        {history.length === 0 ? (
+          <p className="text-sm text-zinc-500">No completed rounds yet.</p>
+        ) : (
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            {history.map((r) => {
+              const res = r.result_data?.result as string | undefined;
+              const cls =
+                res === 'DRAGON'
+                  ? 'from-red-700 to-red-500'
+                  : res === 'TIGER'
+                    ? 'from-yellow-600 to-amber-400'
+                    : 'from-emerald-700 to-green-500';
+              return (
+                <div
+                  key={r.id}
+                  className={`min-w-14 h-14 rounded-xl bg-gradient-to-br ${cls} text-white text-[11px] font-black flex items-center justify-center`}
+                >
+                  {res === 'DRAGON' ? '\uD83D\uDC09' : res === 'TIGER' ? '\uD83D\uDC2F' : 'TIE'}
+                </div>
+              );
+            })}
+          </div>
+        )}
+        <p className="text-[11px] text-zinc-500 mt-3">
+          Previous outcomes are shown for history only. They do not predict future results.
+        </p>
+      </div>
+
+      {/* â”€â”€ My bets â”€â”€ */}
+      <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-4">
+        <p className="text-sm font-semibold text-zinc-300 mb-3">My Dragon Tiger bets</p>
+        {myBets.length === 0 ? (
+          <p className="text-sm text-zinc-500">No bets yet.</p>
+        ) : (
+          <div className="space-y-2">
+            {myBets.map((bet) => (
+              <div key={bet.id} className="flex items-center justify-between text-sm bg-zinc-900 rounded-lg px-3 py-2">
+                <span className="font-semibold text-zinc-200">{bet.prediction}</span>
+                <span className="text-zinc-400">{'\u20B9'}{paiseToRupees(bet.amount)}</span>
+                <span
+                  className={
+                    bet.status === 'WON' ? 'text-yellow-300' : bet.status === 'LOST' ? 'text-red-400' : 'text-zinc-400'
+                  }
+                >
+                  {bet.status === 'WON' ? `+\u20B9${paiseToRupees(bet.net_win_amount || 0)}` : bet.status}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+

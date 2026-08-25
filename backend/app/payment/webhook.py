@@ -303,6 +303,9 @@ def handle_webhook(
         db.rollback()
         raise
 
+    from ..services.referral_service import check_and_qualify_referral
+    check_and_qualify_referral(db, deposit.user_id)
+
     db.commit()
     db.refresh(deposit)
 

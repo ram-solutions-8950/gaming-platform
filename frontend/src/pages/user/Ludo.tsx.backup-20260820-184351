@@ -1,0 +1,169 @@
+import React from 'react';
+import { LudoProvider, useLudo } from '../../contexts/LudoContext';
+import { LudoWaitingRoom } from '../../components/ludo/LudoWaitingRoom';
+import { LudoBoard } from '../../components/ludo/LudoBoard';
+import { LudoDice } from '../../components/ludo/LudoDice';
+import { LudoPlayerPanel } from '../../components/ludo/LudoPlayerPanel';
+import { LudoTurnIndicator } from '../../components/ludo/LudoTurnIndicator';
+import '../../components/ludo/ludo-king.css';
+
+const LudoGame: React.FC = () => {
+  const { match, connectionStatus, error, clearError } = useLudo();
+
+  if (!match || match.status === 'WAITING') {
+    return (
+      <div className="min-h-[calc(100dvh-6rem)] bg-transparent px-0 py-2 sm:py-6">
+        <div className="mx-auto w-full max-w-lg">
+          <LudoWaitingRoom />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="ludo-felt ludo-game-page min-h-screen text-white">
+      {connectionStatus === 'RECONNECTING' && (
+        <div className="fixed left-0 right-0 top-0 z-[100] bg-yellow-500 py-2 text-center text-sm font-bold text-black">
+          Connection lost — reconnecting...
+        </div>
+      )}
+
+      {error && (
+        <div
+          onClick={clearError}
+          className="fixed left-1/2 top-5 z-[100] max-w-md -translate-x-1/2 cursor-pointer rounded-xl bg-red-600/95 px-5 py-3 text-center shadow-2xl"
+        >
+          {error}
+          <span className="ml-3 opacity-70">✕</span>
+        </div>
+      )}
+
+      <div className="ludo-game-container mx-auto w-full max-w-7xl">
+
+        {/* HEADER */}
+        <div className="ludo-game-header flex items-center justify-between gap-3">
+          <h1 className="flex gap-0.5 font-black leading-none">
+            {['L', 'U', 'D', 'O'].map((letter, i) => (
+              <span
+                key={letter}
+                className="text-2xl drop-shadow-[0_2px_0_rgba(0,0,0,0.4)] sm:text-4xl"
+                style={{
+                  color: ['#e53935', '#43a047', '#1e88e5', '#fdd835'][i],
+                }}
+              >
+                {letter}
+              </span>
+            ))}
+          </h1>
+
+          <div className="flex items-center gap-2">
+            <div className="rounded-xl bg-black/35 px-3 py-1.5 ring-1 ring-white/10">
+              <span className="block text-[9px] text-white/50">
+                ENTRY
+              </span>
+              <span className="font-bold text-emerald-300">
+                ₹{(match.entry_fee / 100).toFixed(0)}
+              </span>
+            </div>
+
+            <div className="rounded-xl bg-black/35 px-3 py-1.5 ring-1 ring-white/10">
+              <span className="block text-[9px] text-white/50">
+                PRIZE
+              </span>
+              <span className="font-bold text-[#fdd835]">
+                ₹{(match.prize_pool / 100).toFixed(0)}
+              </span>
+            </div>
+
+            <div className="rounded-xl bg-emerald-500/15 px-3 py-1.5 ring-1 ring-emerald-400/30">
+              <span className="flex items-center gap-2 text-xs font-semibold text-emerald-300">
+                <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-400" />
+                LIVE
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* LANDSCAPE GAME AREA */}
+        <div className="ludo-game-layout">
+
+          {/* LEFT: BOARD */}
+          <div className="ludo-board-column">
+            <LudoTurnIndicator />
+
+            <LudoBoard />
+
+            {/* Portrait/tablet dice */}
+            <div className="ludo-dice-portrait mx-auto mt-2 w-full max-w-[620px]">
+              <LudoDice />
+            </div>
+          </div>
+
+          {/* RIGHT: INFORMATION */}
+          <aside className="ludo-side-column">
+
+            <LudoPlayerPanel />
+
+            {/* Landscape dice */}
+            <div className="ludo-dice-landscape">
+              <LudoDice />
+            </div>
+
+          </aside>
+        </div>
+      </div>
+
+      {/* GAME OVER */}
+      {match.status === 'COMPLETED' && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/85 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-3xl border border-yellow-500/30 bg-[#1b5e20] p-7 text-center shadow-2xl">
+            <div className="mb-3 animate-bounce text-6xl">🏆</div>
+
+            <h2 className="mb-2 text-3xl font-black">
+              Game Over
+            </h2>
+
+            <p className="mb-6 text-white/70">
+              Final standings
+            </p>
+
+            <div className="space-y-2">
+              {match.players
+                .filter(p => p.rank !== null)
+                .sort((a, b) => (a.rank || 0) - (b.rank || 0))
+                .map(p => (
+                  <div
+                    key={p.id}
+                    className="flex items-center justify-between rounded-xl bg-black/30 px-4 py-3"
+                  >
+                    <span className="font-bold">
+                      {p.color}
+                    </span>
+
+                    <span className="font-bold">
+                      #{p.rank}
+                    </span>
+                  </div>
+                ))}
+            </div>
+
+            <button
+              onClick={() => window.location.reload()}
+              className="mt-6 w-full rounded-xl bg-gradient-to-b from-[#7cb342] to-[#33691e] py-3 font-bold"
+            >
+              Play Again
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export const Ludo: React.FC = () => {
+  return (
+    <LudoProvider>
+      <LudoGame />
+    </LudoProvider>
+  );
+};

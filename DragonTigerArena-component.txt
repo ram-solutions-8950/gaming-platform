@@ -1,0 +1,168 @@
+﻿import './DragonTigerArena.css';
+
+const SUIT_GLYPH: Record<string, string> = { S: '\u2660', H: '\u2665', D: '\u2666', C: '\u2663' };
+
+export type ArenaPhase = 'waiting' | 'revealing' | 'dragon-winning' | 'tiger-winning' | 'tie-result';
+
+export function parseDtCard(code?: string | null) {
+  if (!code || typeof code !== 'string') return null;
+  const [rank, suit] = code.split('-');
+  if (!rank || !suit) return null;
+  return { rank, suit, red: suit === 'H' || suit === 'D' };
+}
+
+function PlayingCard({
+  card,
+  flipped,
+  backMark,
+}: {
+  card?: string | null;
+  flipped: boolean;
+  backMark: string;
+}) {
+  const parsed = parseDtCard(card);
+
+  return (
+    <div className={`dvt-card-holder ${flipped ? 'card-revealed' : ''}`}>
+      {!flipped ? (
+        <div className="dvt-card-visible-back">
+          <div className="dvt-card-back-mark">
+            {backMark}
+          </div>
+        </div>
+      ) : (
+        <div
+          className={`dvt-card-visible-front ${
+            parsed?.red ? 'red' : ''
+          }`}
+        >
+          {parsed ? (
+            <>
+              <div>
+                <div className="dvt-rank">{parsed.rank}</div>
+                <div className="dvt-suit-sm">
+                  {SUIT_GLYPH[parsed.suit] || parsed.suit}
+                </div>
+              </div>
+
+              <div className="dvt-suit-lg">
+                {SUIT_GLYPH[parsed.suit] || parsed.suit}
+              </div>
+
+              <div className="dvt-corner-br">
+                <div className="dvt-rank">{parsed.rank}</div>
+                <div className="dvt-suit-sm">
+                  {SUIT_GLYPH[parsed.suit] || parsed.suit}
+                </div>
+              </div>
+            </>
+          ) : (
+            <div className="dvt-card-loading">?</div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+function FireFx() {
+  return (
+    <div className="dvt-fx dvt-fx-dragon" aria-hidden>
+      {[0, 1, 2, 3, 4, 5, 6].map((i) => (
+        <span
+          key={i}
+          className="dvt-particle"
+          style={{
+            left: `${12 + i * 12}%`,
+            animationDelay: `${i * 90}ms`,
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
+function SparkFx() {
+  return (
+    <div className="dvt-fx dvt-fx-tiger" aria-hidden>
+      {[0, 1, 2, 3, 4, 5, 6].map((i) => (
+        <span
+          key={i}
+          className="dvt-particle"
+          style={{
+            left: `${14 + i * 11}%`,
+            animationDelay: `${i * 85}ms`,
+            ['--dx' as string]: `${i % 2 === 0 ? 10 : -8}px`,
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
+function Side({
+  kind,
+  card,
+  flipped,
+}: {
+  kind: 'dragon' | 'tiger';
+  card?: string | null;
+  flipped: boolean;
+}) {
+  const isDragon = kind === 'dragon';
+  return (
+    <div className={`dvt-side dvt-side-${kind}`}>
+      <div className="dvt-character">
+        {isDragon ? <FireFx /> : <SparkFx />}
+        <div className={`dvt-mascot ${isDragon ? 'dvt-mascot-dragon' : 'dvt-mascot-tiger'}`}>
+          {isDragon ? '\uD83D\uDC09' : '\uD83D\uDC2F'}
+        </div>
+        <div className="dvt-label">{isDragon ? 'DRAGON' : 'TIGER'}</div>
+        <div className="dvt-wins-tag">WINS</div>
+      </div>
+      <PlayingCard card={card} flipped={flipped} backMark={isDragon ? '\uD83D\uDC09' : '\uD83D\uDC2F'} />
+    </div>
+  );
+}
+
+export function DragonTigerArena({
+  phase,
+  dragonCard,
+  tigerCard,
+  dragonFlipped,
+  tigerFlipped,
+  showPlayer,
+  playerWon,
+  playerAmountLabel,
+}: {
+  phase: ArenaPhase;
+  dragonCard?: string | null;
+  tigerCard?: string | null;
+  dragonFlipped: boolean;
+  tigerFlipped: boolean;
+  showPlayer: boolean;
+  playerWon: boolean | null;
+  playerAmountLabel?: string;
+}) {
+  const classes = ['dvt-arena', phase];
+  if (showPlayer) classes.push('show-player');
+
+  return (
+    <div className={classes.join(' ')}>
+      <div className="dvt-stage">
+        <Side kind="dragon" card={dragonCard} flipped={dragonFlipped} />
+        <div className="dvt-vs">VS</div>
+        <Side kind="tiger" card={tigerCard} flipped={tigerFlipped} />
+      </div>
+      <div className="dvt-banner">
+        {phase === 'tie-result' && <div className="dvt-tie-banner">âœ¨ TIE âœ¨</div>}
+        {showPlayer && playerWon === true && (
+          <div className="dvt-player-banner dvt-player-win">ðŸŽ‰ YOU WON {playerAmountLabel}</div>
+        )}
+        {showPlayer && playerWon === false && (
+          <div className="dvt-player-banner dvt-player-loss">BET LOST</div>
+        )}
+      </div>
+    </div>
+  );
+}
+

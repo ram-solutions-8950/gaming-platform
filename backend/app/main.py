@@ -11,7 +11,7 @@ from pathlib import Path
 from .config import settings
 from .utils.exceptions import http_exception_handler, validation_exception_handler
 from .middleware.rate_limiter import limiter
-from .routers import auth, users, wallet, transactions, deposits, withdrawals, payments, admin, fees, games
+from .routers import auth, users, wallet, transactions, deposits, withdrawals, payments, admin, fees, games, referral
 from .services.game_engine import start_engine, stop_engine
 from .websocket.manager import game_ws_manager
 
@@ -40,11 +40,12 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 # CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 
 # Exception handlers
 app.add_exception_handler(StarletteHTTPException, http_exception_handler)
@@ -62,6 +63,19 @@ app.include_router(payments.router, prefix=PREFIX)
 app.include_router(admin.router, prefix=PREFIX)
 app.include_router(fees.router, prefix=PREFIX)
 app.include_router(games.router, prefix=PREFIX)
+app.include_router(referral.router, prefix=PREFIX)
+from .routers import ludo, rummy, teen_patti, aviator, poker, chicken_road, triple_777
+from .websocket import teen_patti_ws, aviator_ws, poker_ws
+app.include_router(ludo.router, prefix=PREFIX)
+app.include_router(rummy.router, prefix=PREFIX)
+app.include_router(teen_patti.router, prefix=PREFIX)
+app.include_router(teen_patti_ws.router, prefix=PREFIX)
+app.include_router(aviator.router, prefix=PREFIX)
+app.include_router(aviator_ws.router, prefix=PREFIX)
+app.include_router(poker.router, prefix=PREFIX)
+app.include_router(poker_ws.router, prefix=PREFIX)
+app.include_router(chicken_road.router, prefix=PREFIX)
+app.include_router(triple_777.router, prefix=PREFIX)
 
 # Static file serving — QR code uploads only
 QR_UPLOAD_DIR = Path(__file__).resolve().parent.parent / "uploads" / "qr"

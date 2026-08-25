@@ -1,6 +1,5 @@
-@import "tailwindcss";
-
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+@import "tailwindcss";
 
 @theme {
   --font-sans: 'Inter', system-ui, sans-serif;
@@ -19,16 +18,967 @@
   --color-warn: oklch(78% 0.17 85);
 }
 
+:root {
+  --casino-bg: #18002F;
+  --casino-bg-deep: #10001F;
+  --casino-purple-dark: #200044;
+  --casino-purple: #3D0875;
+  --casino-purple-bright: #6A19C8;
+  --casino-purple-light: #8B2BE2;
+  --casino-gold: #FFD21A;
+  --casino-gold-bright: #FFE900;
+  --casino-gold-dark: #D99A00;
+  --casino-orange: #FF8A00;
+  --casino-green: #19D35A;
+  --casino-white: #FFFFFF;
+  --casino-muted: #D8CBE8;
+}
+
 *, *::before, *::after { box-sizing: border-box; }
+
+/* ─── 777WIN Casino Global Styles ─── */
+.casino-theme-bg,
+.game-catalog-page,
+.games-page {
+  background:
+    radial-gradient(
+      ellipse at 50% 15%,
+      rgba(139,43,226,.30) 0%,
+      rgba(61,8,117,.18) 35%,
+      transparent 70%
+    ),
+    linear-gradient(
+      180deg,
+      #200044 0%,
+      #3D0875 45%,
+      #18002F 100%
+    ) !important;
+}
+
+.casino-header,
+.rummy-header,
+.ab-header,
+.dt-header,
+.tp-header,
+.roulette-header,
+.aviator-header,
+.poker-header,
+.cp-header {
+  background: linear-gradient(180deg, #32105F, #21003F) !important;
+  border-bottom: 1px solid rgba(255,210,26,.25) !important;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4) !important;
+}
+
+.casino-wallet-pill,
+.rummy-balance,
+.ab-balance-pill,
+.dt-balance-pill,
+.tp-balance,
+.roulette-balance,
+.aviator-balance,
+.poker-balance {
+  background: linear-gradient(180deg, #1A002E 0%, #0D0017 100%) !important;
+  border: 1px solid rgba(255, 210, 26, 0.45) !important;
+  box-shadow: 0 0 10px rgba(255, 210, 26, 0.2), inset 0 1px 2px rgba(0, 0, 0, 0.8) !important;
+  border-radius: 20px !important;
+  color: #FFD21A !important;
+  font-weight: 800 !important;
+}
+
+.casino-btn-gold,
+.btn-gold,
+.dt-btn-bet,
+.ab-btn-bet,
+.roulette-btn-spin,
+.rummy-create-btn {
+  background: linear-gradient(180deg, #FFE900, #FFB000) !important;
+  color: #351000 !important;
+  font-weight: 900 !important;
+  border: 1px solid #FFF36A !important;
+  box-shadow: 0 3px 10px rgba(255,210,26,.30) !important;
+  border-radius: 8px !important;
+  cursor: pointer !important;
+  transition: transform 0.15s ease, filter 0.15s ease !important;
+}
+
+.casino-btn-gold:hover,
+.btn-gold:hover {
+  transform: translateY(-1px) !important;
+  filter: brightness(1.08) !important;
+}
+
+.casino-btn-gold:active,
+.btn-gold:active {
+  transform: translateY(1px) !important;
+}
+
+.casino-panel,
+.casino-card,
+.rummy-table-card,
+.ab-panel,
+.dt-panel,
+.roulette-panel {
+  background: rgba(16,0,31,.90) !important;
+  border: 1px solid rgba(139,43,226,.45) !important;
+  border-radius: 12px !important;
+  box-shadow: 0 8px 25px rgba(0,0,0,.35) !important;
+}
+
+.casino-tab {
+  background: rgba(255,255,255,.06) !important;
+  color: #D8CBE8 !important;
+  border-radius: 8px !important;
+  font-weight: 600 !important;
+}
+
+.casino-tab.active {
+  background: linear-gradient(180deg, #8B2BE2, #52109A) !important;
+  border: 1px solid #FFD21A !important;
+  color: #FFFFFF !important;
+  box-shadow: 0 0 10px rgba(139,43,226,.4) !important;
+}
+
+.casino-timer-box {
+  background: rgba(16, 0, 31, 0.85) !important;
+  border: 1px solid rgba(255, 210, 26, 0.4) !important;
+  border-radius: 8px !important;
+  color: #FFD21A !important;
+  box-shadow: 0 0 12px rgba(255, 210, 26, 0.25) !important;
+}
+
+.casino-status-open {
+  color: #19D35A !important;
+  text-shadow: 0 0 8px rgba(25, 211, 90, 0.6) !important;
+}
+
+.casino-status-closing {
+  color: #FF8A00 !important;
+  text-shadow: 0 0 8px rgba(255, 138, 0, 0.6) !important;
+}
+
+.casino-status-closed {
+  color: #E52B1A !important;
+  text-shadow: 0 0 8px rgba(229, 43, 26, 0.6) !important;
+}
+
+.casino-bottom-nav,
+.lobby-bottom-nav {
+  background: linear-gradient(180deg, rgba(91,25,150,.97), rgba(31,0,55,.99)) !important;
+  border-top: 1px solid rgba(255,210,26,.25) !important;
+}
+
+.casino-nav-item.active,
+.lobby-nav-item.active {
+  background: linear-gradient(180deg, #FFE21A, #FF9D00) !important;
+  color: #351000 !important;
+  font-weight: 800 !important;
+  box-shadow: 0 2px 8px rgba(255,210,26,.4) !important;
+}
+
+html, body, #root {
+  width: 100%;
+  height: 100%;
+  max-width: 100dvw;
+  max-height: 100dvh;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
 
 body {
   font-family: var(--font-sans);
   background-color: var(--color-dark-950);
   color: #e2e8f0;
   -webkit-font-smoothing: antialiased;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  padding-left: env(safe-area-inset-left, 0px);
 }
 
 /* Custom scrollbar */
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: var(--color-dark-900); }
 ::-webkit-scrollbar-thumb { background: var(--color-dark-600); border-radius: 3px; }
+
+@keyframes glitter-fall {
+  0% { transform: translateY(-10vh) rotate(0deg); opacity: 0; }
+  10% { opacity: 1; }
+  90% { opacity: 1; }
+  100% { transform: translateY(110vh) rotate(360deg); opacity: 0; }
+}
+
+@keyframes float-slow {
+  0% { transform: translateY(0px); }
+  50% { transform: translateY(-15px); }
+  100% { transform: translateY(0px); }
+}
+
+@theme {
+  --animate-glitter-fall: glitter-fall linear infinite;
+  --animate-float-slow: float-slow 6s ease-in-out infinite;
+}
+.dragon-tiger-page {
+  position: relative;
+  width: 100%;
+  min-height: 100dvh;
+  overflow: hidden;
+
+  background-image:
+    linear-gradient(
+      rgba(5, 8, 20, 0.35),
+      rgba(5, 8, 20, 0.35)
+    ),
+    url("../assets/dragon-tiger-bg.jpeg");
+
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+/* =========================================================
+   AUTH PAGES (LOGIN / SIGNUP) — MOBILE LANDSCAPE AUTHORITY
+   ========================================================= */
+
+@media (orientation: landscape) and (max-height: 500px) {
+  .auth-layout {
+    height: 100dvh !important;
+    min-height: 0 !important;
+    max-height: 100dvh !important;
+    width: 100% !important;
+    overflow: hidden !important;
+    box-sizing: border-box !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: max(4px, env(safe-area-inset-top, 4px)) max(8px, env(safe-area-inset-right, 8px)) max(4px, env(safe-area-inset-bottom, 4px)) max(8px, env(safe-area-inset-left, 8px)) !important;
+  }
+
+  .auth-bg {
+    position: fixed !important;
+    inset: 0 !important;
+    pointer-events: none !important;
+  }
+
+  .auth-content {
+    width: 100% !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 0 !important;
+  }
+
+  .auth-card {
+    width: min(390px, 94vw) !important;
+    max-width: 390px !important;
+    max-height: calc(100dvh - 12px) !important;
+    padding: 8px 16px !important;
+    border-radius: 12px !important;
+    box-sizing: border-box !important;
+    overflow-y: auto !important;
+    scrollbar-width: none !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: center !important;
+    margin: 0 auto !important;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6) !important;
+  }
+
+  .auth-card::-webkit-scrollbar {
+    display: none !important;
+  }
+
+  .auth-header {
+    margin-bottom: 6px !important;
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 8px !important;
+    text-align: left !important;
+  }
+
+  .auth-header-text {
+    display: flex !important;
+    flex-direction: column !important;
+  }
+
+  .auth-logo {
+    width: 32px !important;
+    height: 32px !important;
+    min-width: 32px !important;
+    min-height: 32px !important;
+    margin-bottom: 0 !important;
+    border-radius: 8px !important;
+  }
+
+  .auth-logo-text {
+    font-size: 16px !important;
+  }
+
+  .auth-title {
+    font-size: 16px !important;
+    margin-bottom: 0 !important;
+    line-height: 1.1 !important;
+  }
+
+  .auth-subtitle {
+    font-size: 10px !important;
+    line-height: 1.1 !important;
+  }
+
+  .auth-form {
+    gap: 5px !important;
+    display: flex !important;
+    flex-direction: column !important;
+  }
+
+  .auth-form > * + * {
+    margin-top: 0 !important;
+  }
+
+  .auth-input-group {
+    gap: 1.5px !important;
+  }
+
+  .auth-input-label {
+    font-size: 10px !important;
+    line-height: 1 !important;
+    margin-bottom: 1px !important;
+  }
+
+  .auth-input-field {
+    height: 34px !important;
+    min-height: 34px !important;
+    padding: 3px 8px !important;
+    font-size: 12px !important;
+    border-radius: 6px !important;
+  }
+
+  .auth-submit-btn {
+    height: 36px !important;
+    min-height: 36px !important;
+    padding: 4px 12px !important;
+    font-size: 12px !important;
+    border-radius: 8px !important;
+    margin-top: 2px !important;
+  }
+
+  .auth-footer {
+    font-size: 10px !important;
+    margin-top: 4px !important;
+    line-height: 1 !important;
+  }
+
+  /* ── UserLayout Main Content Padding in Landscape ── */
+  main > div.max-w-7xl {
+    padding: 4px 10px !important;
+  }
+
+  /* ── Deposit Page Mobile Landscape ── */
+  .deposit-page {
+    width: min(580px, calc(100vw - 32px)) !important;
+    max-width: 580px !important;
+    margin: 0 auto !important;
+    padding: 0 !important;
+    gap: 3px !important;
+    display: flex !important;
+    flex-direction: column !important;
+  }
+
+  .deposit-page > * + * {
+    margin-top: 0 !important;
+  }
+
+  .deposit-page-header {
+    margin-bottom: 2px !important;
+  }
+
+  .deposit-page-title {
+    font-size: 15px !important;
+    margin: 0 !important;
+    line-height: 1.1 !important;
+  }
+
+  .deposit-page-badge {
+    font-size: 9.5px !important;
+    padding: 1.5px 7px !important;
+  }
+
+  .deposit-card {
+    padding: 8px 16px !important;
+    border-radius: 12px !important;
+    margin: 0 auto !important;
+    max-height: calc(100dvh - 85px) !important;
+    overflow-y: auto !important;
+    scrollbar-width: none !important;
+  }
+
+  .deposit-card::-webkit-scrollbar {
+    display: none !important;
+  }
+
+  .deposit-card h3 {
+    font-size: 13px !important;
+    margin-bottom: 4px !important;
+    line-height: 1.1 !important;
+  }
+
+  .deposit-card-body {
+    gap: 4px !important;
+    display: flex !important;
+    flex-direction: column !important;
+  }
+
+  .deposit-card-body > * + * {
+    margin-top: 0 !important;
+  }
+
+  .deposit-amount-label {
+    font-size: 9.5px !important;
+    margin-bottom: 1.5px !important;
+    line-height: 1 !important;
+  }
+
+  .deposit-amount-input {
+    height: 36px !important;
+    min-height: 36px !important;
+    padding: 3px 8px 3px 26px !important;
+    font-size: 13px !important;
+    border-radius: 8px !important;
+  }
+
+  .deposit-presets-grid {
+    display: grid !important;
+    grid-template-columns: repeat(4, 1fr) !important;
+    gap: 5px !important;
+    margin-top: 3px !important;
+  }
+
+  .deposit-preset-btn {
+    padding: 3px 4px !important;
+    font-size: 10.5px !important;
+    border-radius: 6px !important;
+  }
+
+  .deposit-limits-row {
+    font-size: 9px !important;
+    margin-top: 2px !important;
+  }
+
+  .deposit-submit-btn {
+    height: 36px !important;
+    min-height: 36px !important;
+    padding: 3px 10px !important;
+    font-size: 11.5px !important;
+    font-weight: 800 !important;
+    border-radius: 8px !important;
+    margin-top: 3px !important;
+  }
+
+  /* ── Withdrawal Page Mobile Landscape ── */
+  .withdrawal-page {
+    width: min(600px, calc(100vw - 32px)) !important;
+    max-width: 600px !important;
+    margin: 0 auto !important;
+    padding: 0 !important;
+    gap: 3px !important;
+    display: flex !important;
+    flex-direction: column !important;
+  }
+
+  .withdrawal-page > * + * {
+    margin-top: 0 !important;
+  }
+
+  .withdrawal-page-header {
+    margin-bottom: 2px !important;
+  }
+
+  .withdrawal-page-title {
+    font-size: 15px !important;
+    margin: 0 !important;
+    line-height: 1.1 !important;
+  }
+
+  .withdrawal-balance-box {
+    padding: 2px 8px !important;
+    border-radius: 8px !important;
+  }
+
+  .withdrawal-balance-label {
+    font-size: 8px !important;
+    line-height: 1 !important;
+  }
+
+  .withdrawal-balance-val {
+    font-size: 12px !important;
+    line-height: 1.1 !important;
+  }
+
+  .withdrawal-card {
+    padding: 8px 16px !important;
+    border-radius: 12px !important;
+    margin: 0 auto !important;
+    max-height: calc(100dvh - 85px) !important;
+    overflow-y: auto !important;
+    scrollbar-width: none !important;
+    overscroll-behavior: contain !important;
+  }
+
+  .withdrawal-card::-webkit-scrollbar {
+    display: none !important;
+  }
+
+  .withdrawal-card h3 {
+    font-size: 13px !important;
+    margin-bottom: 4px !important;
+    line-height: 1.1 !important;
+  }
+
+  .withdrawal-form {
+    gap: 4px !important;
+    display: flex !important;
+    flex-direction: column !important;
+  }
+
+  .withdrawal-form > * + * {
+    margin-top: 0 !important;
+  }
+
+  .withdrawal-method-label,
+  .withdrawal-amount-label,
+  .withdrawal-field-label {
+    font-size: 9.5px !important;
+    margin-bottom: 1.5px !important;
+    line-height: 1 !important;
+  }
+
+  .withdrawal-method-grid {
+    gap: 6px !important;
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .withdrawal-method-btn {
+    padding: 4px 8px !important;
+    font-size: 11px !important;
+    border-radius: 6px !important;
+    height: 30px !important;
+    min-height: 30px !important;
+  }
+
+  .withdrawal-inputs-grid {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 8px !important;
+  }
+
+  .withdrawal-bank-grid {
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 4px !important;
+  }
+
+  .withdrawal-amount-input,
+  .withdrawal-field-input {
+    height: 32px !important;
+    min-height: 32px !important;
+    padding: 3px 8px !important;
+    font-size: 12px !important;
+    border-radius: 6px !important;
+  }
+
+  .withdrawal-amount-input {
+    padding-left: 26px !important;
+  }
+
+  .withdrawal-fee-box {
+    padding: 4px 8px !important;
+    gap: 2px !important;
+    border-radius: 6px !important;
+  }
+
+  .withdrawal-fee-box .text-sm,
+  .withdrawal-fee-box .text-base {
+    font-size: 10px !important;
+    line-height: 1.2 !important;
+  }
+
+  .withdrawal-submit-btn {
+    height: 34px !important;
+    min-height: 34px !important;
+    padding: 3px 10px !important;
+    font-size: 11.5px !important;
+    font-weight: 800 !important;
+    border-radius: 8px !important;
+    margin-top: 2px !important;
+  }
+
+  .withdrawal-history-card {
+    display: none !important;
+  }
+
+  /* ── Colour Prediction Mobile Landscape ── */
+  .cp-page {
+    width: min(640px, calc(100vw - 32px)) !important;
+    max-width: 640px !important;
+    margin: 0 auto !important;
+    padding: 0 !important;
+    gap: 3px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    padding-left: max(6px, env(safe-area-inset-left)) !important;
+    padding-right: max(6px, env(safe-area-inset-right)) !important;
+  }
+
+  .cp-page > * + * {
+    margin-top: 0 !important;
+  }
+
+  .cp-game-header {
+    padding: 3px 10px !important;
+    border-radius: 10px !important;
+    margin-bottom: 2px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 6px !important;
+    flex-wrap: nowrap !important;
+  }
+
+  .cp-exit-btn {
+    padding: 2px 8px !important;
+    font-size: 10.5px !important;
+    height: 24px !important;
+    border-radius: 6px !important;
+  }
+
+  .cp-title {
+    font-size: 13.5px !important;
+    line-height: 1.1 !important;
+    margin: 0 !important;
+  }
+
+  .cp-round-text {
+    font-size: 9px !important;
+    line-height: 1 !important;
+  }
+
+  .cp-timer-box {
+    padding: 2px 8px !important;
+    border-radius: 8px !important;
+    gap: 4px !important;
+  }
+
+  .cp-timer-countdown {
+    font-size: 15px !important;
+    line-height: 1 !important;
+  }
+
+  .cp-timer-status {
+    font-size: 9.5px !important;
+    line-height: 1 !important;
+  }
+
+  .cp-balance-label {
+    font-size: 8px !important;
+    line-height: 1 !important;
+  }
+
+  .cp-balance-val {
+    font-size: 12px !important;
+    line-height: 1.1 !important;
+  }
+
+  .cp-betting-card {
+    padding: 6px 12px !important;
+    border-radius: 12px !important;
+    margin: 0 auto !important;
+    max-height: calc(100dvh - 85px) !important;
+    overflow-y: auto !important;
+    scrollbar-width: none !important;
+    overscroll-behavior: contain !important;
+  }
+
+  .cp-betting-card::-webkit-scrollbar {
+    display: none !important;
+  }
+
+  .cp-betting-card h3 {
+    font-size: 12.5px !important;
+    margin-bottom: 2px !important;
+    line-height: 1.1 !important;
+  }
+
+  .cp-colours-section,
+  .cp-numbers-section,
+  .cp-amounts-section {
+    margin-bottom: 3px !important;
+  }
+
+  .cp-section-label {
+    font-size: 9.5px !important;
+    margin-bottom: 1.5px !important;
+    line-height: 1 !important;
+  }
+
+  .cp-colours-grid {
+    gap: 6px !important;
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+
+  .cp-colour-btn {
+    padding: 3px 6px !important;
+    border-radius: 8px !important;
+    height: 32px !important;
+    min-height: 32px !important;
+    font-size: 11.5px !important;
+  }
+
+  .cp-colour-btn span:first-child {
+    font-size: 11px !important;
+    line-height: 1 !important;
+  }
+
+  .cp-colour-btn span:last-child {
+    font-size: 8.5px !important;
+    line-height: 1 !important;
+  }
+
+  .cp-numbers-grid {
+    gap: 3px !important;
+    display: grid !important;
+    grid-template-columns: repeat(10, minmax(0, 1fr)) !important;
+  }
+
+  .cp-number-btn {
+    padding: 2px 0 !important;
+    height: 20px !important;
+    min-height: 20px !important;
+    font-size: 10px !important;
+    border-radius: 5px !important;
+  }
+
+  .cp-amounts-grid {
+    gap: 4px !important;
+    display: grid !important;
+    grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+  }
+
+  .cp-amount-btn {
+    padding: 2px 4px !important;
+    height: 22px !important;
+    min-height: 22px !important;
+    font-size: 10px !important;
+    border-radius: 5px !important;
+  }
+
+  .cp-submit-btn {
+    height: 30px !important;
+    min-height: 30px !important;
+    padding: 2px 8px !important;
+    font-size: 11px !important;
+    font-weight: 800 !important;
+    border-radius: 8px !important;
+    margin-top: 2px !important;
+  }
+
+  .cp-results-card,
+  .cp-history-card {
+    display: none !important;
+  }
+
+  /* ── Profile Page Mobile Landscape ── */
+  .profile-page {
+    width: min(680px, calc(100vw - 32px)) !important;
+    max-width: 680px !important;
+    margin: 0 auto !important;
+    padding: 0 !important;
+    gap: 3px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    padding-left: max(12px, env(safe-area-inset-left)) !important;
+    padding-right: max(12px, env(safe-area-inset-right)) !important;
+  }
+
+  .profile-page > * + * {
+    margin-top: 0 !important;
+  }
+
+  .profile-header {
+    padding: 3px 12px 4px !important;
+    min-height: 32px !important;
+    max-height: 34px !important;
+    box-sizing: border-box !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+  }
+
+  .profile-title {
+    font-size: 15px !important;
+    line-height: 1.1 !important;
+    margin: 0 !important;
+  }
+
+  .profile-id {
+    font-size: 9.5px !important;
+    line-height: 1 !important;
+  }
+
+  .profile-card {
+    padding: 10px 14px !important;
+    border-radius: 12px !important;
+    margin: 0 auto !important;
+    max-height: calc(100dvh - 85px) !important;
+    overflow-y: auto !important;
+    scrollbar-width: none !important;
+    overscroll-behavior: contain !important;
+  }
+
+  .profile-card::-webkit-scrollbar {
+    display: none !important;
+  }
+
+  .profile-card h3 {
+    font-size: 12.5px !important;
+    margin-bottom: 2px !important;
+    line-height: 1.1 !important;
+  }
+
+  .profile-inner-grid {
+    display: grid !important;
+    grid-template-columns: 200px minmax(0, 1fr) !important;
+    gap: 14px !important;
+    align-items: center !important;
+  }
+
+  .profile-summary {
+    grid-column: span 1 / span 1 !important;
+    padding: 8px !important;
+    border-radius: 12px !important;
+  }
+
+  .profile-avatar {
+    width: 64px !important;
+    height: 64px !important;
+    font-size: 24px !important;
+    margin-bottom: 4px !important;
+  }
+
+  .profile-name-text {
+    font-size: 13px !important;
+    line-height: 1.1 !important;
+  }
+
+  .profile-email-text {
+    font-size: 9px !important;
+    margin-top: 2px !important;
+  }
+
+  .profile-badges {
+    margin-top: 4px !important;
+    gap: 4px !important;
+  }
+
+  .profile-badges span {
+    font-size: 8px !important;
+    padding: 1px 4px !important;
+    border-radius: 4px !important;
+  }
+
+  .profile-form {
+    grid-column: span 1 / span 1 !important;
+    gap: 4px !important;
+    display: flex !important;
+    flex-direction: column !important;
+  }
+
+  .profile-form > * + * {
+    margin-top: 0 !important;
+  }
+
+  .profile-fields-row {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 8px !important;
+  }
+
+  .profile-form label {
+    font-size: 9.5px !important;
+    margin-bottom: 1.5px !important;
+    line-height: 1 !important;
+  }
+
+  .profile-input-field input,
+  .profile-input-field div {
+    height: 30px !important;
+    min-height: 30px !important;
+    padding: 2px 8px !important;
+    font-size: 11px !important;
+    border-radius: 6px !important;
+  }
+
+  .profile-form p {
+    font-size: 9px !important;
+    margin-top: 2px !important;
+    line-height: 1.2 !important;
+  }
+
+  .profile-save-container {
+    padding-top: 2px !important;
+  }
+
+  .profile-save-btn {
+    height: 32px !important;
+    min-height: 32px !important;
+    padding: 3px 12px !important;
+    font-size: 11px !important;
+    font-weight: 800 !important;
+    border-radius: 6px !important;
+  }
+}
+
+/* ───────────────────────────────────────────────────────────
+   UNIVERSAL MOBILE RESPONSIVENESS & SAFE-AREA STANDARDS
+   ─────────────────────────────────────────────────────────── */
+:root {
+  --sat: env(safe-area-inset-top, 0px);
+  --sar: env(safe-area-inset-right, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+}
+
+html, body {
+  min-height: 100dvh;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+/* iOS Safari auto-zoom prevention on input focus */
+@media screen and (max-width: 768px) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not(.no-zoom-fix),
+  select:not(.no-zoom-fix),
+  textarea:not(.no-zoom-fix) {
+    font-size: 16px !important;
+  }
+}
+
+/* Safe-area utility classes */
+.safe-pt { padding-top: max(var(--sat), 0px) !important; }
+.safe-pb { padding-bottom: max(var(--sab), 0px) !important; }
+.safe-pl { padding-left: max(var(--sal), 0px) !important; }
+.safe-pr { padding-right: max(var(--sar), 0px) !important; }
+
+/* Minimum touch target utility (44px) */
+.touch-target {
+  min-width: 44px;
+  min-height: 44px;
+}

@@ -1,0 +1,1607 @@
+/* =========================================================
+   DRAGON TIGER ARENA
+   Full animation stylesheet
+   ========================================================= */
+
+.dvt-arena {
+  --dvt-gold: #f5d76e;
+  --dvt-gold-2: #c9a227;
+  --dvt-dragon: #ff4d2e;
+  --dvt-tiger: #ffcc33;
+
+  position: relative;
+  overflow: hidden;
+  border-radius: 1.15rem;
+  padding: 0.85rem 0.55rem 1rem;
+
+  border: 1px solid rgba(201, 162, 39, 0.35);
+
+  background:
+    radial-gradient(
+      ellipse at 18% 0%,
+      rgba(255, 70, 30, 0.22),
+      transparent 46%
+    ),
+    radial-gradient(
+      ellipse at 82% 0%,
+      rgba(255, 196, 40, 0.20),
+      transparent 46%
+    ),
+    radial-gradient(
+      ellipse at 50% 100%,
+      rgba(245, 215, 110, 0.08),
+      transparent 55%
+    ),
+    linear-gradient(
+      180deg,
+      #160709 0%,
+      #0b0b10 55%,
+      #050507 100%
+    );
+
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.06),
+    0 15px 45px rgba(0,0,0,0.45);
+}
+
+
+/* =========================================================
+   STAGE
+   ========================================================= */
+
+.dvt-stage {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: start;
+  gap: 0.2rem 0.35rem;
+  max-width: 100%;
+}
+
+
+/* =========================================================
+   SIDES
+   ========================================================= */
+
+.dvt-side {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 0;
+
+  transform: translate3d(0, 0, 0);
+  transition:
+    transform 420ms ease,
+    opacity 420ms ease,
+    filter 420ms ease;
+
+  will-change: transform, opacity, filter;
+}
+
+
+/* =========================================================
+   CHARACTER
+   ========================================================= */
+
+.dvt-character {
+  position: relative;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+
+  margin-bottom: 0.35rem;
+
+  z-index: 20;
+}
+
+
+.dvt-mascot {
+  width: 3.35rem;
+  height: 3.35rem;
+
+  border-radius: 999px;
+
+  display: grid;
+  place-items: center;
+
+  font-size: 1.85rem;
+  line-height: 1;
+
+  position: relative;
+
+  transform: translateZ(0);
+
+  z-index: 3;
+}
+
+
+/* =========================================================
+   DRAGON
+   ========================================================= */
+
+.dvt-mascot-dragon {
+  background:
+    radial-gradient(
+      circle at 35% 30%,
+      rgba(255, 220, 160, 0.55),
+      transparent 42%
+    ),
+    radial-gradient(
+      circle at 50% 70%,
+      rgba(255, 60, 20, 0.55),
+      rgba(80, 10, 0, 0.9)
+    );
+
+  box-shadow:
+    0 0 16px rgba(255, 90, 30, 0.45),
+    inset 0 0 10px rgba(255, 200, 80, 0.25);
+
+  border: 1px solid rgba(255, 190, 90, 0.55);
+}
+
+
+/* =========================================================
+   TIGER
+   ========================================================= */
+
+.dvt-mascot-tiger {
+  background:
+    radial-gradient(
+      circle at 35% 30%,
+      rgba(255, 250, 210, 0.6),
+      transparent 42%
+    ),
+    radial-gradient(
+      circle at 50% 70%,
+      rgba(255, 180, 40, 0.55),
+      rgba(90, 50, 0, 0.92)
+    );
+
+  box-shadow:
+    0 0 16px rgba(255, 200, 50, 0.42),
+    inset 0 0 10px rgba(255, 230, 140, 0.28);
+
+  border: 1px solid rgba(255, 220, 120, 0.6);
+}
+
+
+/* =========================================================
+   LABELS
+   ========================================================= */
+
+.dvt-label {
+  margin-top: 0.2rem;
+
+  font-size: 0.68rem;
+  font-weight: 800;
+
+  letter-spacing: 0.18em;
+  line-height: 1;
+}
+
+
+.dvt-side-dragon .dvt-label {
+  color: #ffb089;
+
+  text-shadow:
+    0 0 10px rgba(255, 80, 30, 0.45);
+}
+
+
+.dvt-side-tiger .dvt-label {
+  color: #ffe08a;
+
+  text-shadow:
+    0 0 10px rgba(255, 190, 40, 0.4);
+}
+
+
+/* =========================================================
+   WIN TAG
+   ========================================================= */
+
+.dvt-wins-tag {
+  margin-top: 0.18rem;
+
+  font-size: 0.62rem;
+  font-weight: 900;
+
+  letter-spacing: 0.28em;
+
+  opacity: 0;
+  transform: scale(0.75);
+
+  color: var(--dvt-gold);
+
+  text-shadow:
+    0 0 12px rgba(245, 215, 110, 0.7);
+
+  transition:
+    opacity 280ms ease,
+    transform 280ms ease;
+}
+
+
+/* =========================================================
+   CARD HOLDER
+   ========================================================= */
+
+.dvt-card-holder {
+  position: relative;
+
+  box-sizing: border-box;
+
+  width: min(28vw, 118px);
+  height: calc(min(28vw, 118px) * 1.42);
+
+  min-width: 92px;
+  min-height: 130px;
+
+  max-width: 132px;
+  max-height: 188px;
+
+  border-radius: 0.85rem;
+
+  padding: 5px;
+
+  background:
+    linear-gradient(
+      160deg,
+      rgba(255, 232, 160, 0.85),
+      rgba(120, 90, 20, 0.35) 40%,
+      rgba(255, 210, 90, 0.65)
+    );
+
+  box-shadow:
+    0 10px 22px rgba(0, 0, 0, 0.45),
+    0 0 14px rgba(201, 162, 39, 0.18);
+
+  overflow: visible;
+
+  z-index: 5;
+}
+
+
+/* =========================================================
+   CARD HOLDER HIGHLIGHT
+   ========================================================= */
+
+.dvt-card-holder::before {
+  content: "";
+
+  position: absolute;
+
+  inset: 5px;
+
+  border-radius: 0.68rem;
+
+  pointer-events: none;
+
+  background:
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.08),
+      transparent 40%
+    );
+
+  z-index: 5;
+}
+
+
+/* =========================================================
+   CARD 3D CONTAINER
+   ========================================================= */
+
+/* =========================================================
+   CARD 3D FLIP — FIXED
+   ========================================================= */
+
+.dvt-card-holder {
+  position: relative;
+  perspective: 1400px;
+  -webkit-perspective: 1400px;
+  transform-style: preserve-3d;
+  -webkit-transform-style: preserve-3d;
+}
+
+.dvt-card {
+  position: relative;
+  width: 100%;
+  height: 100%;
+
+  /* IMPORTANT:
+     Do NOT use translateZ(0) here.
+     It can interfere with the 3D flip/compositing.
+  */
+
+  transform-style: preserve-3d;
+  -webkit-transform-style: preserve-3d;
+
+  z-index: 1;
+}
+
+.dvt-card-inner {
+  position: absolute;
+  inset: 0;
+
+  width: 100%;
+  height: 100%;
+
+  transform-style: preserve-3d;
+  -webkit-transform-style: preserve-3d;
+
+  transform: rotateY(0deg);
+  -webkit-transform: rotateY(0deg);
+
+  transition:
+    transform 900ms cubic-bezier(0.2, 0.75, 0.2, 1);
+
+  -webkit-transition:
+    -webkit-transform 900ms cubic-bezier(0.2, 0.75, 0.2, 1);
+
+  will-change: transform;
+}
+
+.dvt-card.flipped .dvt-card-inner {
+  transform: rotateY(180deg);
+  -webkit-transform: rotateY(180deg);
+}
+
+.dvt-card-face {
+  position: absolute;
+  inset: 0;
+
+  width: 100%;
+  height: 100%;
+
+  border-radius: 0.62rem;
+
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+
+  transform-style: preserve-3d;
+  -webkit-transform-style: preserve-3d;
+
+  overflow: hidden;
+}
+
+.dvt-card-back {
+  transform: rotateY(0deg);
+  -webkit-transform: rotateY(0deg);
+
+  z-index: 2;
+}
+
+.dvt-card-front {
+  transform: rotateY(180deg);
+  -webkit-transform: rotateY(180deg);
+
+  z-index: 1;
+
+  background:
+    linear-gradient(
+      180deg,
+      #fffdf8,
+      #efe6d4
+    );
+
+  border: 1px solid rgba(201, 162, 39, 0.55);
+
+  color: #1a1208;
+
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+
+  padding: 0.38rem 0.42rem;
+
+  box-shadow:
+    inset 0 0 12px rgba(0,0,0,0.08);
+}
+
+.dvt-card-front.red {
+  color: #c41e3a;
+}
+
+.dvt-card-front.red {
+  color: #c41e3a;
+}
+
+
+/* =========================================================
+   CARD TEXT
+   ========================================================= */
+
+.dvt-rank {
+  font-size: 1.15rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+
+.dvt-suit-sm {
+  font-size: 0.95rem;
+  line-height: 1;
+}
+
+
+.dvt-suit-lg {
+  align-self: center;
+
+  font-size: 2.15rem;
+
+  line-height: 1;
+}
+
+
+.dvt-corner-br {
+  align-self: flex-end;
+
+  transform: rotate(180deg);
+
+  text-align: left;
+}
+
+
+.dvt-card-loading {
+  width: 100%;
+  height: 100%;
+
+  display: grid;
+  place-items: center;
+
+  font-size: 2rem;
+  font-weight: 900;
+
+  color: #c9a227;
+}
+
+
+/* =========================================================
+   VS
+   ========================================================= */
+
+.dvt-vs {
+  align-self: center;
+
+  margin-top: 4.1rem;
+
+  width: 2.35rem;
+  height: 2.35rem;
+
+  border-radius: 999px;
+
+  display: grid;
+  place-items: center;
+
+  font-size: 0.68rem;
+  font-weight: 900;
+
+  letter-spacing: 0.08em;
+
+  color: #1a1208;
+
+  background:
+    radial-gradient(
+      circle at 30% 25%,
+      #fff3c4,
+      var(--dvt-gold) 42%,
+      var(--dvt-gold-2)
+    );
+
+  box-shadow:
+    0 0 16px rgba(245, 215, 110, 0.4);
+
+  border:
+    1px solid rgba(255, 240, 180, 0.7);
+
+  z-index: 20;
+
+  flex-shrink: 0;
+}
+
+
+/* =========================================================
+   PARTICLE EFFECTS
+   ========================================================= */
+
+.dvt-fx {
+  position: absolute;
+
+  inset: -8% -6% auto;
+
+  height: 58%;
+
+  pointer-events: none;
+
+  overflow: visible;
+
+  z-index: 10;
+}
+
+
+.dvt-particle {
+  position: absolute;
+
+  width: 6px;
+  height: 10px;
+
+  border-radius:
+    40% 40% 20% 20%;
+
+  opacity: 0;
+}
+
+
+/* =========================================================
+   BANNER
+   ========================================================= */
+
+.dvt-banner {
+  margin-top: 0.7rem;
+
+  text-align: center;
+
+  min-height: 2.4rem;
+
+  position: relative;
+
+  z-index: 30;
+}
+
+
+.dvt-tie-banner,
+.dvt-player-banner {
+  display: inline-block;
+
+  padding: 0.42rem 0.9rem;
+
+  border-radius: 999px;
+
+  font-weight: 900;
+
+  letter-spacing: 0.16em;
+
+  font-size: 0.78rem;
+}
+
+
+/* =========================================================
+   TIE
+   ========================================================= */
+
+.dvt-tie-banner {
+  color: #fff8dc;
+
+  background:
+    radial-gradient(
+      circle at 50% 40%,
+      rgba(255, 255, 255, 0.22),
+      rgba(201, 162, 39, 0.18)
+    );
+
+  box-shadow:
+    0 0 22px rgba(255, 255, 255, 0.18),
+    0 0 18px rgba(245, 215, 110, 0.35);
+
+  border:
+    1px solid rgba(255, 255, 255, 0.35);
+
+  opacity: 0;
+}
+
+
+/* =========================================================
+   PLAYER RESULT
+   ========================================================= */
+
+.dvt-player-banner {
+  margin-top: 0.4rem;
+
+  opacity: 0;
+
+  transform: scale(0.75);
+}
+
+
+.dvt-player-win {
+  color: #102410;
+
+  background:
+    linear-gradient(
+      90deg,
+      #f5d76e,
+      #7dff9a,
+      #f5d76e
+    );
+
+  background-size: 200% 100%;
+
+  box-shadow:
+    0 0 18px rgba(125, 255, 154, 0.35);
+
+  animation:
+    dvt-win-banner 1.5s linear infinite;
+}
+
+
+.dvt-player-loss {
+  color: #f3c6c6;
+
+  background:
+    rgba(40, 10, 12, 0.82);
+
+  border:
+    1px solid rgba(180, 60, 60, 0.45);
+
+  letter-spacing: 0.22em;
+}
+
+
+/* =========================================================
+   WAITING
+   ========================================================= */
+
+.dvt-arena.waiting .dvt-side-dragon .dvt-character,
+.dvt-arena.waiting .dvt-side-tiger .dvt-character {
+  animation:
+    dvt-float 3.2s ease-in-out infinite;
+}
+
+
+.dvt-arena.waiting .dvt-side-tiger .dvt-character {
+  animation-delay: -1.4s;
+}
+
+
+.dvt-arena.waiting .dvt-mascot-dragon {
+  animation:
+    dvt-breathe-dragon 2.8s ease-in-out infinite;
+}
+
+
+.dvt-arena.waiting .dvt-mascot-tiger {
+  animation:
+    dvt-breathe-tiger 2.8s ease-in-out infinite;
+}
+
+
+.dvt-arena.waiting .dvt-vs {
+  animation:
+    dvt-vs-idle 2.6s ease-in-out infinite;
+}
+
+
+/* =========================================================
+   REVEALING
+   ========================================================= */
+
+.dvt-arena.revealing .dvt-side-dragon {
+  animation:
+    dvt-dragon-deal
+    650ms
+    cubic-bezier(0.2, 0.8, 0.2, 1)
+    both;
+}
+
+
+.dvt-arena.revealing .dvt-side-tiger {
+  animation:
+    dvt-tiger-deal
+    650ms
+    cubic-bezier(0.2, 0.8, 0.2, 1)
+    900ms
+    both;
+}
+
+
+.dvt-arena.revealing .dvt-vs {
+  animation:
+    dvt-vs-pulse
+    700ms
+    ease
+    600ms
+    both;
+}
+
+
+/* =========================================================
+   DRAGON WIN
+   ========================================================= */
+
+.dvt-arena.dragon-winning .dvt-side-dragon {
+  transform:
+    translateY(-12px)
+    scale(1.1);
+
+  z-index: 10;
+
+  filter: brightness(1.15);
+}
+
+
+.dvt-arena.dragon-winning .dvt-side-tiger {
+  opacity: 0.45;
+
+  filter:
+    saturate(0.5)
+    brightness(0.6);
+
+  transform:
+    scale(0.94);
+}
+
+
+.dvt-arena.dragon-winning .dvt-mascot-dragon {
+  transform: scale(1.18);
+
+  box-shadow:
+    0 0 25px rgba(255, 70, 20, 0.9),
+    0 0 55px rgba(255, 140, 20, 0.7),
+    0 0 90px rgba(255, 60, 10, 0.35);
+
+  animation:
+    dragon-power
+    700ms
+    ease-in-out
+    infinite;
+}
+
+
+.dvt-arena.dragon-winning .dvt-card-holder {
+  animation:
+    dragon-card-win
+    700ms
+    ease-in-out
+    infinite;
+}
+
+
+.dvt-arena.dragon-winning .dvt-side-dragon .dvt-wins-tag {
+  opacity: 1;
+
+  transform: scale(1);
+
+  transition:
+    opacity 280ms ease,
+    transform 280ms ease;
+}
+
+
+.dvt-arena.dragon-winning .dvt-fx-dragon .dvt-particle {
+  background:
+    linear-gradient(
+      180deg,
+      #ffe08a,
+      #ff5a1f 55%,
+      #7a1200
+    );
+
+  animation:
+    dvt-fire
+    900ms
+    ease-out
+    infinite;
+}
+
+
+.dvt-arena.dragon-winning .dvt-vs {
+  opacity: 0.45;
+
+  transform: scale(0.92);
+}
+
+
+/* =========================================================
+   TIGER WIN
+   ========================================================= */
+
+.dvt-arena.tiger-winning .dvt-side-tiger {
+  transform:
+    translateY(-12px)
+    scale(1.1);
+
+  z-index: 10;
+
+  filter: brightness(1.15);
+}
+
+
+.dvt-arena.tiger-winning .dvt-side-dragon {
+  opacity: 0.45;
+
+  filter:
+    saturate(0.5)
+    brightness(0.6);
+
+  transform:
+    scale(0.94);
+}
+
+
+.dvt-arena.tiger-winning .dvt-mascot-tiger {
+  transform: scale(1.18);
+
+  box-shadow:
+    0 0 25px rgba(255, 210, 40, 0.9),
+    0 0 55px rgba(255, 170, 20, 0.7),
+    0 0 90px rgba(255, 120, 10, 0.35);
+
+  animation:
+    tiger-power
+    700ms
+    ease-in-out
+    infinite;
+}
+
+
+.dvt-arena.tiger-winning .dvt-card-holder {
+  animation:
+    tiger-card-win
+    700ms
+    ease-in-out
+    infinite;
+}
+
+
+.dvt-arena.tiger-winning .dvt-side-tiger .dvt-wins-tag {
+  opacity: 1;
+
+  transform: scale(1);
+
+  transition:
+    opacity 280ms ease,
+    transform 280ms ease;
+}
+
+
+.dvt-arena.tiger-winning .dvt-fx-tiger .dvt-particle {
+  width: 5px;
+  height: 5px;
+
+  border-radius: 50%;
+
+  background: #ffe9a0;
+
+  box-shadow:
+    0 0 8px #ffcc33;
+
+  animation:
+    dvt-spark
+    850ms
+    ease-out
+    infinite;
+}
+
+
+.dvt-arena.tiger-winning .dvt-vs {
+  opacity: 0.45;
+
+  transform: scale(0.92);
+}
+
+
+/* =========================================================
+   TIE
+   ========================================================= */
+
+.dvt-arena.tie-result .dvt-side-dragon,
+.dvt-arena.tie-result .dvt-side-tiger {
+  transform: none;
+
+  opacity: 1;
+
+  filter: none;
+}
+
+
+.dvt-arena.tie-result .dvt-card-holder {
+  animation:
+    tie-card-pulse
+    900ms
+    ease-in-out
+    infinite;
+}
+
+
+.dvt-arena.tie-result .dvt-tie-banner {
+  opacity: 1;
+
+  animation:
+    dvt-pop
+    420ms
+    ease
+    both;
+}
+
+
+.dvt-arena.tie-result .dvt-vs {
+  opacity: 0.5;
+
+  animation:
+    dvt-vs-idle
+    1s
+    ease-in-out
+    infinite;
+}
+
+
+/* =========================================================
+   PLAYER RESULT
+   ========================================================= */
+
+.dvt-arena.show-player .dvt-player-banner {
+  opacity: 1;
+
+  transform: scale(1);
+
+  animation:
+    dvt-pop
+    480ms
+    ease
+    both;
+}
+
+
+/* =========================================================
+   KEYFRAMES
+   ========================================================= */
+
+@keyframes dvt-float {
+  0%, 100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-5px);
+  }
+}
+
+
+@keyframes dvt-breathe-dragon {
+  0%, 100% {
+    box-shadow:
+      0 0 12px rgba(255, 90, 30, 0.35);
+  }
+
+  50% {
+    box-shadow:
+      0 0 20px rgba(255, 90, 30, 0.75),
+      0 0 35px rgba(255, 70, 20, 0.25);
+  }
+}
+
+
+@keyframes dvt-breathe-tiger {
+  0%, 100% {
+    box-shadow:
+      0 0 12px rgba(255, 200, 50, 0.32);
+  }
+
+  50% {
+    box-shadow:
+      0 0 20px rgba(255, 200, 50, 0.7),
+      0 0 35px rgba(255, 170, 20, 0.25);
+  }
+}
+
+
+@keyframes dvt-vs-idle {
+  0%, 100% {
+    box-shadow:
+      0 0 12px rgba(245, 215, 110, 0.32);
+  }
+
+  50% {
+    box-shadow:
+      0 0 25px rgba(245, 215, 110, 0.75),
+      0 0 45px rgba(245, 215, 110, 0.2);
+  }
+}
+
+
+@keyframes dvt-vs-pulse {
+  0% {
+    transform: scale(1);
+  }
+
+  40% {
+    transform: scale(1.18);
+  }
+
+  70% {
+    transform: scale(0.92);
+  }
+
+  100% {
+    transform: scale(1);
+  }
+}
+
+
+/* =========================================================
+   DEAL ANIMATIONS
+   ========================================================= */
+
+@keyframes dvt-dragon-deal {
+  0% {
+    opacity: 0;
+
+    transform:
+      translateX(-90px)
+      translateY(30px)
+      rotate(-8deg)
+      scale(0.65);
+  }
+
+  45% {
+    opacity: 1;
+
+    transform:
+      translateX(12px)
+      translateY(-8px)
+      rotate(3deg)
+      scale(1.08);
+  }
+
+  75% {
+    transform:
+      translateX(-4px)
+      translateY(2px)
+      rotate(-1deg)
+      scale(1.03);
+  }
+
+  100% {
+    opacity: 1;
+
+    transform:
+      translateX(0)
+      translateY(0)
+      rotate(0)
+      scale(1);
+  }
+}
+
+
+@keyframes dvt-tiger-deal {
+  0% {
+    opacity: 0;
+
+    transform:
+      translateX(90px)
+      translateY(30px)
+      rotate(8deg)
+      scale(0.65);
+  }
+
+  45% {
+    opacity: 1;
+
+    transform:
+      translateX(-12px)
+      translateY(-8px)
+      rotate(-3deg)
+      scale(1.08);
+  }
+
+  75% {
+    transform:
+      translateX(4px)
+      translateY(2px)
+      rotate(1deg)
+      scale(1.03);
+  }
+
+  100% {
+    opacity: 1;
+
+    transform:
+      translateX(0)
+      translateY(0)
+      rotate(0)
+      scale(1);
+  }
+}
+
+
+/* =========================================================
+   WIN ANIMATIONS
+   ========================================================= */
+
+@keyframes dragon-power {
+  0%, 100% {
+    transform: scale(1.12);
+  }
+
+  50% {
+    transform: scale(1.25);
+  }
+}
+
+
+@keyframes tiger-power {
+  0%, 100% {
+    transform: scale(1.12);
+  }
+
+  50% {
+    transform: scale(1.25);
+  }
+}
+
+
+@keyframes dragon-card-win {
+  0%, 100% {
+    box-shadow:
+      0 0 12px rgba(255, 60, 10, 0.5),
+      0 0 25px rgba(255, 150, 30, 0.3);
+  }
+
+  50% {
+    box-shadow:
+      0 0 30px rgba(255, 60, 10, 1),
+      0 0 65px rgba(255, 150, 30, 0.8);
+  }
+}
+
+
+@keyframes tiger-card-win {
+  0%, 100% {
+    box-shadow:
+      0 0 12px rgba(255, 200, 40, 0.5),
+      0 0 25px rgba(255, 170, 20, 0.25);
+  }
+
+  50% {
+    box-shadow:
+      0 0 30px rgba(255, 220, 50, 1),
+      0 0 65px rgba(255, 160, 20, 0.8);
+  }
+}
+
+
+@keyframes tie-card-pulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+
+  50% {
+    transform: scale(1.04);
+  }
+}
+
+
+/* =========================================================
+   FIRE
+   ========================================================= */
+
+@keyframes dvt-fire {
+  0% {
+    opacity: 0;
+
+    transform:
+      translateY(18px)
+      scale(0.5)
+      rotate(-10deg);
+  }
+
+  20% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.95;
+
+    transform:
+      translateY(-8px)
+      scale(1.1)
+      rotate(5deg);
+  }
+
+  100% {
+    opacity: 0;
+
+    transform:
+      translateY(-55px)
+      scale(1.35)
+      rotate(-8deg);
+  }
+}
+
+
+/* =========================================================
+   TIGER SPARKS
+   ========================================================= */
+
+@keyframes dvt-spark {
+  0% {
+    opacity: 0;
+
+    transform:
+      translate(0, 12px)
+      scale(0.3);
+  }
+
+  30% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+
+    transform:
+      translate(var(--dx, 8px), -30px)
+      scale(1.2);
+  }
+}
+
+
+/* =========================================================
+   RESULT BANNER
+   ========================================================= */
+
+@keyframes dvt-pop {
+  0% {
+    opacity: 0;
+
+    transform:
+      scale(0.65)
+      translateY(12px);
+  }
+
+  60% {
+    opacity: 1;
+
+    transform:
+      scale(1.08)
+      translateY(-2px);
+  }
+
+  100% {
+    opacity: 1;
+
+    transform:
+      scale(1)
+      translateY(0);
+  }
+}
+
+
+@keyframes dvt-win-banner {
+  0% {
+    background-position: 0% 50%;
+  }
+
+  100% {
+    background-position: 200% 50%;
+  }
+}
+
+
+/* =========================================================
+   MOBILE
+   ========================================================= */
+
+@media (max-width: 430px) {
+
+  .dvt-arena {
+    padding:
+      0.7rem
+      0.4rem
+      0.85rem;
+  }
+
+  .dvt-mascot {
+    width: 2.85rem;
+    height: 2.85rem;
+
+    font-size: 1.55rem;
+  }
+
+  .dvt-label {
+    font-size: 0.58rem;
+
+    letter-spacing: 0.12em;
+  }
+
+  .dvt-vs {
+    width: 2rem;
+    height: 2rem;
+
+    font-size: 0.58rem;
+
+    margin-top: 3.55rem;
+  }
+
+  .dvt-suit-lg {
+    font-size: 1.7rem;
+  }
+
+  .dvt-rank {
+    font-size: 1rem;
+  }
+
+  .dvt-card-holder {
+    min-width: 82px;
+    min-height: 116px;
+  }
+}
+.dvt-card-holder {
+  position: relative;
+  overflow: visible;
+}
+
+.dvt-card-visible-back,
+.dvt-card-visible-front {
+  width: 100%;
+  height: 100%;
+  border-radius: 0.62rem;
+
+  box-sizing: border-box;
+
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+
+  animation: cardReveal 650ms cubic-bezier(.2,.8,.2,1);
+}
+
+.dvt-card-visible-back {
+  align-items: center;
+  justify-content: center;
+
+  background:
+    repeating-linear-gradient(
+      45deg,
+      rgba(245,215,110,.12) 0 8px,
+      transparent 8px 16px
+    ),
+    linear-gradient(
+      145deg,
+      #6b1218,
+      #2a0c12 55%,
+      #3d1a08
+    );
+
+  border: 1px solid rgba(245,215,110,.55);
+
+  box-shadow:
+    0 10px 25px rgba(0,0,0,.45),
+    0 0 20px rgba(245,215,110,.18);
+}
+
+.dvt-card-visible-front {
+  padding: .45rem;
+
+  background:
+    linear-gradient(
+      180deg,
+      #fffdf8,
+      #efe6d4
+    );
+
+  border: 2px solid #d6ad3c;
+
+  color: #15100a;
+
+  box-shadow:
+    0 12px 28px rgba(0,0,0,.5),
+    0 0 20px rgba(245,215,110,.25);
+}
+
+.dvt-card-visible-front.red {
+  color: #c41e3a;
+}
+
+.dvt-card-visible-front .dvt-suit-lg {
+  align-self: center;
+}
+
+@keyframes cardReveal {
+  0% {
+    opacity: 0;
+    transform:
+      translateY(-35px)
+      scale(.75)
+      rotate(-8deg);
+  }
+
+  45% {
+    opacity: 1;
+    transform:
+      translateY(8px)
+      scale(1.08)
+      rotate(3deg);
+  }
+
+  75% {
+    transform:
+      translateY(-3px)
+      scale(1.02)
+      rotate(-1deg);
+  }
+
+  100% {
+    opacity: 1;
+    transform:
+      translateY(0)
+      scale(1)
+      rotate(0);
+  }
+}
+
+/* =========================================================
+   ACCESSIBILITY
+   ========================================================= */
+
+@media (prefers-reduced-motion: reduce) {
+
+  .dvt-arena.waiting .dvt-side-dragon .dvt-character,
+  .dvt-arena.waiting .dvt-side-tiger .dvt-character,
+  .dvt-arena.waiting .dvt-mascot-dragon,
+  .dvt-arena.waiting .dvt-mascot-tiger,
+  .dvt-arena.waiting .dvt-vs,
+  .dvt-arena.revealing .dvt-side-dragon,
+  .dvt-arena.revealing .dvt-side-tiger,
+  .dvt-arena.revealing .dvt-vs,
+  .dvt-arena.dragon-winning .dvt-fx-dragon .dvt-particle,
+  .dvt-arena.tiger-winning .dvt-fx-tiger .dvt-particle,
+  .dvt-arena.show-player .dvt-player-banner,
+  .dvt-arena.tie-result .dvt-tie-banner {
+    animation: none !important;
+  }
+
+  .dvt-card-inner {
+    transition: none !important;
+  }
+}/* =========================================================
+   DRAGON TIGER - LANDSCAPE RESPONSIVE OVERRIDE
+   ========================================================= */
+
+@media (orientation: landscape) {
+
+  .dragon-tiger-page {
+    width: 100%;
+    max-width: 1200px !important;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .dvt-arena {
+    width: 100%;
+    max-width: none;
+    box-sizing: border-box;
+  }
+
+  .dvt-stage {
+    width: 100%;
+    max-width: 100%;
+    grid-template-columns:
+      minmax(0, 1fr)
+      auto
+      minmax(0, 1fr);
+    gap: 0.5rem 1rem;
+  }
+
+  .dvt-side {
+    min-width: 0;
+  }
+
+  .dvt-mascot {
+    width: clamp(48px, 7vw, 76px);
+    height: clamp(48px, 7vw, 76px);
+    font-size: clamp(1.6rem, 3vw, 2.4rem);
+  }
+
+  .dvt-vs {
+    width: clamp(36px, 5vw, 54px);
+    height: clamp(36px, 5vw, 54px);
+    font-size: clamp(0.55rem, 1.2vw, 0.8rem);
+  }
+
+  .dvt-card-holder {
+    width: clamp(76px, 10vw, 118px);
+    height: clamp(108px, 14.2vw, 168px);
+    min-width: 76px;
+    min-height: 108px;
+    max-width: 118px;
+    max-height: 168px;
+  }
+
+  .dvt-card-visible-back,
+  .dvt-card-visible-front {
+    width: 100%;
+    height: 100%;
+  }
+
+  .dvt-label {
+    font-size: clamp(0.55rem, 1vw, 0.72rem);
+  }
+
+  .dvt-suit-lg {
+    font-size: clamp(1.5rem, 3vw, 2.3rem);
+  }
+
+  .dvt-rank {
+    font-size: clamp(0.9rem, 1.8vw, 1.3rem);
+  }
+}
+
+
+/* Short landscape phone: 844x390 etc. */
+@media (orientation: landscape) and (max-height: 500px) {
+
+  .dragon-tiger-page {
+    max-width: 100% !important;
+  }
+
+  .dvt-arena {
+    padding: 0.5rem 0.4rem 0.65rem;
+    border-radius: 0.8rem;
+  }
+
+  .dvt-stage {
+    gap: 0.25rem 0.5rem;
+  }
+
+  .dvt-mascot {
+    width: 42px;
+    height: 42px;
+    font-size: 1.35rem;
+  }
+
+  .dvt-label {
+    font-size: 0.5rem;
+    letter-spacing: 0.1em;
+  }
+
+  .dvt-vs {
+    width: 32px;
+    height: 32px;
+    font-size: 0.5rem;
+  }
+
+  .dvt-card-holder {
+    width: 72px;
+    height: 102px;
+    min-width: 72px;
+    min-height: 102px;
+  }
+
+  .dvt-suit-lg {
+    font-size: 1.4rem;
+  }
+
+  .dvt-rank {
+    font-size: 0.85rem;
+  }
+}
+
+
+/* Tablet / desktop landscape */
+@media (orientation: landscape) and (min-width: 768px) {
+
+  .dragon-tiger-page {
+    max-width: 1200px !important;
+  }
+
+  .dvt-arena {
+    padding: 1rem;
+  }
+
+  .dvt-stage {
+    gap: 0.75rem 1.5rem;
+  }
+
+  .dvt-card-holder {
+    width: clamp(90px, 9vw, 130px);
+    height: clamp(128px, 12.8vw, 185px);
+  }
+
+  .dvt-mascot {
+    width: clamp(58px, 6vw, 82px);
+    height: clamp(58px, 6vw, 82px);
+    font-size: clamp(1.8rem, 2.5vw, 2.6rem);
+  }
+}

@@ -33,6 +33,8 @@ class GamePrediction(str, enum.Enum):
     DRAGON = "DRAGON"
     TIGER = "TIGER"
     TIE = "TIE"
+    ANDAR = "ANDAR"
+    BAHAR = "BAHAR"
 
 class GameBetStatus(str, enum.Enum):
     PENDING = "PENDING"

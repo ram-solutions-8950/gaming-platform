@@ -133,3 +133,4 @@ export interface CatalogGame {
   updated_at?: string;
 }
 
+export * from './ludo';

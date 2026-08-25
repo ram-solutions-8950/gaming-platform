@@ -8,7 +8,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=str(PROJECT_ROOT / ".env"), extra="ignore")
 
     ENVIRONMENT: str = "development"
-    CORS_ORIGINS: List[str] = ["http://localhost:5173"]
+    CORS_ORIGINS: List[str] = ["http://localhost:5173", "https://5d61-183-82-187-74.ngrok-free.app", "http://localhost", "https://localhost", "capacitor://localhost"]
     DATABASE_URL: str = "postgresql://postgres@localhost:5432/gaming_db"
     REDIS_URL: str = "redis://localhost:6379/0"
 
@@ -24,3 +24,4 @@ class Settings(BaseSettings):
     PAYMENT_WEBHOOK_SECRET: str = ""
 
 settings = Settings()
+

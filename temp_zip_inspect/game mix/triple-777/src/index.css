@@ -1,0 +1,111 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  @apply font-body text-slate-100;
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
+  /* Premium dark casino background: black/purple base with soft crimson and
+   * gold bokeh — a handful of radial gradients, no image assets, so it costs
+   * nothing on low-end devices and never fights with foreground readability. */
+  background-color: #08060c;
+  background-image:
+    radial-gradient(ellipse 60% 40% at 15% 8%, rgba(168, 85, 247, 0.16), transparent 60%),
+    radial-gradient(ellipse 55% 35% at 85% 12%, rgba(200, 30, 58, 0.14), transparent 60%),
+    radial-gradient(ellipse 70% 50% at 50% 100%, rgba(76, 29, 149, 0.18), transparent 65%),
+    linear-gradient(180deg, #0a0710 0%, #0a0812 50%, #08060c 100%);
+  background-attachment: fixed;
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center rounded-lg px-4 py-3 font-display font-semibold
+           transition-all active:scale-95 focus:outline-none focus:ring-2 focus:ring-gold-500/60
+           disabled:opacity-40 disabled:active:scale-100 select-none;
+  }
+  .btn-gold {
+    @apply btn bg-gradient-to-b from-gold-400 to-gold-600 text-ink-950 shadow-glow hover:brightness-110;
+  }
+  .btn-ghost {
+    @apply btn border border-ink-700 text-slate-200 hover:bg-ink-800;
+  }
+  .btn-danger {
+    @apply btn bg-gradient-to-b from-red-500 to-red-700 text-white shadow-[0_0_16px_rgba(220,38,38,0.35)];
+  }
+  .card-surface {
+    @apply rounded-xl bg-ink-900/80 border border-ink-700 shadow-card backdrop-blur;
+  }
+  .input {
+    @apply w-full rounded-lg bg-ink-800 border border-ink-700 px-3 py-2 text-slate-100
+           focus:outline-none focus:ring-2 focus:ring-gold-500/50;
+  }
+  .glow-win {
+    @apply shadow-[0_0_28px_rgba(74,222,128,0.55)] border-green-400/70;
+  }
+  .glow-loss {
+    @apply shadow-[0_0_28px_rgba(248,113,113,0.45)] border-red-400/70;
+  }
+
+  /* Bright glossy green SPIN button, metallic gold rim, per the premium-brief
+   * palette — separate from `.btn-gold` (used for CTAs elsewhere) since this
+   * one specific button is deliberately green, not gold. */
+  .btn-spin {
+    @apply btn relative overflow-hidden text-ink-950 shadow-glow-green;
+    background: linear-gradient(180deg, #7dffa0 0%, #22c55e 55%, #15803d 100%);
+    border: 2px solid theme("colors.gold.400");
+  }
+  .btn-spin::after {
+    content: "";
+    @apply pointer-events-none absolute inset-0;
+    background: linear-gradient(180deg, rgba(255,255,255,0.45), transparent 40%);
+  }
+
+  /* Gradient-filled premium title text with a light sweep passing over it —
+   * "shine" keyframe animates background-position across a wide gradient. */
+  .title-777 {
+    @apply font-display font-extrabold;
+    background: linear-gradient(90deg, #ffd77a 0%, #f5dfa8 20%, #ffffff 35%, #f5dfa8 50%, #e8302f 65%, #ffd77a 85%, #f5dfa8 100%);
+    background-size: 250% 100%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    text-shadow: 0 0 18px rgba(232, 48, 47, 0.35);
+    animation: shine 3.5s ease-in-out infinite;
+  }
+
+  /* Thick metallic-gold bevel frame — used around the reel machine and the
+   * WIN panel to read as a physical 3D cabinet rather than a flat div. */
+  .frame-gold {
+    @apply rounded-2xl border-2 border-gold-500 shadow-frame-bevel;
+    background: linear-gradient(180deg, rgba(232,195,122,0.08), rgba(0,0,0,0.4));
+  }
+
+  .bulb {
+    @apply h-1.5 w-1.5 rounded-full bg-gold-300 shadow-[0_0_6px_rgba(245,223,168,0.9)] animate-bulb-blink;
+  }
+}
+
+/* Small gold particles bursting outward on a win — plain CSS, no canvas/lib.
+ * Each `.particle` picks up a random `--particle-end` translate via inline
+ * style from the component that renders it. */
+.particle {
+  position: absolute;
+  width: 5px;
+  height: 5px;
+  border-radius: 9999px;
+  background: radial-gradient(circle, #fff6d8, #e8c37a 60%, transparent 70%);
+  animation: particle-burst 0.7s ease-out forwards;
+}

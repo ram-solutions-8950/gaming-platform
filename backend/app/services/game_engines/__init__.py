@@ -1,11 +1,13 @@
 from .base import GameEngine
 from .colour_prediction import ColourPredictionEngine
 from .dragon_tiger import DragonTigerEngine
+from .andar_bahar import AndarBaharEngine
 
 
 _ENGINES: dict[str, GameEngine] = {
     "colour-prediction": ColourPredictionEngine(),
     "dragon-tiger": DragonTigerEngine(),
+    "andar-bahar": AndarBaharEngine(),
 }
 
 

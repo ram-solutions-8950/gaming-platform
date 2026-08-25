@@ -1,0 +1,215 @@
+/* ───────────────────────────────────────────────────────────
+   CASINO STARTUP SPLASH / LOADING SCREEN STYLES
+   ─────────────────────────────────────────────────────────── */
+
+.casino-loading-screen {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  width: 100dvw;
+  height: 100vh;
+  height: 100dvh;
+  z-index: 999999;
+  overflow: hidden;
+  background-color: #1a0002;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.35s ease-out;
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.casino-loading-screen.fade-out {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Background image layer */
+.splash-bg-image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  z-index: 1;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+/* Atmospheric light ray & radial bloom */
+.splash-radial-light {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 70%;
+  height: 48%;
+  background: radial-gradient(ellipse at 50% 0%, rgba(255, 235, 100, 0.45) 0%, rgba(255, 190, 20, 0.2) 40%, transparent 75%);
+  z-index: 2;
+  pointer-events: none;
+  animation: splashBloomPulse 3.5s ease-in-out infinite alternate;
+}
+
+@keyframes splashBloomPulse {
+  0% {
+    opacity: 0.75;
+    transform: translateX(-50%) scale(0.96);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(-50%) scale(1.04);
+  }
+}
+
+/* Subtle Shimmer highlight across center text */
+.splash-center-shine {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(80vw, 650px);
+  height: 90px;
+  background: linear-gradient(90deg, transparent 0%, rgba(255, 240, 150, 0.18) 50%, transparent 100%);
+  z-index: 3;
+  pointer-events: none;
+  mix-blend-mode: overlay;
+  animation: splashTextShimmer 4s infinite ease-in-out;
+}
+
+@keyframes splashTextShimmer {
+  0% {
+    transform: translate(-120%, -50%) skewX(-20deg);
+    opacity: 0;
+  }
+  30% {
+    opacity: 0.8;
+  }
+  60% {
+    transform: translate(120%, -50%) skewX(-20deg);
+    opacity: 0;
+  }
+  100% {
+    transform: translate(120%, -50%) skewX(-20deg);
+    opacity: 0;
+  }
+}
+
+/* Version text at bottom-left corner */
+.splash-version {
+  position: absolute;
+  left: 12px;
+  bottom: 10px;
+  font-size: 13px;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  color: rgba(255, 255, 255, 0.45);
+  font-weight: 500;
+  letter-spacing: 0.5px;
+  z-index: 10;
+  pointer-events: none;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+}
+
+/* Center Glowing Spinner Animation */
+.splash-center-spinner {
+  position: absolute;
+  top: 48%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 64px;
+  height: 64px;
+  border: 3.5px solid rgba(212, 175, 55, 0.18);
+  border-top-color: #ffd700;
+  border-right-color: rgba(255, 215, 0, 0.7);
+  border-radius: 50%;
+  box-shadow: 0 0 18px rgba(255, 215, 0, 0.45);
+  animation: splashSpin 1.2s cubic-bezier(0.5, 0, 0.5, 1) infinite;
+  z-index: 5;
+  pointer-events: none;
+}
+
+@keyframes splashSpin {
+  0% {
+    transform: translate(-50%, -50%) rotate(0deg);
+  }
+  100% {
+    transform: translate(-50%, -50%) rotate(360deg);
+  }
+}
+
+/* Smooth Animated Loading Bar */
+.splash-loading-bar-track {
+  position: absolute;
+  bottom: 28px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(72vw, 360px);
+  height: 4px;
+  background: rgba(15, 5, 5, 0.6);
+  border: 1px solid rgba(212, 175, 55, 0.3);
+  border-radius: 999px;
+  box-shadow: 0 0 12px rgba(0, 0, 0, 0.7), 0 0 6px rgba(212, 175, 55, 0.15);
+  overflow: hidden;
+  z-index: 10;
+  pointer-events: none;
+}
+
+.splash-loading-bar-progress {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(212, 175, 55, 0.4) 20%,
+    #ffd700 50%,
+    rgba(255, 245, 160, 0.9) 65%,
+    #d4af37 80%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  border-radius: 999px;
+  box-shadow: 0 0 8px #ffd700;
+  animation: splashBarSweep 1.6s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+@keyframes splashBarSweep {
+  0% {
+    transform: translateX(-100%);
+  }
+  50% {
+    transform: translateX(0%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+/* Mobile Landscape specific refinements */
+@media (orientation: landscape) and (max-height: 500px) {
+  .splash-version {
+    left: 10px;
+    bottom: 8px;
+    font-size: 12px;
+  }
+
+  .splash-center-spinner {
+    width: 52px;
+    height: 52px;
+    border-width: 3px;
+  }
+}
+
+/* Mobile Portrait orientation */
+@media (orientation: portrait) {
+  .splash-bg-image {
+    object-fit: cover;
+    object-position: center;
+  }
+
+  .splash-version {
+    left: 14px;
+    bottom: 12px;
+    font-size: 13px;
+  }
+}

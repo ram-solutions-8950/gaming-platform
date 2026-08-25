@@ -1,0 +1,145 @@
+/* ───────────────────────────────────────────────────────────
+   777WIN-STYLE CASINO 3D EMBOSSED METALLIC LOGO
+   ─────────────────────────────────────────────────────────── */
+
+.casino-logo-root {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+  user-select: none;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0;
+  position: relative;
+  flex-shrink: 0;
+}
+
+/* 3D Casino Emblem (Spade & Crown) */
+.casino-logo-emblem {
+  position: relative;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  filter: drop-shadow(0 3px 6px rgba(22, 0, 31, 0.9)) drop-shadow(0 0 8px rgba(255, 210, 26, 0.4));
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.casino-logo-root:hover .casino-logo-emblem {
+  transform: scale(1.08) rotate(-4deg);
+}
+
+.casino-logo-svg {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+/* 3D Embossed Metallic Text */
+.casino-logo-text-wrap {
+  display: flex;
+  flex-direction: column;
+  line-height: 1;
+  justify-content: center;
+}
+
+.casino-logo-primary {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-weight: 900;
+  font-size: 20px;
+  letter-spacing: 0.8px;
+  background: linear-gradient(180deg, #FFE66B 0%, #FFF000 35%, #FFD21A 65%, #B96F00 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 1px 0 rgba(255, 240, 0, 0.8))
+          drop-shadow(0 2px 0 #B96F00)
+          drop-shadow(0 3px 0 #5C2300)
+          drop-shadow(0 4px 5px rgba(22, 0, 31, 0.95))
+          drop-shadow(0 0 10px rgba(255, 210, 26, 0.35));
+  text-transform: uppercase;
+  margin: 0;
+  padding: 0;
+  white-space: nowrap;
+}
+
+.casino-logo-sub {
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 8.5px;
+  font-weight: 800;
+  letter-spacing: 1.8px;
+  color: #D8CBE8;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
+  text-transform: uppercase;
+  margin-top: 1px;
+}
+
+/* Size Variants */
+.casino-logo-root.sm .casino-logo-emblem {
+  width: 24px;
+  height: 24px;
+}
+.casino-logo-root.sm .casino-logo-primary {
+  font-size: 14px;
+}
+.casino-logo-root.sm .casino-logo-sub {
+  font-size: 7px;
+}
+
+.casino-logo-root.md .casino-logo-emblem {
+  width: 32px;
+  height: 32px;
+}
+.casino-logo-root.md .casino-logo-primary {
+  font-size: 19px;
+}
+.casino-logo-root.md .casino-logo-sub {
+  font-size: 8.5px;
+}
+
+.casino-logo-root.lg .casino-logo-emblem {
+  width: 48px;
+  height: 48px;
+}
+.casino-logo-root.lg .casino-logo-primary {
+  font-size: 28px;
+}
+.casino-logo-root.lg .casino-logo-sub {
+  font-size: 11px;
+  letter-spacing: 2.2px;
+}
+
+.casino-logo-root.xl .casino-logo-emblem {
+  width: 64px;
+  height: 64px;
+}
+.casino-logo-root.xl .casino-logo-primary {
+  font-size: 38px;
+}
+.casino-logo-root.xl .casino-logo-sub {
+  font-size: 13px;
+  letter-spacing: 3px;
+}
+
+/* Landscape Mobile Header Responsiveness */
+@media (orientation: landscape) and (max-height: 500px) {
+  .casino-logo-root {
+    gap: 6px;
+  }
+  .casino-logo-root.md .casino-logo-emblem,
+  .casino-logo-root.lg .casino-logo-emblem {
+    width: 26px;
+    height: 26px;
+  }
+  .casino-logo-root.md .casino-logo-primary,
+  .casino-logo-root.lg .casino-logo-primary {
+    font-size: 15px;
+  }
+  .casino-logo-root.md .casino-logo-sub,
+  .casino-logo-root.lg .casino-logo-sub {
+    font-size: 7.5px;
+  }
+}

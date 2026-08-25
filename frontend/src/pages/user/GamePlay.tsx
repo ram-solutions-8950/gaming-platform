@@ -1,9 +1,11 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card } from '../../components/common/Card';
 import { Loader } from '../../components/common/Loader';
 import { gameService } from '../../services/game';
 import { walletService } from '../../services/wallet';
 import type { GameState, GameBet, GameRound, Wallet } from '../../types';
+import { soundManager } from '../../services/soundManager';
 
 const PREDICTIONS = [
   { value: 'RED', label: 'Red', color: 'bg-red-600', hoverColor: 'hover:bg-red-500', textColor: 'text-red-400', multi: '2x' },
@@ -24,6 +26,7 @@ function paiseToRupees(p: number): string {
 }
 
 export function GamePlayPage() {
+  const navigate = useNavigate();
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [wallet, setWallet] = useState<Wallet | null>(null);
   const [history, setHistory] = useState<GameRound[]>([]);
@@ -35,22 +38,41 @@ export function GamePlayPage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [countdown, setCountdown] = useState(0);
+  const prevCountdown = useRef<number>(-1);
+  // Play countdown tick sound for values 9-5
+  useEffect(() => {
+    if (countdown !== prevCountdown.current && countdown >= 5 && countdown <= 9) {
+      soundManager.play('countdown_tick');
+    }
+    prevCountdown.current = countdown;
+  }, [countdown]);
   const wsRef = useRef<WebSocket | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const [latestResult, setLatestResult] = useState<{ color: string; number: string; roundId: string } | null>(null);
 
   const fetchAll = useCallback(async () => {
     try {
       const [gs, w, h, b] = await Promise.all([
-        gameService.getCurrentRound(),
+        gameService.getCurrentRound('colour-prediction'),
         walletService.getWallet(),
-        gameService.getHistory(10),
-        gameService.getMyBets(1, 10),
+        gameService.getHistory(15, 'colour-prediction'),
+        gameService.getMyBets(1, 15, 'colour-prediction'),
       ]);
       setGameState(gs);
       setWallet(w);
-      setHistory(h);
-      setMyBets(b.items);
+      setHistory(h || []);
+      setMyBets(b?.items || []);
       setCountdown(gs.seconds_remaining);
+
+      // If history has recent round, populate latestResult if not already set
+      if (h && h.length > 0 && h[0].status === 'COMPLETED' && h[0].result_color) {
+        setLatestResult({
+          color: h[0].result_color,
+          number: h[0].result_number ?? '?',
+          roundId: h[0].id,
+        });
+      }
     } catch {
       // Silently handle
     } finally {
@@ -58,10 +80,10 @@ export function GamePlayPage() {
     }
   }, []);
 
-  // Poll every 5 seconds as a fallback alongside WebSocket
+  // Poll every 3 seconds as a fallback alongside WebSocket
   useEffect(() => {
     fetchAll();
-    const pollId = setInterval(fetchAll, 5000);
+    const pollId = setInterval(fetchAll, 3000);
     return () => clearInterval(pollId);
   }, [fetchAll]);
 
@@ -77,7 +99,7 @@ export function GamePlayPage() {
   // WebSocket connection
   useEffect(() => {
     const wsProtocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
-    const wsHost = import.meta.env.VITE_WS_URL || `${wsProtocol}://localhost:8000`;
+    const wsHost = import.meta.env.VITE_WS_URL || `${wsProtocol}://${window.location.hostname || 'localhost'}:8000`;
     const ws = new WebSocket(`${wsHost}/api/v1/ws/games`);
     wsRef.current = ws;
 
@@ -88,12 +110,22 @@ export function GamePlayPage() {
           return;
         }
         if (data.type === 'round_start') {
+          soundManager.play('betting_start');
           setCountdown(data.seconds_remaining);
           fetchAll();
         } else if (data.type === 'betting_locked') {
+          soundManager.play('betting_stop');
           setCountdown(data.seconds_remaining);
           fetchAll();
         } else if (data.type === 'round_result') {
+          if (data.result_color) {
+            setLatestResult({
+              color: data.result_color,
+              number: data.result_number != null ? String(data.result_number) : '?',
+              roundId: data.round_id,
+            });
+            soundManager.play('reveal_tick');
+          }
           fetchAll();
         }
       } catch {
@@ -147,67 +179,102 @@ export function GamePlayPage() {
   const isCalculating = round?.status === 'CALCULATING';
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-extrabold text-white">Colour Prediction</h1>
-        <p className="text-gray-400 mt-1">Predict the colour or number to win!</p>
-      </div>
-
-      {/* Round Status & Timer */}
-      <Card>
-        <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-          <div>
-            <p className="text-sm text-gray-400">Current Round</p>
-            <p className="text-xs text-gray-500 font-mono mt-1">{round?.id?.slice(0, 8) ?? '---'}</p>
-          </div>
-          <div className="text-center">
-            <div className={`text-6xl font-extrabold tabular-nums ${
-              isBetting ? 'text-green-400' : isCalculating ? 'text-yellow-400' : 'text-gray-500'
-            }`}>
-              {Math.floor(countdown)}s
-            </div>
-            <p className={`text-sm font-semibold mt-1 ${
-              isBetting ? 'text-green-400' : isCalculating ? 'text-yellow-400' : 'text-gray-500'
-            }`}>
-              {isBetting ? '🟢 Betting Open' : isCalculating ? '⏳ Calculating...' : 'Waiting...'}
-            </p>
-          </div>
-          <div className="text-right">
-            <p className="text-sm text-gray-400">Balance</p>
-            <p className="text-2xl font-bold text-white">₹{wallet?.balance_inr ?? '0.00'}</p>
+    <div className="cp-page w-full max-w-4xl mx-auto space-y-3">
+      {/* Header & Status Bar */}
+      <div className="cp-game-header bg-dark-900 border border-dark-700 rounded-2xl p-3 sm:p-4 shadow-lg flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => navigate('/dashboard')}
+            className="cp-exit-btn px-3 py-1.5 bg-dark-800 hover:bg-dark-700 text-white font-bold text-xs rounded-xl border border-dark-700 transition shadow-sm flex items-center gap-1 active:scale-95 shrink-0"
+          >
+            ← Exit
+          </button>
+          <div className="cp-title-wrap">
+            <h1 className="cp-title text-base sm:text-lg font-extrabold text-white">Colour Prediction</h1>
+            <p className="cp-round-text text-[11px] text-gray-400">Round #{round?.id?.slice(0, 8) ?? '---'}</p>
           </div>
         </div>
-      </Card>
+
+        {/* Center Timer */}
+        <div className="cp-timer-box flex items-center gap-2 bg-dark-950 px-4 py-1.5 rounded-xl border border-dark-800 shadow-inner">
+          <span className={`cp-timer-countdown text-2xl sm:text-3xl font-black tabular-nums ${
+            isBetting ? 'text-emerald-400' : isCalculating ? 'text-amber-400' : 'text-gray-500'
+          }`}>
+            {Math.floor(countdown)}s
+          </span>
+          <span className={`cp-timer-status text-xs font-bold uppercase tracking-wider ${
+            isBetting ? 'text-emerald-400' : isCalculating ? 'text-amber-400' : 'text-gray-500'
+          }`}>
+            {isBetting ? '🟢 Open' : isCalculating ? '⏳ Calculating' : 'Closed'}
+          </span>
+        </div>
+
+        {/* Right Balance */}
+        <div className="cp-balance-box text-right">
+          <p className="cp-balance-label text-[10px] text-gray-400 uppercase font-semibold">Balance</p>
+          <p className="cp-balance-val text-base font-extrabold text-gold-400">₹{wallet?.balance_inr ?? '0.00'}</p>
+        </div>
+      </div>
+
+      {/* Latest Winning Result Banner */}
+      {latestResult && (
+        <div className="cp-winner-banner bg-dark-900 border-2 border-gold-500/40 rounded-2xl p-3 sm:p-4 shadow-xl flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-white font-black text-2xl shadow-lg ${
+              latestResult.color === 'RED' ? 'bg-gradient-to-br from-red-500 to-red-700 shadow-red-500/30' :
+              latestResult.color === 'GREEN' ? 'bg-gradient-to-br from-green-500 to-green-700 shadow-green-500/30' :
+              latestResult.color === 'VIOLET' ? 'bg-gradient-to-br from-purple-500 to-purple-700 shadow-purple-500/30' :
+              'bg-gray-700'
+            }`}>
+              {latestResult.number}
+            </div>
+            <div>
+              <p className="text-[10px] text-gold-400 font-bold uppercase tracking-wider">Latest Winning Result</p>
+              <p className="text-base sm:text-lg font-black text-white">
+                <span className={
+                  latestResult.color === 'RED' ? 'text-red-400' :
+                  latestResult.color === 'GREEN' ? 'text-green-400' :
+                  latestResult.color === 'VIOLET' ? 'text-purple-400' : 'text-gray-300'
+                }>{latestResult.color}</span> — Number {latestResult.number}
+              </p>
+            </div>
+          </div>
+          <div className="text-right">
+            <span className="text-[10px] text-gray-400 font-mono">Round #{latestResult.roundId?.slice(0, 8)}</span>
+          </div>
+        </div>
+      )}
 
       {/* Betting Panel */}
-      <Card title="Place Your Bet">
+      <Card title="Place Your Bet" className="cp-betting-card">
         {/* Colour predictions */}
-        <div className="mb-6">
-          <p className="text-sm text-gray-400 mb-3">Pick a colour</p>
-          <div className="flex gap-3 flex-wrap">
+        <div className="cp-colours-section mb-4">
+          <p className="cp-section-label text-xs text-gray-400 mb-2 font-medium">Pick a Colour</p>
+          <div className="cp-colours-grid grid grid-cols-3 gap-2.5">
             {PREDICTIONS.map((p) => (
               <button
                 key={p.value}
                 disabled={!isBetting || betting}
                 onClick={() => setSelectedPrediction(p.value)}
                 className={`
-                  flex-1 min-w-[100px] py-4 rounded-xl text-white font-bold text-lg transition-all duration-200
+                  cp-colour-btn py-3 rounded-xl text-white font-extrabold text-sm sm:text-base transition-all duration-150 flex flex-col items-center justify-center
                   ${p.color} ${p.hoverColor}
-                  ${selectedPrediction === p.value ? 'ring-4 ring-white/50 scale-105' : 'opacity-80'}
-                  ${!isBetting ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}
+                  ${selectedPrediction === p.value ? 'ring-4 ring-white/70 scale-[1.02]' : 'opacity-90'}
+                  ${!isBetting ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer active:scale-95'}
                 `}
               >
-                {p.label}
-                <span className="block text-xs font-normal opacity-70">{p.multi}</span>
+                <span>{p.label}</span>
+                <span className="text-[10px] font-semibold opacity-80">{p.multi}</span>
               </button>
             ))}
           </div>
         </div>
 
         {/* Number predictions */}
-        <div className="mb-6">
-          <p className="text-sm text-gray-400 mb-3">Or pick a number (9x payout)</p>
-          <div className="grid grid-cols-5 md:grid-cols-10 gap-2">
+        <div className="cp-numbers-section mb-4">
+          <p className="cp-section-label text-xs text-gray-400 mb-2 font-medium">Or Pick a Number (9x Payout)</p>
+          <div className="cp-numbers-grid grid grid-cols-10 gap-1.5">
             {NUMBERS.map((n) => {
               const isRed = ['0', '2', '4', '6', '8'].includes(n.value);
               return (
@@ -216,10 +283,10 @@ export function GamePlayPage() {
                   disabled={!isBetting || betting}
                   onClick={() => setSelectedPrediction(n.value)}
                   className={`
-                    py-3 rounded-lg font-bold text-lg transition-all duration-200
-                    ${isRed ? 'bg-red-900/60 text-red-300' : 'bg-green-900/60 text-green-300'}
-                    ${selectedPrediction === n.value ? 'ring-4 ring-white/50 scale-110' : ''}
-                    ${!isBetting ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer hover:opacity-100'}
+                    cp-number-btn py-2 rounded-lg font-black text-sm sm:text-base transition-all duration-150
+                    ${isRed ? 'bg-red-900/60 text-red-300 border border-red-500/30' : 'bg-emerald-900/60 text-emerald-300 border border-emerald-500/30'}
+                    ${selectedPrediction === n.value ? 'ring-2 ring-white scale-110' : ''}
+                    ${!isBetting ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer hover:opacity-100 active:scale-95'}
                   `}
                 >
                   {n.label}
@@ -229,19 +296,19 @@ export function GamePlayPage() {
           </div>
         </div>
 
-        {/* Bet amount */}
-        <div className="mb-6">
-          <p className="text-sm text-gray-400 mb-3">Bet amount</p>
-          <div className="flex gap-2 flex-wrap">
+        {/* Bet amount presets */}
+        <div className="cp-amounts-section mb-4">
+          <p className="cp-section-label text-xs text-gray-400 mb-2 font-medium">Bet Amount</p>
+          <div className="cp-amounts-grid grid grid-cols-5 gap-2">
             {BET_AMOUNTS.map((amt) => (
               <button
                 key={amt}
                 onClick={() => setSelectedAmount(amt)}
                 className={`
-                  px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200
+                  cp-amount-btn py-2 rounded-lg text-xs font-extrabold transition-all duration-150 active:scale-95
                   ${selectedAmount === amt
-                    ? 'bg-brand-600 text-white'
-                    : 'bg-dark-800 text-gray-300 hover:bg-dark-700'}
+                    ? 'bg-brand-600 text-white shadow-md shadow-brand-500/30 border border-brand-400'
+                    : 'bg-dark-800 text-gray-300 hover:bg-dark-700 border border-dark-700'}
                 `}
               >
                 ₹{paiseToRupees(amt)}
@@ -255,39 +322,40 @@ export function GamePlayPage() {
           onClick={handleBet}
           disabled={!isBetting || !selectedPrediction || betting}
           className={`
-            w-full py-4 rounded-xl text-lg font-bold transition-all duration-200
+            cp-submit-btn w-full py-3 rounded-xl text-sm sm:text-base font-extrabold transition-all duration-150 active:scale-95 shadow-lg
             ${isBetting && selectedPrediction
-              ? 'bg-gradient-to-r from-brand-500 to-gold-500 text-white hover:from-brand-400 hover:to-gold-400 cursor-pointer'
-              : 'bg-dark-700 text-gray-500 cursor-not-allowed'}
+              ? 'bg-gradient-to-r from-emerald-600 to-green-600 text-white hover:from-emerald-500 hover:to-green-500 cursor-pointer shadow-green-600/20'
+              : 'bg-dark-800 text-gray-500 cursor-not-allowed border border-dark-700'}
           `}
         >
-          {betting ? 'Placing...' : selectedPrediction
+          {betting ? 'Placing Bet...' : selectedPrediction
             ? `Bet ₹${paiseToRupees(selectedAmount)} on ${selectedPrediction}`
-            : 'Select a prediction'}
+            : 'Select a Colour or Number Above'}
         </button>
 
-        {error && <p className="mt-3 text-sm text-red-400 text-center">{error}</p>}
-        {success && <p className="mt-3 text-sm text-green-400 text-center">{success}</p>}
+        {error && <p className="mt-2 text-xs text-red-400 text-center font-semibold">{error}</p>}
+        {success && <p className="mt-2 text-xs text-emerald-400 text-center font-semibold">{success}</p>}
       </Card>
 
       {/* Recent Results */}
-      <Card title="Recent Results">
+      <Card title="Recent Round Results" className="cp-results-card">
         {history.length === 0 ? (
           <p className="text-gray-500 text-sm">No completed rounds yet.</p>
         ) : (
-          <div className="flex gap-2 flex-wrap">
+          <div className="flex gap-2.5 flex-wrap">
             {history.map((r) => {
               const colorClass =
-                r.result_color === 'RED' ? 'bg-red-600' :
-                r.result_color === 'GREEN' ? 'bg-green-600' :
-                r.result_color === 'VIOLET' ? 'bg-violet-600' : 'bg-gray-600';
+                r.result_color === 'RED' ? 'bg-gradient-to-br from-red-500 to-red-700 border-red-400 shadow-red-500/20' :
+                r.result_color === 'GREEN' ? 'bg-gradient-to-br from-green-500 to-green-700 border-green-400 shadow-green-500/20' :
+                r.result_color === 'VIOLET' ? 'bg-gradient-to-br from-purple-500 to-purple-700 border-purple-400 shadow-purple-500/20' : 'bg-gray-700 border-gray-600';
               return (
                 <div
                   key={r.id}
-                  className={`w-12 h-12 ${colorClass} rounded-lg flex items-center justify-center text-white font-bold text-lg`}
-                  title={`Round ${r.id.slice(0, 8)} — ${r.result_color} #${r.result_number}`}
+                  className={`w-12 h-14 ${colorClass} border rounded-xl flex flex-col items-center justify-center text-white shadow-md transition-transform hover:scale-105`}
+                  title={`Round ${r.id.slice(0, 8)} — ${r.result_color} #${r.result_number ?? '?'}`}
                 >
-                  {r.result_number}
+                  <span className="text-xs font-bold leading-tight uppercase opacity-90">{r.result_color ? r.result_color[0] : '-'}</span>
+                  <span className="text-base font-black leading-tight">{r.result_number ?? '?'}</span>
                 </div>
               );
             })}
@@ -296,7 +364,7 @@ export function GamePlayPage() {
       </Card>
 
       {/* My Recent Bets */}
-      <Card title="My Recent Bets">
+      <Card title="My Recent Bets" className="cp-history-card">
         {myBets.length === 0 ? (
           <p className="text-gray-500 text-sm">You haven't placed any bets yet.</p>
         ) : (

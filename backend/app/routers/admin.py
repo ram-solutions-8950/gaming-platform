@@ -8,6 +8,7 @@ from ..schemas.deposit import DepositOut
 from ..schemas.withdrawal import WithdrawalOut, WithdrawalActionIn
 from ..schemas.wallet import WalletTransactionOut
 from ..schemas.payment import PaymentConfigOut, PaymentConfigUpdateIn, PaymentConfigCreateIn
+from ..schemas.referral import ReferralSettingsUpdateIn
 from ..models.user import User, UserRole, UserStatus
 from ..models.deposit import Deposit
 from ..models.withdrawal import Withdrawal
@@ -485,4 +486,65 @@ def wallet_adjustment(
         return success_response(WalletTransactionOut.model_validate(tx).model_dump())
     except ValueError as e:
         return error_response("ADJUSTMENT_ERROR", str(e))
+
+
+# -- Referral Settings ----------------------------------------------------------
+@router.get("/referral/settings")
+def get_referral_settings_endpoint(
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    from ..services.referral_service import get_referral_settings
+    settings = get_referral_settings(db)
+    return success_response({
+        "reward_amount": float(settings.reward_amount) / 100.0,
+        "is_active": settings.is_active
+    })
+
+
+@router.put("/referral/settings")
+def update_referral_settings_endpoint(
+    data: ReferralSettingsUpdateIn,
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    from ..services.referral_service import get_referral_settings
+    
+    # Validation
+    if data.reward_amount <= 0:
+        return error_response("VALIDATION_ERROR", "Reward amount must be positive", status_code=400)
+    if data.reward_amount > 10000:
+        return error_response("VALIDATION_ERROR", "Reward amount is too large (max ₹10,000)", status_code=400)
+
+    settings = get_referral_settings(db)
+    old_reward = settings.reward_amount
+    old_active = settings.is_active
+
+    # Convert to paisa
+    new_reward_paisa = int(round(data.reward_amount * 100))
+    settings.reward_amount = new_reward_paisa
+    settings.is_active = data.is_active
+    settings.updated_by = admin.id
+
+    # Admin Audit Log
+    audit_service.log_action(
+        db,
+        action="REFERRAL_CONFIG_CHANGE",
+        actor_id=admin.id,
+        entity_type="referral_settings",
+        entity_id=str(settings.id),
+        metadata={
+            "old_reward": old_reward,
+            "new_reward": new_reward_paisa,
+            "old_active": old_active,
+            "new_active": data.is_active,
+        }
+    )
+    db.commit()
+    db.refresh(settings)
+
+    return success_response({
+        "reward_amount": float(settings.reward_amount) / 100.0,
+        "is_active": settings.is_active
+    })
 

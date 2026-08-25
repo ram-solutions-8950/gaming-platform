@@ -1,50 +1,215 @@
-import { Link } from 'react-router-dom';
-import { useEffect, useState } from 'react';
-import { useAuthStore } from '../../store/authStore';
-import { walletService } from '../../services/wallet';
-import { Card } from '../../components/common/Card';
-import { Loader } from '../../components/common/Loader';
-import type { Wallet } from '../../types';
+import { useEffect, useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { gameService } from '../../services/game';
+import { WinningTicker } from '../../components/lobby/WinningTicker';
+import { CategoryTabs } from '../../components/lobby/CategoryTabs';
+import { AnimatedGameCarousel } from '../../components/lobby/AnimatedGameCarousel';
+import { SidePromos } from '../../components/lobby/SidePromos';
+import type { CatalogGame } from '../../types';
+import '../../styles/lobby.css';
+import '../../styles/startup-promotions.css';
+import { FreeRewardPopup } from '../../components/modals/FreeRewardPopup';
+import { ReferWinPopup } from '../../components/modals/ReferWinPopup';
 
-export function DashboardPage() {
-  const { user } = useAuthStore();
-  const [wallet, setWallet] = useState<Wallet | null>(null);
-  const [loading, setLoading] = useState(true);
+/* ─── Game card definitions ─── */
+interface GameCardDef {
+  id: string;
+  name: string;
+  subtitle: string;
+  emoji: string;
+  gradient: string;
+  badge: 'HOT' | 'NEW' | null;
+  path: string;
+  category: string[];
+}
 
-  useEffect(() => {
-    walletService.getWallet().then(setWallet).finally(() => setLoading(false));
-  }, []);
+const GAME_DEFS: GameCardDef[] = [
+  { id: 'ludo', name: 'Ludo', subtitle: 'Board Game', emoji: '🎲', gradient: 'gc-blue', badge: 'HOT', path: '/games/ludo', category: ['ALL'] },
+  { id: 'colour-prediction', name: 'Colour Prediction', subtitle: 'Casino', emoji: '🌈', gradient: 'gc-pink', badge: 'NEW', path: '/games/colour-prediction', category: ['ALL', 'CASINO'] },
+  { id: 'dragon-tiger', name: 'Dragon Tiger', subtitle: 'Casino', emoji: '🐉', gradient: 'gc-orange', badge: 'HOT', path: '/games/dragon-tiger', category: ['ALL', 'CASINO'] },
+  { id: 'andar-bahar', name: 'Andar Bahar', subtitle: 'Cards', emoji: '🎴', gradient: 'gc-emerald', badge: 'NEW', path: '/games/andar-bahar', category: ['ALL', 'CARDS', 'CASINO'] },
+  { id: 'rummy', name: 'Rummy', subtitle: 'Cards', emoji: '🃏', gradient: 'gc-teal', badge: 'HOT', path: '/games/rummy', category: ['ALL', 'CARDS', 'POKER'] },
+  { id: 'teen-patti', name: 'Teen Patti', subtitle: 'Cards', emoji: '♠️', gradient: 'gc-yellow', badge: 'HOT', path: '/games/teen-patti', category: ['ALL', 'CARDS', 'POKER'] },
+  { id: 'aviator', name: 'Aviator', subtitle: 'Crash', emoji: '✈️', gradient: 'gc-red', badge: 'HOT', path: '/games/aviator', category: ['ALL', 'CASINO'] },
+  { id: 'poker', name: "Texas Hold'em Poker", subtitle: 'Cards', emoji: '♠️', gradient: 'gc-indigo', badge: 'NEW', path: '/games/poker', category: ['ALL', 'CARDS', 'POKER'] },
+  { id: 'chicken-road', name: 'Chicken Road', subtitle: 'Arcade', emoji: '🐔', gradient: 'gc-amber', badge: 'NEW', path: '/games/chicken-road', category: ['ALL', 'ARCADE', 'CASINO'] },
+  { id: 'baccarat', name: 'Baccarat', subtitle: 'Casino', emoji: '🂡', gradient: 'gc-indigo', badge: null, path: '#', category: ['ALL', 'BACCARAT', 'CASINO'] },
+  { id: 'roulette', name: 'Roulette', subtitle: 'Casino', emoji: '🎡', gradient: 'gc-red', badge: 'NEW', path: '/games/roulette', category: ['ALL', 'CASINO'] },
+  { id: 'triple-777', name: 'Triple 777', subtitle: 'Classic Slots', emoji: '🎰', gradient: 'gc-rose', badge: 'HOT', path: '/games/triple-777', category: ['ALL', 'SLOTS', 'CASINO'] },
+  { id: 'safari', name: 'Safari of Wealth', subtitle: 'Slots', emoji: '🦁', gradient: 'gc-amber', badge: 'HOT', path: '#', category: ['ALL', 'SLOTS'] },
+  { id: 'jackpot-fishing', name: 'Jackpot Fishing', subtitle: 'Casual', emoji: '🐟', gradient: 'gc-cyan', badge: 'NEW', path: '#', category: ['ALL'] },
+];
+
+const FEATURED_GAME = { id: 'slots', name: 'Explorer Slots', subtitle: 'Slots', emoji: '🎰', gradient: 'gc-purple', badge: 'NEW' as const, path: '#', category: ['ALL', 'SLOTS'] };
+
+/* ─── Glitter particles ─── */
+function LobbyGlitter() {
+  const particles = useMemo(() =>
+    Array.from({ length: 25 }).map((_, i) => ({
+      id: i,
+      left: `${Math.random() * 100}%`,
+      width: `${1.5 + Math.random() * 3}px`,
+      height: `${3 + Math.random() * 6}px`,
+      duration: `${4 + Math.random() * 5}s`,
+      delay: `${Math.random() * 6}s`,
+      opacity: 0.2 + Math.random() * 0.5,
+    })),
+  []);
 
   return (
-    <div className="space-y-8">
-      <div>
-        <h1 className="text-3xl font-extrabold text-white">Dashboard</h1>
-        <p className="text-gray-400 mt-1">Welcome back, <span className="text-brand-400 font-semibold">{user?.name}</span></p>
+    <div className="lobby-glitter">
+      {particles.map((p) => (
+        <div
+          key={p.id}
+          className="lobby-glitter__particle"
+          style={{
+            left: p.left,
+            width: p.width,
+            height: p.height,
+            animationDuration: p.duration,
+            animationDelay: p.delay,
+            opacity: p.opacity,
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
+/* ─── Main Component ─── */
+export function DashboardPage() {
+  const navigate = useNavigate();
+  const [catalogGames, setCatalogGames] = useState<CatalogGame[]>([]);
+  const [activeCategory, setActiveCategory] = useState('ALL');
+  const [activePopup, setActivePopup] = useState<'free' | 'refer' | null>(null);
+
+  useEffect(() => {
+    const timer1 = setTimeout(() => {
+      setActivePopup('free');
+    }, 650);
+    return () => clearTimeout(timer1);
+  }, []);
+
+  const handleCloseFree = () => {
+    setActivePopup(null);
+    setTimeout(() => {
+      setActivePopup('refer');
+    }, 220);
+  };
+
+  const handleCloseRefer = () => {
+    setActivePopup(null);
+  };
+
+  useEffect(() => {
+    gameService.getCatalog().then(setCatalogGames).catch(() => {});
+  }, []);
+
+  const enrichedGames = useMemo(() => {
+    return GAME_DEFS.map((def) => {
+      const catalogMatch = catalogGames.find((g) => g.slug === def.id);
+      if (catalogMatch) {
+        return { ...def, name: catalogMatch.name || def.name, path: def.path };
+      }
+      return def;
+    });
+  }, [catalogGames]);
+
+  const filteredGames = useMemo(() => {
+    if (activeCategory === 'ALL') return enrichedGames;
+    return enrichedGames.filter((g) => g.category.includes(activeCategory));
+  }, [enrichedGames, activeCategory]);
+
+  const carouselSets = useMemo(() => {
+    if (filteredGames.length === 0) return [{ games: [] }];
+    return [{ games: filteredGames }];
+  }, [filteredGames]);
+
+  const handleGameClick = (path: string) => {
+    if (path === '#') return;
+    navigate(path);
+  };
+
+  return (
+    <div className="game-lobby">
+      <LobbyGlitter />
+
+      <div className="game-lobby__content">
+        <div className="lobby-header-ticker-area">
+          <WinningTicker />
+          <CategoryTabs activeCategory={activeCategory} onCategoryChange={setActiveCategory} />
+        </div>
+<div className="lobby-main-grid">
+
+  {/* LEFT PROMO / FEATURED */}
+  <aside className="lobby-sidebar-promos">
+    <SidePromos />
+
+    <div className="lobby-featured-card">
+      <div className="featured-game__content">
+        <div className="featured-game__text">
+          <span className="featured-game__badge">
+            FEATURED
+          </span>
+
+          <h3>{FEATURED_GAME.name}</h3>
+
+          <p>Play & Win Grand Prizes</p>
+
+          <button
+            className="featured-game__btn"
+            onClick={() => handleGameClick(FEATURED_GAME.path)}
+          >
+            Play Now
+          </button>
+        </div>
+
+        <div className="featured-game__emoji">
+          {FEATURED_GAME.emoji}
+        </div>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card className="col-span-1">
-          <div className="flex justify-between items-start">
-            <p className="text-sm text-gray-400 mb-1">Available Balance</p>
-            <Link to="/deposit" className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-3 py-1 rounded">
-              Deposit
-            </Link>
-          </div>
-          {loading ? <Loader size="sm" /> : (
-            <p className="text-4xl font-extrabold text-white">₹{wallet?.balance_inr ?? '0.00'}</p>
-          )}
-          <p className="text-xs text-gray-500 mt-2">Gaming wallet balance</p>
-        </Card>
-        <Card>
-          <p className="text-sm text-gray-400 mb-1">Account Status</p>
-          <p className="text-xl font-bold text-success">{user?.status}</p>
-          <p className="text-xs text-gray-500 mt-2">{user?.role}</p>
-        </Card>
-        <Card>
-          <p className="text-sm text-gray-400 mb-1">Games</p>
-          <p className="text-xl font-bold text-gray-300">Coming Soon</p>
-          <p className="text-xs text-gray-500 mt-2">Poker & Teen Patti launching next phase</p>
-        </Card>
+    </div>
+
+    {/* Portrait banner */}
+    <div className="promo-banner portrait-only">
+      <div className="promo-banner__bg" />
+
+      <div className="promo-banner__content">
+        <div className="promo-banner__text">
+          <h3>PLAY & WIN</h3>
+          <p>Grand Cash Prizes Daily!</p>
+        </div>
+
+        <div className="promo-banner__emoji">
+          🎁
+        </div>
       </div>
+    </div>
+  </aside>
+
+
+  {/* GAME GRID */}
+  <section className="lobby-games-area">
+
+    <div className="lobby-section-title portrait-only">
+      Popular Games
+    </div>
+
+    <div className="lobby-carousel-container">
+      <AnimatedGameCarousel
+        sets={carouselSets}
+        onGameClick={handleGameClick}
+        autoPlayInterval={4000}
+      />
+    </div>
+
+  </section>
+
+</div>
+      </div>
+
+      {activePopup === 'free' && <FreeRewardPopup onClose={handleCloseFree} />}
+      {activePopup === 'refer' && <ReferWinPopup onClose={handleCloseRefer} />}
     </div>
   );
 }

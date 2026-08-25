@@ -15,6 +15,7 @@ class WalletTransactionType(str, enum.Enum):
     WITHDRAWAL = "WITHDRAWAL"
     REFUND = "REFUND"
     ADJUSTMENT = "ADJUSTMENT"
+    REFERRAL_REWARD = "REFERRAL_REWARD"
 
 
 class WalletTransactionStatus(str, enum.Enum):

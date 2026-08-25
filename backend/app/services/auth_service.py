@@ -13,13 +13,20 @@ from ..utils.logging import get_logger
 logger = get_logger("auth")
 
 
-def register_user(db: Session, name: str, username: str, email: str, password: str) -> User:
+def register_user(db: Session, name: str, username: str, email: str, password: str, referral_code: Optional[str] = None) -> User:
     email_lower = email.lower()
 
     if db.query(User).filter(func.lower(User.email) == email_lower).first():
         raise ValueError("Email already registered")
     if db.query(User).filter(User.username == username).first():
         raise ValueError("Username already taken")
+
+    # Generate unique referral code for the registering user
+    import secrets
+    while True:
+        my_ref_code = secrets.token_hex(4).upper()
+        if not db.query(User).filter(User.referral_code == my_ref_code).first():
+            break
 
     user = User(
         name=name,
@@ -28,6 +35,7 @@ def register_user(db: Session, name: str, username: str, email: str, password: s
         password_hash=hash_password(password),
         role=UserRole.USER,
         status=UserStatus.ACTIVE,
+        referral_code=my_ref_code,
     )
     db.add(user)
     db.flush()
@@ -35,6 +43,29 @@ def register_user(db: Session, name: str, username: str, email: str, password: s
     wallet = Wallet(user_id=user.id, balance=0)
     db.add(wallet)
     db.flush()
+
+    # Handle referral relationship if a code was passed
+    if referral_code:
+        referrer = db.query(User).filter(User.referral_code == referral_code).first()
+        if not referrer:
+            raise ValueError("Invalid referral code")
+        if referrer.id == user.id or referrer.username == user.username or referrer.email == user.email:
+            raise ValueError("Self-referral is not allowed")
+        
+        from ..models.referral import Referral, ReferralStatus
+        existing_ref = db.query(Referral).filter(Referral.referred_user_id == user.id).first()
+        if existing_ref:
+            raise ValueError("User has already been referred")
+        
+        ref_rel = Referral(
+            referrer_user_id=referrer.id,
+            referred_user_id=user.id,
+            referral_code=referral_code,
+            status=ReferralStatus.REGISTERED,
+            reward_amount=0,
+        )
+        db.add(ref_rel)
+        db.flush()
 
     log_action(db, action="USER_REGISTER", actor_id=user.id, entity_type="user", entity_id=user.id)
     db.commit()

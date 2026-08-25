@@ -137,24 +137,24 @@ export function WithdrawalPage() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-extrabold text-white">Request Withdrawal</h1>
-        <div className="bg-dark-900 border border-dark-700 px-4 py-2 rounded-xl text-right">
-          <p className="text-xs text-gray-400">Available Balance</p>
-          <p className="text-xl font-extrabold text-white">₹{wallet?.balance_inr ?? '0.00'}</p>
+    <div className="withdrawal-page w-full max-w-3xl mx-auto space-y-4">
+      <div className="withdrawal-page-header flex items-center justify-between">
+        <h1 className="withdrawal-page-title text-xl sm:text-2xl font-extrabold text-white">Request Withdrawal</h1>
+        <div className="withdrawal-balance-box bg-dark-900 border border-dark-700 px-3 py-1.5 rounded-xl text-right">
+          <p className="withdrawal-balance-label text-[10px] text-gray-400">Available Balance</p>
+          <p className="withdrawal-balance-val text-base font-extrabold text-gold-400">₹{wallet?.balance_inr ?? '0.00'}</p>
         </div>
       </div>
 
-      <Card title="Withdrawal Details">
-        <form onSubmit={handleWithdrawalSubmit} className="space-y-6">
-          <div>
-            <label className="block text-sm font-medium text-gray-400 mb-2">Select Payment Method</label>
-            <div className="grid grid-cols-2 gap-4">
+      <Card title="Withdrawal Details" className="withdrawal-card">
+        <form onSubmit={handleWithdrawalSubmit} className="withdrawal-form space-y-6">
+          <div className="withdrawal-method-section">
+            <label className="withdrawal-method-label block text-sm font-medium text-gray-400 mb-2">Select Payment Method</label>
+            <div className="withdrawal-method-grid grid grid-cols-2 gap-4">
               <button
                 type="button"
                 onClick={() => setMethod('upi')}
-                className={`py-3 px-4 rounded-lg font-semibold text-sm border transition-all ${
+                className={`withdrawal-method-btn py-3 px-4 rounded-lg font-semibold text-sm border transition-all ${
                   method === 'upi'
                     ? 'bg-brand-600/20 border-brand-500 text-white'
                     : 'bg-dark-800 border-dark-700 text-gray-400 hover:text-white'
@@ -165,7 +165,7 @@ export function WithdrawalPage() {
               <button
                 type="button"
                 onClick={() => setMethod('bank')}
-                className={`py-3 px-4 rounded-lg font-semibold text-sm border transition-all ${
+                className={`withdrawal-method-btn py-3 px-4 rounded-lg font-semibold text-sm border transition-all ${
                   method === 'bank'
                     ? 'bg-brand-600/20 border-brand-500 text-white'
                     : 'bg-dark-800 border-dark-700 text-gray-400 hover:text-white'
@@ -176,81 +176,81 @@ export function WithdrawalPage() {
             </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-400 mb-1">Withdrawal Amount (₹)</label>
-            <div className="relative rounded-md shadow-sm">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <span className="text-gray-500 sm:text-lg">₹</span>
-              </div>
-              <input
-                type="number"
-                step="0.01"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                className="bg-dark-800 border border-dark-700 text-white rounded-md pl-8 py-3 w-full focus:ring-brand-500 focus:border-brand-500 text-lg"
-                placeholder="Enter amount"
-                disabled={submitting}
-              />
-            </div>
-          </div>
-
-          {method === 'upi' ? (
-            <div>
-              <label className="block text-sm font-medium text-gray-400 mb-1">UPI ID</label>
-              <input
-                type="text"
-                value={upiId}
-                onChange={(e) => setUpiId(e.target.value)}
-                className="bg-dark-800 border border-dark-700 text-white rounded-md px-4 py-3 w-full focus:ring-brand-500 focus:border-brand-500 text-sm font-mono"
-                placeholder="e.g. mobile@upi"
-                disabled={submitting}
-              />
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-400 mb-1">Account Holder Name</label>
+          <div className="withdrawal-inputs-grid grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="withdrawal-amount-section">
+              <label className="withdrawal-amount-label block text-xs font-medium text-gray-400 mb-1">Withdrawal Amount (₹)</label>
+              <div className="relative rounded-md shadow-sm">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <span className="text-gray-400 text-base font-bold">₹</span>
+                </div>
                 <input
-                  type="text"
-                  value={accountHolder}
-                  onChange={(e) => setAccountHolder(e.target.value)}
-                  className="bg-dark-800 border border-dark-700 text-white rounded-md px-4 py-2.5 w-full focus:ring-brand-500 focus:border-brand-500 text-sm"
-                  placeholder="Full name as in bank account"
+                  type="number"
+                  step="0.01"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  className="withdrawal-amount-input bg-dark-800 border border-dark-700 text-white rounded-xl pl-8 pr-4 py-2.5 w-full focus:ring-2 focus:ring-brand-500 focus:border-brand-500 text-base font-bold [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  placeholder="Enter amount"
                   disabled={submitting}
                 />
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            </div>
+
+            {method === 'upi' ? (
+              <div className="withdrawal-fields-section">
+                <label className="withdrawal-field-label block text-sm font-medium text-gray-400 mb-1">UPI ID</label>
+                <input
+                  type="text"
+                  value={upiId}
+                  onChange={(e) => setUpiId(e.target.value)}
+                  className="withdrawal-field-input bg-dark-800 border border-dark-700 text-white rounded-md px-4 py-3 w-full focus:ring-brand-500 focus:border-brand-500 text-sm font-mono"
+                  placeholder="e.g. mobile@upi"
+                  disabled={submitting}
+                />
+              </div>
+            ) : (
+              <div className="withdrawal-fields-section withdrawal-bank-grid grid grid-cols-1 sm:grid-cols-3 gap-2">
                 <div>
-                  <label className="block text-sm font-medium text-gray-400 mb-1">Account Number</label>
+                  <label className="withdrawal-field-label block text-sm font-medium text-gray-400 mb-1">Account Holder</label>
                   <input
                     type="text"
-                    value={accountNumber}
-                    onChange={(e) => setAccountNumber(e.target.value)}
-                    className="bg-dark-800 border border-dark-700 text-white rounded-md px-4 py-2.5 w-full focus:ring-brand-500 focus:border-brand-500 text-sm font-mono"
-                    placeholder="Bank account number"
+                    value={accountHolder}
+                    onChange={(e) => setAccountHolder(e.target.value)}
+                    className="withdrawal-field-input bg-dark-800 border border-dark-700 text-white rounded-md px-4 py-2.5 w-full focus:ring-brand-500 focus:border-brand-500 text-sm"
+                    placeholder="Account Name"
                     disabled={submitting}
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-400 mb-1">IFSC Code</label>
+                  <label className="withdrawal-field-label block text-sm font-medium text-gray-400 mb-1">Account Number</label>
+                  <input
+                    type="text"
+                    value={accountNumber}
+                    onChange={(e) => setAccountNumber(e.target.value)}
+                    className="withdrawal-field-input bg-dark-800 border border-dark-700 text-white rounded-md px-4 py-2.5 w-full focus:ring-brand-500 focus:border-brand-500 text-sm font-mono"
+                    placeholder="A/C Number"
+                    disabled={submitting}
+                  />
+                </div>
+                <div>
+                  <label className="withdrawal-field-label block text-sm font-medium text-gray-400 mb-1">IFSC Code</label>
                   <input
                     type="text"
                     value={ifscCode}
                     onChange={(e) => setIfscCode(e.target.value)}
-                    className="bg-dark-800 border border-dark-700 text-white rounded-md px-4 py-2.5 w-full focus:ring-brand-500 focus:border-brand-500 text-sm font-mono uppercase"
+                    className="withdrawal-field-input bg-dark-800 border border-dark-700 text-white rounded-md px-4 py-2.5 w-full focus:ring-brand-500 focus:border-brand-500 text-sm font-mono uppercase"
                     placeholder="e.g. SBIN0001234"
                     disabled={submitting}
                   />
                 </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
 
           {formError && <p className="text-sm text-red-500 bg-red-500/10 border border-red-500/20 rounded p-3">{formError}</p>}
           {successMsg && <p className="text-sm text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 rounded p-3">{successMsg}</p>}
 
           {feeConfig && amount && !isNaN(parseFloat(amount)) && parseFloat(amount) > 0 && (
-            <div className="bg-dark-800 border border-dark-700 p-4 rounded-lg space-y-2">
+            <div className="withdrawal-fee-box bg-dark-800 border border-dark-700 p-4 rounded-lg space-y-2">
               <div className="flex justify-between text-sm">
                 <span className="text-gray-400">Withdrawal Amount</span>
                 <span className="text-white font-medium">₹{parseFloat(amount).toFixed(2)}</span>
@@ -271,14 +271,14 @@ export function WithdrawalPage() {
           <button
             type="submit"
             disabled={submitting || !amount}
-            className="w-full bg-brand-600 hover:bg-brand-500 disabled:bg-dark-700 disabled:text-gray-500 text-white font-bold py-3 px-4 rounded-lg transition-colors cursor-pointer"
+            className="withdrawal-submit-btn w-full bg-brand-600 hover:bg-brand-500 disabled:bg-dark-700 disabled:text-gray-500 text-white font-bold py-3 px-4 rounded-lg transition-colors cursor-pointer"
           >
             {submitting ? 'Submitting Request...' : 'Submit Withdrawal Request'}
           </button>
         </form>
       </Card>
 
-      <Card title="Withdrawal History">
+      <Card title="Withdrawal History" className="withdrawal-history-card">
         {withdrawals.length === 0 ? (
           <p className="text-gray-500 text-sm text-center py-8">No withdrawal requests found.</p>
         ) : (

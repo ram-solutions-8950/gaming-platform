@@ -31,7 +31,7 @@ def override_get_db():
 def setup_database():
     Base.metadata.create_all(bind=engine)
     with engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
-        for value in ("DRAGON", "TIGER", "TIE"):
+        for value in ("DRAGON", "TIGER", "TIE", "ANDAR", "BAHAR"):
             conn.execute(text(f"ALTER TYPE game_prediction ADD VALUE IF NOT EXISTS '{value}'"))
         conn.execute(text("ALTER TABLE game_rounds ADD COLUMN IF NOT EXISTS result_data JSON"))
     yield

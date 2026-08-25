@@ -1,17 +1,23 @@
 import { useForm } from 'react-hook-form';
 import { useNavigate, Link } from 'react-router-dom';
 import { useState } from 'react';
+import { Eye, EyeOff } from 'lucide-react';
 import { authService } from '../../services/auth';
 import { useAuthStore } from '../../store/authStore';
-import { Button } from '../../components/common/Button';
-import { Input } from '../../components/common/Input';
+import { GlitterRain } from '../../components/common/GlitterRain';
+import { CasinoLogo } from '../../components/common/CasinoLogo';
+import '../../styles/login-page.css';
 
-interface FormData { email: string; password: string; }
+interface FormData {
+  email: string;
+  password: string;
+}
 
 export function LoginPage() {
   const { register, handleSubmit, formState: { errors } } = useForm<FormData>();
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const navigate = useNavigate();
   const { setUser } = useAuthStore();
 
@@ -35,14 +41,94 @@ export function LoginPage() {
   };
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
-      <h2 className="text-2xl font-bold text-white mb-1">Welcome back</h2>
-      <p className="text-gray-400 text-sm mb-6">Sign in to your account</p>
-      {error && <div className="p-3 bg-danger/10 border border-danger/20 rounded-lg text-danger text-sm">{error}</div>}
-      <Input id="email" label="Email" type="email" placeholder="you@example.com" {...register('email', { required: true })} error={errors.email ? 'Email is required' : ''} />
-      <Input id="password" label="Password" type="password" placeholder="Password" {...register('password', { required: true })} error={errors.password ? 'Password is required' : ''} />
-      <Button type="submit" className="w-full" loading={loading}>Sign in</Button>
-      <p className="text-center text-sm text-gray-400">Don't have an account? <Link to="/signup" className="text-brand-400 hover:text-brand-300 font-medium">Sign up</Link></p>
-    </form>
+    <div className="auth-page-wrapper">
+      <GlitterRain />
+
+      <div className="casino-login-card">
+        {/* Logo & Subtitle */}
+        <div className="casino-login-header">
+          <CasinoLogo size="md" showSubtitle={false} />
+          <p className="casino-login-subtitle">Sign in to your account</p>
+        </div>
+
+        {/* Login Form */}
+        <form onSubmit={handleSubmit(onSubmit)} className="casino-login-form" noValidate>
+          {error && (
+            <div className="casino-login-error" role="alert">
+              {error}
+            </div>
+          )}
+
+          {/* Email Input */}
+          <div className="casino-input-group">
+            <label htmlFor="email" className="casino-input-label">
+              Email
+            </label>
+            <input
+              id="email"
+              type="email"
+              placeholder="you@example.com"
+              autoComplete="email"
+              className="casino-input-field"
+              {...register('email', { required: 'Email is required' })}
+            />
+            {errors.email && (
+              <span className="casino-field-error">{errors.email.message}</span>
+            )}
+          </div>
+
+          {/* Password Input with Visibility Toggle */}
+          <div className="casino-input-group">
+            <label htmlFor="password" className="casino-input-label">
+              Password
+            </label>
+            <div className="password-input-wrapper">
+              <input
+                id="password"
+                type={showPassword ? 'text' : 'password'}
+                placeholder="Password"
+                autoComplete="current-password"
+                className="casino-input-field"
+                {...register('password', { required: 'Password is required' })}
+              />
+              <button
+                type="button"
+                className="password-toggle-btn"
+                onClick={() => setShowPassword((prev) => !prev)}
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+                title={showPassword ? 'Hide password' : 'Show password'}
+                tabIndex={0}
+              >
+                {showPassword ? (
+                  <EyeOff size={18} strokeWidth={2.2} />
+                ) : (
+                  <Eye size={18} strokeWidth={2.2} />
+                )}
+              </button>
+            </div>
+            {errors.password && (
+              <span className="casino-field-error">{errors.password.message}</span>
+            )}
+          </div>
+
+          {/* Casino Gold Submit Button */}
+          <button
+            type="submit"
+            className="casino-login-btn"
+            disabled={loading}
+          >
+            {loading ? 'Signing In...' : 'Sign in to Play'}
+          </button>
+
+          {/* Footer Link */}
+          <p className="casino-login-footer">
+            Don't have an account?
+            <Link to="/signup" className="casino-login-link">
+              Sign up
+            </Link>
+          </p>
+        </form>
+      </div>
+    </div>
   );
 }

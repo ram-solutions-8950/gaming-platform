@@ -1,0 +1,788 @@
+/* ───────────────────────────────────────────────────────────
+   CHICKEN ROAD - DEDICATED ARCADE ROAD CROSSING GAME
+   ─────────────────────────────────────────────────────────── */
+
+.cr-arcade-container {
+  width: 100vw;
+  height: 100dvh;
+  max-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background: #181818;
+  color: #FFFFFF;
+  position: relative;
+  overflow: hidden;
+  box-sizing: border-box;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* ───────────────────────────────────────────────────────────
+   1. TOP HEADER BAR (Dark Charcoal #303030)
+   ─────────────────────────────────────────────────────────── */
+.cr-header {
+  flex: 0 0 auto;
+  height: clamp(40px, 6vh, 48px);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 clamp(8px, 2vw, 16px);
+  background: #303030;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  z-index: 30;
+  box-sizing: border-box;
+}
+
+.cr-header-left {
+  display: flex;
+  align-items: center;
+}
+
+.cr-header-back-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: transparent;
+  border: none;
+  color: #E2E8F0;
+  font-size: clamp(11px, 1.6vw, 13px);
+  font-weight: 700;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 6px;
+  transition: background 0.15s ease;
+}
+
+.cr-header-back-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.cr-header-center {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.cr-header-chicken-icon {
+  font-size: clamp(14px, 2vw, 18px);
+}
+
+.cr-header-title {
+  font-size: clamp(12px, 1.8vw, 15px);
+  font-weight: 900;
+  color: #FFFFFF;
+  letter-spacing: 0.5px;
+}
+
+.cr-header-right {
+  display: flex;
+  align-items: center;
+  gap: clamp(6px, 1.2vw, 10px);
+}
+
+.cr-header-help-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #CBD5E1;
+  font-size: clamp(10px, 1.4vw, 11px);
+  font-weight: 700;
+  padding: 4px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.cr-header-help-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #FFFFFF;
+}
+
+.cr-header-balance-pill {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: #242424;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  padding: 3px 6px 3px 8px;
+  border-radius: 20px;
+}
+
+.cr-header-balance-text {
+  font-size: clamp(11px, 1.5vw, 13px);
+  font-weight: 800;
+  color: #FBBF24;
+}
+
+.cr-header-add-cash {
+  background: #10B981;
+  border: none;
+  color: #FFFFFF;
+  font-size: 11px;
+  font-weight: 900;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.15s ease;
+}
+
+.cr-header-add-cash:hover {
+  transform: scale(1.1);
+}
+
+.cr-header-icon-btn {
+  background: transparent;
+  border: none;
+  color: #94A3B8;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.15s ease;
+}
+
+.cr-header-icon-btn:hover {
+  color: #FFFFFF;
+}
+
+/* ───────────────────────────────────────────────────────────
+   2. LIVE INFORMATION STRIP
+   ─────────────────────────────────────────────────────────── */
+.cr-live-strip {
+  flex: 0 0 auto;
+  height: clamp(18px, 3vh, 22px);
+  background: #242424;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 12px;
+  box-sizing: border-box;
+}
+
+.cr-live-strip-content {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: clamp(9px, 1.3vw, 11px);
+  color: #94A3B8;
+  font-weight: 600;
+}
+
+.cr-live-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #10B981;
+  box-shadow: 0 0 6px #10B981;
+  animation: cr-pulse-dot 1.8s infinite ease-in-out;
+}
+
+@keyframes cr-pulse-dot {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.3); opacity: 0.6; }
+}
+
+.cr-live-text {
+  color: #E2E8F0;
+  font-weight: 700;
+}
+
+.cr-live-divider {
+  color: #64748B;
+}
+
+.cr-live-online {
+  color: #94A3B8;
+}
+
+/* ───────────────────────────────────────────────────────────
+   3. FULL-WIDTH GAME STAGE (Road & Canvas)
+   ─────────────────────────────────────────────────────────── */
+.cr-game-stage {
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  position: relative;
+  background: #1e1e1e;
+  overflow: hidden;
+}
+
+/* Floating Compact HUD Inside Stage */
+.cr-floating-hud {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: inline-flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: clamp(8px, 1.5vw, 14px);
+  height: 28px !important;
+  max-height: 28px !important;
+  line-height: 28px !important;
+  background: rgba(22, 22, 22, 0.90);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  padding: 0 clamp(10px, 2vw, 16px) !important;
+  border-radius: 20px;
+  white-space: nowrap !important;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 25;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.6);
+  pointer-events: none;
+  width: auto;
+  max-width: 90vw;
+  box-sizing: border-box;
+}
+
+.cr-hud-pill {
+  display: inline-flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  gap: 4px;
+  height: 100%;
+}
+
+.cr-hud-label {
+  font-size: clamp(9px, 1.3vw, 11px);
+  font-weight: 700;
+  color: #94A3B8;
+}
+
+.cr-hud-val {
+  font-size: clamp(11px, 1.5vw, 13px);
+  font-weight: 900;
+}
+
+.cr-hud-val--gold {
+  color: #FBBF24;
+}
+
+.cr-hud-val--green {
+  color: #34D399;
+}
+
+.cr-hud-val--win {
+  color: #6EE7B7;
+}
+
+/* Canvas Viewport */
+.cr-canvas-viewport {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  overflow: hidden;
+}
+
+.chicken-road-canvas-container {
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+.chicken-road-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* Floating Mobile Steering Touch Controls */
+.cr-mobile-controls {
+  position: absolute;
+  bottom: 10px;
+  left: 10px;
+  right: 10px;
+  display: flex;
+  justify-content: space-between;
+  pointer-events: none;
+  z-index: 20;
+}
+
+.cr-steer-btn {
+  pointer-events: auto;
+  width: clamp(40px, 7vw, 48px);
+  height: clamp(40px, 7vw, 48px);
+  border-radius: 50%;
+  background: rgba(48, 48, 48, 0.80);
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  color: #FFFFFF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  cursor: pointer;
+  transition: transform 0.1s ease, background 0.1s ease;
+  touch-action: manipulation;
+}
+
+.cr-steer-btn:active {
+  transform: scale(0.92);
+  background: rgba(255, 255, 255, 0.25);
+  border-color: #FBBF24;
+  color: #FBBF24;
+}
+
+.cr-error-banner {
+  position: absolute;
+  bottom: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(185, 28, 28, 0.9);
+  color: #FFFFFF;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 12px;
+  border-radius: 8px;
+  z-index: 25;
+}
+
+/* ───────────────────────────────────────────────────────────
+   4. COMPACT BOTTOM BETTING PANEL (#303030)
+   ─────────────────────────────────────────────────────────── */
+.cr-bottom-panel {
+  flex: 0 0 auto;
+  min-height: 52px;
+  height: auto;
+  background: #303030;
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px clamp(8px, 1.8vw, 16px) max(env(safe-area-inset-bottom, 0px), 6px);
+  gap: clamp(4px, 1vw, 10px);
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.4);
+  z-index: 30;
+  box-sizing: border-box;
+  overflow-x: auto;
+}
+
+/* Stepper Group */
+.cr-bet-stepper-group {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  flex-shrink: 0;
+}
+
+.cr-stepper-bound-btn {
+  background: #4A4A4A;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #CBD5E1;
+  font-size: clamp(9px, 1.2vw, 11px);
+  font-weight: 800;
+  padding: 6px clamp(6px, 1vw, 10px);
+  border-radius: 7px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.cr-stepper-bound-btn:hover:not(:disabled) {
+  background: #5A5A5A;
+  color: #FFFFFF;
+}
+
+.cr-stepper-bound-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.cr-stepper-input-box {
+  display: flex;
+  align-items: center;
+  background: #242424;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 7px;
+  overflow: hidden;
+  height: clamp(28px, 5vh, 34px);
+}
+
+.cr-stepper-adj-btn {
+  width: clamp(24px, 3.5vw, 30px);
+  height: 100%;
+  background: #4A4A4A;
+  border: none;
+  color: #FFFFFF;
+  font-size: 15px;
+  font-weight: 800;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s ease;
+}
+
+.cr-stepper-adj-btn:hover:not(:disabled) {
+  background: #5A5A5A;
+}
+
+.cr-stepper-adj-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.cr-stepper-input {
+  width: clamp(38px, 5.5vw, 54px);
+  background: transparent;
+  border: none;
+  color: #FFFFFF;
+  font-size: clamp(11px, 1.5vw, 13px);
+  font-weight: 900;
+  text-align: center;
+  outline: none;
+  -moz-appearance: textfield;
+}
+
+.cr-stepper-input::-webkit-outer-spin-button,
+.cr-stepper-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* Quick Chips */
+.cr-quick-chips {
+  display: flex;
+  align-items: center;
+  gap: clamp(2px, 0.5vw, 5px);
+  flex-shrink: 1;
+}
+
+.cr-chip-btn {
+  background: #4A4A4A;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #E2E8F0;
+  font-size: clamp(9px, 1.2vw, 11px);
+  font-weight: 800;
+  padding: 6px clamp(5px, 0.9vw, 9px);
+  border-radius: 7px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.cr-chip-btn:hover:not(:disabled) {
+  background: #5A5A5A;
+  color: #FFFFFF;
+}
+
+.cr-chip-btn--active {
+  background: #5A5A5A;
+  border-color: #10B981;
+  color: #34D399;
+}
+
+.cr-chip-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Difficulty Pills */
+.cr-diff-pills {
+  display: flex;
+  align-items: center;
+  gap: clamp(2px, 0.5vw, 5px);
+  flex-shrink: 1;
+}
+
+.cr-diff-pill {
+  background: #4A4A4A;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #94A3B8;
+  font-size: clamp(9px, 1.2vw, 11px);
+  font-weight: 800;
+  padding: 6px clamp(6px, 1vw, 10px);
+  border-radius: 7px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.cr-diff-pill:hover:not(:disabled) {
+  background: #5A5A5A;
+  color: #FFFFFF;
+}
+
+.cr-diff-pill--active {
+  background: #5A5A5A;
+  color: #FFFFFF;
+}
+
+.cr-diff-pill--easy.cr-diff-pill--active {
+  border-color: #10B981;
+  color: #34D399;
+}
+
+.cr-diff-pill--medium.cr-diff-pill--active {
+  border-color: #F59E0B;
+  color: #FBBF24;
+}
+
+.cr-diff-pill--hard.cr-diff-pill--active {
+  border-color: #EF4444;
+  color: #F87171;
+}
+
+.cr-diff-pill:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Large Green PLAY Button / Glowing CASH OUT Button */
+.cr-play-action-wrap {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.cr-play-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: clamp(100px, 15vw, 140px);
+  height: clamp(34px, 6vh, 42px);
+  background: #35C759;
+  border: none;
+  border-radius: 10px;
+  color: #FFFFFF;
+  font-size: clamp(12px, 1.6vw, 14px);
+  font-weight: 900;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(53, 199, 89, 0.4);
+  transition: transform 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+  white-space: nowrap;
+}
+
+.cr-play-btn:hover:not(:disabled) {
+  background: #2eb84e;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(53, 199, 89, 0.55);
+}
+
+.cr-play-btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.cr-play-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.cr-cashout-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: clamp(120px, 18vw, 160px);
+  height: clamp(34px, 6vh, 42px);
+  background: linear-gradient(135deg, #F59E0B, #D97706);
+  border: none;
+  border-radius: 10px;
+  color: #FFFFFF;
+  font-size: clamp(11px, 1.5vw, 13px);
+  font-weight: 900;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(245, 158, 11, 0.45);
+  animation: cr-pulse-cashout 2s infinite ease-in-out;
+  transition: transform 0.15s ease;
+  white-space: nowrap;
+}
+
+@keyframes cr-pulse-cashout {
+  0%, 100% { transform: scale(1); box-shadow: 0 4px 14px rgba(245, 158, 11, 0.45); }
+  50% { transform: scale(1.02); box-shadow: 0 4px 22px rgba(245, 158, 11, 0.75); }
+}
+
+.cr-cashout-btn:hover:not(:disabled) {
+  transform: scale(1.02);
+}
+
+.cr-cashout-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ───────────────────────────────────────────────────────────
+   5. ARCADE MODALS (Win / Loss / How to Play)
+   ─────────────────────────────────────────────────────────── */
+.cr-overlay-backdrop {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  width: 100dvw;
+  height: 100vh;
+  height: 100dvh;
+  background: rgba(0, 0, 0, 0.82);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  z-index: 9999;
+  animation: cr-modal-pop 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes cr-modal-pop {
+  from { opacity: 0; transform: scale(0.92); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.cr-arcade-modal {
+  width: 90%;
+  max-width: 340px;
+  background: #27272a;
+  border: 2px solid rgba(255, 255, 255, 0.18);
+  border-radius: 20px;
+  padding: 22px 18px;
+  text-align: center;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.85);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  z-index: 10000;
+  margin: auto;
+}
+
+.cr-arcade-modal--win {
+  border-color: #35C759;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.85), 0 0 30px rgba(53, 199, 89, 0.3);
+}
+
+.cr-arcade-modal--lost {
+  border-color: #EF4444;
+}
+
+.cr-modal-badge {
+  font-size: 36px;
+  line-height: 1;
+}
+
+.cr-modal-heading {
+  font-size: 20px;
+  font-weight: 900;
+  color: #FFFFFF;
+  margin: 0;
+}
+
+.cr-modal-stat-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  width: 100%;
+}
+
+.cr-modal-stat {
+  background: #242424;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+}
+
+.cr-modal-stat-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: #94A3B8;
+  text-transform: uppercase;
+}
+
+.cr-modal-stat-val {
+  font-size: 17px;
+  font-weight: 900;
+  color: #FFFFFF;
+}
+
+.cr-modal-payout-box {
+  width: 100%;
+  background: rgba(53, 199, 89, 0.12);
+  border: 1px solid rgba(53, 199, 89, 0.3);
+  border-radius: 10px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+}
+
+.cr-modal-action-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 11px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 900;
+  cursor: pointer;
+  border: none;
+  transition: transform 0.15s ease;
+}
+
+.cr-modal-action-btn--green {
+  background: #35C759;
+  color: #FFFFFF;
+}
+
+.cr-modal-action-btn--red {
+  background: #EF4444;
+  color: #FFFFFF;
+}
+
+.cr-modal-action-btn:hover {
+  transform: scale(1.02);
+}
+
+/* How to play modal */
+.cr-arcade-modal--help {
+  max-width: 360px;
+  text-align: left;
+  align-items: stretch;
+}
+
+.cr-rules-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.cr-rule-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 12px;
+  color: #E2E8F0;
+  line-height: 1.4;
+}
+
+.cr-rule-num {
+  width: 20px;
+  height: 20px;
+  background: #4A4A4A;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 800;
+  color: #FBBF24;
+  flex-shrink: 0;
+}

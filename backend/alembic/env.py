@@ -11,6 +11,7 @@ from app.config import settings
 from app.models import (  # noqa: F401 - import all models so Alembic can detect them
     User, Wallet, WalletTransaction, Deposit, Withdrawal,
     PaymentConfiguration, AuditLog, RefreshToken, IdempotencyKey,
+    Referral, ReferralSettings, ReferralStatus,
 )
 
 config = context.config

@@ -1,0 +1,692 @@
+/* ───────────────────────────────────────────────────────────
+   777WIN CASINO WALLET PAGE THEME
+   ─────────────────────────────────────────────────────────── */
+
+.casino-wallet-page {
+  width: 100%;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 8px 12px 84px 12px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  overflow-x: hidden;
+}
+
+/* Header Bar */
+.casino-wallet-title-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 4px;
+}
+
+.casino-wallet-heading {
+  font-size: clamp(20px, 2.5vw, 28px);
+  font-weight: 900;
+  color: #FFFFFF;
+  margin: 0;
+  letter-spacing: 0.5px;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.casino-wallet-heading-icon {
+  color: #FFD21A;
+  filter: drop-shadow(0 0 8px rgba(255, 210, 26, 0.4));
+}
+
+.casino-wallet-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 20px;
+  background: rgba(139, 43, 226, 0.25);
+  border: 1px solid rgba(255, 210, 26, 0.3);
+  color: #FFE66B;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+}
+
+/* Hero Top Grid: Balance Card + Quick Actions */
+.casino-wallet-hero-grid {
+  display: grid;
+  grid-template-columns: 1.15fr 1fr;
+  gap: 14px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Balance Card */
+.casino-balance-card {
+  background:
+    radial-gradient(circle at 85% 20%, rgba(255, 210, 26, 0.12), transparent 45%),
+    radial-gradient(circle at 15% 80%, rgba(139, 43, 226, 0.25), transparent 50%),
+    linear-gradient(145deg, #240b4c 0%, #150330 60%, #0d011f 100%);
+  border: 1px solid rgba(255, 210, 26, 0.35);
+  border-radius: 18px;
+  padding: 18px 20px;
+  box-shadow:
+    0 10px 30px rgba(0, 0, 0, 0.6),
+    0 0 24px rgba(139, 43, 226, 0.2),
+    inset 0 1px 1px rgba(255, 255, 255, 0.15);
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  box-sizing: border-box;
+}
+
+.casino-balance-card-glow {
+  position: absolute;
+  top: -20px;
+  right: -20px;
+  width: 100px;
+  height: 100px;
+  background: radial-gradient(circle, rgba(255, 210, 26, 0.25), transparent 70%);
+  filter: blur(20px);
+  pointer-events: none;
+}
+
+.casino-balance-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.casino-balance-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: #B7A9CA;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  margin: 0;
+}
+
+.casino-balance-amount-row {
+  display: flex;
+  align-items: baseline;
+  gap: 2px;
+  margin: 4px 0;
+}
+
+.casino-balance-currency {
+  font-size: clamp(24px, 3.5vw, 36px);
+  font-weight: 900;
+  color: #FFD21A;
+  text-shadow: 0 0 12px rgba(255, 210, 26, 0.4);
+}
+
+.casino-balance-number {
+  font-size: clamp(28px, 4.5vw, 44px);
+  font-weight: 900;
+  color: #FFFFFF;
+  letter-spacing: -0.5px;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.7);
+  line-height: 1.1;
+}
+
+.casino-balance-paisa {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #8C7B9E;
+  margin: 4px 0 0 0;
+}
+
+/* Quick Actions Container */
+.casino-quick-actions-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+  box-sizing: border-box;
+}
+
+/* Quick Action Button Base */
+.casino-action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-radius: 14px;
+  border: none;
+  cursor: pointer;
+  text-decoration: none;
+  box-sizing: border-box;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.casino-action-btn:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.06);
+}
+
+.casino-action-btn:active {
+  transform: translateY(0);
+}
+
+.casino-action-btn-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.casino-action-icon-box {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.casino-action-info {
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+}
+
+.casino-action-title {
+  font-size: 14.5px;
+  font-weight: 800;
+  letter-spacing: 0.3px;
+  margin: 0;
+  line-height: 1.2;
+}
+
+.casino-action-sub {
+  font-size: 11px;
+  font-weight: 600;
+  margin: 2px 0 0 0;
+  opacity: 0.88;
+}
+
+.casino-action-arrow {
+  opacity: 0.75;
+  transition: transform 0.15s ease, opacity 0.15s ease;
+}
+
+.casino-action-btn:hover .casino-action-arrow {
+  opacity: 1;
+  transform: translateX(3px);
+}
+
+/* Deposit Button Style */
+.casino-action-btn--deposit {
+  background: linear-gradient(135deg, #FF8A00 0%, #FFA800 50%, #FFD21A 100%);
+  box-shadow: 0 6px 18px rgba(255, 138, 0, 0.35);
+  border: 1px solid rgba(255, 240, 160, 0.4);
+}
+
+.casino-action-btn--deposit .casino-action-icon-box {
+  background: rgba(36, 16, 68, 0.25);
+  color: #241044;
+}
+
+.casino-action-btn--deposit .casino-action-title {
+  color: #241044;
+}
+
+.casino-action-btn--deposit .casino-action-sub {
+  color: #3B0E5A;
+}
+
+.casino-action-btn--deposit .casino-action-arrow {
+  color: #241044;
+}
+
+/* Withdraw Button Style */
+.casino-action-btn--withdraw {
+  background: linear-gradient(135deg, #00994A 0%, #00B85A 50%, #18D878 100%);
+  box-shadow: 0 6px 18px rgba(0, 184, 90, 0.3);
+  border: 1px solid rgba(160, 255, 200, 0.35);
+}
+
+.casino-action-btn--withdraw .casino-action-icon-box {
+  background: rgba(0, 0, 0, 0.22);
+  color: #FFFFFF;
+}
+
+.casino-action-btn--withdraw .casino-action-title {
+  color: #FFFFFF;
+}
+
+.casino-action-btn--withdraw .casino-action-sub {
+  color: #DCFCE7;
+}
+
+.casino-action-btn--withdraw .casino-action-arrow {
+  color: #FFFFFF;
+}
+
+/* Transactions Button Style */
+.casino-action-btn--txs {
+  background: linear-gradient(135deg, #4B0875 0%, #6A16C7 50%, #8E21D4 100%);
+  box-shadow: 0 6px 18px rgba(114, 27, 209, 0.3);
+  border: 1px solid rgba(210, 140, 255, 0.3);
+}
+
+.casino-action-btn--txs .casino-action-icon-box {
+  background: rgba(0, 0, 0, 0.25);
+  color: #FFE66B;
+}
+
+.casino-action-btn--txs .casino-action-title {
+  color: #FFFFFF;
+}
+
+.casino-action-btn--txs .casino-action-sub {
+  color: #E9D5FF;
+}
+
+.casino-action-btn--txs .casino-action-arrow {
+  color: #FFE66B;
+}
+
+/* ───────────────────────────────────────────────────────────
+   TRANSACTION HISTORY SECTION
+   ─────────────────────────────────────────────────────────── */
+
+.casino-tx-section {
+  background: rgba(16, 5, 34, 0.88);
+  border: 1px solid rgba(255, 210, 26, 0.22);
+  border-radius: 18px;
+  padding: 16px 18px;
+  box-shadow:
+    0 12px 36px rgba(0, 0, 0, 0.55),
+    0 0 20px rgba(139, 43, 226, 0.12);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  box-sizing: border-box;
+}
+
+.casino-tx-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.casino-tx-heading {
+  font-size: 16px;
+  font-weight: 800;
+  color: #FFFFFF;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  letter-spacing: 0.3px;
+}
+
+.casino-tx-heading-icon {
+  color: #FFD21A;
+}
+
+/* Filter Tab Pills */
+.casino-tx-filters {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(9, 2, 20, 0.8);
+  padding: 3px;
+  border-radius: 12px;
+  border: 1px solid rgba(139, 43, 226, 0.3);
+}
+
+.casino-filter-pill {
+  padding: 5px 12px;
+  border-radius: 9px;
+  border: none;
+  background: transparent;
+  color: #B7A9CA;
+  font-size: 11.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  letter-spacing: 0.3px;
+  outline: none;
+}
+
+.casino-filter-pill:hover {
+  color: #FFFFFF;
+}
+
+.casino-filter-pill.active {
+  background: linear-gradient(135deg, #721BD1 0%, #A82CFF 100%);
+  color: #FFFFFF;
+  box-shadow: 0 2px 8px rgba(168, 44, 255, 0.4);
+}
+
+/* Transactions List */
+.casino-tx-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Transaction Card Row */
+.casino-tx-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  background: rgba(28, 10, 56, 0.55);
+  border: 1px solid rgba(139, 43, 226, 0.25);
+  border-radius: 12px;
+  transition: transform 0.12s ease, border-color 0.12s ease, background 0.12s ease;
+}
+
+.casino-tx-row:hover {
+  background: rgba(38, 14, 76, 0.7);
+  border-color: rgba(255, 210, 26, 0.35);
+  transform: translateX(2px);
+}
+
+.casino-tx-row-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.casino-tx-type-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 16px;
+}
+
+.casino-tx-type-icon--deposit {
+  background: rgba(255, 210, 26, 0.15);
+  color: #FFD21A;
+  border: 1px solid rgba(255, 210, 26, 0.3);
+}
+
+.casino-tx-type-icon--withdrawal {
+  background: rgba(24, 216, 120, 0.15);
+  color: #18D878;
+  border: 1px solid rgba(24, 216, 120, 0.3);
+}
+
+.casino-tx-type-icon--game {
+  background: rgba(168, 44, 255, 0.18);
+  color: #C43CFF;
+  border: 1px solid rgba(168, 44, 255, 0.35);
+}
+
+.casino-tx-type-icon--refund {
+  background: rgba(56, 189, 248, 0.15);
+  color: #38BDF8;
+  border: 1px solid rgba(56, 189, 248, 0.3);
+}
+
+.casino-tx-details {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.casino-tx-title {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #FFFFFF;
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.casino-tx-meta {
+  font-size: 11px;
+  font-weight: 500;
+  color: #9E8EB5;
+  margin: 2px 0 0 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.casino-tx-ref {
+  color: #786890;
+}
+
+.casino-tx-row-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.casino-tx-amount {
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.2px;
+}
+
+.casino-tx-amount--credit {
+  color: #18D878;
+  text-shadow: 0 0 8px rgba(24, 216, 120, 0.3);
+}
+
+.casino-tx-amount--debit {
+  color: #F87171;
+}
+
+/* Status Badges */
+.casino-status-badge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.casino-status-badge--completed,
+.casino-status-badge--success {
+  background: rgba(24, 216, 120, 0.15);
+  color: #18D878;
+  border: 1px solid rgba(24, 216, 120, 0.35);
+}
+
+.casino-status-badge--pending,
+.casino-status-badge--processing {
+  background: rgba(255, 210, 26, 0.15);
+  color: #FFE66B;
+  border: 1px solid rgba(255, 210, 26, 0.35);
+}
+
+.casino-status-badge--failed,
+.casino-status-badge--rejected,
+.casino-status-badge--cancelled {
+  background: rgba(239, 68, 68, 0.15);
+  color: #F87171;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+}
+
+.casino-status-badge--reversed {
+  background: rgba(249, 115, 22, 0.15);
+  color: #FB923C;
+  border: 1px solid rgba(249, 115, 22, 0.35);
+}
+
+/* Empty State */
+.casino-tx-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 32px 16px;
+  gap: 8px;
+}
+
+.casino-tx-empty-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  background: rgba(139, 43, 226, 0.2);
+  border: 1px solid rgba(255, 210, 26, 0.25);
+  color: #FFE66B;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 4px;
+}
+
+.casino-tx-empty-title {
+  font-size: 14.5px;
+  font-weight: 700;
+  color: #FFFFFF;
+  margin: 0;
+}
+
+.casino-tx-empty-sub {
+  font-size: 12px;
+  font-weight: 500;
+  color: #B7A9CA;
+  margin: 0;
+}
+
+/* ───────────────────────────────────────────────────────────
+   MOBILE LANDSCAPE RESPONSIVENESS (844 × 390, 896 × 414, etc.)
+   ─────────────────────────────────────────────────────────── */
+@media (max-width: 900px) and (orientation: landscape), (max-height: 500px) {
+  .casino-wallet-page {
+    padding: 6px 10px calc(var(--bottom-nav-height, 50px) + 24px + env(safe-area-inset-bottom, 0px)) 10px !important;
+    gap: 10px !important;
+    overflow: visible !important;
+    touch-action: pan-y !important;
+  }
+
+  .casino-wallet-title-bar {
+    margin-bottom: 2px !important;
+  }
+
+  .casino-wallet-heading {
+    font-size: 18px !important;
+  }
+
+  .casino-wallet-hero-grid {
+    grid-template-columns: 1fr 1fr !important;
+    gap: 10px !important;
+  }
+
+  .casino-balance-card {
+    padding: 12px 14px !important;
+    border-radius: 14px !important;
+  }
+
+  .casino-balance-label {
+    font-size: 11px !important;
+  }
+
+  .casino-balance-currency {
+    font-size: 22px !important;
+  }
+
+  .casino-balance-number {
+    font-size: 26px !important;
+  }
+
+  .casino-balance-paisa {
+    font-size: 10px !important;
+    margin-top: 2px !important;
+  }
+
+  .casino-quick-actions-grid {
+    gap: 6px !important;
+  }
+
+  .casino-action-btn {
+    padding: 7px 12px !important;
+    border-radius: 10px !important;
+  }
+
+  .casino-action-icon-box {
+    width: 28px !important;
+    height: 28px !important;
+    border-radius: 7px !important;
+  }
+
+  .casino-action-title {
+    font-size: 12.5px !important;
+  }
+
+  .casino-action-sub {
+    font-size: 9.5px !important;
+  }
+
+  .casino-tx-section {
+    padding: 12px 14px !important;
+    border-radius: 14px !important;
+    gap: 10px !important;
+  }
+
+  .casino-tx-heading {
+    font-size: 14px !important;
+  }
+
+  .casino-filter-pill {
+    padding: 3px 8px !important;
+    font-size: 10.5px !important;
+    border-radius: 7px !important;
+  }
+
+  .casino-tx-row {
+    padding: 8px 10px !important;
+    border-radius: 10px !important;
+  }
+
+  .casino-tx-type-icon {
+    width: 28px !important;
+    height: 28px !important;
+    font-size: 13px !important;
+  }
+
+  .casino-tx-title {
+    font-size: 12px !important;
+  }
+
+  .casino-tx-meta {
+    font-size: 10px !important;
+  }
+
+  .casino-tx-amount {
+    font-size: 13px !important;
+  }
+
+  .casino-status-badge {
+    font-size: 9px !important;
+    padding: 1px 6px !important;
+  }
+}
+
+/* Portrait Mobile (< 640px) */
+@media (max-width: 640px) and (orientation: portrait) {
+  .casino-wallet-hero-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .casino-quick-actions-grid {
+    grid-template-columns: 1fr !important;
+  }
+}

@@ -1,0 +1,282 @@
+/* ── TeenPattiTable component-level layout overrides ── */
+
+.tp-arena-container {
+  position: relative;
+  width: 100%;
+  height: 100dvh;
+  max-height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  box-sizing: border-box;
+}
+
+.tp-table-oval {
+  position: relative;
+  width: min(92vw, 1100px);
+  height: min(68dvh, 520px);
+  max-height: calc(100dvh - 150px);
+  min-height: 220px;
+  margin: 0 auto;
+  border-radius: 50%;
+  box-sizing: border-box;
+  flex-shrink: 1;
+}
+
+.tp-center-pot {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 20;
+  width: clamp(130px, 15vw, 190px);
+  min-height: 80px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+}
+
+/* Action dock — ensure it stays within viewport */
+.tp-action-dock {
+  flex-shrink: 0;
+}
+
+/* ─────────────────────────────────────────────────────────
+   MOBILE LANDSCAPE (max-height 600px)
+   ───────────────────────────────────────────────────────── */
+@media (orientation: landscape) and (max-height: 600px) {
+  .tp-arena-container {
+    height: 100dvh;
+    max-height: 100dvh;
+    width: 100%;
+    overflow: hidden;
+    padding: 4px 8px 6px 8px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    align-items: center;
+    box-sizing: border-box;
+  }
+
+  /* Fill vertical space nicely while leaving room for action dock */
+  .tp-table-oval {
+    width: min(92vw, 880px);
+    height: calc(100dvh - 70px);
+    max-height: 280px;
+    min-height: 175px;
+    margin: 0 auto;
+    border-width: 6px;
+    border-radius: 180px;
+    box-sizing: border-box;
+    position: relative;
+    flex-shrink: 1;
+  }
+
+  .tp-table-oval::after {
+    inset: 6px;
+    border-radius: 174px;
+  }
+
+  /* Center Pot: true center with compact styling */
+  .tp-center-pot {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 78px;
+    min-height: 26px;
+    padding: 0.1rem 0.3rem;
+    border-radius: 8px;
+    z-index: 10;
+  }
+
+  .tp-pot-label {
+    font-size: 0.4rem;
+    letter-spacing: 0.6px;
+  }
+
+  .tp-pot-amount {
+    font-size: 0.74rem;
+  }
+
+  .tp-stake-info {
+    font-size: 0.4rem;
+    margin-top: 0;
+  }
+
+  /* Seats: compact scaling */
+  .tp-seat {
+    width: 60px;
+    gap: 0px;
+    z-index: 25;
+  }
+
+  .tp-avatar-wrapper {
+    width: 18px;
+    height: 18px;
+    font-size: 0.48rem;
+    border-width: 1.5px;
+  }
+
+  .tp-seat-name {
+    font-size: 0.42rem;
+    padding: 0px 3px;
+    line-height: 1.1;
+    max-width: 52px;
+  }
+
+  .tp-seat-status-badge {
+    font-size: 0.38rem;
+    padding: 0px 2px;
+    line-height: 1.1;
+  }
+
+  /* Seat positions in 4-seat layout */
+  .tp-seat-top {
+    top: 2px;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+
+  .tp-seat-top .tp-card-fan {
+    margin-top: -3px;
+  }
+
+  .tp-seat-bottom {
+    bottom: 2px;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+
+  .tp-seat-bottom .tp-card-fan {
+    margin-top: -3px;
+  }
+
+  .tp-seat-left {
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+  }
+
+  .tp-seat-right {
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+  }
+
+  /* 6-seat layout positions */
+  .tp-seat-top-left     { top: 44px; left: 12%; }
+  .tp-seat-top-right    { top: 44px; right: 12%; }
+  .tp-seat-bottom-left  { bottom: 6px; left: 12%; }
+  .tp-seat-bottom-right { bottom: 6px; right: 12%; }
+
+  /* Card fan size in landscape */
+  .tp-card {
+    width: 14px;
+    height: 20px;
+    border-radius: 2px;
+    padding: 1px;
+    font-size: 0.38rem;
+  }
+
+  .tp-card-fan {
+    margin-top: 0px;
+  }
+
+  /* Action Controls Dock */
+  .tp-action-dock {
+    width: min(92vw, 640px);
+    margin-top: 2px;
+    padding: 0.25rem 0.6rem;
+    gap: 6px;
+    border-radius: 12px;
+    flex-shrink: 0;
+    z-index: 30;
+  }
+
+  .tp-btn {
+    padding: 4px 10px;
+    font-size: 0.65rem;
+    border-radius: 8px;
+    min-width: 60px;
+  }
+
+  .tp-btn-sub {
+    font-size: 0.46rem;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────
+   VERY SHORT LANDSCAPE (max-height 450px — mobile phones)
+   ───────────────────────────────────────────────────────── */
+@media (orientation: landscape) and (max-height: 450px) {
+  .tp-arena-container {
+    padding: 2px 6px 3px 6px;
+  }
+
+  .tp-table-oval {
+    width: min(90vw, 820px);
+    height: calc(100dvh - 60px);
+    max-height: 245px;
+    min-height: 160px;
+    border-width: 5px;
+  }
+
+  .tp-center-pot {
+    top: 48%;
+    transform: translate(-50%, -50%) scale(0.85);
+  }
+
+  .tp-seat {
+    width: 62px;
+  }
+
+  .tp-avatar-wrapper {
+    width: 22px;
+    height: 22px;
+    font-size: 0.54rem;
+  }
+
+  .tp-seat-top    { top: 5px; }
+  .tp-seat-bottom { bottom: 6px; }
+  .tp-seat-left   { left: 10px; top: 50%; }
+  .tp-seat-right  { right: 10px; top: 50%; }
+
+  .tp-card {
+    width: 17px;
+    height: 26px;
+  }
+
+  .tp-action-dock {
+    padding: 0.2rem 0.5rem;
+    gap: 4px;
+  }
+
+  .tp-btn {
+    padding: 3px 8px;
+    font-size: 0.6rem;
+    min-width: 52px;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────
+   PORTRAIT
+   ───────────────────────────────────────────────────────── */
+@media (orientation: portrait) {
+  .tp-arena-container {
+    height: 100dvh;
+    max-height: 100dvh;
+    overflow: hidden;
+  }
+
+  .tp-table-oval {
+    width: 94vw;
+    height: min(50dvh, calc(100dvh - 200px));
+    max-height: calc(100dvh - 200px);
+  }
+}

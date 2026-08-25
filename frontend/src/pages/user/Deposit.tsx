@@ -255,21 +255,26 @@ export function DepositPage() {
   };
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
-      <h1 className="text-3xl font-extrabold text-white text-center">
-        Deposit Funds
-      </h1>
+    <div className="deposit-page w-full max-w-xl mx-auto space-y-4">
+      <div className="deposit-page-header flex items-center justify-between">
+        <h1 className="deposit-page-title text-xl sm:text-2xl font-extrabold text-white">
+          Deposit Funds
+        </h1>
+        <span className="deposit-page-badge text-xs text-brand-400 bg-brand-500/10 border border-brand-500/20 px-2.5 py-1 rounded-full font-semibold">
+          Instant Credit ⚡
+        </span>
+      </div>
 
-      <Card title="Razorpay Deposit">
-        <div className="space-y-5">
+      <Card title="Razorpay Secure Deposit" className="deposit-card">
+        <div className="deposit-card-body space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-400 mb-2">
-              Amount
+            <label className="deposit-amount-label block text-xs font-medium text-gray-400 mb-1.5">
+              Enter Amount (₹)
             </label>
 
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <span className="text-gray-500 text-lg">
+                <span className="text-gray-400 font-bold text-base">
                   ₹
                 </span>
               </div>
@@ -282,81 +287,72 @@ export function DepositPage() {
                 value={amount}
                 onChange={handleAmountChange}
                 disabled={processing}
-                className="bg-gray-800 border border-gray-700 text-white rounded-md pl-8 py-3 w-full focus:ring-indigo-500 focus:border-indigo-500 text-lg"
-                placeholder="Enter amount"
+                className="deposit-amount-input bg-dark-800 border border-dark-700 text-white rounded-xl pl-8 pr-4 py-2.5 w-full focus:ring-2 focus:ring-brand-500 focus:border-brand-500 text-base font-bold [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                placeholder="e.g. 500"
               />
             </div>
 
-            <div className="mt-2 text-xs text-gray-500 flex justify-between">
-              <span>
-                Minimum: ₹100.00
-              </span>
+            {/* Quick Presets */}
+            <div className="deposit-presets-grid grid grid-cols-4 gap-2 mt-2.5">
+              {[100, 500, 1000, 5000].map((preset) => (
+                <button
+                  key={preset}
+                  type="button"
+                  onClick={() => {
+                    setAmount(String(preset));
+                    setAmountError('');
+                    setErrorMsg('');
+                  }}
+                  className="deposit-preset-btn py-1.5 px-2 bg-dark-800 hover:bg-brand-600/30 text-gray-200 hover:text-white border border-dark-700 hover:border-brand-500/50 rounded-lg text-xs font-bold transition-all active:scale-95"
+                >
+                  +₹{preset}
+                </button>
+              ))}
+            </div>
 
-              <span>
-                Maximum: ₹10,000.00
-              </span>
+            <div className="deposit-limits-row mt-1.5 text-[11px] text-gray-500 flex justify-between">
+              <span>Min: ₹100</span>
+              <span>Max: ₹10,000</span>
             </div>
 
             {amountError && (
-              <p className="mt-2 text-sm text-red-500">
+              <p className="mt-1.5 text-xs text-red-400 font-semibold">
                 {amountError}
               </p>
             )}
           </div>
 
           {errorMsg && (
-            <div className="bg-red-900/20 border border-red-500/30 rounded p-4 text-red-300 text-sm">
+            <div className="bg-red-900/20 border border-red-500/30 rounded-xl p-3 text-red-300 text-xs">
               {errorMsg}
             </div>
           )}
 
           {paymentStatus && (
-            <div className="bg-indigo-900/20 border border-indigo-500/30 rounded p-4 text-indigo-200 text-sm">
+            <div className="bg-brand-900/20 border border-brand-500/30 rounded-xl p-3 text-brand-200 text-xs font-medium">
               {paymentStatus}
             </div>
           )}
 
           {deposit && (
-            <div className="bg-gray-800 rounded p-4 text-sm space-y-2">
+            <div className="bg-dark-800 rounded-xl p-3 text-xs space-y-1.5 border border-dark-700">
               <div className="flex justify-between">
-                <span className="text-gray-400">
-                  Deposit
-                </span>
-                <span className="text-white font-mono">
-                  {deposit.id}
-                </span>
+                <span className="text-gray-400">Order ID:</span>
+                <span className="text-white font-mono">{deposit.id.slice(0, 12)}...</span>
               </div>
-
               <div className="flex justify-between">
-                <span className="text-gray-400">
-                  Amount
-                </span>
-                <span className="text-white">
-                  ₹{(deposit.amount / 100).toFixed(2)}
-                </span>
-              </div>
-
-              <div className="flex justify-between">
-                <span className="text-gray-400">
-                  Status
-                </span>
-                <span className="text-white">
-                  {deposit.status}
-                </span>
+                <span className="text-gray-400">Amount:</span>
+                <span className="text-gold-400 font-bold">₹{(deposit.amount / 100).toFixed(2)}</span>
               </div>
             </div>
           )}
 
           <button
             onClick={handleDepositSubmit}
-            disabled={
-              processing || !amount
-            }
-            className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-700 disabled:text-gray-500 text-white font-bold py-3 px-4 rounded transition-colors"
+            disabled={processing || !amount}
+            className="deposit-submit-btn w-full bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-500 hover:to-green-500 disabled:from-dark-800 disabled:to-dark-800 disabled:text-gray-600 text-white font-extrabold py-3 px-4 rounded-xl shadow-lg shadow-green-600/20 transition-all cursor-pointer text-sm active:scale-95"
           >
-            {processing
-              ? 'Processing...'
-              : 'Pay with Razorpay'}
+            {processing ? 'Processing...' : 'Pay Securely via Razorpay ⚡'}
           </button>
         </div>
       </Card>
