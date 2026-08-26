@@ -90,6 +90,14 @@ export function DashboardPage() {
     return () => clearTimeout(timer1);
   }, []);
 
+  useEffect(() => {
+    const handleOpenRefer = () => {
+      setActivePopup('refer');
+    };
+    window.addEventListener('open-refer-popup', handleOpenRefer);
+    return () => window.removeEventListener('open-refer-popup', handleOpenRefer);
+  }, []);
+
   const handleCloseFree = () => {
     setActivePopup(null);
     setTimeout(() => {

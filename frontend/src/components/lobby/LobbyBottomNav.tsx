@@ -88,7 +88,14 @@ export const LobbyBottomNav: React.FC = () => {
 
     switch (item.label) {
       case 'REFER & EARN':
-        console.log('Refer & Earn clicked');
+        if (window.location.pathname !== '/dashboard') {
+          navigate('/dashboard');
+          setTimeout(() => {
+            window.dispatchEvent(new CustomEvent('open-refer-popup'));
+          }, 100);
+        } else {
+          window.dispatchEvent(new CustomEvent('open-refer-popup'));
+        }
         break;
 
       case 'VIP BONUS':

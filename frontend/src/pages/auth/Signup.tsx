@@ -1,6 +1,6 @@
 import { useForm } from 'react-hook-form';
-import { useNavigate, Link } from 'react-router-dom';
-import { useState } from 'react';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
+import { useState, useEffect } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
 import { authService } from '../../services/auth';
 import { GlitterRain } from '../../components/common/GlitterRain';
@@ -12,20 +12,41 @@ interface FormData {
   username: string;
   email: string;
   password: string;
+  referralCode?: string;
 }
 
 export function SignupPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const { register, handleSubmit, formState: { errors } } = useForm<FormData>();
+
+  const initialRef = searchParams.get('ref') || searchParams.get('referral_code') || '';
+
+  const { register, handleSubmit, setValue, formState: { errors } } = useForm<FormData>({
+    defaultValues: {
+      referralCode: initialRef,
+    },
+  });
+
+  useEffect(() => {
+    if (initialRef) {
+      setValue('referralCode', initialRef);
+    }
+  }, [initialRef, setValue]);
 
   const onSubmit = async (data: FormData) => {
     setLoading(true);
     setError('');
     try {
-      const res = await authService.register(data.name, data.username, data.email, data.password);
+      const res = await authService.register(
+        data.name,
+        data.username,
+        data.email,
+        data.password,
+        data.referralCode
+      );
       if (res.success) {
         navigate('/login');
       } else {
@@ -113,6 +134,19 @@ export function SignupPage() {
               </button>
             </div>
             {errors.password && <span className="casino-field-error">{errors.password.message}</span>}
+          </div>
+
+          <div className="casino-input-group">
+            <label htmlFor="referralCode" className="casino-input-label flex items-center justify-between">
+              <span>Referral Code <span className="text-gray-500 font-normal text-xs">(Optional)</span></span>
+              {initialRef && <span className="text-gold-400 text-xs font-semibold">🎁 Applied</span>}
+            </label>
+            <input
+              id="referralCode"
+              placeholder="e.g. A1B2C3D4"
+              className={`casino-input-field uppercase tracking-wider font-mono ${initialRef ? 'border-gold-500/50 bg-gold-500/5' : ''}`}
+              {...register('referralCode')}
+            />
           </div>
 
           <button

@@ -16,6 +16,19 @@ logger = get_logger("auth")
 def register_user(db: Session, name: str, username: str, email: str, password: str, referral_code: Optional[str] = None) -> User:
     email_lower = email.lower()
 
+    # Validate referral code early to reject invalid or self-referrals
+    referrer = None
+    if referral_code and referral_code.strip():
+        clean_code = referral_code.strip().upper()
+        referrer = db.query(User).filter(func.upper(User.referral_code) == clean_code).first()
+        if not referrer:
+            raise ValueError("Invalid referral code")
+        if (
+            referrer.username.lower() == username.lower()
+            or referrer.email.lower() == email_lower
+        ):
+            raise ValueError("Self-referral is not allowed")
+
     if db.query(User).filter(func.lower(User.email) == email_lower).first():
         raise ValueError("Email already registered")
     if db.query(User).filter(User.username == username).first():
@@ -44,12 +57,9 @@ def register_user(db: Session, name: str, username: str, email: str, password: s
     db.add(wallet)
     db.flush()
 
-    # Handle referral relationship if a code was passed
-    if referral_code:
-        referrer = db.query(User).filter(User.referral_code == referral_code).first()
-        if not referrer:
-            raise ValueError("Invalid referral code")
-        if referrer.id == user.id or referrer.username == user.username or referrer.email == user.email:
+    # Handle referral relationship if a valid code was passed
+    if referrer:
+        if referrer.id == user.id or referrer.referral_code.upper() == my_ref_code:
             raise ValueError("Self-referral is not allowed")
         
         from ..models.referral import Referral, ReferralStatus
@@ -60,7 +70,7 @@ def register_user(db: Session, name: str, username: str, email: str, password: s
         ref_rel = Referral(
             referrer_user_id=referrer.id,
             referred_user_id=user.id,
-            referral_code=referral_code,
+            referral_code=referrer.referral_code,
             status=ReferralStatus.REGISTERED,
             reward_amount=0,
         )

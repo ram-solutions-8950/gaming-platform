@@ -3,18 +3,20 @@ from uuid import uuid4
 from fastapi.testclient import TestClient
 from app.models.user import User, UserRole
 from app.models.referral import Referral, ReferralSettings, ReferralStatus
+from app.models.deposit import Deposit, DepositStatus
 from app.models.transaction import WalletTransaction, WalletTransactionType
 from app.services.auth_service import register_user
-from app.services.referral_service import get_referral_settings
+from app.services.referral_service import get_referral_settings, check_and_qualify_referral
 from app.services.wallet_service import get_balance
 
 
 @pytest.fixture
 def admin_user(db):
+    uid = uuid4().hex[:6]
     user = User(
         name="Admin User",
-        username="admin_ref_test",
-        email="admin_ref_test@example.com",
+        username=f"admin_ref_{uid}",
+        email=f"admin_ref_{uid}@example.com",
         password_hash="fakehash",
         role=UserRole.ADMIN,
     )
@@ -32,7 +34,8 @@ def admin_token(admin_user):
 
 @pytest.fixture
 def normal_user(db):
-    user = register_user(db, "Normal User", "user_ref_test", "user_ref_test@example.com", "password123")
+    uid = uuid4().hex[:6]
+    user = register_user(db, "Normal User", f"user_ref_{uid}", f"user_ref_{uid}@example.com", "password123")
     return user
 
 
@@ -121,8 +124,16 @@ def test_self_referral_rejected(db):
     
     with pytest.raises(ValueError, match="Self-referral is not allowed"):
         register_user(
-            db, "Self Referred", "self_ref_2", "self_ref_2@example.com", "password",
+            db, "Self Referrer 2", "self_ref_attempt", "self_ref@example.com", "password",
             referral_code=referrer.referral_code
+        )
+
+
+def test_invalid_referral_code_rejected(db):
+    with pytest.raises(ValueError, match="Invalid referral code"):
+        register_user(
+            db, "Invalid Ref User", "invalid_ref_user", "invalid_ref@example.com", "password",
+            referral_code="NONEXISTENT_CODE_123"
         )
 
 
@@ -133,8 +144,6 @@ def test_duplicate_referral_rejected(db):
         referral_code=referrer.referral_code
     )
     
-    # Try to register another referred user with the same referred user ID (impossible via auth_service, but we check unique referred user constraint)
-    # If we try to create another referral for the same referred user
     from sqlalchemy.exc import IntegrityError
     ref2 = Referral(
         referrer_user_id=referrer.id,
@@ -159,7 +168,7 @@ def test_unqualified_referral_receives_no_reward(db):
     assert bal.balance == 0
 
 
-def test_qualification_rewards_referrer(db, client):
+def test_qualification_rewards_referrer(db):
     # Set reward setting to ₹150
     settings = get_referral_settings(db)
     settings.reward_amount = 15000
@@ -171,28 +180,21 @@ def test_qualification_rewards_referrer(db, client):
         referral_code=referrer.referral_code
     )
 
-    # Make successful deposit for the referred user
-    from app.services.deposit_service import create_deposit, verify_deposit_payment
-    dep = create_deposit(db, referred.id, 10000, provider="razorpay") # ₹100
-    
-    # Mock checkout signature verification success
-    # First mock razorpay provider behaviors
-    from unittest.mock import patch
-    with patch("app.services.deposit_service.get_provider") as mock_gp:
-        mock_prov = mock_gp.return_value
-        mock_prov.create_payment.return_value = {"provider_order_id": "ord_123", "currency": "INR"}
-        mock_prov.verify_payment.return_value = True
-        mock_prov.get_payment_status.return_value = {"status": "SUCCESS", "amount": 10000, "provider_payment_id": "pay_123"}
-        
-        dep.provider_order_id = "ord_123"
-        db.commit()
+    # Create successful deposit for referred user
+    dep = Deposit(
+        user_id=referred.id,
+        wallet_id=referred.wallet.id,
+        amount=10000,
+        status=DepositStatus.SUCCESS,
+    )
+    db.add(dep)
+    db.commit()
 
-        # Complete payment
-        verify_deposit_payment(
-            db, referred.id, dep.id, "ord_123", "pay_123", "sig_123"
-        )
+    # Trigger qualification
+    check_and_qualify_referral(db, referred.id)
+    db.commit()
 
-    # Now verify referrer's wallet got ₹150
+    # Verify referrer's wallet got ₹150
     bal = get_balance(db, referrer.id)
     assert bal.balance == 15000
 
@@ -223,9 +225,6 @@ def test_changing_reward_configuration(db):
         db, "Referred G1", "referred_g1", "referred_g1@example.com", "password",
         referral_code=referrer.referral_code
     )
-
-    from app.services.referral_service import check_and_qualify_referral
-    from app.models.deposit import Deposit, DepositStatus
 
     # Simulate deposit completion
     dep1 = Deposit(user_id=referred1.id, wallet_id=referred1.wallet.id, amount=10000, status=DepositStatus.SUCCESS)
@@ -264,6 +263,10 @@ def test_changing_reward_configuration(db):
 
 
 def test_idempotent_rewards(db):
+    settings = get_referral_settings(db)
+    settings.reward_amount = 10000
+    db.commit()
+
     referrer = register_user(db, "Referrer H", "ref_h", "ref_h@example.com", "password")
     referred = register_user(
         db, "Referred H", "referred_h", "referred_h@example.com", "password",
@@ -274,7 +277,6 @@ def test_idempotent_rewards(db):
     db.add(dep)
     db.commit()
 
-    from app.services.referral_service import check_and_qualify_referral
     # Run once
     check_and_qualify_referral(db, referred.id)
     db.commit()

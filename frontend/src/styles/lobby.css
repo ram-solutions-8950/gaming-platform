@@ -6587,3 +6587,223 @@
     animation: none !important;
   }
 }
+
+/* ───────────────────────────────────────────────────────────
+   POKER, TEEN PATTI & BACCARAT PREMIUM 3D FULL CARD ARTWORK
+   ─────────────────────────────────────────────────────────── */
+
+/* ── Poker ── */
+.game-card--poker {
+  position: relative !important;
+  overflow: hidden !important;
+  isolation: isolate !important;
+  background: radial-gradient(circle at 50% 35%, rgba(59, 130, 246, 0.35) 0%, rgba(30, 27, 75, 0.95) 100%) !important;
+  border: 1px solid rgba(251, 191, 36, 0.35) !important;
+}
+
+.game-card--poker .game-card__icon,
+.game-card--poker .game-card__info {
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+.poker-card-art {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  overflow: hidden !important;
+  pointer-events: none !important;
+  z-index: 1 !important;
+}
+
+.poker-card-aura {
+  position: absolute !important;
+  left: 50% !important;
+  top: 45% !important;
+  width: 120% !important;
+  height: 120% !important;
+  transform: translate(-50%, -50%) !important;
+  border-radius: 50% !important;
+  background: radial-gradient(circle, rgba(59, 130, 246, 0.5) 0%, rgba(251, 191, 36, 0.25) 40%, transparent 70%) !important;
+  filter: blur(10px) !important;
+  opacity: 0.6 !important;
+  z-index: 0 !important;
+  animation: pokerAuraPulse 4s ease-in-out infinite !important;
+}
+
+@keyframes pokerAuraPulse {
+  0%, 100% { opacity: 0.5; transform: translate(-50%, -50%) scale(0.95); }
+  50% { opacity: 0.8; transform: translate(-50%, -50%) scale(1.05); }
+}
+
+.poker-hero-img {
+  position: absolute !important;
+  left: 50% !important;
+  top: 50% !important;
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  object-position: center !important;
+  transform: translate(-50%, -50%) scale(1.02) !important;
+  z-index: 2 !important;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.7)) !important;
+  transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) !important;
+}
+
+.game-card--poker:hover .poker-hero-img {
+  transform: translate(-50%, -50%) scale(1.06) !important;
+}
+
+.poker-dark-overlay {
+  position: absolute !important;
+  inset: 0 !important;
+  background: linear-gradient(180deg, transparent 60%, rgba(10, 15, 35, 0.5) 100%) !important;
+  pointer-events: none !important;
+  z-index: 3 !important;
+}
+
+/* ── Teen Patti ── */
+.game-card--teen-patti {
+  position: relative !important;
+  overflow: hidden !important;
+  isolation: isolate !important;
+  background: radial-gradient(circle at 50% 35%, rgba(245, 158, 11, 0.4) 0%, rgba(41, 20, 4, 0.95) 100%) !important;
+  border: 1px solid rgba(251, 191, 36, 0.45) !important;
+}
+
+.game-card--teen-patti .game-card__icon,
+.game-card--teen-patti .game-card__info {
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+.teen-patti-card-art {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  overflow: hidden !important;
+  pointer-events: none !important;
+  z-index: 1 !important;
+}
+
+.teen-patti-card-aura {
+  position: absolute !important;
+  left: 50% !important;
+  top: 45% !important;
+  width: 120% !important;
+  height: 120% !important;
+  transform: translate(-50%, -50%) !important;
+  border-radius: 50% !important;
+  background: radial-gradient(circle, rgba(245, 158, 11, 0.6) 0%, rgba(220, 38, 38, 0.25) 45%, transparent 70%) !important;
+  filter: blur(10px) !important;
+  opacity: 0.65 !important;
+  z-index: 0 !important;
+  animation: teenPattiAuraPulse 4s ease-in-out infinite !important;
+}
+
+@keyframes teenPattiAuraPulse {
+  0%, 100% { opacity: 0.55; transform: translate(-50%, -50%) scale(0.95); }
+  50% { opacity: 0.85; transform: translate(-50%, -50%) scale(1.05); }
+}
+
+.teen-patti-hero-img {
+  position: absolute !important;
+  left: 50% !important;
+  top: 50% !important;
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  object-position: center !important;
+  transform: translate(-50%, -50%) scale(1.02) !important;
+  z-index: 2 !important;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.7)) !important;
+  transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) !important;
+}
+
+.game-card--teen-patti:hover .teen-patti-hero-img {
+  transform: translate(-50%, -50%) scale(1.06) !important;
+}
+
+.teen-patti-dark-overlay {
+  position: absolute !important;
+  inset: 0 !important;
+  background: linear-gradient(180deg, transparent 60%, rgba(30, 15, 5, 0.5) 100%) !important;
+  pointer-events: none !important;
+  z-index: 3 !important;
+}
+
+/* ── Baccarat ── */
+.game-card--baccarat {
+  position: relative !important;
+  overflow: hidden !important;
+  isolation: isolate !important;
+  background: radial-gradient(circle at 50% 35%, rgba(185, 28, 28, 0.4) 0%, rgba(45, 10, 15, 0.95) 100%) !important;
+  border: 1px solid rgba(251, 191, 36, 0.4) !important;
+}
+
+.game-card--baccarat .game-card__icon,
+.game-card--baccarat .game-card__info {
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+.baccarat-card-art {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  overflow: hidden !important;
+  pointer-events: none !important;
+  z-index: 1 !important;
+}
+
+.baccarat-card-aura {
+  position: absolute !important;
+  left: 50% !important;
+  top: 45% !important;
+  width: 120% !important;
+  height: 120% !important;
+  transform: translate(-50%, -50%) !important;
+  border-radius: 50% !important;
+  background: radial-gradient(circle, rgba(220, 38, 38, 0.55) 0%, rgba(245, 158, 11, 0.25) 45%, transparent 70%) !important;
+  filter: blur(10px) !important;
+  opacity: 0.6 !important;
+  z-index: 0 !important;
+  animation: baccaratAuraPulse 4s ease-in-out infinite !important;
+}
+
+@keyframes baccaratAuraPulse {
+  0%, 100% { opacity: 0.5; transform: translate(-50%, -50%) scale(0.95); }
+  50% { opacity: 0.8; transform: translate(-50%, -50%) scale(1.05); }
+}
+
+.baccarat-hero-img {
+  position: absolute !important;
+  left: 50% !important;
+  top: 50% !important;
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  object-position: center !important;
+  transform: translate(-50%, -50%) scale(1.02) !important;
+  z-index: 2 !important;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.7)) !important;
+  transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) !important;
+}
+
+.game-card--baccarat:hover .baccarat-hero-img {
+  transform: translate(-50%, -50%) scale(1.06) !important;
+}
+
+.baccarat-dark-overlay {
+  position: absolute !important;
+  inset: 0 !important;
+  background: linear-gradient(180deg, transparent 60%, rgba(25, 5, 10, 0.5) 100%) !important;
+  pointer-events: none !important;
+  z-index: 3 !important;
+}

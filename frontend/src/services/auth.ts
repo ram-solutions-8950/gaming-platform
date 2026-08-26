@@ -2,8 +2,14 @@ import api from './api';
 import type { User } from '../types';
 
 export const authService = {
-  async register(name: string, username: string, email: string, password: string) {
-    const res = await api.post('/auth/register', { name, username, email, password });
+  async register(name: string, username: string, email: string, password: string, referral_code?: string) {
+    const res = await api.post('/auth/register', {
+      name,
+      username,
+      email,
+      password,
+      referral_code: referral_code ? referral_code.trim() : undefined,
+    });
     return res.data;
   },
   async login(email: string, password: string) {

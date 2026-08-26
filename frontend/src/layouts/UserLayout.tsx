@@ -78,6 +78,20 @@ export function UserLayout() {
           <NavLink to="/transactions" className={({ isActive }) => `flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 ${isActive ? 'bg-gradient-to-r from-brand-500/20 to-transparent text-brand-400 border-l-2 border-brand-500' : 'text-gray-400 hover:bg-dark-800 hover:text-gray-100'}`}>
             <span className="text-lg">💸</span> Transactions
           </NavLink>
+          <button
+            type="button"
+            onClick={() => {
+              if (window.location.pathname !== '/dashboard') {
+                navigate('/dashboard');
+                setTimeout(() => window.dispatchEvent(new CustomEvent('open-refer-popup')), 100);
+              } else {
+                window.dispatchEvent(new CustomEvent('open-refer-popup'));
+              }
+            }}
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-gray-400 hover:bg-dark-800 hover:text-gold-400 transition-all duration-200"
+          >
+            <span className="text-lg">🎁</span> Refer & Earn
+          </button>
         </nav>
         
         <div className="p-4 border-t border-dark-700">
