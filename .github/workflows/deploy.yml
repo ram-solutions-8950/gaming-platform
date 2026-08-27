@@ -31,25 +31,56 @@ jobs:
             echo "Checking containers..."
             docker compose ps
 
-            echo "Waiting for backend..."
+            echo "Waiting for backend to become ready..."
 
-            for i in {1..12}; do
-              if curl -fsS http://localhost:8000/api/v1/health; then
-                echo "Backend is healthy."
+            BACKEND_READY=false
+
+            for i in $(seq 1 30); do
+              echo "Backend health check attempt $i/30..."
+
+              if curl -fsS --max-time 5 http://localhost:8000/api/v1/health; then
+                echo ""
+                echo "Backend is ready."
+                BACKEND_READY=true
                 break
               fi
 
-              if [ "$i" -eq 12 ]; then
-                echo "Backend failed health check."
-                docker compose logs --tail=100 backend
-                exit 1
-              fi
-
-              echo "Backend not ready yet... attempt $i/12"
-              sleep 5
+              echo "Backend not ready yet. Waiting 2 seconds..."
+              sleep 2
             done
 
+            if [ "$BACKEND_READY" != "true" ]; then
+              echo "Backend failed to become ready."
+              echo "Backend logs:"
+              docker compose logs --tail=100 backend
+              exit 1
+            fi
+
             echo "Checking frontend..."
-            curl -f http://localhost:5173
+
+            FRONTEND_READY=false
+
+            for i in $(seq 1 30); do
+              echo "Frontend health check attempt $i/30..."
+
+              if curl -fsS --max-time 5 http://localhost:5173 > /dev/null; then
+                echo "Frontend is ready."
+                FRONTEND_READY=true
+                break
+              fi
+
+              echo "Frontend not ready yet. Waiting 2 seconds..."
+              sleep 2
+            done
+
+            if [ "$FRONTEND_READY" != "true" ]; then
+              echo "Frontend failed to become ready."
+              echo "Frontend logs:"
+              docker compose logs --tail=100 frontend
+              exit 1
+            fi
+
+            echo "Final container status:"
+            docker compose ps
 
             echo "Deployment successful."
