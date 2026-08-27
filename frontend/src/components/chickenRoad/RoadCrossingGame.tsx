@@ -48,6 +48,13 @@ interface Particle {
   maxLife: number;
 }
 
+interface Pothole {
+  x: number;
+  y: number;
+  radius: number;
+  lane: number;
+}
+
 // Web Audio sound synth for zero-latency rich game audio
 class SoundManager {
   private ctx: AudioContext | null = null;
@@ -203,6 +210,7 @@ export const RoadCrossingGame: React.FC<RoadCrossingGameProps> = ({
     touchSteer: null as 'left' | 'right' | null,
     // Lanes and vehicles
     vehicles: [] as Vehicle[],
+    potholes: [] as Pothole[],
     particles: [] as Particle[],
     screenShake: 0,
     highestLaneCrossed: 0,
@@ -216,6 +224,24 @@ export const RoadCrossingGame: React.FC<RoadCrossingGameProps> = ({
     stateRef.current.totalLanes = totalLanes;
     stateRef.current.worldWidth = worldWidth;
   }, [gameState, difficulty, totalLanes, worldWidth]);
+
+  // Snap chicken X to the correct lane position whenever currentLane changes
+  useEffect(() => {
+    const s = stateRef.current;
+    if (currentLane === 0) {
+      // Start zone — place chicken in the middle of the start pad
+      s.chicken.x = 65;
+    } else {
+      // Centre of the crossed lane (one lane ahead = right edge of that lane)
+      s.chicken.x = START_ZONE_WIDTH + currentLane * LANE_WIDTH - LANE_WIDTH / 2;
+    }
+    s.chicken.y = fixedY;
+    s.currentLane = currentLane;
+    // Keep multiplier ring "crossed" state in sync
+    if (currentLane > s.highestLaneCrossed) {
+      s.highestLaneCrossed = currentLane;
+    }
+  }, [currentLane, fixedY]);
 
   useEffect(() => {
     if (gameState === 'READY') {
@@ -231,6 +257,7 @@ export const RoadCrossingGame: React.FC<RoadCrossingGameProps> = ({
       s.highestLaneCrossed = 0;
       s.cameraX = 0;
       s.particles = [];
+      s.potholes = [];
       s.screenShake = 0;
     } else if (gameState === 'LOST') {
       stateRef.current.chicken.isHit = true;
@@ -267,9 +294,8 @@ export const RoadCrossingGame: React.FC<RoadCrossingGameProps> = ({
     ];
 
     const speedMultipliers: Record<Difficulty, number> = {
-      EASY: 1.0,
       MEDIUM: 1.35,
-      HARD: 1.75,
+      HARD:   1.75,
     };
 
     const speedFactor = speedMultipliers[difficulty] || 1.0;
@@ -316,6 +342,58 @@ export const RoadCrossingGame: React.FC<RoadCrossingGameProps> = ({
   useEffect(() => {
     generateTraffic();
   }, [generateTraffic]);
+
+  // ── Secure random helper (Web Crypto API – no predictable pattern) ──
+  const secureRandom = useCallback((): number => {
+    const buf = new Uint32Array(1);
+    crypto.getRandomValues(buf);
+    return buf[0] / 0x100000000; // [0, 1)
+  }, []);
+
+  // Generate static pothole obstacles per round using crypto randomness
+  const generatePotholes = useCallback(() => {
+    const holes: Pothole[] = [];
+    const roadTop = 45;
+    const roadBottom = WORLD_HEIGHT - 45;
+
+    // Per-lane probability and max slot count by difficulty
+    const chancePerSlot: Record<Difficulty, number> = {
+      MEDIUM: 0.58,
+      HARD:   0.80,
+    };
+    const slotsPerLane: Record<Difficulty, number> = {
+      MEDIUM: 4,
+      HARD:   6,
+    };
+
+    const chance = chancePerSlot[stateRef.current.difficulty];
+    const slots  = slotsPerLane[stateRef.current.difficulty];
+
+    for (let lane = 1; lane <= stateRef.current.totalLanes; lane++) {
+      const laneLeftX = START_ZONE_WIDTH + (lane - 1) * LANE_WIDTH;
+
+      for (let slot = 0; slot < slots; slot++) {
+        if (secureRandom() < chance) {
+          // X: random within lane, 12 px margin from lane edges
+          const x = laneLeftX + 12 + secureRandom() * (LANE_WIDTH - 24);
+          // Y: fully random within road surface (unpredictable hit / no-hit)
+          const y = roadTop + 12 + secureRandom() * (roadBottom - roadTop - 24);
+          // Radius 9–17 px — larger potholes are more dangerous
+          const radius = 9 + secureRandom() * 8;
+          holes.push({ x, y, radius, lane });
+        }
+      }
+    }
+
+    stateRef.current.potholes = holes;
+  }, [secureRandom]);
+
+  // Regenerate potholes fresh every time a new game starts
+  useEffect(() => {
+    if (gameState === 'ACTIVE') {
+      generatePotholes();
+    }
+  }, [gameState, generatePotholes]);
 
   // Keyboard and touch listeners
   useEffect(() => {
@@ -460,7 +538,12 @@ export const RoadCrossingGame: React.FC<RoadCrossingGameProps> = ({
 
       const dpr = window.devicePixelRatio || 1;
       const rect = containerRef.current?.getBoundingClientRect() || { width: 844, height: 270 };
-      const viewScale = rect.height / WORLD_HEIGHT;
+      const viewScale = rect.height > 0 ? rect.height / WORLD_HEIGHT : 1;
+      // Guard: skip frame if canvas has no size yet
+      if (rect.width <= 0 || rect.height <= 0) {
+        animId = requestAnimationFrame(renderLoop);
+        return;
+      }
       const viewWidthInWorld = rect.width / viewScale;
 
       // ──────────────────────────────────────────
@@ -554,6 +637,23 @@ export const RoadCrossingGame: React.FC<RoadCrossingGameProps> = ({
             sounds.playCollision();
             onCollision(v.lane);
             break;
+          }
+        }
+
+        // ── Pothole collision (static circular obstacles) ──
+        if (!s.chicken.isHit) {
+          for (const ph of s.potholes) {
+            const dx = s.chicken.x - ph.x;
+            const dy = s.chicken.y - ph.y;
+            // chicken radius ~10, add pothole radius for combined hit zone
+            if (dx * dx + dy * dy < (ph.radius + 10) * (ph.radius + 10)) {
+              s.chicken.isHit = true;
+              s.screenShake = 14;
+              spawnFeathers(s.chicken.x, s.chicken.y);
+              sounds.playCollision();
+              onCollision(ph.lane);
+              break;
+            }
           }
         }
       }
@@ -714,6 +814,47 @@ export const RoadCrossingGame: React.FC<RoadCrossingGameProps> = ({
       ctx.shadowBlur = 8;
       ctx.fillText('🏁 FINISH 🏆', finishStartX + FINISH_ZONE_WIDTH / 2 + 15, fixedY - 4);
       ctx.restore();
+
+      // 5.5 Pothole obstacles embedded in asphalt
+      s.potholes.forEach((ph) => {
+        ctx.save();
+
+        // Outer dark depression rim
+        ctx.beginPath();
+        ctx.arc(ph.x, ph.y, ph.radius, 0, Math.PI * 2);
+        ctx.fillStyle = '#111111';
+        ctx.shadowColor = 'rgba(0,0,0,0.7)';
+        ctx.shadowBlur = 6;
+        ctx.fill();
+        ctx.shadowBlur = 0;
+
+        // Inner void (deeper black)
+        ctx.beginPath();
+        ctx.arc(ph.x, ph.y, ph.radius * 0.6, 0, Math.PI * 2);
+        ctx.fillStyle = '#050505';
+        ctx.fill();
+
+        // Radiating crack lines
+        ctx.strokeStyle = 'rgba(40, 40, 40, 0.9)';
+        ctx.lineWidth = 1;
+        for (let a = 0; a < Math.PI * 2; a += Math.PI / 3) {
+          ctx.beginPath();
+          ctx.moveTo(ph.x + Math.cos(a) * ph.radius, ph.y + Math.sin(a) * ph.radius);
+          ctx.lineTo(ph.x + Math.cos(a) * (ph.radius + 6), ph.y + Math.sin(a) * (ph.radius + 6));
+          ctx.stroke();
+        }
+
+        // Red danger ring when pothole intersects chicken's horizontal path
+        if (Math.abs(ph.y - fixedY) < ph.radius + 12) {
+          ctx.beginPath();
+          ctx.arc(ph.x, ph.y, ph.radius + 4, 0, Math.PI * 2);
+          ctx.strokeStyle = 'rgba(239, 68, 68, 0.65)';
+          ctx.lineWidth = 2;
+          ctx.stroke();
+        }
+
+        ctx.restore();
+      });
 
       // 6. Vertical Traffic Lanes & Horizontal Multiplier Checkpoints
       for (let lane = 1; lane <= s.totalLanes; lane++) {

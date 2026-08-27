@@ -9,7 +9,6 @@ import {
   X,
   ChevronLeft,
   ChevronRight,
-  ShieldCheck,
   Sparkles,
   Flame,
 } from 'lucide-react';
@@ -24,7 +23,6 @@ import { soundManager } from '../../services/soundManager';
 import '../../styles/chicken-road.css';
 
 const DEFAULT_MULTIPLIERS: Record<Difficulty, number[]> = {
-  EASY: [1.01, 1.03, 1.06, 1.10, 1.15, 1.19, 1.24, 1.30, 1.40, 1.50],
   MEDIUM: [1.03, 1.08, 1.15, 1.25, 1.38, 1.55, 1.75, 2.05, 2.45, 3.00],
   HARD: [1.05, 1.15, 1.30, 1.55, 1.90, 2.40, 3.10, 4.20, 6.00, 10.00],
 };
@@ -39,11 +37,11 @@ export function ChickenRoadPage() {
   const [activeRoundId, setActiveRoundId] = useState<string | null>(null);
   const [balance, setBalance] = useState<number>(0);
   const [betAmount, setBetAmount] = useState<number>(10);
-  const [difficulty, setDifficulty] = useState<Difficulty>('EASY');
+  const [difficulty, setDifficulty] = useState<Difficulty>('MEDIUM');
   const [currentLane, setCurrentLane] = useState<number>(0);
-  const [multipliers, setMultipliers] = useState<number[]>(DEFAULT_MULTIPLIERS.EASY);
+  const [multipliers, setMultipliers] = useState<number[]>(DEFAULT_MULTIPLIERS.MEDIUM);
   const [currentMultiplier, setCurrentMultiplier] = useState<number>(1.0);
-  const [nextMultiplier, setNextMultiplier] = useState<number>(DEFAULT_MULTIPLIERS.EASY[0]);
+  const [nextMultiplier, setNextMultiplier] = useState<number>(DEFAULT_MULTIPLIERS.MEDIUM[0]);
   const [potentialWin, setPotentialWin] = useState<number>(10);
   const [winAmount, setWinAmount] = useState<number>(0);
   const [lossLane, setLossLane] = useState<number | null>(null);
@@ -80,7 +78,7 @@ export function ChickenRoadPage() {
           setCurrentLane(gameStateData.current_lane || 0);
           setCurrentMultiplier(gameStateData.current_multiplier || 1.0);
           setNextMultiplier(
-            gameStateData.next_multiplier || DEFAULT_MULTIPLIERS[gameStateData.difficulty || 'EASY'][0]
+            gameStateData.next_multiplier || DEFAULT_MULTIPLIERS[gameStateData.difficulty || 'MEDIUM'][0]
           );
           setPotentialWin(gameStateData.potential_win || gameStateData.bet_amount || 10);
           if (gameStateData.bet_amount) {
@@ -586,7 +584,7 @@ export function ChickenRoadPage() {
 
         {/* Difficulty Pills */}
         <div className="cr-diff-pills">
-          {(['EASY', 'MEDIUM', 'HARD'] as Difficulty[]).map((diff) => (
+          {(['MEDIUM', 'HARD'] as Difficulty[]).map((diff) => (
             <button
               key={diff}
               type="button"
@@ -596,7 +594,6 @@ export function ChickenRoadPage() {
                 difficulty === diff ? `cr-diff-pill--active cr-diff-pill--${diff.toLowerCase()}` : ''
               }`}
             >
-              {diff === 'EASY' && <ShieldCheck size={12} className="inline mr-1" />}
               {diff === 'MEDIUM' && <Sparkles size={12} className="inline mr-1" />}
               {diff === 'HARD' && <Flame size={12} className="inline mr-1 text-red-400" />}
               <span>{diff.charAt(0) + diff.slice(1).toLowerCase()}</span>

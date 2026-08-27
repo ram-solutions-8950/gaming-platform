@@ -522,10 +522,6 @@
   color: #FFFFFF;
 }
 
-.cr-diff-pill--easy.cr-diff-pill--active {
-  border-color: #10B981;
-  color: #34D399;
-}
 
 .cr-diff-pill--medium.cr-diff-pill--active {
   border-color: #F59E0B;

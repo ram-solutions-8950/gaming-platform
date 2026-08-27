@@ -1,7 +1,7 @@
 import api from './api';
 
 export type GameStatus = 'READY' | 'ACTIVE' | 'WON' | 'LOST' | 'CASHED_OUT';
-export type Difficulty = 'EASY' | 'MEDIUM' | 'HARD';
+export type Difficulty = 'MEDIUM' | 'HARD';
 
 export interface ChickenRoadState {
   round_id?: string;
@@ -74,7 +74,7 @@ export const chickenRoadService = {
     return res.data.data;
   },
 
-  async startGame(bet_amount: number, difficulty: Difficulty = 'EASY'): Promise<StartResponse> {
+  async startGame(bet_amount: number, difficulty: Difficulty = 'MEDIUM'): Promise<StartResponse> {
     const res = await api.post('/games/chicken-road/start', { bet_amount, difficulty });
     return res.data.data;
   },
