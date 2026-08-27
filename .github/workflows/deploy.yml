@@ -21,66 +21,91 @@ jobs:
 
             cd /opt/gaming-platform
 
-            echo "Pulling latest code..."
+            echo "=== PULLING LATEST CODE ==="
             git fetch origin client-version
             git reset --hard origin/client-version
 
-            echo "Rebuilding containers..."
+            echo "=== CURRENT COMMIT ==="
+            git log -1 --oneline
+
+            echo "=== REBUILDING CONTAINERS ==="
             docker compose up -d --build
 
-            echo "Checking containers..."
+            echo "=== CONTAINER STATUS ==="
             docker compose ps
 
-            echo "Waiting for backend to become ready..."
+            echo "=== WAITING FOR BACKEND ==="
 
-            BACKEND_READY=false
+            READY=0
 
             for i in $(seq 1 30); do
-              echo "Backend health check attempt $i/30..."
+              echo "Backend check $i/30"
 
-              if curl -fsS --max-time 5 http://localhost:8000/api/v1/health; then
-                echo ""
-                echo "Backend is ready."
-                BACKEND_READY=true
+              CODE=$(curl -sS \
+                --connect-timeout 2 \
+                --max-time 5 \
+                -o /tmp/backend-health.json \
+                -w "%{http_code}" \
+                http://127.0.0.1:8000/api/v1/health 2>/tmp/backend-curl-error || true)
+
+              echo "HTTP status: $CODE"
+
+              if [ "$CODE" = "200" ]; then
+                echo "Backend is READY"
+                cat /tmp/backend-health.json
+                READY=1
                 break
               fi
 
-              echo "Backend not ready yet. Waiting 2 seconds..."
+              cat /tmp/backend-curl-error || true
+
+              echo "Backend not ready. Waiting 2 seconds..."
               sleep 2
             done
 
-            if [ "$BACKEND_READY" != "true" ]; then
-              echo "Backend failed to become ready."
-              echo "Backend logs:"
+            if [ "$READY" != "1" ]; then
+              echo "ERROR: Backend did not become ready."
+              docker compose ps
               docker compose logs --tail=100 backend
               exit 1
             fi
 
-            echo "Checking frontend..."
+            echo "=== WAITING FOR FRONTEND ==="
 
-            FRONTEND_READY=false
+            READY=0
 
             for i in $(seq 1 30); do
-              echo "Frontend health check attempt $i/30..."
+              echo "Frontend check $i/30"
 
-              if curl -fsS --max-time 5 http://localhost:5173 > /dev/null; then
-                echo "Frontend is ready."
-                FRONTEND_READY=true
+              CODE=$(curl -sS \
+                --connect-timeout 2 \
+                --max-time 5 \
+                -o /dev/null \
+                -w "%{http_code}" \
+                http://127.0.0.1:5173 2>/tmp/frontend-curl-error || true)
+
+              echo "HTTP status: $CODE"
+
+              if [ "$CODE" = "200" ]; then
+                echo "Frontend is READY"
+                READY=1
                 break
               fi
 
-              echo "Frontend not ready yet. Waiting 2 seconds..."
+              cat /tmp/frontend-curl-error || true
+
+              echo "Frontend not ready. Waiting 2 seconds..."
               sleep 2
             done
 
-            if [ "$FRONTEND_READY" != "true" ]; then
-              echo "Frontend failed to become ready."
-              echo "Frontend logs:"
+            if [ "$READY" != "1" ]; then
+              echo "ERROR: Frontend did not become ready."
+              docker compose ps
               docker compose logs --tail=100 frontend
               exit 1
             fi
 
-            echo "Final container status:"
+            echo "=== FINAL STATUS ==="
             docker compose ps
 
-            echo "Deployment successful."
+            echo "=== DEPLOYMENT SUCCESSFUL ==="
