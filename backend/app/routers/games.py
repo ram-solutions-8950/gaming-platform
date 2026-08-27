@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, Query, WebSocket, WebSocketDisconnect
 from sqlalchemy.orm import Session
 
 from ..dependencies.database import get_db
-from ..schemas.game import PlaceBetIn, GameBetOut, GameRoundOut, GameStateOut
+from ..schemas.game import PlaceBetIn, GameBetOut, GameRoundOut, GameStateOut, PublicBetOut
 from ..schemas.game_catalog import GameCreate, GameUpdate, GameOut
 from ..services import game_service, game_catalog_service
 from ..services.game_engines import get_engine
@@ -12,6 +12,7 @@ from ..security.permissions import require_user, require_admin, require_super_ad
 from ..utils.responses import success_response, error_response
 from ..models.user import User
 from ..models.game_catalog import Game
+from ..models.game import GameBet
 from ..websocket.manager import game_ws_manager
 
 router = APIRouter(tags=["Games"])
@@ -25,6 +26,13 @@ def _resolve_engine(db: Session, game_id: _UUID | None = None, game_slug: str | 
             raise ValueError("Game not found")
         slug = game.slug
     return get_engine(slug)
+
+
+import hashlib
+
+def _obfuscate_bet_id(bet_id: _UUID) -> str:
+    """Generate an opaque non-reversible token for public deduplication without exposing internal database UUIDs."""
+    return hashlib.sha256(str(bet_id).encode()).hexdigest()[:16]
 
 
 # ── User endpoints ──────────────────────────────────────────────────
@@ -53,21 +61,54 @@ def get_current_round(
     now = datetime.now(timezone.utc)
     game_row = db.query(Game).filter(Game.slug == engine.slug).first()
     game_out = GameOut.model_validate(game_row) if game_row else None
+    public_bets = []
     if game_round:
         remaining = max(0, (game_round.betting_closes_at - now).total_seconds())
         if game_round.status.value == "CALCULATING":
             started = game_round.started_at.replace(tzinfo=timezone.utc) if game_round.started_at.tzinfo is None else game_round.started_at
             round_end = started + timedelta(seconds=engine.get_round_duration_seconds(db))
             remaining = max(0, (round_end - now).total_seconds())
+
+        raw_bets = db.query(GameBet).filter(GameBet.round_id == game_round.id).order_by(GameBet.created_at.asc()).all()
+        public_bets = [
+            PublicBetOut(
+                id=_obfuscate_bet_id(b.id),
+                prediction=b.prediction.value,
+                amount=b.amount,
+                created_at=b.created_at,
+            )
+            for b in raw_bets
+        ]
+
         state = GameStateOut(
             round=GameRoundOut.model_validate(game_round),
             server_time=now,
             seconds_remaining=round(remaining, 1),
             game=game_out,
+            public_bets=public_bets,
         )
     else:
-        state = GameStateOut(round=None, server_time=now, seconds_remaining=0, game=game_out)
+        state = GameStateOut(round=None, server_time=now, seconds_remaining=0, game=game_out, public_bets=[])
     return success_response(state.model_dump())
+
+
+@router.get("/games/public-bets")
+def get_public_bets(
+    round_id: _UUID = Query(...),
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    bets = db.query(GameBet).filter(GameBet.round_id == round_id).order_by(GameBet.created_at.asc()).all()
+    items = [
+        PublicBetOut(
+            id=_obfuscate_bet_id(b.id),
+            prediction=b.prediction.value,
+            amount=b.amount,
+            created_at=b.created_at,
+        ).model_dump()
+        for b in bets
+    ]
+    return success_response(items)
 
 
 @router.get("/games/history")
@@ -88,7 +129,7 @@ def get_round_history(
 
 
 @router.post("/games/bet")
-def place_bet(
+async def place_bet(
     data: PlaceBetIn,
     current_user: User = Depends(require_user),
     db: Session = Depends(get_db),
@@ -103,6 +144,21 @@ def place_bet(
             prediction=data.prediction,
             amount=data.amount,
         )
+        try:
+            await game_ws_manager.broadcast({
+                "type": "new_bet",
+                "game_slug": engine.slug,
+                "game_id": str(data.game_id) if data.game_id else (str(bet.game_id) if bet.game_id else None),
+                "round_id": str(data.round_id),
+                "bet": {
+                    "id": _obfuscate_bet_id(bet.id),
+                    "prediction": bet.prediction.value,
+                    "amount": bet.amount,
+                    "created_at": bet.created_at.isoformat() if hasattr(bet, "created_at") and bet.created_at else datetime.now(timezone.utc).isoformat(),
+                },
+            })
+        except Exception:
+            pass
         return success_response(GameBetOut.model_validate(bet).model_dump(), status_code=201)
     except ValueError as e:
         return error_response("BET_ERROR", str(e))

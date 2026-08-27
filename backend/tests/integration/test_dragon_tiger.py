@@ -310,3 +310,47 @@ def test_place_bet_api(client, db: Session, auth_user, fee_config, dt_game):
     assert res.status_code == 201
     assert res.json()["data"]["prediction"] == "TIGER"
     assert res.json()["data"]["amount"] == 10000
+
+
+def test_public_bets_in_current_round_api(client, db: Session, auth_user, fee_config, dt_game):
+    headers, user, _ = auth_user
+    rd = engine.create_round(db)
+    b1 = engine.place_bet(db, user.id, rd.id, "DRAGON", 5000, game_id=dt_game.id)
+    b2 = engine.place_bet(db, user.id, rd.id, "TIGER", 10000, game_id=dt_game.id)
+
+    res = client.get("/api/v1/games/current", headers=headers, params={"game_slug": "dragon-tiger"})
+    assert res.status_code == 200
+    body = res.json()["data"]
+    assert "public_bets" in body
+    assert len(body["public_bets"]) == 2
+    for pb in body["public_bets"]:
+        assert "prediction" in pb
+        assert "amount" in pb
+        assert "id" in pb
+        assert "created_at" in pb
+        # Ensure DB UUID is not leaked; opaque 16-char token is used instead
+        assert pb["id"] != str(b1.id)
+        assert pb["id"] != str(b2.id)
+        assert len(pb["id"]) == 16
+        # Privacy guarantee: no private user info
+        assert "user_id" not in pb
+        assert "email" not in pb
+        assert "name" not in pb
+        assert "phone" not in pb
+        assert "balance" not in pb
+
+
+def test_public_bets_endpoint(client, db: Session, auth_user, fee_config, dt_game):
+    headers, user, _ = auth_user
+    rd = engine.create_round(db)
+    b = engine.place_bet(db, user.id, rd.id, "TIE", 2000, game_id=dt_game.id)
+
+    res = client.get("/api/v1/games/public-bets", headers=headers, params={"round_id": str(rd.id)})
+    assert res.status_code == 200
+    items = res.json()["data"]
+    assert len(items) == 1
+    assert items[0]["prediction"] == "TIE"
+    assert items[0]["amount"] == 2000
+    assert items[0]["id"] != str(b.id)
+    assert len(items[0]["id"]) == 16
+    assert "user_id" not in items[0]

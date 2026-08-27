@@ -103,11 +103,19 @@ export interface GameBet {
   settled_at: string | null;
 }
 
+export interface PublicBet {
+  id: string;
+  prediction: string;
+  amount: number;
+  created_at: string;
+}
+
 export interface GameState {
   round: GameRound | null;
   server_time: string;
   seconds_remaining: number;
   game?: CatalogGame | null;
+  public_bets?: PublicBet[];
 }
 
 export interface GameRoundAdmin extends GameRound {

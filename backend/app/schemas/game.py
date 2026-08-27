@@ -51,8 +51,18 @@ class GameRoundDetailOut(GameRoundOut):
     total_amount: int = 0
 
 
+class PublicBetOut(BaseModel):
+    id: str
+    prediction: str
+    amount: int
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
 class GameStateOut(BaseModel):
     round: Optional[GameRoundOut] = None
     server_time: datetime
     seconds_remaining: float = 0.0
     game: Optional[GameOut] = None
+    public_bets: Optional[list[PublicBetOut]] = None

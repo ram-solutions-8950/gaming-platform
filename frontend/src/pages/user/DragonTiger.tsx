@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { gameService } from '../../services/game';
 import { walletService } from '../../services/wallet';
 import { Loader } from '../../components/common/Loader';
-import type { CatalogGame, GameBet, GameRound, GameState, Wallet } from '../../types';
+import type { CatalogGame, GameBet, GameRound, GameState, Wallet, PublicBet } from '../../types';
 import { DragonTigerArena, type ArenaPhase } from '../../components/dragonTiger/DragonTigerArena';
 import useAudio from '../../hooks/useAudio';
 import { ChipLayer } from '../../components/dragonTiger/ChipLayer';
@@ -27,6 +27,8 @@ export function DragonTigerPage() {
   const [history, setHistory] = useState<GameRound[]>([]);
   const [myBets, setMyBets] = useState<GameBet[]>([]);
   const [catalogGame, setCatalogGame] = useState<CatalogGame | null>(null);
+  const [publicBets, setPublicBets] = useState<PublicBet[]>([]);
+  const [recentLiveBets, setRecentLiveBets] = useState<PublicBet[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
   const [amount, setAmount] = useState(1000);
   const [loading, setLoading] = useState(true);
@@ -119,6 +121,9 @@ export function DragonTigerPage() {
       setWallet(w);
       setHistory(h);
       setMyBets(b.items);
+      if (gs?.public_bets) {
+        setPublicBets(gs.public_bets);
+      }
       setCountdown(gs.seconds_remaining);
       setCatalogGame(catalog.find((g) => g.slug === SLUG) || null);
     } catch {
@@ -173,9 +178,19 @@ export function DragonTigerPage() {
             if (data.game_slug && data.game_slug !== SLUG) return;
             if (data.type === 'round_start') {
               setIsBettingLocked(false);
+              setPublicBets([]);
+              setRecentLiveBets([]);
             }
             if (data.type === 'betting_locked') {
               setIsBettingLocked(true);
+            }
+            if (data.type === 'new_bet' && data.bet) {
+              const newBet: PublicBet = data.bet;
+              setPublicBets((prev) => {
+                if (prev.some((b) => b.id === newBet.id)) return prev;
+                return [...prev, newBet];
+              });
+              setRecentLiveBets((prev) => [newBet, ...prev.slice(0, 4)]);
             }
             if (data.type === 'round_result' && data.result_data) {
               const rd = data.result_data;
@@ -391,6 +406,18 @@ export function DragonTigerPage() {
     }
   };
 
+  /* ── public bets memoized aggregations ── */
+  const dragonPublicBets = useMemo(() => publicBets.filter((b) => b.prediction === 'DRAGON'), [publicBets]);
+  const tigerPublicBets = useMemo(() => publicBets.filter((b) => b.prediction === 'TIGER'), [publicBets]);
+  const tiePublicBets = useMemo(() => publicBets.filter((b) => b.prediction === 'TIE'), [publicBets]);
+
+  const dragonPublicTotal = useMemo(() => dragonPublicBets.reduce((sum, b) => sum + b.amount, 0), [dragonPublicBets]);
+  const tigerPublicTotal = useMemo(() => tigerPublicBets.reduce((sum, b) => sum + b.amount, 0), [tigerPublicBets]);
+  const tiePublicTotal = useMemo(() => tiePublicBets.reduce((sum, b) => sum + b.amount, 0), [tiePublicBets]);
+
+  const totalPublicBettors = publicBets.length;
+  const totalPublicVolume = useMemo(() => publicBets.reduce((sum, b) => sum + b.amount, 0), [publicBets]);
+
   /* ── DRAGON | TIE | TIGER order (matches reference) ── */
   const options = [
     { key: 'DRAGON', enabled: allowed.dragon !== false, payout: payouts.dragon },
@@ -454,6 +481,33 @@ export function DragonTigerPage() {
               <span className="text-[9px] text-yellow-300 font-bold tracking-wider">Ranking</span>
             </div>
           </div>
+
+          {/* HUD top-center: Live Public Bets Indicator */}
+          <div className="absolute top-1.5 left-1/2 -translate-x-1/2 z-30 flex items-center gap-1.5 bg-black/70 backdrop-blur-sm px-3 py-1 rounded-full border border-yellow-500/40 shadow-lg">
+            <span className="w-2 h-2 rounded-full bg-red-500 animate-ping" />
+            <span className="text-[10px] sm:text-xs font-bold text-white/90">
+              {totalPublicBettors} {totalPublicBettors === 1 ? 'Player' : 'Players'}
+            </span>
+            <span className="text-zinc-500 text-[10px]">|</span>
+            <span className="text-[10px] sm:text-xs font-extrabold text-yellow-400">
+              ₹{paiseToRupees(totalPublicVolume)}
+            </span>
+          </div>
+
+          {/* HUD top-center sub-ticker: Live incoming bet notification */}
+          {recentLiveBets.length > 0 && isBetting && (
+            <div className="absolute top-9 sm:top-10 left-1/2 -translate-x-1/2 z-30 pointer-events-none flex items-center gap-1.5 bg-black/80 backdrop-blur-md px-3 py-0.5 rounded-full border border-yellow-500/40 shadow-[0_0_12px_rgba(234,179,8,0.3)] animate-pulse">
+              <span className="text-[9px] sm:text-[10px] text-zinc-300 font-medium">
+                ⚡ Live: <strong className="text-white font-bold">₹{paiseToRupees(recentLiveBets[0].amount)}</strong> on{' '}
+                <strong className={
+                  recentLiveBets[0].prediction === 'DRAGON' ? 'text-blue-400' :
+                  recentLiveBets[0].prediction === 'TIGER' ? 'text-orange-400' : 'text-emerald-400'
+                }>
+                  {recentLiveBets[0].prediction === 'DRAGON' ? '🐉 DRAGON' : recentLiveBets[0].prediction === 'TIGER' ? '🐅 TIGER' : '🗿 TIE'}
+                </strong>
+              </span>
+            </div>
+          )}
 
           {/* HUD top-right: Wallet + ADD */}
           <div className="absolute top-1.5 right-2 z-30 flex items-center gap-1.5">
@@ -652,6 +706,9 @@ export function DragonTigerPage() {
               ? 'from-[#c47020]/75 to-[#8a4e10]/75 border-[#f0a840]'
               : 'from-[#2d8a4e]/75 to-[#1a5a30]/75 border-[#50d080]';
 
+            const zonePublicBets = isDragon ? dragonPublicBets : isTiger ? tigerPublicBets : tiePublicBets;
+            const zonePublicTotal = isDragon ? dragonPublicTotal : isTiger ? tigerPublicTotal : tiePublicTotal;
+
             const zoneBets = roundBets.filter(b => b.prediction === opt.key);
             const zoneTotal = zoneBets.reduce((sum, b) => sum + b.amount, 0);
 
@@ -667,11 +724,20 @@ export function DragonTigerPage() {
                   !isBetting || !opt.enabled ? 'opacity-50 cursor-not-allowed saturate-50' : 'hover:brightness-110 active:scale-[0.98] cursor-pointer shadow-[0_0_15px_rgba(255,255,255,0.1)] hover:shadow-[0_0_25px_rgba(255,255,255,0.2)]'
                 } ${isSelected ? 'border-yellow-400 ring-2 ring-yellow-400 shadow-[0_0_20px_rgba(250,204,21,0.6)] scale-[1.02] z-20' : 'border-transparent'}`}
               >
-                {/* Header: count/total */}
-                <div className="w-full flex justify-center pt-1.5 z-10">
-                  <div className="bg-black/40 px-3 py-0.5 rounded text-[10px] font-bold text-white/90 border border-white/10">
-                    {zoneBets.length}/{zoneTotal > 0 ? paiseToRupees(zoneTotal) : '0'}
+                {/* Header: Public live count/total + User bet badge */}
+                <div className="w-full flex items-center justify-between px-2 pt-1.5 z-10">
+                  <div className="bg-black/50 px-2 py-0.5 rounded text-[9px] sm:text-[10px] font-bold text-white/90 border border-white/10 flex items-center gap-1 shadow-sm">
+                    <span className="text-yellow-400">👥</span>
+                    <span>{zonePublicBets.length}</span>
+                    <span className="text-zinc-500 font-normal">|</span>
+                    <span className="text-emerald-400 font-extrabold">₹{paiseToRupees(zonePublicTotal)}</span>
                   </div>
+                  {zoneTotal > 0 && (
+                    <div className="bg-yellow-500/25 border border-yellow-400/60 px-1.5 py-0.5 rounded text-[9px] font-black text-yellow-300 shadow-sm animate-pulse flex items-center gap-0.5">
+                      <span>You:</span>
+                      <span>₹{paiseToRupees(zoneTotal)}</span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Watermark */}
