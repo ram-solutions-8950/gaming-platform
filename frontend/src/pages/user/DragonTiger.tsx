@@ -7,6 +7,7 @@ import type { CatalogGame, GameBet, GameRound, GameState, Wallet } from '../../t
 import { DragonTigerArena, type ArenaPhase } from '../../components/dragonTiger/DragonTigerArena';
 import useAudio from '../../hooks/useAudio';
 import { ChipLayer } from '../../components/dragonTiger/ChipLayer';
+import { getWebSocketUrl } from '../../utils/ws';
 
 import bgImg from '../../assets/dragon-tiger-bg.jpeg';
 import dragonImg from '../../assets/dragon-3d.png';
@@ -162,17 +163,8 @@ export function DragonTigerPage() {
     const connect = () => {
       if (isUnmounted) return;
       try {
-        const wsProtocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
-        let wsHost = import.meta.env.VITE_WS_URL;
-        if (!wsHost) {
-          const apiBase = import.meta.env.VITE_API_URL || `${window.location.protocol}//${window.location.hostname || 'localhost'}:8000/api/v1`;
-          wsHost = apiBase.replace(/^http/, 'ws').replace(/\/api\/v1\/?$/, '');
-        }
-        if (!wsHost.startsWith('ws://') && !wsHost.startsWith('wss://')) {
-          wsHost = `${wsProtocol}://${wsHost}`;
-        }
-
-        ws = new WebSocket(`${wsHost}/api/v1/ws/games`);
+        const wsUrl = getWebSocketUrl('ws/games');
+        ws = new WebSocket(wsUrl);
         wsRef.current = ws;
 
         ws.onmessage = (event) => {

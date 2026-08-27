@@ -3,6 +3,7 @@ import type { LudoMatch, WSMessage } from '../types/ludo';
 import { ludoService } from '../services/ludo';
 import { soundManager } from '../services/soundManager';
 import { useAuthStore } from '../store/authStore';
+import { getWebSocketUrl } from '../utils/ws';
 
 interface MatchmakingStatus {
   status: string;
@@ -85,8 +86,8 @@ export const LudoProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (wsRef.current?.readyState === WebSocket.OPEN) return;
     setConnectionStatus('CONNECTING');
     const token = localStorage.getItem('access_token');
-    const wsUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1'}`.replace(/^http/, 'ws');
-    const ws = new WebSocket(`${wsUrl}/ludo/ws/${matchId}?token=${token}`);
+    const wsUrl = getWebSocketUrl(`ludo/ws/${matchId}`, token || undefined);
+    const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
     ws.onopen = () => {
       setConnectionStatus('CONNECTED');

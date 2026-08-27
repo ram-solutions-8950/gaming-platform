@@ -1,13 +1,5 @@
 import { useCallback, useRef, useState } from "react";
-
-function getWsBaseUrl(): string {
-  if (import.meta.env.VITE_WS_URL) {
-    return import.meta.env.VITE_WS_URL;
-  }
-  const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-  const host = window.location.host.includes(":5173") ? "localhost:8000" : window.location.host;
-  return `${protocol}//${host}/api/v1/rummy`;
-}
+import { getWebSocketUrl } from "../utils/ws";
 
 export interface MatchmakingCriteria {
   name: string;
@@ -61,8 +53,7 @@ export function useRummyMatchmaking(token: string | null): MatchmakingResult {
       setErrorMessage(null);
       setElapsedSeconds(0);
 
-      const wsBase = getWsBaseUrl();
-      const url = `${wsBase}/ws/matchmaking?token=${encodeURIComponent(token)}`;
+      const url = getWebSocketUrl("rummy/ws/matchmaking", token);
       const ws = new WebSocket(url);
       wsRef.current = ws;
 

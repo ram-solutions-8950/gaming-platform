@@ -1,18 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { getWebSocketUrl } from "../utils/ws";
 import type {
   ClientAction,
   ServerMessage,
   TableState,
 } from "../types/rummy";
-
-function getWsBaseUrl(): string {
-  if (import.meta.env.VITE_WS_URL) {
-    return import.meta.env.VITE_WS_URL;
-  }
-  const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-  const host = window.location.host.includes(":5173") ? "localhost:8000" : window.location.host;
-  return `${protocol}//${host}/api/v1/rummy`;
-}
 
 /**
  * Connects to the Rummy game WebSocket for a table and exposes the live table state,
@@ -30,8 +22,7 @@ export function useRummySocket(tableId: string, token: string | null) {
 
   const connect = useCallback(() => {
     if (!token || !tableId) return;
-    const wsBase = getWsBaseUrl();
-    const url = `${wsBase}/ws/game/${tableId}?token=${encodeURIComponent(token)}`;
+    const url = getWebSocketUrl(`rummy/ws/game/${tableId}`, token);
     const ws = new WebSocket(url);
     wsRef.current = ws;
 

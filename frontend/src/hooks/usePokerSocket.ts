@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useAuthStore } from '../store/authStore';
+import { getWebSocketUrl } from '../utils/ws';
 
 export interface PokerPlayerInfo {
   user_id: string;
@@ -44,26 +45,7 @@ export interface UsePokerSocketOptions {
 }
 
 function getPokerWsUrl(tableId: string, token: string): string {
-  const envWs = import.meta.env.VITE_WS_URL;
-  const envApi = import.meta.env.VITE_API_URL;
-
-  let wsBase: string;
-  if (envWs) {
-    wsBase = envWs.replace(/\/+$/, '');
-  } else if (envApi && !envApi.includes('trycloudflare.com')) {
-    const apiUrl = envApi.replace(/\/+$/, '');
-    const wsProto = apiUrl.startsWith('https') ? 'wss:' : 'ws:';
-    wsBase = apiUrl.replace(/^https?:/, wsProto);
-  } else {
-    const isDevPort = window.location.port === '5173' || window.location.port === '3000' || window.location.port === '5174';
-    const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const host = isLocalhost || isDevPort ? '127.0.0.1:8000' : window.location.host;
-    wsBase = `${protocol}//${host}/api/v1`;
-  }
-
-  const cleanBase = wsBase.endsWith('/poker/ws') ? wsBase : `${wsBase}/poker/ws`;
-  return `${cleanBase}/${tableId}?token=${encodeURIComponent(token)}`;
+  return getWebSocketUrl(`poker/ws/${tableId}`, token);
 }
 
 export function usePokerSocket(options: UsePokerSocketOptions) {

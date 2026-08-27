@@ -17,6 +17,7 @@ import {
 } from "../../services/andarBahar";
 import type { GameRound } from "../../types";
 import { soundManager } from "../../services/soundManager";
+import { getWebSocketUrl } from "../../utils/ws";
 import "../../styles/andar-bahar.css";
 
 type Phase = "betting" | "closed" | "dealing" | "result";
@@ -209,19 +210,8 @@ export function AndarBaharPage() {
     const connect = () => {
       if (isUnmounted) return;
       try {
-        const wsProtocol = window.location.protocol === "https:" ? "wss" : "ws";
-        let wsHost = import.meta.env.VITE_WS_URL;
-        if (!wsHost) {
-          const apiBase =
-            import.meta.env.VITE_API_URL ||
-            `${window.location.protocol}//${window.location.hostname || "localhost"}:8000/api/v1`;
-          wsHost = apiBase.replace(/^http/, "ws").replace(/\/api\/v1\/?$/, "");
-        }
-        if (!wsHost.startsWith("ws://") && !wsHost.startsWith("wss://")) {
-          wsHost = `${wsProtocol}://${wsHost}`;
-        }
-
-        ws = new WebSocket(`${wsHost}/api/v1/ws/games`);
+        const wsUrl = getWebSocketUrl("ws/games");
+        ws = new WebSocket(wsUrl);
         wsRef.current = ws;
 
         ws.onmessage = (event) => {

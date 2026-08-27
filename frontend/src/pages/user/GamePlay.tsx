@@ -6,6 +6,7 @@ import { gameService } from '../../services/game';
 import { walletService } from '../../services/wallet';
 import type { GameState, GameBet, GameRound, Wallet } from '../../types';
 import { soundManager } from '../../services/soundManager';
+import { getWebSocketUrl } from '../../utils/ws';
 
 const PREDICTIONS = [
   { value: 'RED', label: 'Red', color: 'bg-red-600', hoverColor: 'hover:bg-red-500', textColor: 'text-red-400', multi: '2x' },
@@ -98,9 +99,8 @@ export function GamePlayPage() {
 
   // WebSocket connection
   useEffect(() => {
-    const wsProtocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
-    const wsHost = import.meta.env.VITE_WS_URL || `${wsProtocol}://${window.location.hostname || 'localhost'}:8000`;
-    const ws = new WebSocket(`${wsHost}/api/v1/ws/games`);
+    const wsUrl = getWebSocketUrl('ws/games');
+    const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
 
     ws.onmessage = (event) => {

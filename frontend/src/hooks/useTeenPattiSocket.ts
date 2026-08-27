@@ -4,6 +4,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useAuthStore } from '../store/authStore';
 import type { TeenPattiGameState } from '../services/teenPatti';
+import { getWebSocketUrl } from '../utils/ws';
 
 export interface UseTeenPattiSocketOptions {
   tableId: string | null;
@@ -33,9 +34,7 @@ export function useTeenPattiSocket({ tableId, onEvent, onError }: UseTeenPattiSo
 
     setIsConnecting(true);
 
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const host = window.location.hostname === 'localhost' ? 'localhost:8000' : window.location.host;
-    const wsUrl = `${protocol}//${host}/api/v1/ws/teen-patti/${tableId}?token=${encodeURIComponent(token)}`;
+    const wsUrl = getWebSocketUrl(`ws/teen-patti/${tableId}`, token);
 
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;

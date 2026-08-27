@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useAuthStore } from '../store/authStore';
+import { getWebSocketUrl } from '../utils/ws';
 
 export type AviatorPhase = 'BETTING' | 'FLYING' | 'CRASHED' | 'SETTLED' | 'COOLDOWN' | 'DISCONNECTED';
 
@@ -32,30 +33,6 @@ export interface UseAviatorSocketOptions {
   onCrash?: (crashPoint: number) => void;
   onError?: (error: string) => void;
   onBalanceUpdateNeeded?: () => void;
-}
-
-function getAviatorWsUrl(token: string): string {
-  const envWs = import.meta.env.VITE_WS_URL;
-  const envApi = import.meta.env.VITE_API_URL;
-
-  let wsBase: string;
-
-  if (envWs) {
-    wsBase = envWs.replace(/\/+$/, '');
-  } else if (envApi && !envApi.includes('trycloudflare.com')) {
-    const apiUrl = envApi.replace(/\/+$/, '');
-    const wsProto = apiUrl.startsWith('https') ? 'wss:' : 'ws:';
-    wsBase = apiUrl.replace(/^https?:/, wsProto);
-  } else {
-    const isDevPort = window.location.port === '5173' || window.location.port === '3000' || window.location.port === '5174';
-    const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const host = isLocalhost || isDevPort ? '127.0.0.1:8000' : window.location.host;
-    wsBase = `${protocol}//${host}/api/v1`;
-  }
-
-  const cleanBase = wsBase.endsWith('/aviator/ws') ? wsBase : `${wsBase}/aviator/ws`;
-  return `${cleanBase}?token=${encodeURIComponent(token)}`;
 }
 
 export function useAviatorSocket(options: UseAviatorSocketOptions = {}) {
@@ -112,7 +89,7 @@ export function useAviatorSocket(options: UseAviatorSocketOptions = {}) {
 
     setIsConnecting(true);
 
-    const wsUrl = getAviatorWsUrl(token);
+    const wsUrl = getWebSocketUrl('aviator/ws', token);
     const sanitizedUrl = wsUrl.replace(/token=([^&]+)/, 'token=***');
     console.log('[AVIATOR] WS URL generated (socket #' + currentSocketId + '):', sanitizedUrl);
 
