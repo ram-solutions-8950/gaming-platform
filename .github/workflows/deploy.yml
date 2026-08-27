@@ -31,8 +31,23 @@ jobs:
             echo "Checking containers..."
             docker compose ps
 
-            echo "Checking backend..."
-            curl -f http://localhost:8000/api/v1/openapi.json
+            echo "Waiting for backend..."
+
+            for i in {1..12}; do
+              if curl -fsS http://localhost:8000/api/v1/health; then
+                echo "Backend is healthy."
+                break
+              fi
+
+              if [ "$i" -eq 12 ]; then
+                echo "Backend failed health check."
+                docker compose logs --tail=100 backend
+                exit 1
+              fi
+
+              echo "Backend not ready yet... attempt $i/12"
+              sleep 5
+            done
 
             echo "Checking frontend..."
             curl -f http://localhost:5173
