@@ -1274,3 +1274,239 @@
     max-height: 58px !important;
   }
 }
+
+/* =========================================================
+   LUDO – LANDSCAPE DICE VISIBILITY FIX
+
+   Problem: ludo-game-page is set to height:100dvh but it is
+   rendered inside UserLayout's <main flex-1> which already
+   sits ABOVE the 48px bottom nav. So 100dvh overflows
+   the available space and the dice container below the board
+   is pushed underneath — or clipped by — the bottom nav.
+
+   Fix summary:
+   1. ludo-game-page fills its flex-1 parent (height:100%),
+      does NOT overflow the bottom nav.
+   2. ludo-board-column uses overflow:visible so the dice
+      is never hard-clipped.
+   3. Board sizes are reduced enough that
+      turn-indicator (~36px) + board + dice (60px) + gaps
+      fit within the available landscape height on every
+      device listed: 667×375, 844×390, 932×430, 740×360.
+   4. Short-screen breakpoints mirror this logic.
+   ========================================================= */
+
+@media (orientation: landscape) {
+
+  /*
+   * CRITICAL: use height:100% not 100dvh.
+   * The component lives inside flex-1 main, not at the
+   * document root. Using 100dvh makes it taller than the
+   * visible area above the bottom nav.
+   */
+  .ludo-game-page {
+    height: 100% !important;
+    min-height: 0 !important;
+    /* Allow scroll only as last resort on very small screens */
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+  }
+
+  /*
+   * CRITICAL: height:100% here so the container fills
+   * only the available space, not the full viewport.
+   */
+  .ludo-game-container {
+    height: 100% !important;
+    min-height: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    padding: 0 6px 0 !important;
+    overflow: hidden !important;
+  }
+
+  /* Game layout fills the remaining flex space */
+  .ludo-game-layout {
+    flex: 1 1 0 !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+  }
+
+  /*
+   * CRITICAL: Change overflow from hidden → visible on the
+   * board column. overflow:hidden was the hard clip that
+   * cut off the dice container whenever the total column
+   * height exceeded the available space.
+   *
+   * The column is a flex-column. Its children (turn-indicator,
+   * board, dice) are flex items. If the sum exceeds the
+   * column height the overflow is now visible (scrollable via
+   * the page-level overflow-y:auto set above) instead of
+   * invisibly clipped.
+   */
+  .ludo-board-column {
+    overflow: visible !important;
+    /* Also allow the column to shrink so flex handles sizing */
+    min-height: 0 !important;
+  }
+
+  /*
+   * Board wrap: smaller default so the dice always fits.
+   *
+   * Available landscape height formula (typical):
+   *   100dvh
+   *   − LobbyHeader (~44px)
+   *   − BottomNav   (~48px)
+   *   = ~dvh − 92px
+   *
+   * For 375px-height phones: 375 − 92 = 283px available.
+   * We need: turn(36) + gap(4) + board + gap(4) + dice(60)
+   * = board + 104px ≤ 283px → board ≤ 179px.
+   *
+   * We use 175px as a safe value here and bump it for
+   * taller phones in the breakpoints below.
+   */
+  .ludo-board-stage .ludo-board-wrap {
+    width: 175px !important;
+    height: 175px !important;
+    min-width: 175px !important;
+    min-height: 175px !important;
+    max-width: 175px !important;
+    max-height: 175px !important;
+    flex: 0 0 175px !important;
+  }
+
+  /* Dice below board: compact but ≥44px touch target */
+  .ludo-dice-below-board {
+    height: 60px !important;
+    min-height: 60px !important;
+    flex: 0 0 60px !important;
+    margin: 3px 0 0 !important;
+    overflow: visible !important;
+  }
+
+  .ludo-dice-below-board .ludo-dice-cube {
+    width: 52px !important;
+    height: 52px !important;
+    min-width: 52px !important;
+    min-height: 52px !important;
+    max-width: 52px !important;
+    max-height: 52px !important;
+  }
+
+  /* Turn indicator: tighten vertical padding in landscape */
+  .ludo-board-column .ludo-turn-indicator {
+    padding-top: 2px !important;
+    padding-bottom: 2px !important;
+    margin: 0 0 3px !important;
+    flex: 0 0 auto !important;
+  }
+}
+
+/* -----------------------------------------------------------
+   Taller landscape phones (390px+ height): board 200px
+   Available: 390 − 92 = 298px → board + 104 ≤ 298 → ≤ 194px
+   Use 190px with dice 62px.
+   ----------------------------------------------------------- */
+@media (orientation: landscape) and (min-height: 390px) {
+  .ludo-board-stage .ludo-board-wrap {
+    width: 190px !important;
+    height: 190px !important;
+    min-width: 190px !important;
+    min-height: 190px !important;
+    max-width: 190px !important;
+    max-height: 190px !important;
+    flex: 0 0 190px !important;
+  }
+
+  .ludo-dice-below-board {
+    height: 62px !important;
+    min-height: 62px !important;
+    flex: 0 0 62px !important;
+  }
+
+  .ludo-dice-below-board .ludo-dice-cube {
+    width: 54px !important;
+    height: 54px !important;
+    min-width: 54px !important;
+    min-height: 54px !important;
+    max-width: 54px !important;
+    max-height: 54px !important;
+  }
+}
+
+/* -----------------------------------------------------------
+   Tall landscape phones (430px+ height): board 215px
+   Available: 430 − 92 = 338px → board + 104 ≤ 338 → ≤ 234px
+   Use 215px safe.
+   ----------------------------------------------------------- */
+@media (orientation: landscape) and (min-height: 430px) {
+  .ludo-board-stage .ludo-board-wrap {
+    width: 215px !important;
+    height: 215px !important;
+    min-width: 215px !important;
+    min-height: 215px !important;
+    max-width: 215px !important;
+    max-height: 215px !important;
+    flex: 0 0 215px !important;
+  }
+
+  .ludo-dice-below-board {
+    height: 65px !important;
+    min-height: 65px !important;
+    flex: 0 0 65px !important;
+  }
+
+  .ludo-dice-below-board .ludo-dice-cube {
+    width: 56px !important;
+    height: 56px !important;
+    min-width: 56px !important;
+    min-height: 56px !important;
+    max-width: 56px !important;
+    max-height: 56px !important;
+  }
+}
+
+/* -----------------------------------------------------------
+   Very short landscape screens (max-height: 360px)
+   Available: ~360 − 92 = 268px → board ≤ 164px
+   ----------------------------------------------------------- */
+@media (orientation: landscape) and (max-height: 360px) {
+  .ludo-board-stage .ludo-board-wrap {
+    width: 160px !important;
+    height: 160px !important;
+    min-width: 160px !important;
+    min-height: 160px !important;
+    max-width: 160px !important;
+    max-height: 160px !important;
+    flex: 0 0 160px !important;
+  }
+
+  .ludo-dice-below-board {
+    height: 56px !important;
+    min-height: 56px !important;
+    flex: 0 0 56px !important;
+    margin: 2px 0 0 !important;
+  }
+
+  .ludo-dice-below-board .ludo-dice-cube {
+    width: 48px !important;
+    height: 48px !important;
+    min-width: 48px !important;
+    min-height: 48px !important;
+    max-width: 48px !important;
+    max-height: 48px !important;
+  }
+
+  .ludo-board-column .ludo-turn-indicator {
+    transform: scale(0.88) !important;
+    transform-origin: center !important;
+    margin: 0 !important;
+  }
+
+  /* Tighten the right column on tiny screens */
+  .ludo-game-layout {
+    grid-template-columns: minmax(0, 1fr) 165px !important;
+    gap: 5px !important;
+  }
+}
