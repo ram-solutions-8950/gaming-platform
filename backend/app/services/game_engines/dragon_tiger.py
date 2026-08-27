@@ -76,14 +76,15 @@ def calculate_payout_gross(
     result: str,
     payout_configuration: dict,
 ) -> int:
-    """Gross win in paisa: stake * configured multiplier. Losing bets return 0."""
+    """Gross return in paise: stake + (stake * multiplier) on win, 0 on loss."""
     if bet_type.upper() != result.upper():
         return 0
     key = bet_type.lower()
     if key not in payout_configuration:
         raise ValueError(f"No payout configured for bet type: {bet_type}")
     mult = Decimal(str(payout_configuration[key]))
-    return int((Decimal(bet_amount) * mult).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+    net_win = (Decimal(bet_amount) * mult).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
+    return int(Decimal(bet_amount) + net_win)
 
 
 def _parse_prediction(prediction: str) -> GamePrediction:

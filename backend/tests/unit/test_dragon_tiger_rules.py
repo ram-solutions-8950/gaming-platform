@@ -28,15 +28,15 @@ def test_rank_order_ace_high():
 
 def test_payout_uses_configuration_not_hardcoded_tie():
     payouts = {"dragon": 1.0, "tiger": 1.0, "tie": 11.0}
-    assert calculate_payout_gross(9500, "TIE", "TIE", payouts) == 104500
+    assert calculate_payout_gross(9500, "TIE", "TIE", payouts) == 114000
     custom = {"dragon": 1.0, "tiger": 1.0, "tie": 8.0}
-    assert calculate_payout_gross(9500, "TIE", "TIE", custom) == 76000
+    assert calculate_payout_gross(9500, "TIE", "TIE", custom) == 85500
 
 
 def test_payout_dragon_and_tiger_from_config():
     payouts = {"dragon": "1.0", "tiger": "2.5", "tie": "11.0"}
-    assert calculate_payout_gross(10000, "DRAGON", "DRAGON", payouts) == 10000
-    assert calculate_payout_gross(10000, "TIGER", "TIGER", payouts) == 25000
+    assert calculate_payout_gross(10000, "DRAGON", "DRAGON", payouts) == 20000
+    assert calculate_payout_gross(10000, "TIGER", "TIGER", payouts) == 35000
 
 
 def test_losing_bet_payout_is_zero():
@@ -46,8 +46,8 @@ def test_losing_bet_payout_is_zero():
 
 def test_payout_uses_decimal_rounding():
     payouts = {"dragon": Decimal("1.5"), "tiger": 1.0, "tie": 11.0}
-    # 10001 * 1.5 = 15001.5 -> 15002 ROUND_HALF_UP
-    assert calculate_payout_gross(10001, "DRAGON", "DRAGON", payouts) == 15002
+    # 10001 + round(10001 * 1.5) = 10001 + 15002 = 25003 ROUND_HALF_UP
+    assert calculate_payout_gross(10001, "DRAGON", "DRAGON", payouts) == 25003
 
 
 def test_draw_cards_returns_two_unique_from_standard_deck():
