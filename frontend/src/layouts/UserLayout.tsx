@@ -35,7 +35,7 @@ export function UserLayout() {
   };
 
   return (
-    <div className="h-dvh max-h-dvh min-h-dvh flex flex-col lg:flex-row bg-gradient-to-br from-[#2c085c] via-[#1b053c] to-[#0c021e] relative overflow-hidden">
+    <div className="h-dvh max-h-dvh min-h-dvh flex flex-col lg:flex-row bg-gradient-to-br from-[#2c085c] via-[#1b053c] to-[#0c021e] relative overflow-x-hidden">
       <GlitterRain />
 
       {/* ─── DESKTOP SIDEBAR (Large Desktop only) ─── */}
@@ -111,7 +111,7 @@ export function UserLayout() {
       </aside>
 
       {/* ─── MOBILE SHELL & MAIN CONTENT ─── */}
-      <div className="flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden z-10 relative h-dvh max-h-dvh">
+      <div className="flex-1 min-w-0 min-h-0 flex flex-col overflow-x-hidden z-10 relative h-dvh max-h-dvh">
         {/* Mobile Header */}
         <div className="2xl:hidden shrink-0 z-30">
           <LobbyHeader user={user} wallet={wallet} />
