@@ -13,7 +13,6 @@ import { WalletPage } from './pages/user/Wallet';
 import { TransactionsPage } from './pages/user/Transactions';
 import { DepositPage } from './pages/user/Deposit';
 import { WithdrawalPage } from './pages/user/Withdrawal';
-import { GamePlayPage } from './pages/user/GamePlay';
 import { DragonTigerPage } from './pages/user/DragonTiger';
 import { AndarBaharPage } from './pages/user/AndarBahar';
 import { RummyPage } from './pages/user/Rummy';
@@ -125,8 +124,6 @@ function App() {
           <Route element={<UserLayout />}>
             <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/games-catalog" element={<GameCatalogPage />} />
-            <Route path="/games" element={<GamePlayPage />} />
-            <Route path="/games/colour-prediction" element={<GamePlayPage />} />
             <Route path="/games/ludo" element={<Ludo />} />
             <Route path="/wallet" element={<WalletPage />} />
             <Route path="/transactions" element={<TransactionsPage />} />

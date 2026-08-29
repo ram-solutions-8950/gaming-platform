@@ -25,6 +25,7 @@ export interface LudoMatch {
   current_turn_color: LudoColor | null;
   last_dice_roll: number | null;
   turn_timeout_seconds: number;
+  turn_started_at: string | null;
   version: number;
   entry_fee: number;
   prize_pool: number;

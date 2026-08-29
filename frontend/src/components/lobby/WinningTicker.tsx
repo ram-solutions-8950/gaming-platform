@@ -10,7 +10,7 @@ const DEFAULT_ITEMS: TickerItem[] = [
   { username: 'Player***21', amount: '₹2,265', game: 'AVIATOR' },
   { username: 'Lucky***89', amount: '₹5,120', game: 'LUDO' },
   { username: 'Win***45', amount: '₹1,830', game: 'DRAGON TIGER' },
-  { username: 'Star***77', amount: '₹3,650', game: 'COLOUR PREDICTION' },
+  { username: 'Star***77', amount: '₹3,650', game: 'CHICKEN ROAD' },
   { username: 'King***03', amount: '₹8,900', game: 'RUMMY' },
   { username: 'Pro***56', amount: '₹4,210', game: 'TEEN PATTI' },
   { username: 'Ace***12', amount: '₹6,740', game: 'LUDO' },

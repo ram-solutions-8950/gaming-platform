@@ -23,7 +23,7 @@ from ..services.rummy import bot_strategy
 from ..services.rummy.deals_rummy import DealsRummyGame, GameConfig, Phase, Player
 from ..services.rummy.errors import GameError
 from ..services.rummy.game_manager import game_manager
-from ..services.wallet_service import credit_wallet, debit_wallet
+from ..services.wallet_service import credit_wallet, debit_wallet, get_balance
 
 
 @contextmanager
@@ -323,11 +323,14 @@ def _settle_real_money(table_id: str, game: DealsRummyGame) -> None:
 
         deal_key = f"{table_id}:{game.deal_number}"
         total_credit = 0
-        for p in game.players:
-            if p.id == game.winner_id or p.deal_points <= 0 or _is_bot(p.id):
-                continue
-            amount = p.deal_points * point_value
-            try:
+
+        # Enforce atomic savepoint transaction for all wallet entries in this deal
+        sp = db.begin_nested()
+        try:
+            for p in game.players:
+                if p.id == game.winner_id or p.deal_points <= 0 or _is_bot(p.id):
+                    continue
+                amount = p.deal_points * point_value
                 uid = uuid.UUID(p.id)
                 debit_wallet(
                     db=db,
@@ -339,11 +342,8 @@ def _settle_real_money(table_id: str, game: DealsRummyGame) -> None:
                     metadata={"table_id": table_id, "deal_number": game.deal_number, "points": p.deal_points}
                 )
                 total_credit += amount
-            except Exception:
-                pass
 
-        if total_credit > 0 and not _is_bot(game.winner_id):
-            try:
+            if total_credit > 0 and not _is_bot(game.winner_id):
                 winner_uid = uuid.UUID(game.winner_id)
                 credit_wallet(
                     db=db,
@@ -354,8 +354,11 @@ def _settle_real_money(table_id: str, game: DealsRummyGame) -> None:
                     reference_id=f"rummy_payout_{deal_key}",
                     metadata={"table_id": table_id, "deal_number": game.deal_number, "prize_pool": total_credit}
                 )
-            except Exception:
-                pass
+            sp.commit()
+        except Exception as e:
+            sp.rollback()
+            logger.error("RUMMY_SETTLEMENT_FAILED: table_id=%s deal=%d error=%s. Rollback wallet changes.", table_id, game.deal_number, str(e))
+            raise
 
         # Record finished round
         try:
@@ -383,6 +386,20 @@ async def game_socket(websocket: WebSocket, table_id: str) -> None:
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
         return
     user_id, username = auth
+
+    # Load table from DB and check maximum possible loss
+    with _get_db_session() as db:
+        try:
+            tid = uuid.UUID(str(table_id))
+            table = db.query(RummyTable).filter(RummyTable.id == tid).first()
+        except Exception:
+            table = None
+
+        if table is not None and str(table.mode.value if hasattr(table.mode, "value") else table.mode) == "real_money" and table.entry_fee_paise > 0:
+            wallet = get_balance(db, uuid.UUID(user_id))
+            if not wallet or wallet.balance < table.entry_fee_paise:
+                await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+                return
 
     game = game_manager.get_or_create(table_id, _load_config(table_id))
     await manager.connect(table_id, user_id, websocket)

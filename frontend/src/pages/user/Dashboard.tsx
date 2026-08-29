@@ -25,7 +25,6 @@ interface GameCardDef {
 
 const GAME_DEFS: GameCardDef[] = [
   { id: 'ludo', name: 'Ludo', subtitle: 'Board Game', emoji: '🎲', gradient: 'gc-blue', badge: 'HOT', path: '/games/ludo', category: ['ALL'] },
-  { id: 'colour-prediction', name: 'Colour Prediction', subtitle: 'Casino', emoji: '🌈', gradient: 'gc-pink', badge: 'NEW', path: '/games/colour-prediction', category: ['ALL', 'CASINO'] },
   { id: 'dragon-tiger', name: 'Dragon Tiger', subtitle: 'Casino', emoji: '🐉', gradient: 'gc-orange', badge: 'HOT', path: '/games/dragon-tiger', category: ['ALL', 'CASINO'] },
   { id: 'andar-bahar', name: 'Andar Bahar', subtitle: 'Cards', emoji: '🎴', gradient: 'gc-emerald', badge: 'NEW', path: '/games/andar-bahar', category: ['ALL', 'CARDS', 'CASINO'] },
   { id: 'rummy', name: 'Rummy', subtitle: 'Cards', emoji: '🃏', gradient: 'gc-teal', badge: 'HOT', path: '/games/rummy', category: ['ALL', 'CARDS', 'POKER'] },

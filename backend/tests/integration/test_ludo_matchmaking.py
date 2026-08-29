@@ -1,9 +1,13 @@
 import pytest
+import uuid
+from datetime import datetime, timezone, timedelta
 from uuid import uuid4
 from sqlalchemy.orm import Session
 from app.models.user import User
-from app.models.ludo import LudoMatchmakingQueue, QueueStatus, LudoMatch, LudoPlayer, LudoMatchStatus
+from app.models.ludo import LudoMatchmakingQueue, QueueStatus, LudoMatch, LudoPlayer, LudoMatchStatus, LudoColor
 from app.services.ludo.matchmaking import LudoMatchmakingService
+from app.services.ludo.board import STARTS
+from app.services.ludo.dice import roll_dice
 from app.services.wallet_service import credit_wallet
 from app.models.transaction import WalletTransactionType
 
@@ -71,6 +75,7 @@ def test_two_compatible_players_get_same_match(db: Session, ludo_game_active):
     
     res1 = svc1.join_queue(u1.id, 2, 1000)
     assert res1["status"] == "SEARCHING"
+    assert res1["seconds_left"] <= 30
     
     res2 = svc2.join_queue(u2.id, 2, 1000)
     assert res2["status"] == "MATCH_FOUND"
@@ -82,11 +87,15 @@ def test_two_compatible_players_get_same_match(db: Session, ludo_game_active):
     # They must have the EXACT SAME match_id!
     assert stat1["match_id"] == res2["match_id"]
     
-    # Verify the match was created with 2 players
+    # Verify the match was created with 2 players and opposite colors (RED + YELLOW)
     match = db.query(LudoMatch).filter_by(id=res2["match_id"]).first()
     assert match is not None
     assert len(match.players) == 2
     assert match.status == LudoMatchStatus.IN_PROGRESS
+    
+    # Deterministic diagonal/opposite colors:
+    assert match.players[0].color == LudoColor.RED
+    assert match.players[1].color == LudoColor.YELLOW
 
 def test_four_compatible_players_get_same_match(db: Session, ludo_game_active):
     users = [create_funded_user(db, f"u4_{i}@match.com") for i in range(4)]
@@ -123,8 +132,6 @@ def test_different_entry_fee_not_matched(db: Session, ludo_game_active):
 def test_different_player_count_not_matched(db: Session, ludo_game_active):
     u1 = create_funded_user(db, "diff3@match.com")
     u2 = create_funded_user(db, "diff4@match.com")
-        # This test checks player-count compatibility,
-    # not the configured entry-fee validation.
     ludo_game_active.config = {}
     db.commit()
     
@@ -178,3 +185,85 @@ def test_matched_users_status_returns_same_match_id(db: Session, ludo_game_activ
     svc.join_queue(u2.id, 2, 1000)
     
     assert svc.get_status(u1.id)["match_id"] == svc.get_status(u2.id)["match_id"]
+
+def test_matchmaking_30_seconds_timeout(db: Session, ludo_game_active):
+    u1 = create_funded_user(db, "timeout_user@match.com")
+    svc = LudoMatchmakingService(db)
+    
+    res = svc.join_queue(u1.id, 2, 1000)
+    assert res["status"] == "SEARCHING"
+    
+    # Backdate the queue entry by 30 seconds
+    q = db.query(LudoMatchmakingQueue).filter(LudoMatchmakingQueue.user_id == u1.id).first()
+    q.queued_at = datetime.now(timezone.utc) - timedelta(seconds=31)
+    db.commit()
+    
+    # Status check after >= 30 seconds must return NOT_QUEUED and cancel the queue entry
+    stat = svc.get_status(u1.id)
+    assert stat["status"] == "NOT_QUEUED"
+    
+    db.refresh(q)
+    assert q.status == QueueStatus.CANCELLED
+
+def test_matchmaking_joins_before_timeout(db: Session, ludo_game_active):
+    u1 = create_funded_user(db, "u_before1@match.com")
+    u2 = create_funded_user(db, "u_before2@match.com")
+    
+    svc1 = LudoMatchmakingService(db)
+    svc2 = LudoMatchmakingService(db)
+    
+    svc1.join_queue(u1.id, 2, 1000)
+    
+    # Backdate u1 by 29 seconds (still valid)
+    q1 = db.query(LudoMatchmakingQueue).filter(LudoMatchmakingQueue.user_id == u1.id).first()
+    q1.queued_at = datetime.now(timezone.utc) - timedelta(seconds=29)
+    db.commit()
+    
+    # u2 joins at 29 seconds -> match must succeed
+    res2 = svc2.join_queue(u2.id, 2, 1000)
+    assert res2["status"] == "MATCH_FOUND"
+    
+    db.refresh(q1)
+    assert q1.status == QueueStatus.MATCHED
+    assert q1.match_id == uuid.UUID(res2["match_id"])
+
+def test_matchmaking_race_condition_protection(db: Session, ludo_game_active):
+    # Multiple users: some expired, some fresh
+    u_exp = create_funded_user(db, "u_exp@match.com")
+    u_fresh1 = create_funded_user(db, "u_fresh1@match.com")
+    u_fresh2 = create_funded_user(db, "u_fresh2@match.com")
+    
+    svc = LudoMatchmakingService(db)
+    
+    svc.join_queue(u_exp.id, 2, 1000)
+    q_exp = db.query(LudoMatchmakingQueue).filter(LudoMatchmakingQueue.user_id == u_exp.id).first()
+    q_exp.queued_at = datetime.now(timezone.utc) - timedelta(seconds=35)
+    db.commit()
+    
+    svc.join_queue(u_fresh1.id, 2, 1000)
+    res_match = svc.join_queue(u_fresh2.id, 2, 1000)
+    
+    # Expired user must be cancelled and not included in match
+    db.refresh(q_exp)
+    assert q_exp.status == QueueStatus.CANCELLED
+    assert q_exp.match_id is None
+    
+    # Fresh users must form the match
+    assert res_match["status"] == "MATCH_FOUND"
+    match = db.query(LudoMatch).filter_by(id=res_match["match_id"]).first()
+    assert match is not None
+    matched_user_ids = {p.user_id for p in match.players}
+    assert u_exp.id not in matched_user_ids
+    assert u_fresh1.id in matched_user_ids
+    assert u_fresh2.id in matched_user_ids
+
+def test_two_player_fairness_and_geometry(db: Session):
+    # Verify board geometry: RED and YELLOW are diagonal opposites (26 steps apart on 52 track loop)
+    red_start = STARTS[LudoColor.RED]
+    yellow_start = STARTS[LudoColor.YELLOW]
+    assert (yellow_start - red_start) % 52 == 26
+    
+    # Verify dice randomness is independent of player color
+    rolls = [roll_dice() for _ in range(100)]
+    assert all(1 <= r <= 6 for r in rolls)
+    assert len(set(rolls)) == 6  # all outcomes 1-6 produced

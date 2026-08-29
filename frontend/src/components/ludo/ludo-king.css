@@ -1378,9 +1378,9 @@
 
   /* Dice below board: compact but ≥44px touch target */
   .ludo-dice-below-board {
-    height: 60px !important;
+    height: auto !important;
     min-height: 60px !important;
-    flex: 0 0 60px !important;
+    flex: 0 0 auto !important;
     margin: 3px 0 0 !important;
     overflow: visible !important;
   }
@@ -1420,9 +1420,9 @@
   }
 
   .ludo-dice-below-board {
-    height: 62px !important;
+    height: auto !important;
     min-height: 62px !important;
-    flex: 0 0 62px !important;
+    flex: 0 0 auto !important;
   }
 
   .ludo-dice-below-board .ludo-dice-cube {
@@ -1452,9 +1452,9 @@
   }
 
   .ludo-dice-below-board {
-    height: 65px !important;
+    height: auto !important;
     min-height: 65px !important;
-    flex: 0 0 65px !important;
+    flex: 0 0 auto !important;
   }
 
   .ludo-dice-below-board .ludo-dice-cube {
@@ -1483,9 +1483,9 @@
   }
 
   .ludo-dice-below-board {
-    height: 56px !important;
+    height: auto !important;
     min-height: 56px !important;
-    flex: 0 0 56px !important;
+    flex: 0 0 auto !important;
     margin: 2px 0 0 !important;
   }
 

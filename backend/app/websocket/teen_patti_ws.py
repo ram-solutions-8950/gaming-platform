@@ -373,6 +373,47 @@ def _settle_hand(table_id: str, hand: TeenPattiHand) -> None:
         hand_key = f"{table_id}:{_hand_number[table_id]}"
         s_seed_hash = server_seed_hash(hand.server_seed) if hand.server_seed else ""
 
+        # Enforce atomic savepoint transaction for all wallet entries in this deal
+        sp = db.begin_nested()
+        try:
+            for i, s in enumerate(hand.seats):
+                if _is_bot(s.id):
+                    continue
+                try:
+                    uid = uuid.UUID(str(s.id))
+                except ValueError:
+                    continue
+
+                won_this = (i == hand.winner_seat)
+                payout = hand.pot if won_this else 0
+
+                # Debit net stakes contributed by this user
+                if is_real and s.total_bet > 0:
+                    debit_wallet(
+                        db=db,
+                        user_id=uid,
+                        amount=s.total_bet,
+                        tx_type=WalletTransactionType.GAME_ENTRY,
+                        reference_type="TEEN_PATTI_STAKE",
+                        reference_id=f"tp_stake_{hand_key}_{s.id}",
+                    )
+
+                if is_real and won_this and payout > 0:
+                    credit_wallet(
+                        db=db,
+                        user_id=uid,
+                        amount=payout,
+                        tx_type=WalletTransactionType.GAME_WIN,
+                        reference_type="TEEN_PATTI_PAYOUT",
+                        reference_id=f"tp_payout_{hand_key}",
+                    )
+            sp.commit()
+        except Exception as e:
+            sp.rollback()
+            logger.error("TEEN_PATTI_SETTLEMENT_FAILED: table_id=%s hand=%d error=%s. Rollback wallet changes.", table_id, _hand_number[table_id], str(e))
+            raise
+
+        # Store hand records
         for i, s in enumerate(hand.seats):
             if _is_bot(s.id):
                 continue
@@ -384,31 +425,6 @@ def _settle_hand(table_id: str, hand: TeenPattiHand) -> None:
             won_this = (i == hand.winner_seat)
             payout = hand.pot if won_this else 0
 
-            # Debit net stakes contributed by this user
-            if is_real and s.total_bet > 0:
-                try:
-                    debit_wallet(
-                        db=db,
-                        user_id=uid,
-                        amount=s.total_bet,
-                        tx_type=WalletTransactionType.GAME_ENTRY,
-                        reference_type="TEEN_PATTI_STAKE",
-                        reference_id=f"tp_stake_{hand_key}_{s.id}",
-                    )
-                except ValueError:
-                    pass
-
-            if is_real and won_this and payout > 0:
-                credit_wallet(
-                    db=db,
-                    user_id=uid,
-                    amount=payout,
-                    tx_type=WalletTransactionType.GAME_WIN,
-                    reference_type="TEEN_PATTI_PAYOUT",
-                    reference_id=f"tp_payout_{hand_key}",
-                )
-
-            # Store hand record
             db.add(TeenPattiHandHistory(
                 user_id=uid,
                 table_id=table.id,
@@ -458,6 +474,15 @@ async def teen_patti_socket(websocket: WebSocket, table_id: str) -> None:
         return
     user_id, username = auth
 
+    # Check player balance for real money tables
+    cfg, mode = _load_config(table_id)
+    if mode == "real":
+        with _get_db_session() as db:
+            wallet = get_balance(db, uuid.UUID(user_id))
+            if not wallet or wallet.balance < cfg.boot_amount:
+                await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+                return
+
     _seat_and_kick_off(table_id, user_id, username)
     await manager.connect(table_id, user_id, websocket)
     await manager.send_to_user(table_id, user_id, {"type": "event", "event": "joined"})
@@ -486,16 +511,52 @@ async def _handle_action(table_id: str, user_id: str, msg: dict) -> None:
         await _broadcast_state(table_id)
         return
 
+    # Check table mode
+    _, mode = _load_config(table_id)
+    is_real = (mode == "real")
+
     try:
         if action == "see":
             hand.see(user_id)
         elif action == "bet":
-            hand.bet(user_id, raise_=bool(msg.get("raise", False)))
+            is_raise = bool(msg.get("raise", False))
+            seat_idx = hand._seat_index(user_id)
+            if seat_idx is not None and is_real:
+                seat = hand.seats[seat_idx]
+                mult = 2 if seat.seen else 1
+                next_stake = hand.current_stake * 2 if is_raise else hand.current_stake
+                if hand.config.max_stake and next_stake > hand.config.max_stake:
+                    next_stake = hand.config.max_stake
+                bet_cost = next_stake * mult
+
+                with _get_db_session() as db:
+                    wallet = get_balance(db, uuid.UUID(user_id))
+                    if not wallet or wallet.balance < (seat.total_bet + bet_cost):
+                        await manager.send_to_user(table_id, user_id, {"type": "error", "message": "Insufficient balance to place bet"})
+                        hand.pack(user_id)
+                        await _broadcast_state(table_id)
+                        await _after_action(table_id)
+                        return
+
+            hand.bet(user_id, raise_=is_raise)
         elif action == "pack":
             hand.pack(user_id)
         elif action == "show":
             hand.show(user_id)
         elif action == "side_show":
+            seat_idx = hand._seat_index(user_id)
+            if seat_idx is not None and is_real:
+                seat = hand.seats[seat_idx]
+                cost = hand.current_stake * 2
+                with _get_db_session() as db:
+                    wallet = get_balance(db, uuid.UUID(user_id))
+                    if not wallet or wallet.balance < (seat.total_bet + cost):
+                        await manager.send_to_user(table_id, user_id, {"type": "error", "message": "Insufficient balance to request side show"})
+                        hand.pack(user_id)
+                        await _broadcast_state(table_id)
+                        await _after_action(table_id)
+                        return
+
             target_idx = hand.prev_seen_seat_index(hand._seat_index(user_id))
             if target_idx is None:
                 await manager.send_to_user(table_id, user_id,

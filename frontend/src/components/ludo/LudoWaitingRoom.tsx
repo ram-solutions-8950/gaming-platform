@@ -234,6 +234,11 @@ export const LudoWaitingRoom: React.FC = () => {
               <p className="mt-1 text-[11px] sm:text-xs font-bold text-[#fdd835]">
                 {matchmakingStatus.players_found} / {matchmakingStatus.players_required || matchmakingStatus.player_count}
               </p>
+              {matchmakingStatus.seconds_left !== undefined && (
+                <p className="mt-1 text-[11px] sm:text-xs font-semibold text-white/80">
+                  Time remaining: <span className="font-bold text-[#fdd835]">{matchmakingStatus.seconds_left}s</span>
+                </p>
+              )}
               <button
                 type="button"
                 onClick={() => cancelMatchmaking()}

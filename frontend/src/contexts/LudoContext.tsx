@@ -12,6 +12,7 @@ interface MatchmakingStatus {
   players_found: number;
   players_required?: number;
   match_id?: string;
+  seconds_left?: number;
 }
 
 interface LudoContextState {
@@ -257,9 +258,30 @@ export const LudoProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       setError(null);
       await ludoService.claimTimeout(match.id);
+      // Timeout claim succeeded — server advanced the turn.
+      // Refresh to get new state with updated turn_started_at.
       await refreshState();
     } catch (err: any) {
-      setError(err.response?.data?.detail || err.message || 'Failed to claim timeout');
+      // Expected race-condition errors (another client already
+      // claimed, or turn hasn't actually expired yet on server).
+      // Silently ignore these — the state will update via
+      // WebSocket broadcast from the winning claim.
+      const detail = err.response?.data?.detail || err.message || '';
+      const isExpectedRace =
+        detail.includes('not timed out') ||
+        detail.includes('Not your turn') ||
+        detail.includes('not in progress') ||
+        detail.includes('Turn timer initialized');
+
+      if (!isExpectedRace) {
+        setError(detail || 'Failed to claim timeout');
+      }
+      // In all cases, refresh to sync with server state.
+      try {
+        await refreshState();
+      } catch {
+        // ignore refresh errors
+      }
     }
   };
 

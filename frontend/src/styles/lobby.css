@@ -1026,7 +1026,7 @@
    LANDSCAPE TABLETS
    ========================================================= */
 
-@media (orientation: landscape) and (min-width: 768px) and (max-height: 900px) {
+@media (orientation: landscape) and (min-width: 768px) and (max-width: 1023px) and (max-height: 900px) {
 
   .game-lobby__content {
     width: 100%;
@@ -2098,11 +2098,6 @@
   filter: saturate(1.16) brightness(1.08);
 }
 
-/* Pink / Colour Prediction */
-.game-card:nth-child(3) {
-  filter: saturate(1.18) brightness(1.08);
-}
-
 /* Orange / Dragon Tiger */
 .game-card:nth-child(4) {
   filter: saturate(1.18) brightness(1.08);
@@ -2723,68 +2718,21 @@
 }
 
 
-/* COLOUR PREDICTION */
-.game-card:nth-child(3) {
-
-  background:
-    linear-gradient(145deg,
-      #ff43a4 0%,
-      #ed187d 50%,
-      #b90c62 100%);
-
-  border-color: #ffd34e !important;
-}
-
-
-/* DRAGON TIGER */
-.game-card:nth-child(4) {
-
-  background:
-    linear-gradient(145deg,
-      #ff8a24 0%,
-      #f04c09 55%,
-      #c72e00 100%);
-
-  border-color: #ffd84d !important;
-}
-
-
-/* RUMMY */
-.game-card:nth-child(5) {
-
-  background:
-    linear-gradient(145deg,
-      #32c6c8 0%,
-      #079b9e 55%,
-      #056e79 100%);
-
-  border-color: #ffd94c !important;
-}
-
-
 /* =========================================================
-   LUDO + COLOUR PREDICTION SPECIAL ANIMATION
+   LUDO SPECIAL ANIMATION
    ========================================================= */
 
-.game-card:nth-child(2),
-.game-card:nth-child(3) {
+.game-card:nth-child(2) {
 
   animation:
     featuredCardPulse 2.8s ease-in-out infinite;
 }
 
 
-/* Ludo slightly different timing */
+/* Ludo timing */
 
 .game-card:nth-child(2) {
   animation-delay: 0s;
-}
-
-
-/* Colour Prediction */
-
-.game-card:nth-child(3) {
-  animation-delay: -1.4s;
 }
 
 
@@ -2796,17 +2744,6 @@
 
   box-shadow:
     inset 0 0 20px rgba(75, 145, 255, .45);
-}
-
-
-/* =========================================================
-   COLOUR PREDICTION GLOW
-   ========================================================= */
-
-.game-card:nth-child(3)::before {
-
-  box-shadow:
-    inset 0 0 20px rgba(255, 75, 170, .45);
 }
 
 
@@ -2893,7 +2830,7 @@
 
 /* =========================================================
    FEATURED CARD PULSE
-   Only Ludo + Colour Prediction
+   Only Ludo
    ========================================================= */
 
 @keyframes featuredCardPulse {
@@ -4054,191 +3991,10 @@
 }
 
 /* =========================================================
-   COLOUR PREDICTION
-   ========================================================= */
-
-.game-card--colour-prediction {
-  background:
-    radial-gradient(circle at 50% 42%,
-      rgba(255, 126, 219, 0.55),
-      transparent 45%),
-    linear-gradient(145deg,
-      #ff4da8,
-      #d62b91 42%,
-      #8c36d5 100%) !important;
-
-  border: 2px solid rgba(255, 205, 246, 0.72);
-
-  box-shadow:
-    0 12px 35px rgba(151, 24, 132, 0.5),
-    0 0 22px rgba(255, 82, 194, 0.35),
-    inset 0 1px 0 rgba(255, 255, 255, 0.5);
-}
-
-.colour-card-art {
-  position: absolute;
-  z-index: 3;
-  left: 50%;
-  top: 46%;
-  width: 120px;
-  height: 100px;
-  transform: translate(-50%, -50%);
-  pointer-events: none;
-}
-
-.colour-orbit {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  border-radius: 50%;
-  transform: translate(-50%, -50%);
-  border-style: solid;
-}
-
-.colour-orbit--outer {
-  width: 86px;
-  height: 86px;
-  border-width: 3px;
-  border-color:
-    #ff4b65 #ffd53e #3ee27b #4ca9ff;
-  animation: colour-orbit-spin 4s linear infinite;
-}
-
-.colour-orbit--inner {
-  width: 60px;
-  height: 60px;
-  border-width: 3px;
-  border-color:
-    #8a45ff #ff54b8 #ffe04c #44e7a0;
-  animation: colour-orbit-spin-reverse 3s linear infinite;
-}
-
-@keyframes colour-orbit-spin {
-  to {
-    transform: translate(-50%, -50%) rotate(360deg);
-  }
-}
-
-@keyframes colour-orbit-spin-reverse {
-  to {
-    transform: translate(-50%, -50%) rotate(-360deg);
-  }
-}
-
-.colour-ball {
-  position: absolute;
-  width: 17px;
-  height: 17px;
-  border-radius: 50%;
-  border: 2px solid rgba(255, 255, 255, 0.75);
-  box-shadow:
-    0 0 10px currentColor,
-    inset 2px 2px 4px rgba(255, 255, 255, 0.65);
-  animation: colour-ball-pulse 1.8s ease-in-out infinite;
-}
-
-.colour-ball--red {
-  left: 18px;
-  top: 41px;
-  background: #ff354f;
-  color: #ff354f;
-}
-
-.colour-ball--green {
-  right: 18px;
-  top: 41px;
-  background: #35e675;
-  color: #35e675;
-  animation-delay: 0.35s;
-}
-
-.colour-ball--yellow {
-  left: 51px;
-  top: 10px;
-  background: #ffe345;
-  color: #ffe345;
-  animation-delay: 0.7s;
-}
-
-.colour-ball--blue {
-  left: 51px;
-  bottom: 7px;
-  background: #4ba7ff;
-  color: #4ba7ff;
-  animation-delay: 1.05s;
-}
-
-@keyframes colour-ball-pulse {
-
-  0%,
-  100% {
-    transform: scale(0.85);
-  }
-
-  50% {
-    transform: scale(1.15);
-  }
-}
-
-.colour-rainbow {
-  position: absolute;
-  z-index: 5;
-  left: 50%;
-  top: 50%;
-  width: 47px;
-  height: 30px;
-  transform: translate(-50%, -50%);
-  border-radius: 30px 30px 0 0;
-  overflow: hidden;
-  border-top: 5px solid #ff3b68;
-  border-left: 5px solid #ffbd35;
-  border-right: 5px solid #4de583;
-  box-shadow: 0 0 15px rgba(255, 255, 255, 0.5);
-  animation: rainbow-float 2s ease-in-out infinite;
-}
-
-@keyframes rainbow-float {
-
-  0%,
-  100% {
-    transform: translate(-50%, -50%) translateY(0);
-  }
-
-  50% {
-    transform: translate(-50%, -50%) translateY(-6px);
-  }
-}
-
-.game-card--colour-prediction .game-card__info {
-  position: relative;
-  z-index: 12;
-  text-shadow: 0 2px 5px rgba(80, 0, 70, 0.65);
-}
-
-.game-card--colour-prediction .game-badge--new {
-  z-index: 15;
-  animation: new-badge-pulse 1.8s ease-in-out infinite;
-}
-
-@keyframes new-badge-pulse {
-
-  0%,
-  100% {
-    transform: scale(1);
-    box-shadow: 0 0 5px rgba(75, 255, 170, 0.3);
-  }
-
-  50% {
-    transform: scale(1.08);
-    box-shadow: 0 0 14px rgba(75, 255, 170, 0.75);
-  }
-}
-
-/* =========================================================
    OTHER CARDS - CLIENT STYLE BRIGHTNESS
    ========================================================= */
 
-.game-card:not(.game-card--ludo):not(.game-card--colour-prediction)::before {
+.game-card:not(.game-card--ludo)::before {
   content: '';
   position: absolute;
   inset: 0;
@@ -4252,8 +4008,8 @@
       rgba(255, 255, 255, 0.08));
 }
 
-.game-card:not(.game-card--ludo):not(.game-card--colour-prediction):not(.game-card--aviator):not(.game-card--dragon-tiger):not(.game-card--andar-bahar):not(.game-card--roulette) .game-card__icon,
-.game-card:not(.game-card--ludo):not(.game-card--colour-prediction):not(.game-card--aviator):not(.game-card--dragon-tiger):not(.game-card--andar-bahar):not(.game-card--roulette) .game-card__info {
+.game-card:not(.game-card--ludo):not(.game-card--aviator):not(.game-card--dragon-tiger):not(.game-card--andar-bahar):not(.game-card--roulette) .game-card__icon,
+.game-card:not(.game-card--ludo):not(.game-card--aviator):not(.game-card--dragon-tiger):not(.game-card--andar-bahar):not(.game-card--roulette) .game-card__info {
   position: relative;
   z-index: 4;
 }
@@ -5039,11 +4795,7 @@
   .ludo-pawn,
   .ludo-spark,
   .game-card--ludo::after,
-  .game-card--ludo .game-badge--hot,
-  .colour-orbit,
-  .colour-ball,
-  .colour-rainbow,
-  .game-card--colour-prediction .game-badge--new {
+  .game-card--ludo .game-badge--hot {
     animation: none !important;
     transition: none !important;
   }
@@ -5642,13 +5394,9 @@
     right: 2px !important;
   }
 
-  /* Scale Ludo and Colour Prediction Artworks */
+  /* Scale Ludo Artwork */
   .ludo-card-art {
     transform: translate(-50%, -50%) scale(0.5) !important;
-  }
-
-  .colour-card-art {
-    transform: translate(-50%, -50%) scale(0.55) !important;
   }
 
   /* Compact Fixed Bottom Navigation (~48px) */

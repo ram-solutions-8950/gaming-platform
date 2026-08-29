@@ -30,6 +30,7 @@ class LudoMatchSchema(BaseModel):
     current_turn_color: Optional[LudoColor]
     last_dice_roll: Optional[int]
     turn_timeout_seconds: int
+    turn_started_at: Optional[datetime] = None
     version: int
     entry_fee: int
     prize_pool: int
@@ -72,3 +73,4 @@ class MatchmakingStatusResponse(BaseModel):
     players_found: int
     players_required: Optional[int] = None
     match_id: Optional[str] = None
+    seconds_left: Optional[int] = None

@@ -1,3 +1,4 @@
+import uuid
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
@@ -146,7 +147,7 @@ def join_poker_table(
                 amount=req.buy_in_amount,
                 tx_type=WalletTransactionType.GAME_ENTRY,
                 reference_type="poker_buyin",
-                reference_id=f"{table.id}_{current_user.id}_{int(db.query(PokerPlayer).count())}"
+                reference_id=f"poker_buyin_{uuid.uuid4()}"
             )
             db.commit()
         except ValueError as e:
@@ -167,7 +168,7 @@ def join_poker_table(
                 amount=req.buy_in_amount,
                 tx_type=WalletTransactionType.REFUND,
                 reference_type="poker_refund",
-                reference_id=f"{table.id}_{current_user.id}_{int(db.query(PokerPlayer).count())}"
+                reference_id=f"poker_refund_{uuid.uuid4()}"
             )
             db.commit()
         raise HTTPException(status_code=400, detail=msg)
@@ -206,7 +207,7 @@ def leave_poker_table(
             amount=remaining_stack,
             tx_type=WalletTransactionType.GAME_WIN,
             reference_type="poker_leave",
-            reference_id=f"{table.id}_{current_user.id}_{remaining_stack}"
+            reference_id=f"poker_leave_{uuid.uuid4()}"
         )
         db.commit()
 

@@ -14,7 +14,7 @@ export function GameCatalogPage() {
     const fetchGames = async () => {
       try {
         const data = await gameService.getCatalog();
-        setGames(data);
+        setGames(data.filter((g: any) => g.slug !== 'colour-prediction'));
       } catch (e: any) {
         console.error('Failed to load games', e);
       } finally {
@@ -25,10 +25,6 @@ export function GameCatalogPage() {
   }, []);
 
   const handlePlay = (slug: string) => {
-    if (slug === 'colour-prediction') {
-      navigate('/games');
-      return;
-    }
     navigate(`/games/${slug}`);
   };
 

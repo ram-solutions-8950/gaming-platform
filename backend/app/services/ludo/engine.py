@@ -14,7 +14,7 @@ from ...models.idempotency import IdempotencyKey
 from ...models.game_catalog import Game
 from ...models.transaction import WalletTransactionType
 
-from ..wallet_service import debit_wallet, credit_wallet
+from ..wallet_service import debit_wallet, credit_wallet, get_balance
 
 from .board import get_next_position
 from .dice import roll_dice
@@ -238,10 +238,15 @@ class LudoEngine:
         ):
 
             # ---------------------------------------------
-            # Debit entry fee
+            # Debit entry fee (with upfront balance check)
             # ---------------------------------------------
 
             if match.entry_fee > 0:
+
+                for p in match.players:
+                    w = get_balance(self.db, p.user_id)
+                    if not w or w.balance < match.entry_fee:
+                        raise ValueError("Insufficient balance")
 
                 for p in match.players:
 
@@ -476,6 +481,7 @@ class LudoEngine:
             )
 
         token.position = target_pos
+        player.consecutive_timeouts = 0
 
         if target_pos == 57:
             token.is_home = True
@@ -767,8 +773,8 @@ class LudoEngine:
             or 30
         )
 
-        # 2 seconds grace period
-        if diff < timeout_seconds + 2:
+        # Check timeout threshold
+        if diff < timeout_seconds:
 
             raise ValueError(
                 "Turn has not timed out yet"
@@ -791,16 +797,7 @@ class LudoEngine:
 
         if timeout_count >= 3:
 
-            existing_ranks = [
-                p.rank
-                for p in match.players
-                if p.rank is not None
-            ]
-
-            current_player.rank = (
-                max(existing_ranks, default=0)
-                + 1
-            )
+            current_player.rank = len(match.players)
 
             current_player.finished_at = (
                 datetime.now(timezone.utc)

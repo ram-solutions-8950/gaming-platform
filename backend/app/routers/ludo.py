@@ -65,6 +65,10 @@ def set_ready(match_id: uuid.UUID, db: Session = Depends(get_db), current_user: 
             
         return match
     except ValueError as e:
+        from ..models.ludo import LudoMatch, LudoMatchStatus
+        match_obj = db.query(LudoMatch).filter(LudoMatch.id == match_id).first()
+        if match_obj and match_obj.status == LudoMatchStatus.CANCELLED:
+            ludo_ws_manager.broadcast_to_match(match_id, {"type": "MATCH_CANCELLED", "data": {"reason": str(e)}})
         raise HTTPException(status_code=400, detail=str(e))
 
 @router.post("/match/{match_id}/roll")

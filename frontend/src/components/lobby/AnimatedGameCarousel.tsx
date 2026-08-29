@@ -37,16 +37,6 @@ const isLudoGame = (game: GameCardData) => {
   return value.includes('ludo');
 };
 
-const isColourPredictionGame = (game: GameCardData) => {
-  const value = `${game.id} ${game.name} ${game.path}`.toLowerCase();
-
-  return (
-    value.includes('colour') ||
-    value.includes('color') ||
-    value.includes('prediction')
-  );
-};
-
 const isAviatorGame = (game: GameCardData) => {
   const value = `${game.id} ${game.name} ${game.path}`.toLowerCase();
   return value.includes('aviator') || value.includes('crash');
@@ -305,28 +295,6 @@ const LudoAnimatedArtwork: React.FC = () => {
   );
 };
 
-/* ─── Colour Prediction Artwork ─── */
-const ColourPredictionArtwork: React.FC = () => {
-  return (
-    <div className="colour-card-art" aria-hidden="true">
-      <div className="colour-orbit colour-orbit--outer" />
-      <div className="colour-orbit colour-orbit--inner" />
-
-      <div className="colour-ball colour-ball--red" />
-      <div className="colour-ball colour-ball--green" />
-      <div className="colour-ball colour-ball--yellow" />
-      <div className="colour-ball colour-ball--blue" />
-
-      <div className="colour-rainbow">
-        <span />
-        <span />
-        <span />
-        <span />
-      </div>
-    </div>
-  );
-};
-
 /* ─── Component ─── */
 export const AnimatedGameCarousel: React.FC<Props> = ({
   sets,
@@ -398,7 +366,6 @@ export const AnimatedGameCarousel: React.FC<Props> = ({
         <div className="game-carousel-grid">
           {currentSet.games.map((game) => {
             const ludo = isLudoGame(game);
-            const colourPrediction = isColourPredictionGame(game);
             const aviator = isAviatorGame(game);
             const dragonTiger = isDragonTigerGame(game);
             const andarBahar = isAndarBaharGame(game);
@@ -412,33 +379,30 @@ export const AnimatedGameCarousel: React.FC<Props> = ({
 
             const cardTypeClass = ludo
               ? 'game-card--ludo'
-              : colourPrediction
-                ? 'game-card--colour-prediction'
-                : aviator
-                  ? 'game-card--aviator'
-                  : dragonTiger
-                    ? 'game-card--dragon-tiger'
-                    : andarBahar
-                      ? 'game-card--andar-bahar'
-                      : roulette
-                        ? 'game-card--roulette'
-                        : chickenRoad
-                          ? 'game-card--chicken-road'
-                          : triple777
-                            ? 'game-card--triple-777'
-                            : poker
-                              ? 'game-card--poker'
-                              : teenPatti
-                                ? 'game-card--teen-patti'
-                                : baccarat
-                                  ? 'game-card--baccarat'
-                                  : cardGame
-                                    ? 'game-card--casino-card'
-                                    : '';
+              : aviator
+                ? 'game-card--aviator'
+                : dragonTiger
+                  ? 'game-card--dragon-tiger'
+                  : andarBahar
+                    ? 'game-card--andar-bahar'
+                    : roulette
+                      ? 'game-card--roulette'
+                      : chickenRoad
+                        ? 'game-card--chicken-road'
+                        : triple777
+                          ? 'game-card--triple-777'
+                          : poker
+                            ? 'game-card--poker'
+                            : teenPatti
+                              ? 'game-card--teen-patti'
+                              : baccarat
+                                ? 'game-card--baccarat'
+                                : cardGame
+                                  ? 'game-card--casino-card'
+                                  : '';
 
             const hasCustomArtwork =
               ludo ||
-              colourPrediction ||
               aviator ||
               dragonTiger ||
               andarBahar ||
@@ -485,9 +449,6 @@ export const AnimatedGameCarousel: React.FC<Props> = ({
 
                   {/* Ludo-specific artwork */}
                   {ludo && <LudoAnimatedArtwork />}
-
-                  {/* Colour Prediction artwork */}
-                  {colourPrediction && <ColourPredictionArtwork />}
 
                   {/* Aviator-specific 3D artwork */}
                   {aviator && <AviatorAnimatedArtwork />}
