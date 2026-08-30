@@ -11,6 +11,7 @@ import { soundManager } from '../../services/triple777/soundManager';
 import { haptics } from '../../services/triple777/haptics';
 import { REEL_STOPS_MS, REVEAL_BUFFER_MS, spinPace } from '../../services/triple777/spinTiming';
 import triple777Logo from '../../assets/triple-777-logo.png';
+import { setNativePortrait, setNativeLandscape } from '../../utils/nativeOrientation';
 import '../../styles/triple-777.css';
 
 const QUICK_MULTIPLIERS = [1, 2, 5, 10];
@@ -27,7 +28,7 @@ export function Triple777Page() {
   const navigate = useNavigate();
 
   // Orientation State
-  const [isMobileLandscape, setIsMobileLandscape] = useState<boolean>(() => checkIsMobileLandscape());
+  const [isMobileLandscape, setIsMobileLandscape] = useState<boolean>(false);
 
   // Game States
   const [config, setConfig] = useState<api.Triple777Config | null>(null);
@@ -60,19 +61,60 @@ export function Triple777Page() {
   const symbols = config?.symbols ?? ['7', 'BAR', 'CHERRY', 'LEMON', 'BELL', 'STAR', 'COIN'];
 
   const spinLockRef = useRef(false);
+  const userDismissedBlockerRef = useRef(false);
 
-  // 1. Attempt Screen Orientation Lock & Synchronize Orientation Listener
-  useEffect(() => {
+  // Orientation Lock Helpers (Scoped strictly to Triple 777 via Android Native Activity & Bridge)
+  const requestPortraitLock = async (): Promise<boolean> => {
     try {
-      if (window.screen?.orientation && typeof (window.screen.orientation as any).lock === 'function') {
-        (window.screen.orientation as any).lock('portrait-primary').catch(() => {});
-      }
+      await setNativePortrait();
+      setIsMobileLandscape(false);
+      userDismissedBlockerRef.current = true;
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  const restoreLandscapeLock = () => {
+    try {
+      setNativeLandscape().catch(() => {});
     } catch {
       // Ignored
     }
+  };
+
+  const handleExitToLobby = () => {
+    restoreLandscapeLock();
+    navigate('/dashboard');
+  };
+
+  const handleRotateToPortrait = async () => {
+    userDismissedBlockerRef.current = true;
+    await requestPortraitLock();
+    // Dismiss blocker and show full-viewport game directly
+    setIsMobileLandscape(false);
+  };
+
+  // 1. Attempt Screen Orientation Lock & Synchronize Orientation Listener
+  useEffect(() => {
+    const initOrientation = async () => {
+      const locked = await requestPortraitLock();
+      if (!locked && checkIsMobileLandscape() && !userDismissedBlockerRef.current) {
+        setIsMobileLandscape(true);
+      } else {
+        setIsMobileLandscape(false);
+      }
+    };
+
+    initOrientation();
 
     const updateOrientation = () => {
-      setIsMobileLandscape(checkIsMobileLandscape());
+      const isPortraitNow = window.innerHeight >= window.innerWidth;
+      if (isPortraitNow) {
+        setIsMobileLandscape(false);
+      } else if (!userDismissedBlockerRef.current && checkIsMobileLandscape()) {
+        setIsMobileLandscape(true);
+      }
     };
 
     window.addEventListener('resize', updateOrientation, { passive: true });
@@ -83,6 +125,9 @@ export function Triple777Page() {
     }
 
     return () => {
+      // Restore application's original orientation (LANDSCAPE) on unmount/leave
+      restoreLandscapeLock();
+
       window.removeEventListener('resize', updateOrientation);
       window.removeEventListener('orientationchange', updateOrientation);
       if (window.screen?.orientation) {
@@ -241,14 +286,19 @@ export function Triple777Page() {
             Triple 777 is designed exclusively for portrait mode.
           </p>
 
-          <div className="t777-blocker-badge">
-            <RotateCw size={14} className="text-amber-400 animate-spin" />
+          <button
+            type="button"
+            onClick={handleRotateToPortrait}
+            className="t777-blocker-badge"
+            style={{ cursor: 'pointer', background: 'rgba(255, 255, 255, 0.12)', border: '1px solid rgba(251, 191, 36, 0.4)' }}
+          >
+            <RotateCw size={14} className="text-amber-400" />
             <span>Rotate to portrait</span>
-          </div>
+          </button>
 
           <button
             type="button"
-            onClick={() => navigate('/dashboard')}
+            onClick={handleExitToLobby}
             className="mt-3 px-4 py-1.5 bg-white/10 hover:bg-white/20 text-white rounded-lg text-xs font-bold border border-white/20 transition flex items-center gap-1.5 cursor-pointer"
           >
             <ArrowLeft size={14} /> Exit to Lobby
@@ -263,7 +313,7 @@ export function Triple777Page() {
           <button
             type="button"
             disabled={spinning}
-            onClick={() => navigate('/dashboard')}
+            onClick={handleExitToLobby}
             className="t777-header-back-btn"
             aria-label="Back to Dashboard"
           >

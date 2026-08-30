@@ -23,6 +23,7 @@ export function UserLayout() {
   const [wallet, setWallet] = useState<Wallet | null>(null);
 
   const isDashboard = location.pathname === '/dashboard';
+  const isLudo = location.pathname === '/games/ludo';
 
   useEffect(() => {
     walletService.getWallet().then(setWallet).catch(() => {});
@@ -111,19 +112,19 @@ export function UserLayout() {
       </aside>
 
       {/* ─── MOBILE SHELL & MAIN CONTENT ─── */}
-      <div className="flex-1 min-w-0 min-h-0 flex flex-col overflow-x-hidden z-10 relative h-dvh max-h-dvh">
+      <div className={`flex-1 min-w-0 min-h-0 flex flex-col overflow-x-hidden z-10 relative h-dvh max-h-dvh ${isLudo ? 'is-ludo-page' : ''}`}>
         {/* Mobile Header */}
         <div className="2xl:hidden shrink-0 z-30">
           <LobbyHeader user={user} wallet={wallet} />
         </div>
 
         <main className={
-          isDashboard
+          isDashboard || isLudo
             ? "flex-1 min-h-0 min-w-0 relative overflow-hidden flex flex-col"
             : "flex-1 min-h-0 min-w-0 relative overflow-y-auto overflow-x-hidden"
         }>
           <div className={
-            isDashboard
+            isDashboard || isLudo
               ? "h-full w-full p-0 flex flex-col flex-1 min-h-0"
               : "min-h-full w-full max-w-7xl mx-auto p-3 sm:p-5 lg:p-8"
           }>

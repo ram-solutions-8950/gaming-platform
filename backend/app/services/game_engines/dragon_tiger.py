@@ -11,6 +11,7 @@ from uuid import UUID
 
 from sqlalchemy import select, func
 from sqlalchemy.orm import Session
+from sqlalchemy.orm.attributes import flag_modified
 
 from .base import GameEngine
 from .dragon_tiger_cards import determine_result, draw_cards
@@ -20,10 +21,10 @@ from ...models.game_catalog import Game, GameStatus
 from ...models.transaction import WalletTransactionType
 from ...services.wallet_service import debit_wallet, credit_wallet
 
-# Demo-only defaults. Admin/client may override via Game.config / min_bet / max_bet.
+# Authoritative defaults: 15-second betting window + 10-second calculation/animation = 25s total round
 DEFAULT_CONFIG = {
-    "round_duration_seconds": 60,
-    "betting_duration_seconds": 50,
+    "round_duration_seconds": 25,
+    "betting_duration_seconds": 15,
     "allowed_bets": {"dragon": True, "tiger": True, "tie": True},
     "payouts": {"dragon": 1.0, "tiger": 1.0, "tie": 11.0},
     "deck": {"type": "STANDARD_52_CARD", "cards_per_round": 2},
@@ -102,6 +103,15 @@ class DragonTigerEngine(GameEngine):
         if game:
             if game.config is None:
                 game.config = copy.deepcopy(DEFAULT_CONFIG)
+                flag_modified(game, "config")
+                db.commit()
+                db.refresh(game)
+            elif game.config.get("betting_duration_seconds") != 15 or game.config.get("round_duration_seconds") != 25:
+                cfg = copy.deepcopy(game.config)
+                cfg["betting_duration_seconds"] = 15
+                cfg["round_duration_seconds"] = 25
+                game.config = cfg
+                flag_modified(game, "config")
                 db.commit()
                 db.refresh(game)
             return game

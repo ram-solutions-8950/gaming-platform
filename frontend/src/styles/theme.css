@@ -811,3 +811,367 @@ html, body {
   min-width: 44px;
   min-height: 44px;
 }
+
+/* ── Ludo Responsive Lobby & Viewport ── */
+.ludo-page-container {
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  -webkit-overflow-scrolling: touch !important;
+  box-sizing: border-box !important;
+}
+
+.ludo-lobby-wrapper {
+  width: 100% !important;
+  max-width: 520px !important;
+  margin: auto !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  box-sizing: border-box !important;
+}
+
+/* ── Ludo Mobile Landscape Viewport (Single Screen, No Scroll) ── */
+@media (orientation: landscape) and (max-height: 600px) {
+  .ludo-page-container {
+    height: 100% !important;
+    max-height: 100% !important;
+    overflow: hidden !important;
+    padding-top: 2px !important;
+    padding-bottom: 2px !important;
+    padding-left: max(env(safe-area-inset-left, 0px), 8px) !important;
+    padding-right: max(env(safe-area-inset-right, 0px), 8px) !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+
+  .ludo-lobby-wrapper {
+    height: 100% !important;
+    max-height: 100% !important;
+    margin: auto !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+
+  .ludo-lobby-card {
+    max-width: 560px !important;
+    padding: 8px 16px !important;
+    gap: 5px !important;
+    border-radius: 18px !important;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4) !important;
+  }
+
+  .ludo-lobby-header {
+    padding-bottom: 4px !important;
+  }
+
+  .ludo-lobby-title {
+    font-size: 17px !important;
+    line-height: 1.1 !important;
+  }
+
+  .ludo-lobby-subtitle {
+    font-size: 9.5px !important;
+    line-height: 1.1 !important;
+  }
+
+  .ludo-balance-lbl {
+    font-size: 8.5px !important;
+  }
+
+  .ludo-balance-val {
+    font-size: 13px !important;
+  }
+
+  .ludo-section-label {
+    font-size: 9.5px !important;
+    margin-bottom: 2px !important;
+  }
+
+  .ludo-match-grid {
+    gap: 8px !important;
+  }
+
+  .ludo-match-btn {
+    padding: 4px 8px !important;
+    border-radius: 12px !important;
+    gap: 2px !important;
+  }
+
+  .ludo-match-icon {
+    font-size: 16px !important;
+    line-height: 1 !important;
+  }
+
+  .ludo-match-title {
+    font-size: 12px !important;
+    line-height: 1.1 !important;
+  }
+
+  .ludo-match-sub {
+    font-size: 9.5px !important;
+    line-height: 1 !important;
+  }
+
+  .ludo-tier-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    gap: 6px !important;
+  }
+
+  .ludo-tier-btn {
+    padding: 3px 6px !important;
+    border-radius: 10px !important;
+  }
+
+  .ludo-tier-badge {
+    font-size: 7px !important;
+    top: -5px !important;
+    padding: 0.5px 3.5px !important;
+  }
+
+  .ludo-tier-amount {
+    font-size: 13px !important;
+    line-height: 1.1 !important;
+  }
+
+  .ludo-tier-sub {
+    font-size: 8.5px !important;
+    line-height: 1 !important;
+  }
+
+  .ludo-find-btn {
+    padding: 6px 12px !important;
+    font-size: 12.5px !important;
+    border-radius: 12px !important;
+    letter-spacing: 0.5px !important;
+  }
+
+  /* ── LUDO ACTIVE GAME: Single-Screen Mobile Landscape ── */
+  .is-ludo-page {
+    overflow: hidden !important;
+  }
+
+  .is-ludo-page .lobby-header {
+    height: 38px !important;
+    min-height: 38px !important;
+    padding-top: max(env(safe-area-inset-top, 0px), 1px) !important;
+    padding-bottom: 1px !important;
+    border-bottom: 1px solid rgba(168, 85, 247, 0.25) !important;
+  }
+
+  .is-ludo-page .lobby-bottom-nav.client-style-nav {
+    height: 36px !important;
+    min-height: 36px !important;
+    max-height: 36px !important;
+    padding-bottom: max(env(safe-area-inset-bottom, 0px), 0px) !important;
+    border-top: 1px solid rgba(168, 85, 247, 0.25) !important;
+  }
+
+  .is-ludo-page .client-nav-item {
+    height: 32px !important;
+    padding: 0px 2px !important;
+    min-width: 30px !important;
+    max-width: 55px !important;
+  }
+
+  .is-ludo-page .client-nav-icon {
+    font-size: 11px !important;
+    width: 13px !important;
+    height: 13px !important;
+    margin-bottom: 0px !important;
+  }
+
+  .is-ludo-page .client-nav-label {
+    font-size: 6px !important;
+    line-height: 1 !important;
+  }
+
+  .is-ludo-page .ludo-page-container {
+    height: 100% !important;
+    max-height: 100% !important;
+    overflow: hidden !important;
+    padding: 2px 8px !important;
+    box-sizing: border-box !important;
+    justify-content: center !important;
+  }
+
+  /* Active Match Outer Container */
+  .ludo-active-match {
+    width: 100% !important;
+    height: 100% !important;
+    max-width: 100% !important;
+    max-height: 100% !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: space-between !important;
+    align-items: stretch !important;
+    gap: 3px !important;
+    min-height: 0 !important;
+    min-width: 0 !important;
+    overflow: hidden !important;
+    box-sizing: border-box !important;
+  }
+
+  /* Compact Active Match Header */
+  .ludo-active-match .ludo-game-header {
+    height: 32px !important;
+    min-height: 32px !important;
+    padding: 2px 10px !important;
+    border-radius: 8px !important;
+    margin: 0 !important;
+    flex-shrink: 0 !important;
+  }
+
+  .ludo-active-match .ludo-game-header h1 {
+    font-size: 13px !important;
+    line-height: 1 !important;
+  }
+
+  .ludo-active-match .ludo-game-header span {
+    font-size: 9px !important;
+  }
+
+  .ludo-active-match .ludo-game-header button {
+    padding: 2px 8px !important;
+    font-size: 10px !important;
+    border-radius: 6px !important;
+  }
+
+  /* Hide Portrait Sections */
+  .ludo-active-match .ludo-opponents-grid,
+  .ludo-active-match .ludo-my-player-wrapper {
+    display: none !important;
+  }
+
+  /* Middle Stage: Board + Side Controls */
+  .ludo-active-match .ludo-board-control-row {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: center !important;
+    flex: 1 1 0% !important;
+    min-height: 0 !important;
+    min-width: 0 !important;
+    gap: 8px !important;
+    overflow: hidden !important;
+    width: 100% !important;
+    height: calc(100% - 36px) !important;
+    box-sizing: border-box !important;
+  }
+
+  /* Responsive Square Board (Fits Height Without Cropping) */
+  .ludo-active-match .ludo-board-wrapper {
+    height: calc(100dvh - 124px) !important;
+    width: calc(100dvh - 124px) !important;
+    max-height: calc(100dvh - 124px) !important;
+    max-width: calc(100dvh - 124px) !important;
+    aspect-ratio: 1 / 1 !important;
+    padding: 3px !important;
+    border-radius: 12px !important;
+    flex-shrink: 0 !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    box-sizing: border-box !important;
+  }
+
+  .ludo-active-match .ludo-board-wrapper svg {
+    width: 100% !important;
+    height: 100% !important;
+    max-width: 100% !important;
+    max-height: 100% !important;
+    display: block !important;
+  }
+
+  /* Controls Side Panel: Row of [Players List, Dice Box] */
+  .ludo-active-match .ludo-controls-side-panel {
+    flex: 1 1 0% !important;
+    max-width: 420px !important;
+    height: calc(100dvh - 124px) !important;
+    max-height: calc(100dvh - 124px) !important;
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 6px !important;
+    min-height: 0 !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+  }
+
+  /* All Players Compact List */
+  .ludo-active-match .ludo-landscape-players-list {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 3px !important;
+    flex: 1 1 0% !important;
+    min-width: 130px !important;
+    max-width: 220px !important;
+    justify-content: center !important;
+  }
+
+  .ludo-active-match .ludo-landscape-players-list .ludo-player-card {
+    padding: 2.5px 5px !important;
+    border-radius: 8px !important;
+  }
+
+  .ludo-active-match .ludo-landscape-players-list .ludo-player-card .w-8.h-8 {
+    width: 20px !important;
+    height: 20px !important;
+    font-size: 9px !important;
+  }
+
+  .ludo-active-match .ludo-landscape-players-list .ludo-player-card span {
+    font-size: 8.5px !important;
+    line-height: 1.1 !important;
+  }
+
+  .ludo-active-match .ludo-landscape-players-list .ludo-player-card .w-2.h-2 {
+    width: 5px !important;
+    height: 5px !important;
+  }
+
+  /* Compact Dice Box */
+  .ludo-active-match .ludo-controls-side-panel .ludo-dice-box {
+    padding: 4px 8px !important;
+    border-radius: 12px !important;
+    gap: 3px !important;
+    flex: 0 0 auto !important;
+    min-width: 110px !important;
+    max-width: 140px !important;
+  }
+
+  .ludo-active-match .ludo-controls-side-panel .ludo-dice-box .w-16.h-16 {
+    width: 44px !important;
+    height: 44px !important;
+    border-radius: 10px !important;
+    padding: 3px !important;
+  }
+
+  .ludo-active-match .ludo-controls-side-panel .ludo-dice-box .w-3.h-3 {
+    width: 7px !important;
+    height: 7px !important;
+  }
+
+  .ludo-active-match .ludo-controls-side-panel .ludo-dice-box button {
+    padding: 3px 8px !important;
+    font-size: 9.5px !important;
+    border-radius: 6px !important;
+  }
+
+  .ludo-active-match .ludo-controls-side-panel .ludo-dice-box span {
+    font-size: 8.5px !important;
+  }
+}
+

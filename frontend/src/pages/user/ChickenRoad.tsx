@@ -286,7 +286,7 @@ export function ChickenRoadPage() {
               <span className="cr-hud-val cr-hud-val--green">
                 {gameState === 'ACTIVE' && currentLane < multipliers.length
                   ? `${nextMultiplier.toFixed(2)}x`
-                  : `${multipliers[0]?.toFixed(2) || '1.01'}x`}
+                  : `${multipliers[0]?.toFixed(2) || '1.03'}x`}
               </span>
             </div>
 
@@ -570,37 +570,29 @@ export function ChickenRoadPage() {
           ))}
         </div>
 
-        {/* Large Green PLAY Button / Status Button */}
+        {/* Large Action Button: Strictly invariant position, size & structure */}
         <div className="cr-play-action-wrap">
-          {gameState === 'READY' ? (
-            <button
-              type="button"
-              disabled={isActionLoading || betAmount <= 0}
-              onClick={handleStartGame}
-              className="cr-play-btn"
-            >
-              <Play size={18} fill="#FFFFFF" />
-              <span>{isActionLoading ? 'STARTING...' : `PLAY ₹${betAmount}`}</span>
-            </button>
-          ) : gameState === 'ACTIVE' ? (
-            <button
-              type="button"
-              disabled
-              className="cr-play-btn"
-              style={{ opacity: 0.7, filter: 'grayscale(1)' }}
-            >
-              <span>CROSSING...</span>
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={handlePlayAgain}
-              className="cr-play-btn"
-            >
-              <RotateCcw size={16} />
-              <span>PLAY AGAIN</span>
-            </button>
-          )}
+          <button
+            type="button"
+            disabled={gameState === 'ACTIVE' || (gameState === 'READY' && (isActionLoading || betAmount <= 0))}
+            onClick={gameState === 'READY' ? handleStartGame : handlePlayAgain}
+            className="cr-play-btn"
+          >
+            <span className="cr-btn-icon-slot">
+              {gameState === 'READY' && <Play size={15} fill="#FFFFFF" />}
+              {gameState === 'ACTIVE' && <span className="cr-btn-pulse-dot" />}
+              {(gameState === 'WON' || gameState === 'LOST') && <RotateCcw size={15} />}
+            </span>
+            <span className="cr-btn-label">
+              {gameState === 'READY'
+                ? isActionLoading
+                  ? 'STARTING...'
+                  : `PLAY ₹${betAmount}`
+                : gameState === 'ACTIVE'
+                ? 'CROSSING...'
+                : 'PLAY AGAIN'}
+            </span>
+          </button>
         </div>
       </footer>
     </div>

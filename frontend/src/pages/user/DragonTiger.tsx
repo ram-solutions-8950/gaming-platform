@@ -34,7 +34,7 @@ export function DragonTigerPage() {
   const [loading, setLoading] = useState(true);
   const [betting, setBetting] = useState(false);
   const [isBettingLocked, setIsBettingLocked] = useState(false);
-  const [countdown, setCountdown] = useState(0);
+  const [countdown, setCountdown] = useState(15);
 
   // Initialize audio hook
   const audio = useAudio();
@@ -151,9 +151,9 @@ export function DragonTigerPage() {
   }, [gameState?.round?.id, gameState?.round?.status]);
 
   const prevCountdown = useRef<number>(-1);
-  // Play countdown tick sound for values 9-5
+  // Play countdown tick sound for values 5-1
   useEffect(() => {
-    if (countdown !== prevCountdown.current && countdown >= 5 && countdown <= 9) {
+    if (countdown !== prevCountdown.current && countdown >= 1 && countdown <= 5) {
       audio.play('countdown_tick');
     }
     prevCountdown.current = countdown;
@@ -206,7 +206,7 @@ export function DragonTigerPage() {
               }
             }
             if (data.type === 'round_start' || data.type === 'betting_locked' || data.type === 'round_result') {
-              if (data.seconds_remaining != null) setCountdown(data.seconds_remaining);
+              if (data.seconds_remaining != null) setCountdown(Math.max(0, Math.round(data.seconds_remaining)));
               fetchAll();
             }
           } catch {
@@ -242,7 +242,7 @@ export function DragonTigerPage() {
 
   /* ── derived state ── */
   const round = gameState?.round;
-  const isBetting = round?.status === 'BETTING' && !isBettingLocked;
+  const isBetting = round?.status === 'BETTING' && !isBettingLocked && countdown > 0;
   const isCalculating = round?.status === 'CALCULATING';
   // Detect round start for audio
   const prevRoundStatus = useRef<string | null>(null);
@@ -253,8 +253,8 @@ export function DragonTigerPage() {
     prevRoundStatus.current = round?.status || null;
   }, [round?.status]);
   
-  // Stop betting overlay flag — only during BETTING status when lock arrives
-  const showStopBettingOverlay = round?.status === 'BETTING' && isBettingLocked;
+  // Stop betting overlay flag — shown when betting locks or timer reaches 0 during BETTING status
+  const showStopBettingOverlay = round?.status === 'BETTING' && (isBettingLocked || countdown <= 0);
   // Calculating overlay flag (when in CALCULATING phase without result data yet)
   const showCalculatingOverlay = isCalculating && !(round?.result_data?.result);
 
@@ -390,7 +390,7 @@ export function DragonTigerPage() {
   const handleBet = async (predictionKey?: string) => {
     const prediction = predictionKey || selected;
     if (!prediction || !round || !game || betting) return;
-    if (round.status !== 'BETTING' || isBettingLocked) return;
+    if (round.status !== 'BETTING' || isBettingLocked || countdown <= 0) return;
     setBetting(true);
     try {
       await gameService.placeBet(round.id, prediction, amount, game.id);
@@ -436,9 +436,9 @@ export function DragonTigerPage() {
   const countdownColor = isAnimating
     ? 'text-yellow-300'
     : isBetting
-      ? countdown <= 5
+      ? countdown <= 3
         ? 'text-red-400 animate-pulse'
-        : countdown <= 10 ? 'text-orange-400' : 'text-green-400'
+        : countdown <= 7 ? 'text-orange-400' : 'text-green-400'
       : isCalculating ? 'text-yellow-300' : 'text-zinc-500';
 
   if (loading) {

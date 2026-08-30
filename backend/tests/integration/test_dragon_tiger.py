@@ -8,7 +8,7 @@ from sqlalchemy.orm.attributes import flag_modified
 from app.models.user import User, UserRole, UserStatus
 from app.models.wallet import Wallet
 from app.models.transaction import WalletTransaction, WalletTransactionType
-from app.models.game import GameRound, GameRoundStatus, GameBet, GameBetStatus
+from app.models.game import GameRound, GameRoundStatus, GameBet, GameBetStatus, GamePrediction
 from app.models.game_catalog import Game, GameStatus
 from app.models.fee_configuration import FeeConfiguration
 from app.services.game_engines.dragon_tiger import DragonTigerEngine
@@ -59,8 +59,8 @@ def dt_game(db: Session):
     game.min_bet = 1000
     game.max_bet = 100000
     game.config = {
-        "round_duration_seconds": 60,
-        "betting_duration_seconds": 50,
+        "round_duration_seconds": 25,
+        "betting_duration_seconds": 15,
         "allowed_bets": {"dragon": True, "tiger": True, "tie": True},
         "payouts": {"dragon": 1.0, "tiger": 1.0, "tie": 11.0},
         "deck": {"type": "STANDARD_52_CARD", "cards_per_round": 2},
@@ -354,3 +354,61 @@ def test_public_bets_endpoint(client, db: Session, auth_user, fee_config, dt_gam
     assert items[0]["id"] != str(b.id)
     assert len(items[0]["id"]) == 16
     assert "user_id" not in items[0]
+
+
+def test_dragon_tiger_15_second_betting_timer_config(db: Session, dt_game):
+    """Verify backend authoritative betting timer is exactly 15 seconds."""
+    assert engine.get_betting_duration_seconds(db) == 15
+    assert engine.get_round_duration_seconds(db) == 25
+
+    rd = engine.create_round(db)
+    duration = (rd.betting_closes_at - rd.started_at).total_seconds()
+    assert abs(duration - 15.0) < 0.1, f"Expected 15s betting window, got {duration}"
+
+
+def test_dragon_tiger_bet_accepted_within_15_seconds(db: Session, auth_user, fee_config, dt_game):
+    """Verify bets placed within the 15-second window succeed."""
+    _, user, _ = auth_user
+    rd = engine.create_round(db)
+    bet = engine.place_bet(db, user.id, rd.id, "DRAGON", 10000, game_id=dt_game.id)
+    assert bet.amount == 10000
+    assert bet.prediction == GamePrediction.DRAGON
+
+
+def test_dragon_tiger_bet_rejected_after_15_seconds(db: Session, auth_user, fee_config, dt_game):
+    """Verify bets placed after 15 seconds are rejected server-side."""
+    _, user, _ = auth_user
+    rd = engine.create_round(db)
+    # Simulate time passing past the 15-second window
+    rd.betting_closes_at = datetime.now(timezone.utc) - timedelta(seconds=1)
+    db.commit()
+
+    with pytest.raises(ValueError, match="Betting window has expired"):
+        engine.place_bet(db, user.id, rd.id, "DRAGON", 10000, game_id=dt_game.id)
+
+
+def test_dragon_tiger_bet_rejected_when_calculating(db: Session, auth_user, fee_config, dt_game):
+    """Verify bets placed when round status is CALCULATING are rejected server-side."""
+    _, user, _ = auth_user
+    rd = engine.create_round(db)
+    engine.lock_round_for_calculation(db, rd.id)
+    db.refresh(rd)
+    assert rd.status == GameRoundStatus.CALCULATING
+
+    with pytest.raises(ValueError, match="Betting is closed for this round"):
+        engine.place_bet(db, user.id, rd.id, "DRAGON", 10000, game_id=dt_game.id)
+
+
+def test_current_round_api_reports_15_seconds_countdown(client, db: Session, auth_user, dt_game):
+    """Verify /api/v1/games/current reports remaining time <= 15.0s for a new round."""
+    headers, _, _ = auth_user
+    rd = engine.create_round(db)
+
+    res = client.get("/api/v1/games/current", headers=headers, params={"game_slug": "dragon-tiger"})
+    assert res.status_code == 200
+    body = res.json()["data"]
+    assert body["round"]["id"] == str(rd.id)
+    assert body["round"]["status"] == "BETTING"
+    # Remaining seconds must be <= 15.0 and > 13.0
+    assert 0.0 < body["seconds_remaining"] <= 15.0
+

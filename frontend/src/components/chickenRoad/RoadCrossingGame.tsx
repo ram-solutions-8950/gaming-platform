@@ -815,46 +815,7 @@ export const RoadCrossingGame: React.FC<RoadCrossingGameProps> = ({
       ctx.fillText('🏁 FINISH 🏆', finishStartX + FINISH_ZONE_WIDTH / 2 + 15, fixedY - 4);
       ctx.restore();
 
-      // 5.5 Pothole obstacles embedded in asphalt
-      s.potholes.forEach((ph) => {
-        ctx.save();
 
-        // Outer dark depression rim
-        ctx.beginPath();
-        ctx.arc(ph.x, ph.y, ph.radius, 0, Math.PI * 2);
-        ctx.fillStyle = '#111111';
-        ctx.shadowColor = 'rgba(0,0,0,0.7)';
-        ctx.shadowBlur = 6;
-        ctx.fill();
-        ctx.shadowBlur = 0;
-
-        // Inner void (deeper black)
-        ctx.beginPath();
-        ctx.arc(ph.x, ph.y, ph.radius * 0.6, 0, Math.PI * 2);
-        ctx.fillStyle = '#050505';
-        ctx.fill();
-
-        // Radiating crack lines
-        ctx.strokeStyle = 'rgba(40, 40, 40, 0.9)';
-        ctx.lineWidth = 1;
-        for (let a = 0; a < Math.PI * 2; a += Math.PI / 3) {
-          ctx.beginPath();
-          ctx.moveTo(ph.x + Math.cos(a) * ph.radius, ph.y + Math.sin(a) * ph.radius);
-          ctx.lineTo(ph.x + Math.cos(a) * (ph.radius + 6), ph.y + Math.sin(a) * (ph.radius + 6));
-          ctx.stroke();
-        }
-
-        // Red danger ring when pothole intersects chicken's horizontal path
-        if (Math.abs(ph.y - fixedY) < ph.radius + 12) {
-          ctx.beginPath();
-          ctx.arc(ph.x, ph.y, ph.radius + 4, 0, Math.PI * 2);
-          ctx.strokeStyle = 'rgba(239, 68, 68, 0.65)';
-          ctx.lineWidth = 2;
-          ctx.stroke();
-        }
-
-        ctx.restore();
-      });
 
       // 6. Vertical Traffic Lanes & Horizontal Multiplier Checkpoints
       for (let lane = 1; lane <= s.totalLanes; lane++) {

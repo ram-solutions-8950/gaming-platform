@@ -33,6 +33,7 @@ const GAME_DEFS: GameCardDef[] = [
   { id: 'roulette', name: 'Roulette', subtitle: 'Casino', emoji: '🎡', gradient: 'gc-red', badge: 'HOT', path: '/games/roulette', category: ['ALL', 'CASINO'] },
   { id: 'chicken-road', name: 'Chicken Road', subtitle: 'Arcade', emoji: '🐔', gradient: 'gc-amber', badge: 'NEW', path: '/games/chicken-road', category: ['ALL', 'CASINO'] },
   { id: 'triple-777', name: 'Triple 777', subtitle: 'Classic Slots', emoji: '🎰', gradient: 'gc-rose', badge: 'HOT', path: '/games/triple-777', category: ['ALL', 'SLOTS', 'CASINO'] },
+  { id: 'ludo', name: 'Ludo V1', subtitle: 'Multiplayer Board', emoji: '🎲', gradient: 'gc-blue', badge: 'NEW', path: '/games/ludo', category: ['ALL', 'CASINO'] },
 ];
 
 const FEATURED_GAME = GAME_DEFS[0]; // Dragon Tiger

@@ -497,6 +497,7 @@
 .triple-777-card-art,
 .aviator-card-art,
 .roulette-card-art,
+.rummy-card-art,
 .casino-card-art-container {
   position: absolute !important;
   inset: 0 !important;
@@ -514,6 +515,7 @@
 .chicken-road-hero-img,
 .triple-777-hero-img,
 .aviator-plane-img,
+.rummy-hero-img,
 .casino-card-art-img {
   position: absolute !important;
   left: 50% !important;
@@ -542,12 +544,52 @@
 .triple-777-dark-overlay,
 .aviator-dark-overlay,
 .roulette-dark-overlay,
+.rummy-dark-overlay,
 .casino-card-art-overlay {
   position: absolute !important;
   inset: 0 !important;
   background: linear-gradient(180deg, transparent 40%, rgba(10, 2, 25, 0.4) 70%, rgba(10, 2, 25, 0.85) 100%) !important;
   pointer-events: none !important;
   z-index: 3 !important;
+}
+
+/* Indian Rummy Card Artwork & Atmosphere */
+.game-card--rummy {
+  position: relative !important;
+  overflow: hidden !important;
+  isolation: isolate !important;
+  background: radial-gradient(circle at 50% 35%, rgba(13, 148, 136, 0.5) 0%, rgba(4, 47, 46, 0.95) 100%) !important;
+  border: 1px solid rgba(45, 212, 191, 0.45) !important;
+}
+
+.rummy-card-aura {
+  position: absolute !important;
+  left: 50% !important;
+  top: 45% !important;
+  width: 130% !important;
+  height: 130% !important;
+  transform: translate(-50%, -50%) !important;
+  border-radius: 50% !important;
+  background: radial-gradient(circle, rgba(20, 184, 166, 0.6) 0%, rgba(245, 158, 11, 0.22) 45%, transparent 70%) !important;
+  filter: blur(12px) !important;
+  opacity: 0.65 !important;
+  z-index: 0 !important;
+  animation: rummyAuraPulse 4s ease-in-out infinite !important;
+}
+
+@keyframes rummyAuraPulse {
+  0%, 100% { opacity: 0.55; transform: translate(-50%, -50%) scale(0.95); }
+  50% { opacity: 0.85; transform: translate(-50%, -50%) scale(1.05); }
+}
+
+.rummy-hero-img {
+  transform: translate(-50%, -50%) scale(1.05) !important;
+  filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.75)) drop-shadow(0 0 16px rgba(45, 212, 191, 0.25)) !important;
+  transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) !important;
+}
+
+.game-card--rummy:hover .rummy-hero-img {
+  transform: translate(-50%, -50%) scale(1.10) !important;
 }
 
 /* Roulette Card Artwork */

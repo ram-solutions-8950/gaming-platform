@@ -6,6 +6,7 @@ import chickenRoadHero from '../../assets/chicken-road-3d.jpg';
 import triple777Logo from '../../assets/triple-777-logo.png';
 import pokerHero from '../../assets/poker-hero.jpg';
 import teenPattiHero from '../../assets/teen-patti-hero.jpg';
+import rummyHero from '../../assets/casino-cards-3d-emblem.png';
 import { AnimatedCasinoGameLogo } from './AnimatedCasinoGameLogo';
 
 /* ─── Types ─── */
@@ -63,6 +64,11 @@ const isPokerGame = (game: GameCardData) => {
 const isTeenPattiGame = (game: GameCardData) => {
   const value = `${game.id} ${game.name} ${game.path}`.toLowerCase();
   return value.includes('teen') || value.includes('patti');
+};
+
+const isRummyGame = (game: GameCardData) => {
+  const value = `${game.id} ${game.name} ${game.path}`.toLowerCase();
+  return value.includes('rummy');
 };
 
 const isRouletteGame = (game: GameCardData) => {
@@ -134,6 +140,24 @@ const TeenPattiAnimatedArtwork: React.FC = () => {
         decoding="async"
       />
       <div className="teen-patti-dark-overlay" />
+      <div className="casino-card-art-sweep" />
+    </div>
+  );
+};
+
+/* ─── Indian Rummy Animated Artwork ─── */
+const RummyAnimatedArtwork: React.FC = () => {
+  return (
+    <div className="rummy-card-art" aria-hidden="true">
+      <div className="rummy-card-aura" />
+      <img
+        className="rummy-hero-img"
+        src={rummyHero}
+        alt="Indian Rummy"
+        loading="lazy"
+        decoding="async"
+      />
+      <div className="rummy-dark-overlay" />
       <div className="casino-card-art-sweep" />
     </div>
   );
@@ -295,6 +319,7 @@ export const AnimatedGameCarousel: React.FC<Props> = ({
             const aviator = isAviatorGame(game);
             const dragonTiger = isDragonTigerGame(game);
             const andarBahar = isAndarBaharGame(game);
+            const rummy = isRummyGame(game);
             const roulette = isRouletteGame(game);
             const chickenRoad = isChickenRoadGame(game);
             const triple777 = isTriple777Game(game);
@@ -308,24 +333,27 @@ export const AnimatedGameCarousel: React.FC<Props> = ({
                 ? 'game-card--dragon-tiger'
                 : andarBahar
                   ? 'game-card--andar-bahar'
-                  : roulette
-                    ? 'game-card--roulette'
-                    : chickenRoad
-                      ? 'game-card--chicken-road'
-                      : triple777
-                        ? 'game-card--triple-777'
-                        : poker
-                          ? 'game-card--poker'
-                          : teenPatti
-                            ? 'game-card--teen-patti'
-                            : cardGame
-                              ? 'game-card--casino-card'
-                              : '';
+                  : rummy
+                    ? 'game-card--rummy'
+                    : roulette
+                      ? 'game-card--roulette'
+                      : chickenRoad
+                        ? 'game-card--chicken-road'
+                        : triple777
+                          ? 'game-card--triple-777'
+                          : poker
+                            ? 'game-card--poker'
+                            : teenPatti
+                              ? 'game-card--teen-patti'
+                              : cardGame
+                                ? 'game-card--casino-card'
+                                : '';
 
             const hasCustomArtwork =
               aviator ||
               dragonTiger ||
               andarBahar ||
+              rummy ||
               roulette ||
               chickenRoad ||
               triple777 ||
@@ -367,6 +395,9 @@ export const AnimatedGameCarousel: React.FC<Props> = ({
                   {/* Andar Bahar full card artwork */}
                   {andarBahar && <AndarBaharAnimatedArtwork />}
 
+                  {/* Indian Rummy full card artwork */}
+                  {rummy && <RummyAnimatedArtwork />}
+
                   {/* Roulette full card artwork */}
                   {roulette && <RouletteAnimatedArtwork />}
 
@@ -382,8 +413,8 @@ export const AnimatedGameCarousel: React.FC<Props> = ({
                   {/* Teen Patti full card artwork */}
                   {teenPatti && <TeenPattiAnimatedArtwork />}
 
-                  {/* Universal 3D Casino Card Game Artwork for Rummy etc. */}
-                  {cardGame && !dragonTiger && !andarBahar && !chickenRoad && !triple777 && !poker && !teenPatti && (
+                  {/* Universal 3D Casino Card Game Artwork for other cards */}
+                  {cardGame && !rummy && !dragonTiger && !andarBahar && !chickenRoad && !triple777 && !poker && !teenPatti && (
                     <AnimatedCasinoGameLogo game={game.id} />
                   )}
 
