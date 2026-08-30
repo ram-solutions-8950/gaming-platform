@@ -19,6 +19,7 @@ export function useTeenPattiSocket({ tableId, onEvent, onError }: UseTeenPattiSo
   const [isConnected, setIsConnected] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const [pendingSideShow, setPendingSideShow] = useState<{ requester: string; target: string } | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<any>(null);
 
@@ -33,6 +34,7 @@ export function useTeenPattiSocket({ tableId, onEvent, onError }: UseTeenPattiSo
     }
 
     setIsConnecting(true);
+    setErrorMessage(null);
 
     const wsUrl = getWebSocketUrl(`ws/teen-patti/${tableId}`, token);
 
@@ -59,6 +61,7 @@ export function useTeenPattiSocket({ tableId, onEvent, onError }: UseTeenPattiSo
           }
           onEvent?.(msg);
         } else if (msg.type === 'error') {
+          setErrorMessage(msg.message);
           onError?.(msg.message);
         }
       } catch (e) {
@@ -70,9 +73,13 @@ export function useTeenPattiSocket({ tableId, onEvent, onError }: UseTeenPattiSo
       onError?.('WebSocket connection encountered an error');
     };
 
-    ws.onclose = () => {
+    ws.onclose = (event: CloseEvent) => {
       setIsConnected(false);
       setIsConnecting(false);
+      // Policy violation (e.g. table full or game in progress) - do not loop reconnect
+      if (event.code === 1008) {
+        return;
+      }
       // Auto-reconnect after 3s if still mounted
       if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
       reconnectTimeoutRef.current = setTimeout(() => {
@@ -116,6 +123,7 @@ export function useTeenPattiSocket({ tableId, onEvent, onError }: UseTeenPattiSo
     isConnected,
     isConnecting,
     pendingSideShow,
+    errorMessage,
     currentUserId: user?.id || null,
     seeCards,
     chaal,

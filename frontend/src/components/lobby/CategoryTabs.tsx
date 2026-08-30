@@ -1,13 +1,18 @@
 import React from 'react';
 
-const CATEGORIES = ['ALL', 'BACCARAT', 'SLOTS', 'POKER'];
+export const DEFAULT_CATEGORIES = ['ALL', 'CASINO', 'CARDS', 'SLOTS'];
 
 interface Props {
+  categories?: string[];
   activeCategory: string;
   onCategoryChange: (cat: string) => void;
 }
 
-export const CategoryTabs: React.FC<Props> = ({ activeCategory, onCategoryChange }) => {
+export const CategoryTabs: React.FC<Props> = ({
+  categories = DEFAULT_CATEGORIES,
+  activeCategory,
+  onCategoryChange,
+}) => {
   return (
     <div className="category-tabs flex items-center gap-2">
       <button
@@ -19,7 +24,7 @@ export const CategoryTabs: React.FC<Props> = ({ activeCategory, onCategoryChange
         <span>Bind +₹10</span>
       </button>
 
-      {CATEGORIES.map((cat) => (
+      {categories.map((cat) => (
         <button
           key={cat}
           type="button"

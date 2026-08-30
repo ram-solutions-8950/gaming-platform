@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+import asyncio
+import logging
 import secrets
 import string
+import threading
 import uuid
+from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -20,6 +24,8 @@ router = APIRouter(prefix="/rummy", tags=["Rummy"])
 router.include_router(ws_router)
 
 _CODE_ALPHABET = string.ascii_uppercase + string.digits
+_table_lock = threading.Lock()
+_logger = logging.getLogger(__name__)
 
 
 def _generate_join_code(db: Session) -> str:
@@ -72,25 +78,76 @@ def create_table(
     if payload.mode == "real_money" and payload.entry_fee_paise <= 0:
         raise HTTPException(status_code=400, detail="Real-money tables require an entry fee")
 
-    join_code = _generate_join_code(db) if payload.is_private else None
+    with _table_lock:
+        # --- Clean up stale empty tables older than 30 minutes ---
+        _cleanup_stale_tables(db)
 
-    table = RummyTable(
-        name=payload.name,
-        mode=RummyTableMode(payload.mode),
-        status=RummyTableStatus.OPEN,
-        max_players=payload.max_players,
-        num_deals=payload.num_deals,
-        entry_fee_paise=payload.entry_fee_paise,
-        pool_limit=payload.pool_limit,
-        turn_seconds=payload.turn_seconds,
-        starting_chips=payload.starting_chips,
-        is_private=payload.is_private,
-        join_code=join_code,
+        # --- Try to reuse an existing waiting table with matching criteria ---
+        if not payload.is_private:
+            existing = (
+                db.query(RummyTable)
+                .filter(
+                    RummyTable.status == RummyTableStatus.OPEN,
+                    RummyTable.is_private.is_(False),
+                    RummyTable.mode == RummyTableMode(payload.mode),
+                    RummyTable.max_players == payload.max_players,
+                    RummyTable.entry_fee_paise == payload.entry_fee_paise,
+                    RummyTable.num_deals == payload.num_deals,
+                )
+                .order_by(RummyTable.created_at.asc())
+                .all()
+            )
+            for candidate in existing:
+                game = game_manager.get(str(candidate.id))
+                if game is None:
+                    # No game engine yet — table is idle, safe to join
+                    _logger.info("Reusing idle table %s for user %s", candidate.id, current_user.id)
+                    return _to_out(candidate)
+                if game.phase.value in ("waiting",) and len(game.players) < candidate.max_players:
+                    _logger.info("Reusing waiting table %s (%d/%d) for user %s",
+                                 candidate.id, len(game.players), candidate.max_players, current_user.id)
+                    return _to_out(candidate)
+
+        # --- No reusable table found, create a new one ---
+        join_code = _generate_join_code(db) if payload.is_private else None
+
+        table = RummyTable(
+            name=payload.name,
+            mode=RummyTableMode(payload.mode),
+            status=RummyTableStatus.OPEN,
+            max_players=payload.max_players,
+            num_deals=payload.num_deals,
+            entry_fee_paise=payload.entry_fee_paise,
+            pool_limit=payload.pool_limit,
+            turn_seconds=payload.turn_seconds,
+            starting_chips=payload.starting_chips,
+            is_private=payload.is_private,
+            join_code=join_code,
+        )
+        db.add(table)
+        db.commit()
+        db.refresh(table)
+        return _to_out(table)
+
+
+def _cleanup_stale_tables(db: Session) -> None:
+    """Mark abandoned OPEN tables with 0 in-memory players as FINISHED if older than 30 min."""
+    cutoff = datetime.now(timezone.utc) - timedelta(minutes=30)
+    stale = (
+        db.query(RummyTable)
+        .filter(
+            RummyTable.status == RummyTableStatus.OPEN,
+            RummyTable.created_at < cutoff,
+        )
+        .all()
     )
-    db.add(table)
-    db.commit()
-    db.refresh(table)
-    return _to_out(table)
+    for t in stale:
+        game = game_manager.get(str(t.id))
+        if game is None or len(game.players) == 0:
+            t.status = RummyTableStatus.FINISHED
+            _logger.info("Cleaned up stale empty table %s (created %s)", t.id, t.created_at)
+    if stale:
+        db.commit()
 
 
 @router.get("/tables/{table_id}", response_model=TableOut)

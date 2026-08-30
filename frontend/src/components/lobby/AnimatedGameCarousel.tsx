@@ -2,12 +2,10 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import aviatorImg from '../../assets/aviator-3d.png';
 import dragonImg from '../../assets/dragon-hero.png';
 import andarBaharHero from '../../assets/andar-bahar-hero.png';
-import rouletteHero from '../../assets/roulette-hero.png';
 import chickenRoadHero from '../../assets/chicken-road-3d.jpg';
 import triple777Logo from '../../assets/triple-777-logo.png';
 import pokerHero from '../../assets/poker-hero.jpg';
 import teenPattiHero from '../../assets/teen-patti-hero.jpg';
-import baccaratHero from '../../assets/baccarat-hero.jpg';
 import { AnimatedCasinoGameLogo } from './AnimatedCasinoGameLogo';
 
 /* ─── Types ─── */
@@ -52,11 +50,6 @@ const isAndarBaharGame = (game: GameCardData) => {
   return value.includes('andar') || value.includes('bahar');
 };
 
-const isRouletteGame = (game: GameCardData) => {
-  const value = `${game.id} ${game.name} ${game.path}`.toLowerCase();
-  return value.includes('roulette');
-};
-
 const isChickenRoadGame = (game: GameCardData) => {
   const value = `${game.id} ${game.name} ${game.path}`.toLowerCase();
   return value.includes('chicken') || value.includes('road');
@@ -77,9 +70,9 @@ const isTeenPattiGame = (game: GameCardData) => {
   return value.includes('teen') || value.includes('patti');
 };
 
-const isBaccaratGame = (game: GameCardData) => {
+const isRouletteGame = (game: GameCardData) => {
   const value = `${game.id} ${game.name} ${game.path}`.toLowerCase();
-  return value.includes('baccarat');
+  return value.includes('roulette');
 };
 
 const isCardGame = (game: GameCardData) => {
@@ -89,8 +82,29 @@ const isCardGame = (game: GameCardData) => {
     value.includes('teen') ||
     value.includes('patti') ||
     value.includes('poker') ||
-    value.includes('baccarat') ||
     value.includes('30 cards')
+  );
+};
+
+/* ─── Roulette Animated Artwork ─── */
+const RouletteAnimatedArtwork: React.FC = () => {
+  return (
+    <div className="roulette-card-art" aria-hidden="true">
+      <div className="roulette-card-felt-glow" />
+      <div className="roulette-card-wheel-wrap">
+        <div className="roulette-card-wheel-glow" />
+        <div className="roulette-card-wheel-inner">
+          <span className="roulette-card-num-green">0</span>
+          <span className="roulette-card-num-red">32</span>
+          <span className="roulette-card-num-black">15</span>
+          <span className="roulette-card-num-red">19</span>
+          <span className="roulette-card-num-black">4</span>
+          <span className="roulette-card-num-red">21</span>
+        </div>
+        <div className="roulette-card-ball" />
+      </div>
+      <div className="roulette-dark-overlay" />
+    </div>
   );
 };
 
@@ -130,24 +144,6 @@ const TeenPattiAnimatedArtwork: React.FC = () => {
   );
 };
 
-/* ─── Baccarat Animated Artwork ─── */
-const BaccaratAnimatedArtwork: React.FC = () => {
-  return (
-    <div className="baccarat-card-art" aria-hidden="true">
-      <div className="baccarat-card-aura" />
-      <img
-        className="baccarat-hero-img"
-        src={baccaratHero}
-        alt="Baccarat (Coming Soon)"
-        loading="lazy"
-        decoding="async"
-      />
-      <div className="baccarat-dark-overlay" />
-      <div className="casino-card-art-sweep" />
-    </div>
-  );
-};
-
 /* ─── Triple 777 Animated Artwork ─── */
 const Triple777AnimatedArtwork: React.FC = () => {
   return (
@@ -179,21 +175,6 @@ const ChickenRoadAnimatedArtwork: React.FC = () => {
         alt="Chicken Road"
       />
       <div className="chicken-road-dark-overlay" />
-    </div>
-  );
-};
-
-/* ─── Roulette Animated Artwork ─── */
-const RouletteAnimatedArtwork: React.FC = () => {
-  return (
-    <div className="roulette-card-art" aria-hidden="true">
-      <div className="roulette-card-aura" />
-      <img
-        className="roulette-hero-img"
-        src={rouletteHero}
-        alt=""
-      />
-      <div className="roulette-dark-overlay" />
     </div>
   );
 };
@@ -374,7 +355,6 @@ export const AnimatedGameCarousel: React.FC<Props> = ({
             const triple777 = isTriple777Game(game);
             const poker = isPokerGame(game);
             const teenPatti = isTeenPattiGame(game);
-            const baccarat = isBaccaratGame(game);
             const cardGame = isCardGame(game);
 
             const cardTypeClass = ludo
@@ -395,11 +375,9 @@ export const AnimatedGameCarousel: React.FC<Props> = ({
                             ? 'game-card--poker'
                             : teenPatti
                               ? 'game-card--teen-patti'
-                              : baccarat
-                                ? 'game-card--baccarat'
-                                : cardGame
-                                  ? 'game-card--casino-card'
-                                  : '';
+                              : cardGame
+                                ? 'game-card--casino-card'
+                                : '';
 
             const hasCustomArtwork =
               ludo ||
@@ -411,21 +389,15 @@ export const AnimatedGameCarousel: React.FC<Props> = ({
               triple777 ||
               poker ||
               teenPatti ||
-              baccarat ||
               cardGame;
 
             return (
               <div
                 key={game.id}
                 className="game-card-wrapper"
-                onClick={() =>
-                  game.path !== '#' && onGameClick(game.path)
-                }
+                onClick={() => onGameClick(game.path)}
                 onKeyDown={(e) => {
-                  if (
-                    e.key === 'Enter' &&
-                    game.path !== '#'
-                  ) {
+                  if (e.key === 'Enter') {
                     onGameClick(game.path);
                   }
                 }}
@@ -437,9 +409,6 @@ export const AnimatedGameCarousel: React.FC<Props> = ({
                     'game-card',
                     game.gradient,
                     cardTypeClass,
-                    game.path === '#'
-                      ? 'game-card--disabled'
-                      : '',
                   ]
                     .filter(Boolean)
                     .join(' ')}
@@ -474,11 +443,8 @@ export const AnimatedGameCarousel: React.FC<Props> = ({
                   {/* Teen Patti full card artwork */}
                   {teenPatti && <TeenPattiAnimatedArtwork />}
 
-                  {/* Baccarat full card artwork */}
-                  {baccarat && <BaccaratAnimatedArtwork />}
-
                   {/* Universal 3D Casino Card Game Artwork for Rummy etc. */}
-                  {cardGame && !dragonTiger && !andarBahar && !chickenRoad && !triple777 && !poker && !teenPatti && !baccarat && (
+                  {cardGame && !dragonTiger && !andarBahar && !chickenRoad && !triple777 && !poker && !teenPatti && (
                     <AnimatedCasinoGameLogo game={game.id} />
                   )}
 

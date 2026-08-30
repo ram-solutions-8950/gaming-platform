@@ -29,6 +29,7 @@ export const TeenPattiTable: React.FC<TeenPattiTableProps> = ({
     sideShow,
     respondSideShow,
     startHand,
+    errorMessage,
   } = useTeenPattiSocket({ tableId });
 
   const lastPhaseRef = useRef<string | null>(null);
@@ -82,10 +83,25 @@ export const TeenPattiTable: React.FC<TeenPattiTableProps> = ({
 
   if (!gameState) {
     return (
-      <div className="tp-arena-container">
-        <div style={{ color: '#94a3b8', fontSize: '1.1rem', fontWeight: 600 }}>
-          {isConnected ? 'Syncing Table State...' : 'Connecting to Table...'}
-        </div>
+      <div className="tp-arena-container" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16 }}>
+        {errorMessage ? (
+          <>
+            <div style={{ color: '#ef4444', fontSize: '1.1rem', fontWeight: 700, textAlign: 'center', maxWidth: 400 }}>
+              {errorMessage}
+            </div>
+            <button
+              onClick={onLeaveTable}
+              className="tp-btn tp-btn-chaal"
+              style={{ padding: '8px 24px', fontSize: '0.9rem' }}
+            >
+              Back to Lobby
+            </button>
+          </>
+        ) : (
+          <div style={{ color: '#94a3b8', fontSize: '1.1rem', fontWeight: 600 }}>
+            {isConnected ? 'Syncing Table State...' : 'Connecting to Table...'}
+          </div>
+        )}
       </div>
     );
   }

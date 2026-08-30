@@ -67,6 +67,14 @@ _pending_side_show: Dict[str, Dict[str, str]] = {}
 _processed_actions: Dict[str, set] = defaultdict(set)
 _rng_per_table: Dict[str, random.Random] = {}
 _hand_number: Dict[str, int] = defaultdict(lambda: 1)
+_table_locks: Dict[str, asyncio.Lock] = {}
+
+
+def _get_table_lock(table_id: str) -> asyncio.Lock:
+    if table_id not in _table_locks:
+        _table_locks[table_id] = asyncio.Lock()
+    return _table_locks[table_id]
+
 
 _BOT_JOIN_DELAY_SECONDS = 3.0
 _START_COUNTDOWN_SECONDS = 3.0
@@ -167,44 +175,11 @@ async def _broadcast_state(table_id: str) -> None:
         await manager.send_to_user(table_id, seat.id, payload)
 
 
-def _seat_and_kick_off(table_id: str, user_id: str, username: str) -> None:
-    cfg, _mode = _load_config(table_id)
-    hand = teen_patti_manager.get_or_create(table_id, cfg)
-
-    if not any(s.id == user_id for s in hand.seats):
-        try:
-            hand.add_seat(user_id, username, is_bot=False)
-        except GameError:
-            return
-
-    if hand.phase == Phase.WAITING and table_id not in _start_timers:
-        _start_timers[table_id] = asyncio.create_task(_delayed_start_sequence(table_id))
-
-
-async def _delayed_start_sequence(table_id: str) -> None:
-    await asyncio.sleep(_BOT_JOIN_DELAY_SECONDS)
+async def _start_hand(table_id: str) -> None:
     hand = teen_patti_manager.get(table_id)
     if hand is None or hand.phase != Phase.WAITING:
         return
-
-    # Auto-fill remaining seats with bots
-    needed = hand.config.max_players - len(hand.seats)
-    for _ in range(needed):
-        bot_id = f"bot_{uuid.uuid4().hex[:6]}"
-        bot_name = random.choice(_BOT_NAMES)
-        try:
-            hand.add_seat(bot_id, bot_name, is_bot=True)
-        except GameError:
-            break
-
-    await _broadcast_state(table_id)
-    await asyncio.sleep(_START_COUNTDOWN_SECONDS)
-    await _start_hand(table_id)
-
-
-async def _start_hand(table_id: str) -> None:
-    hand = teen_patti_manager.get(table_id)
-    if hand is None:
+    if len(hand.seats) < 2:
         return
 
     _cancel(_turn_timers, table_id)
@@ -213,6 +188,17 @@ async def _start_hand(table_id: str) -> None:
     _pending_side_show.pop(table_id, None)
 
     hand.start_hand(client_seed=f"tp_{table_id}_{_hand_number[table_id]}", nonce=_hand_number[table_id])
+
+    try:
+        with _get_db_session() as db:
+            tid = uuid.UUID(str(table_id))
+            table = db.query(TeenPattiTable).filter(TeenPattiTable.id == tid).first()
+            if table:
+                table.status = TeenPattiTableStatus.RUNNING
+                db.commit()
+    except Exception:
+        pass
+
     await manager.broadcast(table_id, {
         "type": "event",
         "event": "hand_started",
@@ -358,8 +344,10 @@ async def _resolve_side_show(table_id: str, accept: bool) -> None:
 
 
 def _settle_hand(table_id: str, hand: TeenPattiHand) -> None:
-    if hand.winner_seat is None:
+    if hand.winner_seat is None or hand.is_settled:
         return
+    hand.is_settled = True
+
     with _get_db_session() as db:
         try:
             tid = uuid.UUID(str(table_id))
@@ -410,7 +398,6 @@ def _settle_hand(table_id: str, hand: TeenPattiHand) -> None:
             sp.commit()
         except Exception as e:
             sp.rollback()
-            logger.error("TEEN_PATTI_SETTLEMENT_FAILED: table_id=%s hand=%d error=%s. Rollback wallet changes.", table_id, _hand_number[table_id], str(e))
             raise
 
         # Store hand records
@@ -440,7 +427,26 @@ def _settle_hand(table_id: str, hand: TeenPattiHand) -> None:
                 server_seed=hand.server_seed or "",
                 server_seed_hash=s_seed_hash,
             ))
+        table.status = TeenPattiTableStatus.OPEN
         db.commit()
+
+
+async def _schedule_next_hand(table_id: str) -> None:
+    try:
+        await asyncio.sleep(_NEXT_HAND_DELAY_SECONDS)
+    except asyncio.CancelledError:
+        return
+    lock = _get_table_lock(table_id)
+    async with lock:
+        hand = teen_patti_manager.get(table_id)
+        if hand is not None and hand.phase == Phase.FINISHED:
+            hand.reset_for_next_hand()
+            await manager.broadcast(table_id, {
+                "type": "event",
+                "event": "next_hand_ready",
+                "hand_number": _hand_number[table_id],
+            })
+            await _broadcast_state(table_id)
 
 
 async def _after_action(table_id: str) -> None:
@@ -460,6 +466,7 @@ async def _after_action(table_id: str) -> None:
             "reason": hand.reason,
         })
         _hand_number[table_id] += 1
+        _start_timers[table_id] = asyncio.create_task(_schedule_next_hand(table_id))
     elif hand.phase == Phase.PLAYING and table_id not in _pending_side_show:
         _arm_turn_timer(table_id)
         _maybe_trigger_bot_turn(table_id)
@@ -470,6 +477,8 @@ async def teen_patti_socket(websocket: WebSocket, table_id: str) -> None:
     token = websocket.query_params.get("token")
     auth = _authenticate(token)
     if auth is None:
+        await websocket.accept()
+        await websocket.send_json({"type": "error", "message": "Authentication failure. Please log in again."})
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
         return
     user_id, username = auth
@@ -479,21 +488,66 @@ async def teen_patti_socket(websocket: WebSocket, table_id: str) -> None:
     if mode == "real":
         with _get_db_session() as db:
             wallet = get_balance(db, uuid.UUID(user_id))
-            if not wallet or wallet.balance < cfg.boot_amount:
+            current_bal = wallet.balance if wallet else 0
+            if not wallet or current_bal < cfg.boot_amount:
+                await websocket.accept()
+                await websocket.send_json({
+                    "type": "error",
+                    "message": f"Insufficient wallet balance. Required: ₹{cfg.boot_amount / 100:.2f}, Available: ₹{current_bal / 100:.2f}"
+                })
                 await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
                 return
 
-    _seat_and_kick_off(table_id, user_id, username)
-    await manager.connect(table_id, user_id, websocket)
-    await manager.send_to_user(table_id, user_id, {"type": "event", "event": "joined"})
-    await _broadcast_state(table_id)
+    lock = _get_table_lock(table_id)
+    async with lock:
+        hand = teen_patti_manager.get_or_create(table_id, cfg)
+        is_already_seated = any(s.id == user_id for s in hand.seats)
+
+        if not is_already_seated:
+            # Late join check
+            if hand.phase != Phase.WAITING:
+                await websocket.accept()
+                await websocket.send_json({
+                    "type": "error",
+                    "message": "Game is currently in progress at this table. Please wait or choose another table."
+                })
+                await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+                return
+
+            # Table full check
+            if len(hand.seats) >= hand.config.max_players:
+                await websocket.accept()
+                await websocket.send_json({
+                    "type": "error",
+                    "message": "Table is full."
+                })
+                await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+                return
+
+            try:
+                hand.add_seat(user_id, username, is_bot=False)
+            except GameError as ge:
+                await websocket.accept()
+                await websocket.send_json({"type": "error", "message": str(ge)})
+                await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+                return
+
+        await manager.connect(table_id, user_id, websocket)
+        await manager.send_to_user(table_id, user_id, {"type": "event", "event": "joined"})
+        await _broadcast_state(table_id)
 
     try:
         while True:
             msg = await websocket.receive_json()
-            await _handle_action(table_id, user_id, msg)
+            async with lock:
+                await _handle_action(table_id, user_id, msg)
     except WebSocketDisconnect:
         await manager.disconnect(table_id, user_id)
+        async with lock:
+            h = teen_patti_manager.get(table_id)
+            if h and h.phase == Phase.WAITING:
+                h.remove_seat(user_id)
+                await _broadcast_state(table_id)
         await manager.broadcast(table_id, {"type": "event", "event": "left", "seat": user_id})
     except Exception as exc:
         await manager.send_to_user(table_id, user_id, {"type": "error", "message": str(exc)})
@@ -516,12 +570,38 @@ async def _handle_action(table_id: str, user_id: str, msg: dict) -> None:
     is_real = (mode == "real")
 
     try:
+        if action == "start":
+            if hand.phase == Phase.WAITING:
+                if len(hand.seats) < 2:
+                    await manager.send_to_user(table_id, user_id, {
+                        "type": "error",
+                        "message": "Need at least 2 players to start"
+                    })
+                    return
+                await _start_hand(table_id)
+            return
+        elif action == "leave":
+            if hand.phase == Phase.WAITING:
+                hand.remove_seat(user_id)
+                await manager.disconnect(table_id, user_id)
+                await manager.broadcast(table_id, {"type": "event", "event": "left", "seat": user_id})
+                await _broadcast_state(table_id)
+            return
+        elif action == "sync":
+            await _broadcast_state(table_id)
+            return
+
+        # Player must be seated for in-game actions
+        seat_idx = hand._seat_index(user_id)
+        if seat_idx is None:
+            await manager.send_to_user(table_id, user_id, {"type": "error", "message": "Player not at table"})
+            return
+
         if action == "see":
             hand.see(user_id)
         elif action == "bet":
             is_raise = bool(msg.get("raise", False))
-            seat_idx = hand._seat_index(user_id)
-            if seat_idx is not None and is_real:
+            if is_real:
                 seat = hand.seats[seat_idx]
                 mult = 2 if seat.seen else 1
                 next_stake = hand.current_stake * 2 if is_raise else hand.current_stake
@@ -544,8 +624,7 @@ async def _handle_action(table_id: str, user_id: str, msg: dict) -> None:
         elif action == "show":
             hand.show(user_id)
         elif action == "side_show":
-            seat_idx = hand._seat_index(user_id)
-            if seat_idx is not None and is_real:
+            if is_real:
                 seat = hand.seats[seat_idx]
                 cost = hand.current_stake * 2
                 with _get_db_session() as db:
@@ -557,7 +636,7 @@ async def _handle_action(table_id: str, user_id: str, msg: dict) -> None:
                         await _after_action(table_id)
                         return
 
-            target_idx = hand.prev_seen_seat_index(hand._seat_index(user_id))
+            target_idx = hand.prev_seen_seat_index(seat_idx)
             if target_idx is None:
                 await manager.send_to_user(table_id, user_id,
                                            {"type": "error", "message": "no seen seat to compare with"})
@@ -578,11 +657,6 @@ async def _handle_action(table_id: str, user_id: str, msg: dict) -> None:
             _mark_processed(table_id, action_id)
             await _resolve_side_show(table_id, accept=bool(msg.get("accept")))
             return
-        elif action == "start":
-            if hand.phase == Phase.WAITING:
-                await _start_hand(table_id)
-        elif action == "sync":
-            pass
         else:
             await manager.send_to_user(table_id, user_id, {"type": "error", "message": f"unknown action {action}"})
             return

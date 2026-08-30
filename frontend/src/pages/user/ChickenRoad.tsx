@@ -42,7 +42,7 @@ export function ChickenRoadPage() {
   const [multipliers, setMultipliers] = useState<number[]>(DEFAULT_MULTIPLIERS.MEDIUM);
   const [currentMultiplier, setCurrentMultiplier] = useState<number>(1.0);
   const [nextMultiplier, setNextMultiplier] = useState<number>(DEFAULT_MULTIPLIERS.MEDIUM[0]);
-  const [potentialWin, setPotentialWin] = useState<number>(10);
+
   const [winAmount, setWinAmount] = useState<number>(0);
   const [lossLane, setLossLane] = useState<number | null>(null);
   const [isActionLoading, setIsActionLoading] = useState<boolean>(false);
@@ -80,7 +80,7 @@ export function ChickenRoadPage() {
           setNextMultiplier(
             gameStateData.next_multiplier || DEFAULT_MULTIPLIERS[gameStateData.difficulty || 'MEDIUM'][0]
           );
-          setPotentialWin(gameStateData.potential_win || gameStateData.bet_amount || 10);
+
           if (gameStateData.bet_amount) {
             setBetAmount(gameStateData.bet_amount);
           }
@@ -127,7 +127,7 @@ export function ChickenRoadPage() {
       setCurrentLane(0);
       setCurrentMultiplier(1.0);
       setNextMultiplier(res.next_multiplier || multipliers[0]);
-      setPotentialWin(res.potential_win || betAmount);
+
       if (res.wallet_balance !== undefined) {
         setBalance(res.wallet_balance);
       } else {
@@ -151,7 +151,7 @@ export function ChickenRoadPage() {
       setCurrentLane(res.current_lane);
       setCurrentMultiplier(res.current_multiplier);
       setNextMultiplier(res.next_multiplier);
-      setPotentialWin(res.potential_win);
+
     } catch (err) {
       console.error('Failed to register lane cross:', err);
     }
@@ -192,31 +192,6 @@ export function ChickenRoadPage() {
     }
   };
 
-  // Cashout mid-round
-  const handleCashout = async () => {
-    if (!activeRoundId || gameState !== 'ACTIVE' || isActionLoading) return;
-
-    setIsActionLoading(true);
-    setErrorMessage(null);
-
-    try {
-      const res = await chickenRoadService.cashout(activeRoundId);
-      soundManager.play('cashout');
-      setGameState('WON');
-      setWinAmount(res.won_amount);
-      setCurrentMultiplier(res.multiplier);
-      if (res.wallet_balance !== undefined) {
-        setBalance(res.wallet_balance);
-      }
-      setActiveRoundId(null);
-    } catch (err: any) {
-      const msg = err.response?.data?.detail || err.message || 'Failed to cash out';
-      setErrorMessage(msg);
-    } finally {
-      setIsActionLoading(false);
-    }
-  };
-
   // Play again
   const handlePlayAgain = () => {
     setGameState('READY');
@@ -224,7 +199,7 @@ export function ChickenRoadPage() {
     setCurrentLane(0);
     setCurrentMultiplier(1.0);
     setNextMultiplier(multipliers[0]);
-    setPotentialWin(betAmount);
+
     setWinAmount(0);
     setLossLane(null);
     setErrorMessage(null);
@@ -315,12 +290,6 @@ export function ChickenRoadPage() {
               </span>
             </div>
 
-            <div className="cr-hud-pill">
-              <span className="cr-hud-label">Cashout:</span>
-              <span className="cr-hud-val cr-hud-val--win">
-                ₹{potentialWin.toFixed(2)}
-              </span>
-            </div>
           </div>
 
           <RoadCrossingGame
@@ -481,7 +450,7 @@ export function ChickenRoadPage() {
                   </div>
                   <div className="cr-rule-item">
                     <span className="cr-rule-num">5</span>
-                    <span>Cash out anytime or reach the finish line safe zone!</span>
+                    <span>Reach the finish line safe zone!</span>
                   </div>
                 </div>
 
@@ -601,7 +570,7 @@ export function ChickenRoadPage() {
           ))}
         </div>
 
-        {/* Large Green PLAY Button / Glowing CASH OUT Button */}
+        {/* Large Green PLAY Button / Status Button */}
         <div className="cr-play-action-wrap">
           {gameState === 'READY' ? (
             <button
@@ -616,12 +585,11 @@ export function ChickenRoadPage() {
           ) : gameState === 'ACTIVE' ? (
             <button
               type="button"
-              disabled={isActionLoading}
-              onClick={handleCashout}
-              className="cr-cashout-btn"
+              disabled
+              className="cr-play-btn"
+              style={{ opacity: 0.7, filter: 'grayscale(1)' }}
             >
-              <Coins size={18} />
-              <span>{isActionLoading ? 'CASHING...' : `CASH OUT ₹${potentialWin.toFixed(2)}`}</span>
+              <span>CROSSING...</span>
             </button>
           ) : (
             <button

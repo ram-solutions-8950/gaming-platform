@@ -5,7 +5,6 @@ import { Eye, EyeOff } from 'lucide-react';
 import { authService } from '../../services/auth';
 import { useAuthStore } from '../../store/authStore';
 import { GlitterRain } from '../../components/common/GlitterRain';
-import { CasinoLogo } from '../../components/common/CasinoLogo';
 import '../../styles/login-page.css';
 
 interface FormData {
@@ -27,6 +26,9 @@ export function LoginPage() {
     try {
       const res = await authService.login(data.email, data.password);
       if (res.success) {
+        try {
+          sessionStorage.removeItem('referral_popup_shown_this_session');
+        } catch {}
         const me = await authService.me();
         setUser(me);
         navigate(me.role === 'USER' ? '/dashboard' : '/admin/dashboard');
@@ -47,8 +49,8 @@ export function LoginPage() {
       <div className="casino-login-card">
         {/* Logo & Subtitle */}
         <div className="casino-login-header">
-          <CasinoLogo size="md" showSubtitle={false} />
-          <p className="casino-login-subtitle">Sign in to your account</p>
+          <h2 style={{ margin: 0, color: '#fff', fontSize: '24px', letterSpacing: '1px' }}>WELCOME BACK</h2>
+          <p className="casino-login-subtitle">Login to continue your winning journey</p>
         </div>
 
         {/* Login Form */}

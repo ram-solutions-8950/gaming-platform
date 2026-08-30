@@ -23,6 +23,7 @@ export function UserLayout() {
   const [wallet, setWallet] = useState<Wallet | null>(null);
 
   const isLudo = location.pathname.startsWith('/games/ludo');
+  const isDashboard = location.pathname === '/dashboard';
 
   useEffect(() => {
     walletService.getWallet().then(setWallet).catch(() => {});
@@ -43,7 +44,7 @@ export function UserLayout() {
         <div className="p-6 border-b border-dark-700">
           <CasinoLogo size="md" />
         </div>
-        
+
         <div className="p-4">
           <div className="bg-dark-800 rounded-xl p-4 border border-dark-700 shadow-inner">
              <p className="text-xs text-gray-400 mb-1">Total Balance</p>
@@ -93,7 +94,7 @@ export function UserLayout() {
             <span className="text-lg">🎁</span> Refer & Earn
           </button>
         </nav>
-        
+
         <div className="p-4 border-t border-dark-700">
           <div className="flex items-center gap-3 mb-3 px-2">
             <div className="w-9 h-9 bg-gradient-to-br from-brand-500 to-gold-500 rounded-full flex items-center justify-center text-sm font-bold text-white shadow-inner">
@@ -117,8 +118,16 @@ export function UserLayout() {
           <LobbyHeader user={user} wallet={wallet} />
         </div>
 
-        <main className={isLudo ? "flex-1 min-h-0 min-w-0 relative overflow-hidden flex flex-col" : "flex-1 min-h-0 min-w-0 relative overflow-y-auto overflow-x-hidden"}>
-          <div className={isLudo ? "h-full w-full max-w-7xl mx-auto p-0 flex flex-col justify-center items-center overflow-hidden" : "min-h-full w-full max-w-7xl mx-auto p-3 sm:p-5 lg:p-8"}>
+        <main className={
+          isLudo || isDashboard
+            ? "flex-1 min-h-0 min-w-0 relative overflow-hidden flex flex-col"
+            : "flex-1 min-h-0 min-w-0 relative overflow-y-auto overflow-x-hidden"
+        }>
+          <div className={
+            isLudo || isDashboard
+              ? "h-full w-full p-0 flex flex-col flex-1 min-h-0"
+              : "min-h-full w-full max-w-7xl mx-auto p-3 sm:p-5 lg:p-8"
+          }>
             <Outlet />
           </div>
         </main>

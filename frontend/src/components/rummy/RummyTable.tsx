@@ -369,7 +369,7 @@ export default function GameTable({ onBack, customTableId }: { onBack?: () => vo
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hand]);
 
-  const me = state?.players.find((p) => p.name === myUsername) ?? null;
+  const me = state?.players.find((p) => (user?.id && p.id === user.id) || p.name === myUsername) ?? null;
   const myTurn = !!(state && me && state.turn === me.id);
   const phase = state?.phase ?? "connecting";
   const wildRank = state?.wild_rank ?? null;
@@ -404,10 +404,10 @@ export default function GameTable({ onBack, customTableId }: { onBack?: () => vo
   }, [state?.phase, state?.deal_number, state?.players.length, me?.id, resultDismissed, table?.max_players]);
 
   const showingResult = !!state && (state.phase === "deal_over" || state.phase === "game_over") && !resultDismissed;
-  const pointValue = table && table.mode === "real_money" ? table.entry_fee_paise / 100 : null;
+  const pointValue = table && table.mode === "real_money" ? (table.entry_fee_paise / 80) / 100 : null;
   const modeName = table ? (table.mode === "real_money" ? "Points Rummy" : "Practice Rummy") : "";
   const dropPoints = phase === "await_draw" && hand.length === 13 ? FIRST_DROP_POINTS : MIDDLE_DROP_POINTS;
-  const dropCost = pointValue != null ? `₹${(dropPoints * pointValue).toFixed(0)}` : `${dropPoints}`;
+  const dropCost = pointValue != null ? `₹${(dropPoints * pointValue).toFixed(2)}` : `${dropPoints}`;
 
   function toggleSelect(code: string) {
     setSelected((s) => {
@@ -701,7 +701,7 @@ export default function GameTable({ onBack, customTableId }: { onBack?: () => vo
           )}
 
           {state && (state.phase === "deal_over" || state.phase === "game_over") && !resultDismissed && (
-            <ResultOverlay state={state} meId={me?.id ?? null} onContinue={() => setResultDismissed(true)} onBackToLobby={() => navigate("/lobby")} onPlayAgain={handlePlayAgain} playAgainBusy={playAgainBusy} />
+            <ResultOverlay state={state} meId={me?.id ?? null} onContinue={() => setResultDismissed(true)} onBackToLobby={handleBackToLobby} onPlayAgain={handlePlayAgain} playAgainBusy={playAgainBusy} />
           )}
         </div>
       </main>

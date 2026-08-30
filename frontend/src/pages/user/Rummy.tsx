@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   Trophy, Play, Plus, Key, ArrowLeft, RotateCcw,
   BookOpen, History, Flame, Zap
@@ -34,9 +34,11 @@ const POINT_TIERS: { pointValue: number; entryFeePaise: number }[] = [
 ];
 
 export function RummyPage() {
+  const { tableId: routeTableId } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
-  const urlTableId = searchParams.get("tableId");
-  const [activeTableId, setActiveTableId] = useState<string | null>(urlTableId);
+  const queryTableId = searchParams.get("tableId");
+  const effectiveTableId = routeTableId || queryTableId || null;
+  const [activeTableId, setActiveTableId] = useState<string | null>(effectiveTableId);
   const [balance, setBalance] = useState<number>(0);
   const [openTables, setOpenTables] = useState<RummyTableOut[]>([]);
   const [mode, setMode] = useState<Mode>("real_money");
@@ -66,15 +68,15 @@ export function RummyPage() {
 
   const matchmaking = useRummyMatchmaking(token);
 
-  // Sync activeTableId with URL param
+  // Sync activeTableId with route and URL query params
   useEffect(() => {
-    setActiveTableId(urlTableId || null);
-  }, [urlTableId]);
+    setActiveTableId(routeTableId || queryTableId || null);
+  }, [routeTableId, queryTableId]);
 
-  // Fetch real balance
+  // Fetch real balance from /wallet
   const fetchBalance = async () => {
     try {
-      const res = await api.get("/wallet/balance");
+      const res = await api.get("/wallet");
       if (res.data?.data?.balance !== undefined) {
         setBalance(res.data.data.balance / 100);
       }
@@ -206,6 +208,9 @@ export function RummyPage() {
   const handleLeaveTable = () => {
     setActiveTableId(null);
     setSearchParams({});
+    if (routeTableId) {
+      navigate("/games/rummy");
+    }
     fetchBalance();
     fetchTables();
   };

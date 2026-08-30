@@ -74,6 +74,11 @@ class TeenPattiHand:
         self.winner_seat: Optional[int] = None
         self.reason: Optional[str] = None
         self.last_action: Optional[Dict[str, Any]] = None
+        self.is_settled: bool = False
+
+    @property
+    def is_full(self) -> bool:
+        return len(self.seats) >= self.config.max_players
 
     def add_seat(self, user_id: str, name: str, is_bot: bool = False) -> int:
         if len(self.seats) >= self.config.max_players:
@@ -111,6 +116,7 @@ class TeenPattiHand:
         self.phase = Phase.PLAYING
         self.winner_seat = None
         self.reason = None
+        self.is_settled = False
 
         deck = shuffled_deck(self.rng)
         for s in self.seats:
@@ -330,6 +336,22 @@ class TeenPattiHand:
         self.winner_seat = winner_idx
         self.reason = reason
         self.dealer_seat = (self.dealer_seat + 1) % max(1, len(self.seats))
+
+    def reset_for_next_hand(self) -> None:
+        self.phase = Phase.WAITING
+        self.pot = 0
+        self.current_stake = self.config.boot_amount
+        self.winner_seat = None
+        self.reason = None
+        self.last_action = None
+        self.is_settled = False
+        for s in self.seats:
+            s.cards = []
+            s.seen = False
+            s.blind_count = 0
+            s.status = PlayerStatus.ACTIVE
+            s.total_bet = 0
+            s.show_cards = False
 
     def as_dict(self, for_user_id: Optional[str] = None) -> Dict[str, Any]:
         viewer_idx = self._seat_index(for_user_id) if for_user_id else None

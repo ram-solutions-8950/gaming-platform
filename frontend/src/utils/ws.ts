@@ -12,9 +12,8 @@ export function getWebSocketUrl(path: string, token?: string): string {
 
   const envApiUrl = import.meta.env.VITE_API_URL?.trim() || 'http://76.13.177.44/api/v1';
   const isDevHost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-  const isEnvLocal = envApiUrl.includes('localhost') || envApiUrl.includes('127.0.0.1');
 
-  if (isDevHost && isEnvLocal) {
+  if (isDevHost) {
     wsBase = `${wsProtocol}//127.0.0.1:8000/api/v1`;
   } else {
     try {

@@ -1,7 +1,10 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: (import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.trim() : '') || 'http://76.13.177.44/api/v1',
+  baseURL:
+    window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+      ? 'http://127.0.0.1:8000/api/v1'
+      : ((import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.trim() : '') || 'http://76.13.177.44/api/v1'),
   headers: { 'Content-Type': 'application/json' },
 });
 

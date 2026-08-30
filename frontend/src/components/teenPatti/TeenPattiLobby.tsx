@@ -39,18 +39,34 @@ export const TeenPattiLobby: React.FC<TeenPattiLobbyProps> = ({ onJoinTable }) =
 
   const handleCreateTierTable = async (tier: typeof BOOT_TIERS[0]) => {
     try {
+      setJoinError('');
       setCreatingTable(true);
-      const tbl = await teenPattiService.createTable({
-        name: tier.name,
-        mode: 'real',
-        max_players: 4,
-        boot_amount: tier.boot,
-        turn_seconds: 15,
-        is_private: false,
-      });
+      const tbl = await teenPattiService.quickJoinTable(tier.boot, 'real');
       onJoinTable(tbl.id);
-    } catch (e) {
-      alert('Could not create table. Please check wallet balance.');
+    } catch (e: any) {
+      let errorMsg = 'Could not join or create table.';
+      const status = e.response?.status;
+      const detail = e.response?.data?.detail;
+      const message = e.response?.data?.message;
+
+      if (status === 401) {
+        errorMsg = 'Authentication failure. Please log in again.';
+      } else if (detail && typeof detail === 'string') {
+        errorMsg = detail;
+      } else if (message && typeof message === 'string') {
+        errorMsg = message;
+      } else if (status === 404) {
+        errorMsg = 'Table unavailable or not found.';
+      } else if (status === 409) {
+        errorMsg = 'Table is currently full. Please try another stake.';
+      } else if (status && status >= 500) {
+        errorMsg = 'Game server error. Please try again shortly.';
+      } else if (e.code === 'ERR_NETWORK' || !e.response) {
+        errorMsg = 'Cannot connect to game server. Please check your connection.';
+      } else if (e.message) {
+        errorMsg = e.message;
+      }
+      setJoinError(errorMsg);
     } finally {
       setCreatingTable(false);
     }
@@ -64,14 +80,22 @@ export const TeenPattiLobby: React.FC<TeenPattiLobbyProps> = ({ onJoinTable }) =
       const tbl = await teenPattiService.joinByCode(joinCodeInput.trim().toUpperCase());
       onJoinTable(tbl.id);
     } catch (e: any) {
-      setJoinError(e.response?.data?.detail || 'Invalid or expired room code');
+      const detail = e.response?.data?.detail;
+      const status = e.response?.status;
+      let msg = 'Invalid or expired room code';
+      if (status === 401) {
+        msg = 'Authentication failure. Please log in again.';
+      } else if (detail) {
+        msg = detail;
+      }
+      setJoinError(msg);
     }
   };
 
   return (
-    <div className="w-full max-w-5xl mx-auto p-3 sm:p-4 text-white space-y-4">
-      {/* Header Bar */}
-      <div className="flex items-center justify-between border-b border-white/10 pb-3">
+    <div className="w-full max-w-5xl mx-auto p-3 sm:p-4 pb-32 text-white space-y-4">
+      {/* Sticky Header Bar */}
+      <div className="sticky top-0 z-30 bg-[#020617]/95 backdrop-blur-md py-2.5 px-1 border-b border-white/10 flex items-center justify-between">
         <button
           type="button"
           onClick={() => navigate('/dashboard')}
@@ -84,6 +108,23 @@ export const TeenPattiLobby: React.FC<TeenPattiLobbyProps> = ({ onJoinTable }) =
         </h1>
         <div className="w-20 hidden sm:block" />
       </div>
+
+      {/* Prominent Error Banner */}
+      {joinError && (
+        <div className="bg-red-500/20 border border-red-500/50 rounded-xl p-3 text-red-300 text-xs font-semibold flex items-center justify-between gap-2 shadow-sm">
+          <div className="flex items-center gap-2">
+            <span className="text-base">⚠️</span>
+            <span>{joinError}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setJoinError('')}
+            className="text-red-300 hover:text-white font-bold text-sm px-1"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       {/* Private Room Code Input */}
       <div className="bg-dark-900/90 border border-gold-500/30 rounded-2xl p-3 sm:p-4 flex flex-wrap items-center justify-between gap-3 shadow-lg">
@@ -107,7 +148,6 @@ export const TeenPattiLobby: React.FC<TeenPattiLobbyProps> = ({ onJoinTable }) =
             Join Room
           </button>
         </form>
-        {joinError && <div className="text-red-400 text-xs w-full font-semibold">{joinError}</div>}
       </div>
 
       {/* Quick Play Stakes Grid */}

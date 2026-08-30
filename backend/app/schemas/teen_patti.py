@@ -41,6 +41,11 @@ class TableJoinByCode(BaseModel):
     code: str = Field(min_length=6, max_length=8)
 
 
+class TableQuickJoin(BaseModel):
+    boot_amount: int = Field(default=1000, gt=0)
+    mode: Literal["virtual", "real"] = "real"
+
+
 class TableOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

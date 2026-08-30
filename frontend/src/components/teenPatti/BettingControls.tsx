@@ -38,12 +38,26 @@ export const BettingControls: React.FC<BettingControlsProps> = ({
   const raiseChaalCost = (gameState.current_stake * 2) * multiplier;
 
   if (isWaiting) {
+    const playerCount = gameState.seats?.length || 0;
+    const canStart = playerCount >= 2;
+
     return (
       <div className="tp-action-dock">
-        <button className="tp-btn tp-btn-chaal" onClick={onStart} style={{ minWidth: 160 }}>
-          <span>Deal Hand</span>
-          <span className="tp-btn-sub">Start Round</span>
-        </button>
+        {canStart ? (
+          <button className="tp-btn tp-btn-chaal" onClick={onStart} style={{ minWidth: 160 }}>
+            <span>Deal Hand</span>
+            <span className="tp-btn-sub">Start Round ({playerCount} Players)</span>
+          </button>
+        ) : (
+          <button
+            className="tp-btn tp-btn-chaal"
+            disabled
+            style={{ minWidth: 180, opacity: 0.65, cursor: 'not-allowed' }}
+          >
+            <span>Waiting for Players</span>
+            <span className="tp-btn-sub">Need min 2 ({playerCount}/4)</span>
+          </button>
+        )}
       </div>
     );
   }

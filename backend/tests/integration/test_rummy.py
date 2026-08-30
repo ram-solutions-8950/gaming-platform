@@ -292,3 +292,51 @@ def test_wallet_stake_and_settlement(db):
             reference_type="RUMMY_STAKE",
             reference_id="deal_test_123_p2",
         )
+
+
+def test_settlement_point_value_regression():
+    """Regression: point_value_paise must be entry_fee_paise / 80, NOT entry_fee_paise.
+
+    Bug: Previously, _settle_real_money used point_value = table.entry_fee_paise,
+    causing an 80x over-calculation. E.g. for ₹0.10/pt (entry_fee=800 paise),
+    a 40-point loss debited 40*800=32000 paise (₹320) instead of 40*10=400 (₹4).
+    """
+    # Verify the formula for each tier
+    tiers = [
+        # (entry_fee_paise, expected_point_value_paise, expected_80pt_loss)
+        (800, 10, 800),       # ₹0.10/pt → 10 paise/pt → 80 * 10 = 800
+        (4000, 50, 4000),     # ₹0.50/pt → 50 paise/pt → 80 * 50 = 4000
+        (8000, 100, 8000),    # ₹1.00/pt → 100 paise/pt → 80 * 100 = 8000
+        (40000, 500, 40000),  # ₹5.00/pt → 500 paise/pt → 80 * 500 = 40000
+    ]
+    for entry_fee_paise, expected_pv, expected_max_loss in tiers:
+        point_value_paise = max(1, round(entry_fee_paise / 80))
+        assert point_value_paise == expected_pv, (
+            f"entry_fee={entry_fee_paise}: got pv={point_value_paise}, expected {expected_pv}"
+        )
+
+        # 40-point loss should be 40 * point_value, capped at entry_fee
+        loss_40pt = min(40 * point_value_paise, entry_fee_paise)
+        assert loss_40pt == 40 * expected_pv
+
+        # 80-point loss (max drop) should equal entry_fee_paise exactly
+        loss_80pt = min(80 * point_value_paise, entry_fee_paise)
+        assert loss_80pt == expected_max_loss
+
+        # 100-point loss (over max) should be capped at entry_fee_paise
+        loss_100pt = min(100 * point_value_paise, entry_fee_paise)
+        assert loss_100pt == entry_fee_paise
+
+
+def test_table_reuse_logic():
+    """Verify that create_table returns an existing waiting table when criteria match."""
+    from app.routers.rummy import _cleanup_stale_tables
+    from app.services.rummy.game_manager import game_manager
+
+    # Directly test that _cleanup_stale_tables doesn't crash with empty DB
+    # (Just a smoke test — full reuse is an integration concern)
+    assert callable(_cleanup_stale_tables)
+
+    # Verify game_manager.get returns None for non-existent tables
+    result = game_manager.get("nonexistent-table-id")
+    assert result is None

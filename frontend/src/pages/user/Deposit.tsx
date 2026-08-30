@@ -163,7 +163,7 @@ export function DepositPage() {
         key: depositData.key_id,
         amount: depositData.amount,
         currency: depositData.currency,
-        name: 'Gaming Platform',
+        name: 'Corona 888',
         description: 'Wallet Deposit',
         order_id:
           depositData.provider_order_id,

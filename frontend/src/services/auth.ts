@@ -27,6 +27,9 @@ export const authService = {
     }
     localStorage.removeItem('access_token');
     localStorage.removeItem('refresh_token');
+    try {
+      sessionStorage.removeItem('referral_popup_shown_this_session');
+    } catch {}
   },
   async me(): Promise<User> {
     const res = await api.get('/auth/me');

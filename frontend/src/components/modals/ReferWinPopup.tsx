@@ -42,7 +42,7 @@ export function ReferWinPopup({ onClose }: ReferWinPopupProps) {
   };
 
   const shareText = encodeURIComponent(
-    `Join me on 777WIN and get bonus rewards! Use my referral code ${stats?.referral_code || ''} to play and win: ${referralLink}`
+    `Join me on Corona 888 and get bonus rewards! Use my referral code ${stats?.referral_code || ''} to play and win: ${referralLink}`
   );
 
   const rewardPerFriend = stats?.reward_amount ?? 100;

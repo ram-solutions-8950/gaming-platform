@@ -64,7 +64,7 @@ app.include_router(admin.router, prefix=PREFIX)
 app.include_router(fees.router, prefix=PREFIX)
 app.include_router(games.router, prefix=PREFIX)
 app.include_router(referral.router, prefix=PREFIX)
-from .routers import ludo, rummy, teen_patti, aviator, poker, chicken_road, triple_777
+from .routers import ludo, rummy, teen_patti, aviator, poker, chicken_road, triple_777, roulette
 from .websocket import teen_patti_ws, aviator_ws, poker_ws
 app.include_router(ludo.router, prefix=PREFIX)
 app.include_router(rummy.router, prefix=PREFIX)
@@ -76,6 +76,7 @@ app.include_router(poker.router, prefix=PREFIX)
 app.include_router(poker_ws.router, prefix=PREFIX)
 app.include_router(chicken_road.router, prefix=PREFIX)
 app.include_router(triple_777.router, prefix=PREFIX)
+app.include_router(roulette.router, prefix=PREFIX)
 
 # Static file serving — QR code uploads only
 QR_UPLOAD_DIR = Path(__file__).resolve().parent.parent / "uploads" / "qr"

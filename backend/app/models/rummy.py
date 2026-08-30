@@ -26,8 +26,8 @@ class RummyTable(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name = Column(String(80), nullable=False, default="Deals Rummy")
-    mode = Column(SAEnum(RummyTableMode, name="rummy_table_mode"), nullable=False, default=RummyTableMode.FREE)
-    status = Column(SAEnum(RummyTableStatus, name="rummy_table_status"), nullable=False, default=RummyTableStatus.OPEN)
+    mode = Column(SAEnum(RummyTableMode, values_callable=lambda x: [e.value for e in x], name="rummy_table_mode"), nullable=False, default=RummyTableMode.FREE)
+    status = Column(SAEnum(RummyTableStatus, values_callable=lambda x: [e.value for e in x], name="rummy_table_status"), nullable=False, default=RummyTableStatus.OPEN)
     max_players = Column(Integer, nullable=False, default=2)
     num_deals = Column(Integer, nullable=False, default=2)
     entry_fee_paise = Column(BigInteger, nullable=False, default=0)

@@ -24,22 +24,20 @@ interface GameCardDef {
 }
 
 const GAME_DEFS: GameCardDef[] = [
-  { id: 'ludo', name: 'Ludo', subtitle: 'Board Game', emoji: '🎲', gradient: 'gc-blue', badge: 'HOT', path: '/games/ludo', category: ['ALL'] },
+  { id: 'ludo', name: 'Ludo', subtitle: 'Board Game', emoji: '🎲', gradient: 'gc-blue', badge: 'HOT', path: '/games/ludo', category: ['ALL', 'CASINO'] },
   { id: 'dragon-tiger', name: 'Dragon Tiger', subtitle: 'Casino', emoji: '🐉', gradient: 'gc-orange', badge: 'HOT', path: '/games/dragon-tiger', category: ['ALL', 'CASINO'] },
   { id: 'andar-bahar', name: 'Andar Bahar', subtitle: 'Cards', emoji: '🎴', gradient: 'gc-emerald', badge: 'NEW', path: '/games/andar-bahar', category: ['ALL', 'CARDS', 'CASINO'] },
-  { id: 'rummy', name: 'Rummy', subtitle: 'Cards', emoji: '🃏', gradient: 'gc-teal', badge: 'HOT', path: '/games/rummy', category: ['ALL', 'CARDS', 'POKER'] },
-  { id: 'teen-patti', name: 'Teen Patti', subtitle: 'Cards', emoji: '♠️', gradient: 'gc-yellow', badge: 'HOT', path: '/games/teen-patti', category: ['ALL', 'CARDS', 'POKER'] },
+  { id: 'rummy', name: 'Indian Rummy', subtitle: 'Cards', emoji: '🃏', gradient: 'gc-teal', badge: 'HOT', path: '/games/rummy', category: ['ALL', 'CARDS'] },
+  { id: 'teen-patti', name: 'Teen Patti', subtitle: 'Cards', emoji: '♠️', gradient: 'gc-yellow', badge: 'HOT', path: '/games/teen-patti', category: ['ALL', 'CARDS', 'CASINO'] },
   { id: 'aviator', name: 'Aviator', subtitle: 'Crash', emoji: '✈️', gradient: 'gc-red', badge: 'HOT', path: '/games/aviator', category: ['ALL', 'CASINO'] },
-  { id: 'poker', name: "Texas Hold'em Poker", subtitle: 'Cards', emoji: '♠️', gradient: 'gc-indigo', badge: 'NEW', path: '/games/poker', category: ['ALL', 'CARDS', 'POKER'] },
-  { id: 'chicken-road', name: 'Chicken Road', subtitle: 'Arcade', emoji: '🐔', gradient: 'gc-amber', badge: 'NEW', path: '/games/chicken-road', category: ['ALL', 'ARCADE', 'CASINO'] },
-  { id: 'baccarat', name: 'Baccarat', subtitle: 'Casino', emoji: '🂡', gradient: 'gc-indigo', badge: null, path: '#', category: ['ALL', 'BACCARAT', 'CASINO'] },
-  { id: 'roulette', name: 'Roulette', subtitle: 'Casino', emoji: '🎡', gradient: 'gc-red', badge: 'NEW', path: '/games/roulette', category: ['ALL', 'CASINO'] },
+  { id: 'poker', name: "Texas Hold'em Poker", subtitle: 'Cards', emoji: '♠️', gradient: 'gc-indigo', badge: 'NEW', path: '/games/poker', category: ['ALL', 'CARDS'] },
+  { id: 'roulette', name: 'Roulette', subtitle: 'Casino', emoji: '🎡', gradient: 'gc-red', badge: 'HOT', path: '/games/roulette', category: ['ALL', 'CASINO'] },
+  { id: 'chicken-road', name: 'Chicken Road', subtitle: 'Arcade', emoji: '🐔', gradient: 'gc-amber', badge: 'NEW', path: '/games/chicken-road', category: ['ALL', 'CASINO'] },
   { id: 'triple-777', name: 'Triple 777', subtitle: 'Classic Slots', emoji: '🎰', gradient: 'gc-rose', badge: 'HOT', path: '/games/triple-777', category: ['ALL', 'SLOTS', 'CASINO'] },
-  { id: 'safari', name: 'Safari of Wealth', subtitle: 'Slots', emoji: '🦁', gradient: 'gc-amber', badge: 'HOT', path: '#', category: ['ALL', 'SLOTS'] },
-  { id: 'jackpot-fishing', name: 'Jackpot Fishing', subtitle: 'Casual', emoji: '🐟', gradient: 'gc-cyan', badge: 'NEW', path: '#', category: ['ALL'] },
 ];
 
-const FEATURED_GAME = { id: 'slots', name: 'Explorer Slots', subtitle: 'Slots', emoji: '🎰', gradient: 'gc-purple', badge: 'NEW' as const, path: '#', category: ['ALL', 'SLOTS'] };
+const FEATURED_GAME = GAME_DEFS[0]; // Real playable Ludo
+const PLAYABLE_CATEGORIES = ['ALL', 'CASINO', 'CARDS', 'SLOTS'];
 
 /* ─── Glitter particles ─── */
 function LobbyGlitter() {
@@ -75,6 +73,8 @@ function LobbyGlitter() {
   );
 }
 
+const REFERRAL_POPUP_SESSION_KEY = 'referral_popup_shown_this_session';
+
 /* ─── Main Component ─── */
 export function DashboardPage() {
   const navigate = useNavigate();
@@ -83,10 +83,18 @@ export function DashboardPage() {
   const [activePopup, setActivePopup] = useState<'free' | 'refer' | null>(null);
 
   useEffect(() => {
-    const timer1 = setTimeout(() => {
-      setActivePopup('free');
-    }, 650);
-    return () => clearTimeout(timer1);
+    try {
+      const alreadyShown = sessionStorage.getItem(REFERRAL_POPUP_SESSION_KEY);
+      if (!alreadyShown) {
+        sessionStorage.setItem(REFERRAL_POPUP_SESSION_KEY, 'true');
+        const timer1 = setTimeout(() => {
+          setActivePopup('free');
+        }, 650);
+        return () => clearTimeout(timer1);
+      }
+    } catch {
+      // Graceful fallback if sessionStorage is inaccessible
+    }
   }, []);
 
   useEffect(() => {
@@ -144,7 +152,7 @@ export function DashboardPage() {
       <div className="game-lobby__content">
         <div className="lobby-header-ticker-area">
           <WinningTicker />
-          <CategoryTabs activeCategory={activeCategory} onCategoryChange={setActiveCategory} />
+          <CategoryTabs categories={PLAYABLE_CATEGORIES} activeCategory={activeCategory} onCategoryChange={setActiveCategory} />
         </div>
 <div className="lobby-main-grid">
 

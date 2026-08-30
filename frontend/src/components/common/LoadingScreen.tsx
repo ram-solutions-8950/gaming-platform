@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import splashBg from '../../assets/casino-splash-bg.png';
+import splashBg from '../../assets/corona888-logo.jpg';
 import '../../styles/loading-screen.css';
 
 interface LoadingScreenProps {
@@ -51,23 +51,12 @@ export function LoadingScreen({
         className="splash-bg-image"
       />
 
-      {/* Atmospheric upper-center golden glow bloom */}
-      <div className="splash-radial-light" />
-
-      {/* Subtle sweeping light shimmer across center */}
-      <div className="splash-center-shine" />
-
-      {/* Center animated loading indicator */}
-      <div className="splash-center-spinner" />
-
-      {/* Smooth animated loading bar */}
-      <div className="splash-loading-bar-track">
-        <div className="splash-loading-bar-progress" />
-      </div>
-
-      {/* Version identifier in bottom-left */}
-      <div className="splash-version">
-        V1.8.2
+      {/* Clean loading indicator at the bottom */}
+      <div className="splash-loading-container">
+        <div className="splash-loading-text">LOADING...</div>
+        <div className="splash-loading-bar-track">
+          <div className="splash-loading-bar-progress" />
+        </div>
       </div>
     </div>
   );

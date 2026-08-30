@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import random
 import uuid
 from collections import OrderedDict, defaultdict
@@ -24,6 +25,8 @@ from ..services.rummy.deals_rummy import DealsRummyGame, GameConfig, Phase, Play
 from ..services.rummy.errors import GameError
 from ..services.rummy.game_manager import game_manager
 from ..services.wallet_service import credit_wallet, debit_wallet, get_balance
+
+logger = logging.getLogger(__name__)
 
 
 @contextmanager
@@ -317,9 +320,17 @@ def _settle_real_money(table_id: str, game: DealsRummyGame) -> None:
             return
         if table is None or str(table.mode.value if hasattr(table.mode, "value") else table.mode) != "real_money":
             return
-        point_value = table.entry_fee_paise
-        if point_value <= 0:
+        if table.entry_fee_paise <= 0:
             return
+
+        # In Points Rummy, entry_fee_paise represents the 80-point maximum loss cap.
+        # The point value per point is table.entry_fee_paise // 80.
+        # e.g., ₹0.10/point: entry_fee_paise = 800 -> point_value_paise = 10 paise (₹0.10).
+        # 80 points * 10 paise = 800 paise = ₹8.00.
+        if table.entry_fee_paise >= 80:
+            point_value_paise = max(1, round(table.entry_fee_paise / 80))
+        else:
+            point_value_paise = max(1, table.entry_fee_paise)
 
         deal_key = f"{table_id}:{game.deal_number}"
         total_credit = 0
@@ -330,7 +341,8 @@ def _settle_real_money(table_id: str, game: DealsRummyGame) -> None:
             for p in game.players:
                 if p.id == game.winner_id or p.deal_points <= 0 or _is_bot(p.id):
                     continue
-                amount = p.deal_points * point_value
+                # Calculate exact loss capped at entry_fee_paise (80 points maximum)
+                amount = min(p.deal_points * point_value_paise, table.entry_fee_paise)
                 uid = uuid.UUID(p.id)
                 debit_wallet(
                     db=db,
@@ -383,6 +395,12 @@ async def game_socket(websocket: WebSocket, table_id: str) -> None:
     token = websocket.query_params.get("token")
     auth = _authenticate(token)
     if auth is None:
+        await websocket.accept()
+        await websocket.send_json({
+            "type": "error",
+            "code": "AUTH_REQUIRED",
+            "message": "Authentication required. Please log in again.",
+        })
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
         return
     user_id, username = auth
@@ -397,7 +415,16 @@ async def game_socket(websocket: WebSocket, table_id: str) -> None:
 
         if table is not None and str(table.mode.value if hasattr(table.mode, "value") else table.mode) == "real_money" and table.entry_fee_paise > 0:
             wallet = get_balance(db, uuid.UUID(user_id))
-            if not wallet or wallet.balance < table.entry_fee_paise:
+            current_balance = wallet.balance if wallet else 0
+            if current_balance < table.entry_fee_paise:
+                await websocket.accept()
+                await websocket.send_json({
+                    "type": "error",
+                    "code": "INSUFFICIENT_BALANCE",
+                    "message": f"Insufficient balance. Required: ₹{table.entry_fee_paise / 100:.2f}, Available: ₹{current_balance / 100:.2f}",
+                    "required_paise": table.entry_fee_paise,
+                    "available_paise": current_balance,
+                })
                 await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
                 return
 

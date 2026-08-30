@@ -89,6 +89,11 @@ export const teenPattiService = {
     return res.data;
   },
 
+  quickJoinTable: async (boot_amount: number, mode: 'virtual' | 'real' = 'real'): Promise<TeenPattiTable> => {
+    const res = await api.post('/teen-patti/tables/quick-join', { boot_amount, mode });
+    return res.data;
+  },
+
   getHistory: async (): Promise<HandHistoryItem[]> => {
     const res = await api.get('/teen-patti/history');
     return res.data;

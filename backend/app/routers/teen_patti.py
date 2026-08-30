@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 import secrets
+import threading
 import uuid
 from typing import List, Optional
 
@@ -15,7 +16,7 @@ from ..dependencies.database import get_db
 from ..models.teen_patti import TeenPattiHandHistory, TeenPattiTable, TeenPattiTableMode, TeenPattiTableStatus
 from ..models.transaction import WalletTransactionType
 from ..models.user import User
-from ..schemas.teen_patti import HandHistoryOut, PlayHandRequest, PlayHandResponse, TableCreate, TableJoinByCode, TableOut
+from ..schemas.teen_patti import HandHistoryOut, PlayHandRequest, PlayHandResponse, TableCreate, TableJoinByCode, TableQuickJoin, TableOut
 from ..security.permissions import require_user
 from ..services.teen_patti import bot_strategy
 from ..services.teen_patti.cards import Card, new_server_seed, server_seed_hash
@@ -24,6 +25,8 @@ from ..services.teen_patti.manager import teen_patti_manager
 from ..services.wallet_service import credit_wallet, debit_wallet, get_balance
 
 router = APIRouter(prefix="/teen-patti", tags=["teen-patti"])
+
+_matchmaking_lock = threading.Lock()
 
 
 def _generate_join_code() -> str:
@@ -158,6 +161,9 @@ def play_instant_hand(
     )
 
 
+VALID_BOOT_TIERS = {100, 500, 1000, 5000}
+
+
 @router.get("/tables", response_model=List[TableOut])
 def list_tables(
     mode: Optional[str] = Query(None),
@@ -168,8 +174,11 @@ def list_tables(
         TeenPattiTable.status.in_([TeenPattiTableStatus.OPEN, TeenPattiTableStatus.RUNNING]),
     )
     if mode:
-        q = q.filter(TeenPattiTable.mode == mode)
-    tables = q.order_by(TeenPattiTable.created_at.desc()).all()
+        try:
+            q = q.filter(TeenPattiTable.mode == TeenPattiTableMode(mode))
+        except ValueError:
+            q = q.filter(TeenPattiTable.mode == mode)
+    tables = q.order_by(TeenPattiTable.created_at.desc()).limit(20).all()
     results = []
     for t in tables:
         live = teen_patti_manager.get(str(t.id))
@@ -233,6 +242,97 @@ def join_by_code(
     out = TableOut.model_validate(table)
     out.player_count = count
     return out
+
+
+@router.post("/tables/quick-join", response_model=TableOut)
+def quick_join_table(
+    payload: TableQuickJoin,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    # Validate boot tier
+    if payload.boot_amount not in VALID_BOOT_TIERS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid boot tier: ₹{payload.boot_amount / 100:.2f}. Allowed stakes: ₹1, ₹5, ₹10, ₹50."
+        )
+
+    mode_enum = TeenPattiTableMode(payload.mode)
+
+    # Check user balance for real-money table
+    if payload.mode == "real":
+        wallet = get_balance(db, current_user.id)
+        current_balance = wallet.balance if wallet else 0
+        if current_balance < payload.boot_amount:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Insufficient wallet balance. Required: ₹{payload.boot_amount / 100:.2f}, Available: ₹{current_balance / 100:.2f}"
+            )
+
+    with _matchmaking_lock:
+        open_tables = db.query(TeenPattiTable).filter(
+            TeenPattiTable.is_private == False,
+            TeenPattiTable.mode == mode_enum,
+            TeenPattiTable.boot_amount == payload.boot_amount,
+            TeenPattiTable.status == TeenPattiTableStatus.OPEN,
+        ).order_by(TeenPattiTable.created_at.desc()).all()
+
+        # If user is already seated at an open table, return that table
+        for t in open_tables:
+            live = teen_patti_manager.get(str(t.id))
+            if live and any(s.id == str(current_user.id) for s in live.seats):
+                out = TableOut.model_validate(t)
+                out.player_count = len(live.seats)
+                return out
+
+        # Priority 1: Find open table with waiting players (1 to max_players - 1)
+        for t in open_tables:
+            live = teen_patti_manager.get(str(t.id))
+            if live and 0 < len(live.seats) < t.max_players and live.phase == Phase.WAITING:
+                out = TableOut.model_validate(t)
+                out.player_count = len(live.seats)
+                return out
+
+        # Priority 2: Reuse an existing open table that is currently empty
+        for t in open_tables:
+            live = teen_patti_manager.get(str(t.id))
+            count = len(live.seats) if live else 0
+            if count == 0 and (live is None or live.phase == Phase.WAITING):
+                cfg = GameConfig(
+                    boot_amount=t.boot_amount,
+                    max_players=t.max_players,
+                    turn_seconds=t.turn_seconds,
+                )
+                teen_patti_manager.get_or_create(str(t.id), cfg)
+                out = TableOut.model_validate(t)
+                out.player_count = 0
+                return out
+
+        # Priority 3: Create a new open table
+        tier_label = f"₹{payload.boot_amount // 100}" if payload.boot_amount >= 100 else f"{payload.boot_amount}p"
+        table = TeenPattiTable(
+            name=f"Royal Table {tier_label}",
+            mode=mode_enum,
+            status=TeenPattiTableStatus.OPEN,
+            max_players=4,
+            boot_amount=payload.boot_amount,
+            turn_seconds=15,
+            is_private=False,
+        )
+        db.add(table)
+        db.commit()
+        db.refresh(table)
+
+        cfg = GameConfig(
+            boot_amount=table.boot_amount,
+            max_players=table.max_players,
+            turn_seconds=table.turn_seconds,
+        )
+        teen_patti_manager.get_or_create(str(table.id), cfg)
+
+        out = TableOut.model_validate(table)
+        out.player_count = 0
+        return out
 
 
 @router.get("/tables/{table_id}", response_model=TableOut)

@@ -1,4 +1,4 @@
-package com.gamestack.app;
+package com.corona888.app;
 
 import com.getcapacitor.BridgeActivity;
 

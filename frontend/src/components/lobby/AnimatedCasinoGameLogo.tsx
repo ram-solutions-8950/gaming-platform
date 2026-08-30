@@ -2,7 +2,6 @@ import React from 'react';
 import casinoCardsEmblem from '../../assets/casino-cards-3d-emblem.png';
 import pokerHero from '../../assets/poker-hero.jpg';
 import teenPattiHero from '../../assets/teen-patti-hero.jpg';
-import baccaratHero from '../../assets/baccarat-hero.jpg';
 import '../../styles/animated-casino-logo.css';
 
 export interface AnimatedCasinoGameLogoProps {
@@ -17,19 +16,16 @@ export const AnimatedCasinoGameLogo: React.FC<AnimatedCasinoGameLogoProps> = ({
   const g = game.toLowerCase();
   const isPoker = g.includes('poker');
   const isTeenPatti = g.includes('teen') || g.includes('patti');
-  const isBaccarat = g.includes('baccarat');
 
   const imgSrc = isPoker
     ? pokerHero
     : isTeenPatti
     ? teenPattiHero
-    : isBaccarat
-    ? baccaratHero
     : casinoCardsEmblem;
 
   return (
     <div
-      className={`casino-card-art-container ${className} ${isPoker ? 'casino-card-art--poker' : ''} ${isTeenPatti ? 'casino-card-art--teen-patti' : ''} ${isBaccarat ? 'casino-card-art--baccarat' : ''}`}
+      className={`casino-card-art-container ${className} ${isPoker ? 'casino-card-art--poker' : ''} ${isTeenPatti ? 'casino-card-art--teen-patti' : ''}`}
       data-game={game}
       aria-hidden="true"
     >
