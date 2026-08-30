@@ -61,7 +61,7 @@ export const LobbyHeader: React.FC<Props> = ({ user, wallet }) => {
               className="text-[8px] bg-red-600/90 hover:bg-red-500 text-white font-black px-1.5 py-0.5 rounded border border-red-400/60 shadow-sm active:scale-95 transition cursor-pointer flex items-center gap-0.5"
               title="Logout this Account"
             >
-              🚪 Exit
+              🚪 Sign Out
             </button>
           </div>
         </div>

@@ -1,10 +1,11 @@
 import { useForm } from 'react-hook-form';
 import { useNavigate, Link } from 'react-router-dom';
 import { useState } from 'react';
-import { Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, Mail, Lock } from 'lucide-react';
 import { authService } from '../../services/auth';
 import { useAuthStore } from '../../store/authStore';
 import { GlitterRain } from '../../components/common/GlitterRain';
+import splashBg from '../../assets/corona888-logo.jpg';
 import '../../styles/login-page.css';
 
 interface FormData {
@@ -43,13 +44,18 @@ export function LoginPage() {
   };
 
   return (
-    <div className="auth-page-wrapper">
+    <div
+      className="auth-page-wrapper"
+      style={{
+        backgroundImage: `linear-gradient(rgba(3, 6, 16, 0.15), rgba(3, 6, 16, 0.32)), url(${splashBg})`,
+      }}
+    >
       <GlitterRain />
 
       <div className="casino-login-card">
         {/* Logo & Subtitle */}
         <div className="casino-login-header">
-          <h2 style={{ margin: 0, color: '#fff', fontSize: '24px', letterSpacing: '1px' }}>WELCOME BACK</h2>
+          <h2 className="casino-login-title">WELCOME BACK</h2>
           <p className="casino-login-subtitle">Login to continue your winning journey</p>
         </div>
 
@@ -66,14 +72,17 @@ export function LoginPage() {
             <label htmlFor="email" className="casino-input-label">
               Email
             </label>
-            <input
-              id="email"
-              type="email"
-              placeholder="you@example.com"
-              autoComplete="email"
-              className="casino-input-field"
-              {...register('email', { required: 'Email is required' })}
-            />
+            <div className="casino-input-wrapper">
+              <Mail className="casino-input-icon" size={18} />
+              <input
+                id="email"
+                type="email"
+                placeholder="you@example.com"
+                autoComplete="email"
+                className="casino-input-field with-icon"
+                {...register('email', { required: 'Email is required' })}
+              />
+            </div>
             {errors.email && (
               <span className="casino-field-error">{errors.email.message}</span>
             )}
@@ -84,13 +93,14 @@ export function LoginPage() {
             <label htmlFor="password" className="casino-input-label">
               Password
             </label>
-            <div className="password-input-wrapper">
+            <div className="casino-input-wrapper password-input-wrapper">
+              <Lock className="casino-input-icon" size={18} />
               <input
                 id="password"
                 type={showPassword ? 'text' : 'password'}
                 placeholder="Password"
                 autoComplete="current-password"
-                className="casino-input-field"
+                className="casino-input-field with-icon with-toggle"
                 {...register('password', { required: 'Password is required' })}
               />
               <button
@@ -124,7 +134,7 @@ export function LoginPage() {
 
           {/* Footer Link */}
           <p className="casino-login-footer">
-            Don't have an account?
+            Don't have an account?{' '}
             <Link to="/signup" className="casino-login-link">
               Sign up
             </Link>

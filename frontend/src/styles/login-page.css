@@ -1,37 +1,40 @@
 /* ───────────────────────────────────────────────────────────
-   Corona 888 CASINO LOGIN PAGE THEME
+   Corona 888 CASINO LOGIN & SIGNUP PAGE THEME
    ─────────────────────────────────────────────────────────── */
 
 .auth-page-wrapper {
+  min-height: 100vh;
   min-height: 100dvh;
   width: 100%;
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   justify-content: center;
-  padding: 16px;
-  padding-bottom: 8vh;
+  padding: 20px;
   box-sizing: border-box;
   position: relative;
-  overflow: hidden;
-  background:
-    linear-gradient(rgba(10, 15, 30, 0.2), rgba(10, 15, 30, 0.5)),
+  overflow-x: hidden;
+  background-color: #040713;
+  background-image:
+    linear-gradient(rgba(3, 6, 16, 0.15), rgba(3, 6, 16, 0.30)),
     url('../assets/corona888-logo.jpg');
   background-size: cover;
-  background-position: center;
+  background-position: center center;
   background-repeat: no-repeat;
 }
 
+/* Semi-transparent dark glass panel */
 .casino-login-card {
   width: 100%;
   max-width: 410px;
-  background: rgba(18, 20, 35, 0.75);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 20px;
+  background: rgba(11, 15, 27, 0.78);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 18px;
   box-shadow:
-    0 20px 60px rgba(0, 0, 0, 0.8),
-    0 0 40px rgba(69, 123, 157, 0.2);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(14px);
+    0 20px 50px rgba(0, 0, 0, 0.7),
+    0 0 35px rgba(69, 123, 157, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
   padding: 28px 24px;
   box-sizing: border-box;
   position: relative;
@@ -50,8 +53,17 @@
   margin-bottom: 20px;
 }
 
+.casino-login-title {
+  margin: 0;
+  color: #FFFFFF;
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.6);
+}
+
 .casino-login-subtitle {
-  color: #B7A9CA;
+  color: #A3B1CC;
   font-size: 13px;
   font-weight: 500;
   margin-top: 6px;
@@ -59,7 +71,7 @@
   letter-spacing: 0.2px;
 }
 
-/* Form Groups */
+/* Form */
 .casino-login-form {
   display: flex;
   flex-direction: column;
@@ -82,43 +94,61 @@
   display: block;
 }
 
-/* Input Fields */
-.casino-input-field {
-  width: 100%;
-  height: 50px;
-  background: #0D0915;
-  border: 1px solid rgba(160, 90, 220, 0.35);
-  border-radius: 10px;
-  padding: 0 16px;
-  color: #FFFFFF;
-  font-size: 14px;
-  font-weight: 500;
-  box-sizing: border-box;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
-  outline: none;
-}
-
-.casino-input-field::placeholder {
-  color: #746A82;
-}
-
-.casino-input-field:focus {
-  border-color: #FFD83D;
-  box-shadow: 0 0 0 3px rgba(255, 216, 61, 0.12);
-}
-
-/* Password Input Wrapper with Eye Toggle */
-.password-input-wrapper {
+.casino-input-wrapper {
   position: relative;
   width: 100%;
   display: flex;
   align-items: center;
 }
 
-.password-input-wrapper .casino-input-field {
+.casino-input-icon {
+  position: absolute;
+  left: 14px;
+  color: #6C7D9B;
+  pointer-events: none;
+  z-index: 2;
+  transition: color 0.2s ease;
+}
+
+.casino-input-wrapper:focus-within .casino-input-icon {
+  color: #FFD83D;
+}
+
+/* Input Fields */
+.casino-input-field {
+  width: 100%;
+  height: 48px;
+  background: rgba(8, 11, 20, 0.78);
+  border: 1px solid rgba(130, 110, 190, 0.35);
+  border-radius: 10px;
+  padding: 0 16px;
+  color: #FFFFFF;
+  font-size: 14px;
+  font-weight: 500;
+  box-sizing: border-box;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+  outline: none;
+}
+
+.casino-input-field.with-icon {
+  padding-left: 42px;
+}
+
+.casino-input-field.with-toggle {
   padding-right: 48px;
 }
 
+.casino-input-field::placeholder {
+  color: #616F8A;
+}
+
+.casino-input-field:focus {
+  border-color: #FFD83D;
+  box-shadow: 0 0 0 3px rgba(255, 216, 61, 0.15);
+  background: rgba(10, 14, 25, 0.92);
+}
+
+/* Password Toggle Button */
 .password-toggle-btn {
   position: absolute;
   right: 6px;
@@ -131,7 +161,7 @@
   background: transparent;
   border: none;
   border-radius: 8px;
-  color: #B7A9CA;
+  color: #A3B1CC;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -153,13 +183,13 @@
   outline-offset: 1px;
 }
 
-/* Error Notice */
+/* Errors */
 .casino-login-error {
   padding: 10px 14px;
-  background: rgba(239, 68, 68, 0.12);
-  border: 1px solid rgba(239, 68, 68, 0.3);
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.35);
   border-radius: 8px;
-  color: #F87171;
+  color: #FCA5A5;
   font-size: 12.5px;
   font-weight: 600;
   text-align: center;
@@ -175,27 +205,27 @@
 /* Casino Gold Submit Button */
 .casino-login-btn {
   width: 100%;
-  height: 50px;
-  background: linear-gradient(135deg, #F5B51B, #FFD83D);
-  color: #241044;
+  height: 48px;
+  background: linear-gradient(135deg, #F5B51B 0%, #FFD83D 100%);
+  color: #1F1037;
   font-size: 15px;
   font-weight: 800;
   border: none;
   border-radius: 10px;
-  box-shadow: 0 6px 18px rgba(245, 181, 27, 0.25);
+  box-shadow: 0 6px 20px rgba(245, 181, 27, 0.3);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-top: 6px;
+  margin-top: 4px;
   outline: none;
   transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;
-  letter-spacing: 0.3px;
+  letter-spacing: 0.4px;
 }
 
 .casino-login-btn:hover:not(:disabled) {
   transform: translateY(-1px);
-  box-shadow: 0 8px 22px rgba(245, 181, 27, 0.35);
+  box-shadow: 0 8px 24px rgba(245, 181, 27, 0.4);
   filter: brightness(1.05);
 }
 
@@ -212,8 +242,8 @@
 .casino-login-footer {
   text-align: center;
   font-size: 13px;
-  color: #B7A9CA;
-  margin-top: 18px;
+  color: #A3B1CC;
+  margin-top: 16px;
   margin-bottom: 0;
 }
 
@@ -231,20 +261,25 @@
 }
 
 /* ───────────────────────────────────────────────────────────
-   MOBILE LANDSCAPE (844 × 390, 812 × 375, etc.)
+   MOBILE LANDSCAPE (844 × 390, 800 × 360, 812 × 375, etc.)
+   Aligns form to the right so Corona 888 crest is visible on left
    ─────────────────────────────────────────────────────────── */
-@media (orientation: landscape) and (max-height: 500px) {
+@media (orientation: landscape) and (max-height: 550px) {
   .auth-page-wrapper {
-    padding: 12px 5% !important;
+    padding: 10px 4% !important;
     min-height: 100dvh !important;
     align-items: center !important;
     justify-content: flex-end !important;
+    background-size: auto 100% !important;
+    background-position: 8% center !important;
+    background-repeat: no-repeat !important;
+    background-color: #040713 !important;
   }
 
   .casino-login-card {
-    max-width: 390px !important;
-    max-height: calc(100dvh - 12px) !important;
-    padding: 10px 18px !important;
+    max-width: 360px !important;
+    max-height: calc(100dvh - 16px) !important;
+    padding: 12px 18px !important;
     border-radius: 14px !important;
     overflow-y: auto !important;
     scrollbar-width: none !important;
@@ -256,6 +291,10 @@
 
   .casino-login-header {
     margin-bottom: 8px !important;
+  }
+
+  .casino-login-title {
+    font-size: 18px !important;
   }
 
   .casino-login-subtitle {
@@ -282,20 +321,30 @@
     border-radius: 8px !important;
   }
 
-  .password-input-wrapper .casino-input-field {
-    padding-right: 42px !important;
+  .casino-input-field.with-icon {
+    padding-left: 34px !important;
+  }
+
+  .casino-input-icon {
+    left: 10px !important;
+    width: 15px !important;
+    height: 15px !important;
+  }
+
+  .casino-input-field.with-toggle {
+    padding-right: 38px !important;
   }
 
   .password-toggle-btn {
-    width: 36px !important;
-    height: 36px !important;
-    min-width: 36px !important;
-    min-height: 36px !important;
+    width: 34px !important;
+    height: 34px !important;
+    min-width: 34px !important;
+    min-height: 34px !important;
     right: 3px !important;
   }
 
   .casino-login-btn {
-    height: 40px !important;
+    height: 38px !important;
     font-size: 13.5px !important;
     margin-top: 2px !important;
     border-radius: 8px !important;
@@ -303,11 +352,29 @@
 
   .casino-login-footer {
     font-size: 11.5px !important;
-    margin-top: 8px !important;
+    margin-top: 6px !important;
   }
 
   .casino-login-error {
     padding: 6px 10px !important;
     font-size: 11px !important;
+  }
+}
+
+/* ───────────────────────────────────────────────────────────
+   PORTRAIT MOBILE (390 × 844, 412 × 915, etc.)
+   Aligns form towards bottom so Corona 888 crest is visible above
+   ─────────────────────────────────────────────────────────── */
+@media (orientation: portrait) {
+  .auth-page-wrapper {
+    align-items: flex-end;
+    padding-bottom: 5vh;
+    background-size: cover;
+    background-position: center top;
+  }
+
+  .casino-login-card {
+    max-width: 380px;
+    padding: 22px 20px;
   }
 }

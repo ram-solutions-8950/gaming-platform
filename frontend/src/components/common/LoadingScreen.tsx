@@ -43,21 +43,18 @@ export function LoadingScreen({
   if (isDone) return null;
 
   return (
-    <div className={`casino-loading-screen ${isFadingOut ? 'fade-out' : ''}`}>
-      {/* High-res casino environment artwork */}
-      <img
-        src={splashBg}
-        alt=""
-        className="splash-bg-image"
-      />
-
+    <div
+      className={`casino-loading-screen ${isFadingOut ? 'fade-out' : ''}`}
+      style={{ backgroundImage: `url(${splashBg})` }}
+    >
       {/* Clean loading indicator at the bottom */}
       <div className="splash-loading-container">
-        <div className="splash-loading-text">LOADING...</div>
         <div className="splash-loading-bar-track">
           <div className="splash-loading-bar-progress" />
         </div>
+        <div className="splash-loading-text">LOADING...</div>
       </div>
     </div>
   );
 }
+
