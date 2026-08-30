@@ -24,7 +24,6 @@ interface GameCardDef {
 }
 
 const GAME_DEFS: GameCardDef[] = [
-  { id: 'ludo', name: 'Ludo', subtitle: 'Board Game', emoji: '🎲', gradient: 'gc-blue', badge: 'HOT', path: '/games/ludo', category: ['ALL', 'CASINO'] },
   { id: 'dragon-tiger', name: 'Dragon Tiger', subtitle: 'Casino', emoji: '🐉', gradient: 'gc-orange', badge: 'HOT', path: '/games/dragon-tiger', category: ['ALL', 'CASINO'] },
   { id: 'andar-bahar', name: 'Andar Bahar', subtitle: 'Cards', emoji: '🎴', gradient: 'gc-emerald', badge: 'NEW', path: '/games/andar-bahar', category: ['ALL', 'CARDS', 'CASINO'] },
   { id: 'rummy', name: 'Indian Rummy', subtitle: 'Cards', emoji: '🃏', gradient: 'gc-teal', badge: 'HOT', path: '/games/rummy', category: ['ALL', 'CARDS'] },
@@ -36,7 +35,7 @@ const GAME_DEFS: GameCardDef[] = [
   { id: 'triple-777', name: 'Triple 777', subtitle: 'Classic Slots', emoji: '🎰', gradient: 'gc-rose', badge: 'HOT', path: '/games/triple-777', category: ['ALL', 'SLOTS', 'CASINO'] },
 ];
 
-const FEATURED_GAME = GAME_DEFS[0]; // Real playable Ludo
+const FEATURED_GAME = GAME_DEFS[0]; // Dragon Tiger
 const PLAYABLE_CATEGORIES = ['ALL', 'CASINO', 'CARDS', 'SLOTS'];
 
 /* ─── Glitter particles ─── */

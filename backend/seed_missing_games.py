@@ -4,19 +4,6 @@ from app.models.game_catalog import Game, GameStatus
 
 GAMES = [
     {
-        "name": "Ludo",
-        "slug": "ludo",
-        "game_type": "MULTIPLAYER",
-        "description": "Classic Ludo multiplayer game.",
-        "min_bet": 0,
-        "max_bet": 100000,
-        "config": {
-            "entry_fee": 1000,
-            "platform_fee_percent": 10,
-            "players": [2, 4],
-        },
-    },
-    {
         "name": "Triple 777 Classic",
         "slug": "triple-777",
         "game_type": "SLOT",

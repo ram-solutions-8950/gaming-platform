@@ -30,11 +30,6 @@ interface Props {
 }
 
 /* ─── Helpers ─── */
-const isLudoGame = (game: GameCardData) => {
-  const value = `${game.id} ${game.name} ${game.path}`.toLowerCase();
-  return value.includes('ludo');
-};
-
 const isAviatorGame = (game: GameCardData) => {
   const value = `${game.id} ${game.name} ${game.path}`.toLowerCase();
   return value.includes('aviator') || value.includes('crash');
@@ -227,55 +222,6 @@ const AviatorAnimatedArtwork: React.FC = () => {
   );
 };
 
-/* ─── Ludo Animated Artwork ─── */
-const LudoAnimatedArtwork: React.FC = () => {
-  return (
-    <div className="ludo-card-art" aria-hidden="true">
-      <div className="ludo-card-glow" />
-
-      <div className="ludo-pawn ludo-pawn--red">
-        <span />
-      </div>
-
-      <div className="ludo-pawn ludo-pawn--green">
-        <span />
-      </div>
-
-      <div className="ludo-pawn ludo-pawn--gold">
-        <span />
-      </div>
-
-      <div className="ludo-pawn ludo-pawn--blue">
-        <span />
-      </div>
-
-      <div className="ludo-mini-board">
-        <div className="ludo-board-red" />
-        <div className="ludo-board-green" />
-        <div className="ludo-board-blue" />
-        <div className="ludo-board-yellow" />
-        <div className="ludo-board-center" />
-      </div>
-
-      <div className="ludo-dice">
-        <div className="ludo-dice-face">
-          <i />
-          <i />
-          <i />
-          <i />
-          <i />
-          <i />
-        </div>
-      </div>
-
-      <span className="ludo-spark ludo-spark--1" />
-      <span className="ludo-spark ludo-spark--2" />
-      <span className="ludo-spark ludo-spark--3" />
-      <span className="ludo-spark ludo-spark--4" />
-    </div>
-  );
-};
-
 /* ─── Component ─── */
 export const AnimatedGameCarousel: React.FC<Props> = ({
   sets,
@@ -346,7 +292,6 @@ export const AnimatedGameCarousel: React.FC<Props> = ({
       >
         <div className="game-carousel-grid">
           {currentSet.games.map((game) => {
-            const ludo = isLudoGame(game);
             const aviator = isAviatorGame(game);
             const dragonTiger = isDragonTigerGame(game);
             const andarBahar = isAndarBaharGame(game);
@@ -357,30 +302,27 @@ export const AnimatedGameCarousel: React.FC<Props> = ({
             const teenPatti = isTeenPattiGame(game);
             const cardGame = isCardGame(game);
 
-            const cardTypeClass = ludo
-              ? 'game-card--ludo'
-              : aviator
-                ? 'game-card--aviator'
-                : dragonTiger
-                  ? 'game-card--dragon-tiger'
-                  : andarBahar
-                    ? 'game-card--andar-bahar'
-                    : roulette
-                      ? 'game-card--roulette'
-                      : chickenRoad
-                        ? 'game-card--chicken-road'
-                        : triple777
-                          ? 'game-card--triple-777'
-                          : poker
-                            ? 'game-card--poker'
-                            : teenPatti
-                              ? 'game-card--teen-patti'
-                              : cardGame
-                                ? 'game-card--casino-card'
-                                : '';
+            const cardTypeClass = aviator
+              ? 'game-card--aviator'
+              : dragonTiger
+                ? 'game-card--dragon-tiger'
+                : andarBahar
+                  ? 'game-card--andar-bahar'
+                  : roulette
+                    ? 'game-card--roulette'
+                    : chickenRoad
+                      ? 'game-card--chicken-road'
+                      : triple777
+                        ? 'game-card--triple-777'
+                        : poker
+                          ? 'game-card--poker'
+                          : teenPatti
+                            ? 'game-card--teen-patti'
+                            : cardGame
+                              ? 'game-card--casino-card'
+                              : '';
 
             const hasCustomArtwork =
-              ludo ||
               aviator ||
               dragonTiger ||
               andarBahar ||
@@ -415,9 +357,6 @@ export const AnimatedGameCarousel: React.FC<Props> = ({
                 >
                   {/* Glossy moving light */}
                   <div className="game-card__shine" />
-
-                  {/* Ludo-specific artwork */}
-                  {ludo && <LudoAnimatedArtwork />}
 
                   {/* Aviator-specific 3D artwork */}
                   {aviator && <AviatorAnimatedArtwork />}

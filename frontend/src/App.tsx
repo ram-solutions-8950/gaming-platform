@@ -17,7 +17,6 @@ import { DragonTigerPage } from './pages/user/DragonTiger';
 import { AndarBaharPage } from './pages/user/AndarBahar';
 import { RummyPage } from './pages/user/Rummy';
 import { TeenPatti } from './pages/user/TeenPatti';
-import { Ludo } from './pages/user/Ludo';
 import { AviatorPage } from './pages/user/Aviator';
 import { PokerPage } from './pages/user/Poker';
 import { RoulettePage } from './pages/user/Roulette';
@@ -124,7 +123,7 @@ function App() {
           <Route element={<UserLayout />}>
             <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/games-catalog" element={<GameCatalogPage />} />
-            <Route path="/games/ludo" element={<Ludo />} />
+            <Route path="/games/ludo" element={<Navigate to="/dashboard" replace />} />
             <Route path="/wallet" element={<WalletPage />} />
             <Route path="/transactions" element={<TransactionsPage />} />
             <Route path="/deposit" element={<DepositPage />} />

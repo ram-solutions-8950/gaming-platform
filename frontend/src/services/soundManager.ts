@@ -27,7 +27,7 @@ export type SoundEvent =
   // Dragon/Tiger specific events
   | "dragon_wins"
   | "tiger_wins"
-  // Ludo specific events
+  // Table / Dice events
   | "dice_roll";
 
 // Triple777 events that use Web Audio oscillators instead of Howler files

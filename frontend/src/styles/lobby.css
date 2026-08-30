@@ -496,7 +496,6 @@
 .chicken-road-card-art,
 .triple-777-card-art,
 .aviator-card-art,
-.ludo-card-art,
 .roulette-card-art,
 .casino-card-art-container {
   position: absolute !important;
@@ -601,56 +600,6 @@
   box-shadow: 0 0 5px #ffffff;
 }
 
-/* Ludo CSS mini artwork */
-.ludo-card-art {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.ludo-mini-board {
-  position: absolute;
-  width: 48px;
-  height: 40px;
-  border-radius: 6px;
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  grid-template-rows: 1fr 1fr;
-  overflow: hidden;
-  opacity: 0.85;
-}
-
-.ludo-board-red { background: #ef4444; }
-.ludo-board-green { background: #22c55e; }
-.ludo-board-blue { background: #3b82f6; }
-.ludo-board-yellow { background: #eab308; }
-
-.ludo-dice {
-  position: absolute;
-  width: 28px;
-  height: 28px;
-  background: #ffffff;
-  border-radius: 6px;
-  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.6);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.ludo-dice-face {
-  display: grid;
-  grid-template-columns: repeat(3, 4px);
-  gap: 3px;
-}
-
-.ludo-dice-face i {
-  width: 4px;
-  height: 4px;
-  border-radius: 50%;
-  background: #dc2626;
-  display: block;
-}
 
 
 /* ═══════════════════════════════════════════════════════════════

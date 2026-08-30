@@ -22,7 +22,6 @@ export function UserLayout() {
   const location = useLocation();
   const [wallet, setWallet] = useState<Wallet | null>(null);
 
-  const isLudo = location.pathname.startsWith('/games/ludo');
   const isDashboard = location.pathname === '/dashboard';
 
   useEffect(() => {
@@ -119,12 +118,12 @@ export function UserLayout() {
         </div>
 
         <main className={
-          isLudo || isDashboard
+          isDashboard
             ? "flex-1 min-h-0 min-w-0 relative overflow-hidden flex flex-col"
             : "flex-1 min-h-0 min-w-0 relative overflow-y-auto overflow-x-hidden"
         }>
           <div className={
-            isLudo || isDashboard
+            isDashboard
               ? "h-full w-full p-0 flex flex-col flex-1 min-h-0"
               : "min-h-full w-full max-w-7xl mx-auto p-3 sm:p-5 lg:p-8"
           }>
