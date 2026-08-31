@@ -7,6 +7,7 @@ import { UserLayout } from './layouts/UserLayout';
 import { AdminLayout } from './layouts/AdminLayout';
 import { LoginPage } from './pages/auth/Login';
 import { SignupPage } from './pages/auth/Signup';
+import { DownloadPage } from './pages/Download';
 import { DashboardPage } from './pages/user/Dashboard';
 import { ProfilePage } from './pages/user/Profile';
 import { WalletPage } from './pages/user/Wallet';
@@ -101,6 +102,7 @@ function App() {
       <BrowserRouter>
       <Routes>
         <Route element={<PublicLayout />}>
+          <Route path="/download" element={<DownloadPage />} />
           <Route element={<AuthLayout />}>
             <Route path="/login" element={<LoginPage />} />
             <Route path="/signup" element={<SignupPage />} />
