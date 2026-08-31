@@ -39,3 +39,9 @@ Thumbs.db
 
 # Uploaded payment assets
 backend/uploads/
+
+# Android APK builds
+*.apk
+
+# Temporary extracted projects
+temp_zip_inspect/
