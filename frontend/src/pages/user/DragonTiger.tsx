@@ -15,6 +15,36 @@ import tigerImg from '../../assets/tiger-3d.webp';
 
 const SLUG = 'dragon-tiger';
 
+export type WinningSide = 'DRAGON' | 'TIGER' | 'TIE';
+
+export function normalizeDtResult(raw: any): WinningSide | null {
+  if (!raw) return null;
+  const str = String(raw).trim().toUpperCase();
+  if (str === 'DRAGON') return 'DRAGON';
+  if (str === 'TIGER') return 'TIGER';
+  if (str === 'TIE') return 'TIE';
+  return null;
+}
+
+export function extractDtResult(resultData: any, rootData?: any): WinningSide | null {
+  const candidates = [
+    resultData?.result,
+    resultData?.winner,
+    resultData?.winning_side,
+    resultData?.winner_side,
+    resultData?.outcome,
+    rootData?.result,
+    rootData?.winner,
+    rootData?.winning_side,
+    rootData?.outcome,
+  ];
+  for (const c of candidates) {
+    const res = normalizeDtResult(c);
+    if (res) return res;
+  }
+  return null;
+}
+
 function paiseToRupees(p: number): string {
   return (p / 100).toFixed(2);
 }
@@ -81,6 +111,7 @@ export function DragonTigerPage() {
   const [dragonFlipped, setDragonFlipped] = useState(false);
   const [tigerFlipped, setTigerFlipped] = useState(false);
   const [showPlayer, setShowPlayer] = useState(false);
+  const [winnerResult, setWinnerResult] = useState<WinningSide | null>(null);
 
   // Keep myBets ref synchronized for animation callbacks
   const myBetsRef = useRef(myBets);
@@ -94,10 +125,22 @@ export function DragonTigerPage() {
    * if the backend already created a new BETTING round.
    */
   const [displayRound, setDisplayRound] = useState<GameRound | null>(null);
-  const [lastAnimatedRoundId, setLastAnimatedRoundId] = useState<string | null>(null);
+  const lastAnimatedRoundIdRef = useRef<string | null>(null);
+  const initialMountDoneRef = useRef(false);
+  const serverOffsetMsRef = useRef<number>(0);
   /** Ref tracks whether an animation sequence is in progress so we never
    *  start a second one or let polling/ws clobber state mid-animation. */
   const animatingRef = useRef(false);
+
+  // Authoritative Round ID mapping & pending queues
+  const roundResultMapRef = useRef<Record<string, WinningSide>>({});
+  const pendingRoundStartRef = useRef<{
+    round: GameRound;
+    roundId: string;
+    startedAt?: string;
+    bettingClosesAt?: string;
+  } | null>(null);
+  const pendingResultRoundRef = useRef<GameRound | null>(null);
 
   const wsRef = useRef<WebSocket | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -116,23 +159,51 @@ export function DragonTigerPage() {
         walletService.getWallet(),
         gameService.getHistory(12, SLUG),
         gameService.getMyBets(1, 10, SLUG),
-        gameService.getCatalog(),
+        catalogGame ? Promise.resolve(null) : gameService.getCatalog(),
       ]);
-      setGameState(gs);
+
+      if (gs?.server_time) {
+        serverOffsetMsRef.current = new Date(gs.server_time).getTime() - Date.now();
+      }
+
+      if (!animatingRef.current && !displayRound && !pendingRoundStartRef.current) {
+        setGameState(gs);
+      }
       setWallet(w);
       setHistory(h);
       setMyBets(b.items);
       if (gs?.public_bets) {
         setPublicBets(gs.public_bets);
       }
-      setCountdown(gs.seconds_remaining);
-      setCatalogGame(catalog.find((g) => g.slug === SLUG) || null);
+      if (catalog) {
+        setCatalogGame(catalog.find((g) => g.slug === SLUG) || null);
+      }
+
+      // INITIAL MOUNT SAFEGUARD:
+      // Any round that completed before the player opened the page is historical.
+      // Record its ID so it NEVER plays as a fake live animation on screen!
+      if (!initialMountDoneRef.current) {
+        if (gs?.round?.status === 'COMPLETED') {
+          lastAnimatedRoundIdRef.current = gs.round.id;
+        } else if (h && h[0]) {
+          lastAnimatedRoundIdRef.current = h[0].id;
+        }
+        initialMountDoneRef.current = true;
+
+        // If user opens page mid-round, synchronize to that round once on initial mount only
+        if (gs?.round?.status === 'BETTING' && gs.round.betting_closes_at) {
+          startCountdownForRound(gs.round.id, gs.round.betting_closes_at, gs.round.started_at);
+        } else if (gs?.round?.status === 'CALCULATING') {
+          setCountdown(0);
+          setIsBettingLocked(true);
+        }
+      }
     } catch {
       // keep last good state
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [catalogGame]);
 
   useEffect(() => {
     fetchAll();
@@ -140,16 +211,106 @@ export function DragonTigerPage() {
     return () => clearInterval(pollId);
   }, [fetchAll]);
 
-  /* ── countdown timer ── */
-  useEffect(() => {
-    if (timerRef.current) clearInterval(timerRef.current);
+  /* ── Authoritative Server-Driven Countdown Timer (One Timer Source of Truth) ── */
+  const activeCountdownRoundIdRef = useRef<string | null>(null);
+
+  const startCountdownForRound = useCallback((roundId: string, closesAtIso: string, _startedAtIso?: string) => {
+    // Clear previous timer to guarantee exactly one timer instance
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+
+    activeCountdownRoundIdRef.current = roundId;
+
+    const targetCloseMs = new Date(closesAtIso).getTime();
+    const serverNow = Date.now() + serverOffsetMsRef.current;
+    const remainingMs = targetCloseMs - serverNow;
+    const remainingSec = Math.max(0, Math.min(15, Math.ceil(remainingMs / 1000)));
+
+    setCountdown(remainingSec);
+
+    if (remainingSec <= 0) {
+      setIsBettingLocked(true);
+      return;
+    }
+
+    setIsBettingLocked(false);
+
+    // Single interval: 250ms for smooth integer updates without skipping seconds
     timerRef.current = setInterval(() => {
-      setCountdown((prev) => Math.max(0, prev - 1));
-    }, 1000);
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
-  }, [gameState?.round?.id, gameState?.round?.status]);
+      // Round ID Protection: Never update or run timer for an old or mismatched round
+      if (activeCountdownRoundIdRef.current !== roundId) {
+        if (timerRef.current) {
+          clearInterval(timerRef.current);
+          timerRef.current = null;
+        }
+        return;
+      }
+
+      const currentServerNow = Date.now() + serverOffsetMsRef.current;
+      const currentRemainingMs = targetCloseMs - currentServerNow;
+
+      if (currentRemainingMs <= 0) {
+        setCountdown(0);
+        setIsBettingLocked(true);
+        if (timerRef.current) {
+          clearInterval(timerRef.current);
+          timerRef.current = null;
+        }
+        return;
+      }
+
+      const currentSec = Math.max(0, Math.min(15, Math.ceil(currentRemainingMs / 1000)));
+      setCountdown(currentSec);
+    }, 250);
+  }, []);
+
+  const applyRoundStart = useCallback(
+    (newRound: GameRound, startedAt?: string, bettingClosesAt?: string) => {
+      if (startedAt) {
+        serverOffsetMsRef.current = new Date(startedAt).getTime() - Date.now();
+      }
+
+      setIsBettingLocked(false);
+      setPublicBets([]);
+      setRecentLiveBets([]);
+
+      setGameState((prev) =>
+        prev
+          ? {
+              ...prev,
+              round: newRound,
+              seconds_remaining: 15,
+            }
+          : ({
+              round: newRound,
+              server_time: startedAt,
+              seconds_remaining: 15,
+              game: catalogGame,
+              public_bets: [],
+            } as GameState)
+      );
+
+      if (bettingClosesAt) {
+        startCountdownForRound(newRound.id, bettingClosesAt, startedAt);
+      }
+    },
+    [catalogGame, startCountdownForRound]
+  );
+
+  // Ensure active round in BETTING has the single authoritative timer running
+  useEffect(() => {
+    const currentRound = gameState?.round;
+    if (!currentRound || currentRound.status !== 'BETTING' || !currentRound.betting_closes_at) {
+      return;
+    }
+
+    // Only start if not already running for this exact round ID
+    if (activeCountdownRoundIdRef.current !== currentRound.id) {
+      startCountdownForRound(currentRound.id, currentRound.betting_closes_at, currentRound.started_at);
+    }
+  }, [gameState?.round?.id, gameState?.round?.status, gameState?.round?.betting_closes_at, startCountdownForRound]);
 
   const prevCountdown = useRef<number>(-1);
   // Play countdown tick sound for values 5-1 only during active betting (never during result/reveal)
@@ -186,14 +347,49 @@ export function DragonTigerPage() {
           try {
             const data = JSON.parse(event.data);
             if (data.game_slug && data.game_slug !== SLUG) return;
+
             if (data.type === 'round_start') {
-              setIsBettingLocked(false);
-              setPublicBets([]);
-              setRecentLiveBets([]);
+              const newRound: GameRound = {
+                id: data.round_id,
+                game_id: data.game_id,
+                status: 'BETTING',
+                started_at: data.started_at,
+                betting_closes_at: data.betting_closes_at,
+              } as GameRound;
+
+              // CRITICAL: If the previous round's result is currently animating or holding,
+              // buffer this new round so the winner display and hold are NOT cut off!
+              if (displayRound || animatingRef.current) {
+                pendingRoundStartRef.current = {
+                  round: newRound,
+                  roundId: data.round_id,
+                  startedAt: data.started_at,
+                  bettingClosesAt: data.betting_closes_at,
+                };
+                return;
+              }
+
+              applyRoundStart(newRound, data.started_at, data.betting_closes_at);
             }
+
             if (data.type === 'betting_locked') {
-              setIsBettingLocked(true);
+              if (pendingRoundStartRef.current && pendingRoundStartRef.current.roundId === data.round_id) {
+                // Pending round betting closed while finishing previous result
+              } else if (!data.round_id || !activeCountdownRoundIdRef.current || data.round_id === activeCountdownRoundIdRef.current) {
+                setIsBettingLocked(true);
+                setCountdown(0);
+                if (timerRef.current) {
+                  clearInterval(timerRef.current);
+                  timerRef.current = null;
+                }
+                setGameState((prev) => prev?.round ? {
+                  ...prev,
+                  round: { ...prev.round, status: 'CALCULATING' as any },
+                  seconds_remaining: 0,
+                } : prev);
+              }
             }
+
             if (data.type === 'new_bet' && data.bet) {
               const newBet: PublicBet = data.bet;
               setPublicBets((prev) => {
@@ -202,22 +398,46 @@ export function DragonTigerPage() {
               });
               setRecentLiveBets((prev) => [newBet, ...prev.slice(0, 4)]);
             }
+
             if (data.type === 'round_result' && data.result_data) {
               const rd = data.result_data;
-              if (rd.dragon_card && rd.tiger_card && !animatingRef.current) {
+              const roundId = data.round_id;
+              const normalizedResult = extractDtResult(rd, data);
+
+              if (rd.dragon_card && rd.tiger_card) {
                 const syntheticRound: GameRound = {
-                  id: data.round_id,
+                  id: roundId,
                   game_id: data.game_id,
                   status: 'COMPLETED',
-                  result_data: rd,
+                  result_data: {
+                    ...rd,
+                    result: normalizedResult || rd.result,
+                  },
                 } as GameRound;
-                setLastAnimatedRoundId(data.round_id);
-                setDisplayRound(syntheticRound);
+
+                lastAnimatedRoundIdRef.current = roundId;
+                if (normalizedResult) {
+                  roundResultMapRef.current[roundId] = normalizedResult;
+                }
+
+                // If an animation is already running, queue it rather than losing it!
+                if (animatingRef.current) {
+                  pendingResultRoundRef.current = syntheticRound;
+                } else {
+                  setDisplayRound(syntheticRound);
+                }
+
+                // Update settlement data immediately
+                Promise.all([
+                  walletService.getWallet(),
+                  gameService.getMyBets(1, 10, SLUG),
+                  gameService.getHistory(12, SLUG),
+                ]).then(([w, b, h]) => {
+                  setWallet(w);
+                  setMyBets(b.items);
+                  setHistory(h);
+                }).catch(() => {});
               }
-            }
-            if (data.type === 'round_start' || data.type === 'betting_locked' || data.type === 'round_result') {
-              if (data.seconds_remaining != null) setCountdown(Math.max(0, Math.round(data.seconds_remaining)));
-              fetchAll();
             }
           } catch {
             /* ignore */
@@ -248,7 +468,7 @@ export function DragonTigerPage() {
       if (ws) ws.close();
       wsRef.current = null;
     };
-  }, [fetchAll]);
+  }, [catalogGame]);
 
   /* ── derived state ── */
   const round = gameState?.round;
@@ -303,28 +523,22 @@ export function DragonTigerPage() {
   const dragonCard = (activeRound?.result_data?.dragon_card as string) || undefined;
   const tigerCard = (activeRound?.result_data?.tiger_card as string) || undefined;
 
-  /* ── fallback: capture completed round from polling or history if WS missed it ── */
+  /* ── fallback: capture completed live round from polling if WS was disconnected ── */
   useEffect(() => {
     if (animatingRef.current || displayRound) return;
+    if (!initialMountDoneRef.current) return;
 
-    // 1. Direct from round result
     const rd = round?.result_data;
     const hasCards = Boolean(rd?.dragon_card && rd?.tiger_card);
-    if (hasCards && round?.id !== lastAnimatedRoundId) {
+    if (hasCards && round?.status === 'COMPLETED' && round?.id !== lastAnimatedRoundIdRef.current) {
+      lastAnimatedRoundIdRef.current = round!.id;
+      const normalized = extractDtResult(rd, round);
+      if (normalized) {
+        roundResultMapRef.current[round!.id] = normalized;
+      }
       setDisplayRound(round!);
-      setLastAnimatedRoundId(round!.id);
-      return;
     }
-
-    // 2. From latest history item
-    const latestHistory = history[0];
-    const hRd = latestHistory?.result_data;
-    const hasHistoryCards = Boolean(hRd?.dragon_card && hRd?.tiger_card);
-    if (hasHistoryCards && latestHistory?.id !== lastAnimatedRoundId) {
-      setDisplayRound(latestHistory);
-      setLastAnimatedRoundId(latestHistory.id);
-    }
-  }, [round, history, displayRound, lastAnimatedRoundId]);
+  }, [round?.id, round?.status, round?.result_data, displayRound]);
 
   useEffect(() => {
     if (!displayRound) {
@@ -334,6 +548,7 @@ export function DragonTigerPage() {
         setDragonFlipped(false);
         setTigerFlipped(false);
         setShowPlayer(false);
+        setWinnerResult(null);
       }
       return;
     }
@@ -343,7 +558,9 @@ export function DragonTigerPage() {
     animatingRef.current = true;
 
     const rd = displayRound.result_data;
-    const resVal = rd?.result as string | undefined;
+    const roundId = displayRound.id;
+    // Authoritative result stored for this exact round ID
+    const resVal = roundResultMapRef.current[roundId] || extractDtResult(rd, displayRound);
 
     let cancelled = false;
     const delay = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
@@ -354,6 +571,7 @@ export function DragonTigerPage() {
       setDragonFlipped(false);
       setTigerFlipped(false);
       setShowPlayer(false);
+      setWinnerResult(null);
 
       // Dragon card slide + flip (faster reveal: 200ms lead-in)
       await delay(200);
@@ -371,14 +589,18 @@ export function DragonTigerPage() {
       await delay(450);
       if (cancelled) return;
 
+      // 2. Authoritative winner output display
       if (resVal === 'DRAGON') {
         setPhase('dragon-winning');
+        setWinnerResult('DRAGON');
         audio.play('dragon_wins');
       } else if (resVal === 'TIGER') {
         setPhase('tiger-winning');
+        setWinnerResult('TIGER');
         audio.play('tiger_wins');
       } else if (resVal === 'TIE') {
         setPhase('tie-result');
+        setWinnerResult('TIE');
       }
 
       // Winner animation plays, then show player outcome banner & win/loss sound
@@ -386,31 +608,43 @@ export function DragonTigerPage() {
       if (cancelled) return;
       setShowPlayer(true);
 
-      const roundId = displayRound.id;
-      if (resultSoundPlayedRef.current !== roundId) {
-        const userBets = myBetsRef.current.filter((b) => b.round_id === roundId);
+      const displayRoundIdVal = displayRound.id;
+      if (resultSoundPlayedRef.current !== displayRoundIdVal) {
+        const userBets = myBetsRef.current.filter((b) => b.round_id === displayRoundIdVal);
         const isUserWin = userBets.some((b) => b.status === 'WON');
         const isUserLoss = userBets.some((b) => b.status === 'LOST') && !isUserWin;
         if (isUserWin) {
           audio.playWin();
-          resultSoundPlayedRef.current = roundId;
+          resultSoundPlayedRef.current = displayRoundIdVal;
         } else if (isUserLoss) {
           audio.playLoss();
-          resultSoundPlayedRef.current = roundId;
+          resultSoundPlayedRef.current = displayRoundIdVal;
         }
       }
 
-      // Hold everything on screen for 2.2 seconds (reduced from 4.0s)
+      // 3. RESULT HOLD: Hold everything on screen for 2.2 seconds so user clearly sees the winner!
       await delay(2200);
       if (cancelled) return;
 
-      // Clear — next round takes over
+      // 4. Clear — next round takes over
       animatingRef.current = false;
       setDisplayRound(null);
       setPhase('waiting');
       setDragonFlipped(false);
       setTigerFlipped(false);
       setShowPlayer(false);
+      setWinnerResult(null);
+
+      // If a new round was buffered during presentation, transition cleanly now!
+      if (pendingRoundStartRef.current) {
+        const pending = pendingRoundStartRef.current;
+        pendingRoundStartRef.current = null;
+        applyRoundStart(pending.round, pending.startedAt, pending.bettingClosesAt);
+      } else if (pendingResultRoundRef.current) {
+        const pendingRes = pendingResultRoundRef.current;
+        pendingResultRoundRef.current = null;
+        setDisplayRound(pendingRes);
+      }
     };
 
     run();
@@ -418,7 +652,7 @@ export function DragonTigerPage() {
       cancelled = true;
       animatingRef.current = false;
     };
-  }, [displayRound]);
+  }, [displayRound, applyRoundStart]);
 
   /* ── bet matching ── */
   const displayRoundId = displayRound?.id || round?.id;
@@ -438,8 +672,7 @@ export function DragonTigerPage() {
     try {
       await gameService.placeBet(round.id, prediction, amount, game.id);
       setSelected(prediction);
-      console.log(`Bet placed: ₹${paiseToRupees(amount)} on ${prediction}`);
-    audio.playChip();
+      audio.playChip();
       await fetchAll();
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: { error?: { message?: string } } } };
@@ -676,6 +909,7 @@ export function DragonTigerPage() {
               showPlayer={showPlayer && (wonThisRound || lostThisRound)}
               playerWon={wonThisRound ? true : lostThisRound ? false : null}
               playerAmountLabel={wonThisRound ? `+₹${paiseToRupees(roundBets.reduce((sum, b) => sum + (b.net_win_amount || 0), 0))}` : undefined}
+              winnerResult={winnerResult}
             />
           </div>
 

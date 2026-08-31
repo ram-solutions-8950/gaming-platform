@@ -69,7 +69,11 @@ function App() {
       .finally(() => setLoading(false));
   }, [setLoading, setUser]);
 
+  const isDownloadPath = typeof window !== 'undefined' && window.location.pathname.toLowerCase().includes('download');
+
   useEffect(() => {
+    if (isDownloadPath) return;
+
     const handleFirstInteraction = () => {
       soundManager.init();
       document.removeEventListener('click', handleFirstInteraction);
@@ -77,22 +81,22 @@ function App() {
     };
     document.addEventListener('click', handleFirstInteraction);
     document.addEventListener('keydown', handleFirstInteraction);
-    
+
     return () => {
       document.removeEventListener('click', handleFirstInteraction);
       document.removeEventListener('keydown', handleFirstInteraction);
     };
-  }, []);
+  }, [isDownloadPath]);
 
   useEffect(() => {
-    if (!user) {
+    if (!user || isDownloadPath) {
       soundManager.stopMusic();
     }
-  }, [user]);
+  }, [user, isDownloadPath]);
 
   return (
     <>
-      {!isSplashDone && (
+      {!isSplashDone && !isDownloadPath && (
         <LoadingScreen
           isReady={!isLoading}
           minDurationMs={2400}
@@ -101,8 +105,11 @@ function App() {
       )}
       <BrowserRouter>
       <Routes>
+        {/* Dedicated standalone APK download routes - completely separate from game/dashboard layouts */}
+        <Route path="/download-apk" element={<DownloadPage />} />
+        <Route path="/download" element={<DownloadPage />} />
+
         <Route element={<PublicLayout />}>
-          <Route path="/download" element={<DownloadPage />} />
           <Route element={<AuthLayout />}>
             <Route path="/login" element={<LoginPage />} />
             <Route path="/signup" element={<SignupPage />} />

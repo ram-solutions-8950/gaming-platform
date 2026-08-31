@@ -577,16 +577,71 @@
 
 .dvt-banner {
   margin-top: 0.7rem;
-
   text-align: center;
-
   min-height: 2.4rem;
-
   position: relative;
-
   z-index: 30;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
 }
 
+.dvt-winner-banner {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.45rem 1.4rem;
+  border-radius: 999px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  font-size: clamp(0.92rem, 2.2vw, 1.22rem);
+  text-transform: uppercase;
+  animation: dvt-pop 400ms cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
+  z-index: 35;
+  position: relative;
+}
+
+.dvt-winner-dragon {
+  color: #fff;
+  background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%);
+  border: 2px solid #fca5a5;
+  box-shadow: 0 0 25px rgba(239, 68, 68, 0.85), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.7);
+}
+
+.dvt-winner-tiger {
+  color: #fff;
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  border: 2px solid #fde68a;
+  box-shadow: 0 0 25px rgba(245, 158, 11, 0.85), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.7);
+}
+
+.dvt-winner-tie {
+  color: #fff;
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  border: 2px solid #a7f3d0;
+  box-shadow: 0 0 25px rgba(16, 185, 129, 0.85), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.7);
+}
+
+@keyframes dvt-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.6) translateY(6px);
+  }
+  70% {
+    opacity: 1;
+    transform: scale(1.08) translateY(-2px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
 
 .dvt-tie-banner,
 .dvt-player-banner {

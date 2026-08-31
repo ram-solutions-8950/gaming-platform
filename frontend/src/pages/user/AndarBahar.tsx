@@ -77,7 +77,18 @@ export function AndarBaharPage() {
   const timers = useRef<number[]>([]);
   const wsRef = useRef<WebSocket | null>(null);
   const isAnimatingRef = useRef(false);
+  const activeAnimatingRoundIdRef = useRef<string | null>(null);
   const lastProcessedResultRef = useRef<string | null>(null);
+  const currentRoundIdRef = useRef<string | null>(null);
+  const myBetRef = useRef<{ side: Side; amount: number; roundId: string } | null>(null);
+  const pendingRoundStartRef = useRef<{
+    roundId: string;
+    gameId?: string;
+    startedAt?: string;
+    bettingClosesAt?: string;
+    secondsRemaining?: number;
+  } | null>(null);
+  const pendingResultRef = useRef<{ rd: any; roundId: string } | null>(null);
 
   // Refresh balance from server
   const refreshBalance = useCallback(async () => {
@@ -110,35 +121,71 @@ export function AndarBaharPage() {
       });
   }, []);
 
-  // Fetch initial round & history
-  const fetchAll = useCallback(async () => {
-    try {
-      const [state, hist] = await Promise.all([getCurrentRound(), getRoundHistory(20)]);
-      if (state.round) {
-        setCurrentRoundId(state.round.id);
-        if (state.game?.id) setCurrentGameId(state.game.id);
-        if (state.round.status === "BETTING") {
-          setPhase("betting");
-          setTimeLeft(Math.max(0, Math.round(state.seconds_remaining)));
-        } else if (state.round.status === "CALCULATING") {
-          setPhase("closed");
-          setTimeLeft(0);
-        }
-      }
-      setHistory(formatHistory(hist));
-      await refreshBalance();
-    } catch {
-      // fallback
-    }
-  }, [formatHistory, refreshBalance]);
+  // Apply a new round's betting start cleanly
+  const applyRoundStart = useCallback(
+    (data: {
+      roundId: string;
+      gameId?: string;
+      startedAt?: string;
+      bettingClosesAt?: string;
+      secondsRemaining?: number;
+    }) => {
+      currentRoundIdRef.current = data.roundId;
+      setCurrentRoundId(data.roundId);
+      if (data.gameId) setCurrentGameId(data.gameId);
 
-  // Run server card deal animation
+      // Clean up previous cards and state
+      setMiddle(null);
+      setAndar([]);
+      setBahar([]);
+      setResult(null);
+      setMyBet(null);
+      myBetRef.current = null;
+      setSelectedSide(null);
+      setServerError(null);
+
+      // Calculate authoritative remaining time
+      const closesAt = data.bettingClosesAt ? new Date(data.bettingClosesAt).getTime() : 0;
+      const now = Date.now();
+      const remainingSec =
+        closesAt > 0
+          ? Math.max(0, Math.ceil((closesAt - now) / 1000))
+          : data.secondsRemaining != null
+          ? Math.max(0, Math.round(data.secondsRemaining))
+          : 15;
+
+      if (remainingSec > 0) {
+        setPhase("betting");
+        setTimeLeft(remainingSec);
+        soundManager.play("betting_start");
+      } else {
+        setPhase("closed");
+        setTimeLeft(0);
+        soundManager.play("betting_stop");
+      }
+    },
+    []
+  );
+
+  // Run server card deal animation & result hold presentation
   const animateServerDeal = useCallback(
     (rd: any, roundId: string) => {
-      if (isAnimatingRef.current || lastProcessedResultRef.current === roundId) return;
+      // If this exact round result was already processed, ignore duplicate
+      if (lastProcessedResultRef.current === roundId) {
+        return;
+      }
+
+      // If currently animating another round, QUEUE this result instead of dropping it!
+      if (isAnimatingRef.current) {
+        pendingResultRef.current = { rd, roundId };
+        return;
+      }
+
       isAnimatingRef.current = true;
+      activeAnimatingRoundIdRef.current = roundId;
       lastProcessedResultRef.current = roundId;
 
+      // Clear any prior timeouts
       timers.current.forEach(clearTimeout);
       timers.current = [];
 
@@ -150,18 +197,24 @@ export function AndarBaharPage() {
       setResult(null);
 
       const steps = rd.steps || [];
-      const winner = rd.winner.toLowerCase() as Side;
+      const winner = String(rd.winner || "").toLowerCase() as Side;
 
       let i = 0;
       const step = () => {
+        // Round ID check: Never append cards from a cancelled or stale round
+        if (activeAnimatingRoundIdRef.current !== roundId) {
+          return;
+        }
+
         if (i >= steps.length) {
-          isAnimatingRef.current = false;
+          // Cards finished dealing -> Show Winner & Result
           setPhase("result");
-          const didWin = myBet && myBet.roundId === roundId && myBet.side === winner;
-          const didLose = myBet && myBet.roundId === roundId && myBet.side !== winner;
+          const bet = myBetRef.current;
+          const didWin = bet && bet.roundId === roundId && bet.side === winner;
+          const didLose = bet && bet.roundId === roundId && bet.side !== winner;
 
           if (didWin) {
-            const payout = Math.round(myBet.amount * (PAYOUT[winner] || 1.0));
+            const payout = Math.round(bet.amount * (PAYOUT[winner] || 1.0));
             setResult({
               won: true,
               text: `YOU WON! ${winner.toUpperCase()} WINS (+₹${payout})`,
@@ -170,7 +223,7 @@ export function AndarBaharPage() {
           } else if (didLose) {
             setResult({
               won: false,
-              text: `${winner.toUpperCase()} WINS (-₹${myBet.amount})`,
+              text: `${winner.toUpperCase()} WINS (-₹${bet.amount})`,
             });
             soundManager.play("loss");
           } else {
@@ -182,6 +235,29 @@ export function AndarBaharPage() {
 
           refreshBalance();
           getRoundHistory(20).then((h) => setHistory(formatHistory(h)));
+
+          // RESULT HOLD: Hold winner on screen so user sees the outcome before next round
+          const holdTimer = window.setTimeout(() => {
+            if (activeAnimatingRoundIdRef.current !== roundId) {
+              return;
+            }
+
+            isAnimatingRef.current = false;
+            activeAnimatingRoundIdRef.current = null;
+
+            // Transition: If a new round arrived while displaying result, transition now
+            if (pendingRoundStartRef.current) {
+              const nextRound = pendingRoundStartRef.current;
+              pendingRoundStartRef.current = null;
+              applyRoundStart(nextRound);
+            } else if (pendingResultRef.current) {
+              const nextResult = pendingResultRef.current;
+              pendingResultRef.current = null;
+              animateServerDeal(nextResult.rd, nextResult.roundId);
+            }
+          }, 2000);
+
+          timers.current.push(holdTimer);
           return;
         }
 
@@ -193,51 +269,111 @@ export function AndarBaharPage() {
         }
         soundManager.play("card_deal");
         i += 1;
-        timers.current.push(window.setTimeout(step, 320));
+
+        const nextStepTimer = window.setTimeout(step, 280);
+        timers.current.push(nextStepTimer);
       };
 
-      timers.current.push(window.setTimeout(step, 380));
+      const leadInTimer = window.setTimeout(step, 360);
+      timers.current.push(leadInTimer);
     },
-    [myBet, refreshBalance, formatHistory]
+    [applyRoundStart, formatHistory, refreshBalance]
   );
 
-  // WebSocket Connection
+  // Fetch initial round & history
+  const fetchAll = useCallback(async () => {
+    try {
+      const [state, hist] = await Promise.all([getCurrentRound(), getRoundHistory(20)]);
+      setHistory(formatHistory(hist));
+      await refreshBalance();
+
+      // Guard against stale HTTP polling overwriting newer WebSocket or active presentation state
+      if (
+        state.round &&
+        !isAnimatingRef.current &&
+        !pendingRoundStartRef.current &&
+        (!currentRoundIdRef.current || state.round.id === currentRoundIdRef.current)
+      ) {
+        currentRoundIdRef.current = state.round.id;
+        setCurrentRoundId(state.round.id);
+        if (state.game?.id) setCurrentGameId(state.game.id);
+
+        if (state.round.status === "BETTING") {
+          setPhase("betting");
+          setTimeLeft(Math.max(0, Math.round(state.seconds_remaining)));
+        } else if (state.round.status === "CALCULATING") {
+          setPhase("closed");
+          setTimeLeft(0);
+        }
+      }
+    } catch {
+      // fallback
+    }
+  }, [formatHistory, refreshBalance]);
+
+  // WebSocket Connection with APK lifecycle safety
   useEffect(() => {
     let ws: WebSocket | null = null;
     let isUnmounted = false;
     let reconnectTimer: number | null = null;
 
+    const cleanupSocket = () => {
+      if (ws) {
+        ws.onopen = null;
+        ws.onmessage = null;
+        ws.onclose = null;
+        ws.onerror = null;
+        try {
+          ws.close();
+        } catch {}
+        ws = null;
+      }
+      if (wsRef.current) {
+        wsRef.current = null;
+      }
+    };
+
     const connect = () => {
       if (isUnmounted) return;
+      cleanupSocket();
+
       try {
         const wsUrl = getWebSocketUrl("ws/games");
         ws = new WebSocket(wsUrl);
         wsRef.current = ws;
 
         ws.onmessage = (event) => {
+          if (isUnmounted) return;
           try {
             const data = JSON.parse(event.data);
             if (data.game_slug && data.game_slug !== SLUG) return;
 
             if (data.type === "round_start") {
-              soundManager.play("betting_start");
-              setCurrentRoundId(data.round_id);
-              if (data.game_id) setCurrentGameId(data.game_id);
-              setPhase("betting");
-              setTimeLeft(data.seconds_remaining != null ? Math.round(data.seconds_remaining) : 15);
-              setMyBet(null);
-              setSelectedSide(null);
-              setMiddle(null);
-              setAndar([]);
-              setBahar([]);
-              setResult(null);
-              setServerError(null);
+              const roundInfo = {
+                roundId: data.round_id,
+                gameId: data.game_id,
+                startedAt: data.started_at,
+                bettingClosesAt: data.betting_closes_at,
+                secondsRemaining: data.seconds_remaining,
+              };
+
+              // If currently presenting cards / winner from previous round,
+              // queue this new round so winner display is never cut off
+              if (isAnimatingRef.current) {
+                pendingRoundStartRef.current = roundInfo;
+              } else {
+                applyRoundStart(roundInfo);
+              }
             }
 
             if (data.type === "betting_locked") {
-              soundManager.play("betting_stop");
-              setPhase("closed");
-              setTimeLeft(0);
+              if (pendingRoundStartRef.current && pendingRoundStartRef.current.roundId === data.round_id) {
+                pendingRoundStartRef.current.secondsRemaining = 0;
+              } else if (!isAnimatingRef.current && currentRoundIdRef.current === data.round_id) {
+                soundManager.play("betting_stop");
+                setPhase("closed");
+                setTimeLeft(0);
+              }
             }
 
             if (data.type === "round_result" && data.result_data) {
@@ -255,9 +391,7 @@ export function AndarBaharPage() {
         };
 
         ws.onerror = () => {
-          try {
-            ws?.close();
-          } catch {}
+          cleanupSocket();
         };
       } catch {
         if (!isUnmounted) {
@@ -272,13 +406,11 @@ export function AndarBaharPage() {
     return () => {
       isUnmounted = true;
       if (reconnectTimer) window.clearTimeout(reconnectTimer);
-      try {
-        ws?.close();
-      } catch {}
+      cleanupSocket();
       timers.current.forEach(clearTimeout);
       timers.current = [];
     };
-  }, [animateServerDeal, fetchAll]);
+  }, [animateServerDeal, applyRoundStart, fetchAll]);
 
   // Local Countdown ticker while betting
   useEffect(() => {
@@ -320,7 +452,9 @@ export function AndarBaharPage() {
       await placeBetApi(currentRoundId, selectedSide === "andar" ? "ANDAR" : "BAHAR", paiseAmount, currentGameId || undefined);
 
       soundManager.play("bet_coin");
-      setMyBet({ side: selectedSide, amount: stake, roundId: currentRoundId });
+      const placedBet = { side: selectedSide, amount: stake, roundId: currentRoundId };
+      setMyBet(placedBet);
+      myBetRef.current = placedBet;
       setBalance((b) => b - stake);
       setShowChipMenu(false);
     } catch (err: any) {
@@ -377,13 +511,21 @@ export function AndarBaharPage() {
         </header>
 
         <div className="rail">
-          <button className="rail-btn" onClick={() => setRulesPopup("how")}>
+          <button type="button" className="rail-btn" onClick={() => setRulesPopup("how")}>
             <span className="rail-icon">📖</span>How to Play
           </button>
-          <button className="rail-btn" onClick={() => setRulesPopup("rules")}>
+          <button type="button" className="rail-btn" onClick={() => setRulesPopup("rules")}>
             <span className="rail-icon">📋</span>Rules
           </button>
-          <button className="rail-btn" onClick={() => setShowHistory((v) => !v)}>
+          <button
+            type="button"
+            className="rail-btn"
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowHistory((v) => !v);
+            }}
+            aria-label="Toggle History"
+          >
             <span className="rail-icon">📜</span>History
           </button>
         </div>
@@ -437,10 +579,16 @@ export function AndarBaharPage() {
         {/* Desktop History Sidebar */}
         <HistoryPanel entries={history} />
 
-        {/* Mobile History Drawer */}
-        {showHistory && <div className="history-backdrop" onClick={() => setShowHistory(false)} />}
+        {/* Mobile / APK History Drawer */}
+        {showHistory && (
+          <div className="history-backdrop" onClick={() => setShowHistory(false)} />
+        )}
         <div className={`history-drawer${showHistory ? " open" : ""}`}>
-          <HistoryPanel entries={history} onClose={() => setShowHistory(false)} />
+          <HistoryPanel
+            className="in-drawer"
+            entries={history}
+            onClose={() => setShowHistory(false)}
+          />
         </div>
 
         <footer className="app-footer">

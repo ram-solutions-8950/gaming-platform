@@ -1,8 +1,10 @@
 /* ───────────────────────────────────────────────────────────
-   Corona 888 - OFFICIAL ANDROID APK DOWNLOAD PAGE
+   Corona 888 - OFFICIAL APK DOWNLOAD POSTER PAGE
+   Matches reference design: Red/Blue split neon, tactical frame,
+   authentic logo, golden 888, neon gradient button, glass cards.
    ─────────────────────────────────────────────────────────── */
 
-.download-page-root {
+.c888-download-root {
   min-height: 100vh;
   min-height: 100dvh;
   width: 100%;
@@ -10,329 +12,425 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 24px 16px;
+  padding: 16px 12px;
   box-sizing: border-box;
-  background: radial-gradient(circle at 50% 20%, #1f0b40 0%, #0d041c 55%, #05010a 100%);
+  background-color: #04060d;
+  background-image:
+    radial-gradient(ellipse 45% 45% at 5% 30%, rgba(239, 68, 68, 0.18) 0%, transparent 70%),
+    radial-gradient(ellipse 45% 45% at 95% 30%, rgba(0, 176, 255, 0.20) 0%, transparent 70%),
+    radial-gradient(circle 35% at 50% 60%, rgba(147, 51, 234, 0.12) 0%, transparent 70%),
+    radial-gradient(circle at 50% 15%, rgba(255, 255, 255, 0.03) 0%, transparent 50%),
+    linear-gradient(180deg, #050811 0%, #030409 100%);
   color: #f1f5f9;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-  position: relative;
+  margin: 0;
   overflow-x: hidden;
+  position: relative;
 }
 
-/* Ambient glow accents */
-.download-page-root::before {
+/* Background Subtle High-Tech Circuit Board Ambience */
+.c888-download-root::before {
   content: '';
-  position: absolute;
-  top: -100px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 380px;
-  height: 380px;
-  background: radial-gradient(circle, rgba(245, 158, 11, 0.22) 0%, rgba(168, 85, 247, 0.15) 50%, transparent 70%);
+  position: fixed;
+  inset: 0;
+  background:
+    radial-gradient(circle at 20% 40%, rgba(255, 23, 68, 0.05) 0%, transparent 40%),
+    radial-gradient(circle at 80% 40%, rgba(0, 176, 255, 0.05) 0%, transparent 40%);
   pointer-events: none;
-  filter: blur(40px);
+  z-index: 1;
 }
 
-/* Main Centered Download Card */
-.download-card {
+/* Outer Tactical Cyberpunk Poster Card Frame */
+.c888-poster-frame {
   width: 100%;
-  max-width: 440px;
-  background: rgba(18, 10, 36, 0.88);
-  border: 1px solid rgba(245, 158, 11, 0.32);
-  border-radius: 24px;
-  padding: 36px 28px 30px;
+  max-width: 480px;
+  margin: 0 auto;
+  position: relative;
+  z-index: 2;
   box-sizing: border-box;
-  box-shadow:
-    0 24px 60px rgba(0, 0, 0, 0.8),
-    0 0 40px rgba(245, 158, 11, 0.14),
-    inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  padding: 24px 22px 26px;
+  background: rgba(7, 11, 22, 0.88);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
+  border-radius: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow:
+    -6px 0 35px -4px rgba(239, 68, 68, 0.3),
+    6px 0 35px -4px rgba(0, 176, 255, 0.32),
+    0 24px 60px rgba(0, 0, 0, 0.9),
+    inset 0 1px 0 rgba(255, 255, 255, 0.15),
+    inset 0 0 30px rgba(0, 0, 0, 0.6);
   display: flex;
   flex-direction: column;
   align-items: center;
   text-align: center;
+}
+
+/* Tactical Chamfered Corner Accents (Red on left, Blue on right) */
+.c888-frame-corner {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  pointer-events: none;
+  z-index: 5;
+}
+
+.c888-frame-corner.corner-tl {
+  top: 6px;
+  left: 6px;
+  border-top: 2.5px solid #ff2a5f;
+  border-left: 2.5px solid #ff2a5f;
+  border-top-left-radius: 8px;
+  filter: drop-shadow(0 0 6px rgba(255, 42, 95, 0.8));
+}
+
+.c888-frame-corner.corner-tr {
+  top: 6px;
+  right: 6px;
+  border-top: 2.5px solid #00b0ff;
+  border-right: 2.5px solid #00b0ff;
+  border-top-right-radius: 8px;
+  filter: drop-shadow(0 0 6px rgba(0, 176, 255, 0.8));
+}
+
+.c888-frame-corner.corner-bl {
+  bottom: 6px;
+  left: 6px;
+  border-bottom: 2.5px solid #ff2a5f;
+  border-left: 2.5px solid #ff2a5f;
+  border-bottom-left-radius: 8px;
+  filter: drop-shadow(0 0 6px rgba(255, 42, 95, 0.8));
+}
+
+.c888-frame-corner.corner-br {
+  bottom: 6px;
+  right: 6px;
+  border-bottom: 2.5px solid #00b0ff;
+  border-right: 2.5px solid #00b0ff;
+  border-bottom-right-radius: 8px;
+  filter: drop-shadow(0 0 6px rgba(0, 176, 255, 0.8));
+}
+
+/* 1. Large Corona 888 Tactical Emblem Logo Container */
+.c888-logo-container {
+  width: 100%;
+  max-width: 420px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-bottom: 8px;
   position: relative;
-  z-index: 2;
-  animation: downloadCardFadeIn 0.4s ease-out;
 }
 
-@keyframes downloadCardFadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(14px) scale(0.98);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
+.c888-logo-img {
+  width: 100%;
+  height: auto;
+  max-height: 250px;
+  object-fit: contain;
+  filter:
+    drop-shadow(0 10px 25px rgba(0, 0, 0, 0.85))
+    drop-shadow(-8px 0 20px rgba(239, 68, 68, 0.35))
+    drop-shadow(8px 0 20px rgba(0, 176, 255, 0.35));
+  user-select: none;
+  pointer-events: none;
 }
 
-/* Brand Logo Area */
-.download-logo-wrap {
-  width: 96px;
-  height: 96px;
-  border-radius: 22px;
-  background: linear-gradient(145deg, #2b1050, #130526);
-  padding: 4px;
-  box-sizing: border-box;
-  box-shadow:
-    0 12px 28px rgba(0, 0, 0, 0.6),
-    0 0 25px rgba(245, 158, 11, 0.35);
-  border: 2px solid rgba(255, 215, 0, 0.6);
-  margin-bottom: 20px;
+/* 2. Main Title: "Corona 888" */
+.c888-title {
+  margin: 0 0 4px;
+  font-size: clamp(2.1rem, 6.5vw, 2.75rem);
+  font-weight: 900;
+  letter-spacing: 0.02em;
   display: flex;
   align-items: center;
   justify-content: center;
-  position: relative;
+  gap: 10px;
+  line-height: 1.1;
 }
 
-.download-logo-img {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  border-radius: 18px;
-  display: block;
+.c888-title .title-corona {
+  color: #ffffff;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.8);
 }
 
-/* App Titles & Descriptions */
-.download-title {
-  margin: 0 0 4px;
-  font-size: 28px;
-  font-weight: 900;
-  letter-spacing: 0.5px;
-  background: linear-gradient(135deg, #ffffff 0%, #ffeaa7 35%, #ffd700 70%, #f59e0b 100%);
+.c888-title .title-888 {
+  color: #ffc83b;
+  background: linear-gradient(180deg, #fff2be 0%, #ffc83b 50%, #f59e0b 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
-  text-shadow: 0 2px 14px rgba(245, 158, 11, 0.3);
+  filter: drop-shadow(0 0 16px rgba(255, 200, 59, 0.6));
 }
 
-.download-subtitle {
-  margin: 0 0 12px;
-  font-size: 14px;
-  font-weight: 700;
-  color: #a78bfa;
-  letter-spacing: 0.4px;
-  text-transform: uppercase;
-}
-
-.download-desc {
-  margin: 0 0 22px;
-  font-size: 14px;
-  line-height: 1.5;
-  color: #cbd5e1;
-  max-width: 320px;
-}
-
-/* Info Badges Row */
-.download-info-badges {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  margin-bottom: 26px;
-  flex-wrap: wrap;
-}
-
-.download-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 9999px;
-  padding: 6px 14px;
-  font-size: 12px;
-  font-weight: 600;
-  color: #e2e8f0;
-}
-
-.download-badge-icon {
-  width: 14px;
-  height: 14px;
-  color: #4ade80;
-  flex-shrink: 0;
-}
-
-/* Download APK Button */
-.download-btn {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  background: linear-gradient(135deg, #f59e0b 0%, #ea580c 50%, #c2410c 100%);
-  color: #ffffff;
-  font-size: 17px;
+/* 3. Sub-title: "OFFICIAL ANDROID APPLICATION" */
+.c888-subtitle {
+  font-size: clamp(0.85rem, 2.8vw, 1.02rem);
   font-weight: 800;
-  letter-spacing: 0.5px;
-  text-decoration: none;
-  padding: 16px 24px;
-  border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  box-shadow:
-    0 10px 24px rgba(234, 88, 12, 0.45),
-    0 2px 0 rgba(255, 255, 255, 0.3) inset;
-  cursor: pointer;
-  transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;
-  user-select: none;
-  -webkit-tap-highlight-color: transparent;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: #a78bfa;
+  background: linear-gradient(90deg, #c084fc 0%, #a78bfa 50%, #818cf8 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 0 12px rgba(167, 139, 250, 0.5));
+  margin-bottom: 12px;
+}
+
+/* 4. Description */
+.c888-desc {
+  font-size: clamp(0.92rem, 2.7vw, 1.05rem);
+  color: #f1f5f9;
+  line-height: 1.48;
+  margin: 0 0 22px;
+  max-width: 320px;
+  font-weight: 400;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+}
+
+/* 5. Trust / Information Badges Row */
+.c888-badges-row {
+  display: flex;
+  gap: 12px;
+  width: 100%;
+  max-width: 410px;
   margin-bottom: 24px;
 }
 
-.download-btn:hover {
-  transform: translateY(-2px);
-  filter: brightness(1.08);
+.c888-badge {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: rgba(10, 18, 34, 0.85);
+  border: 1px solid rgba(56, 189, 248, 0.28);
+  border-radius: 14px;
   box-shadow:
-    0 14px 30px rgba(234, 88, 12, 0.55),
-    0 2px 0 rgba(255, 255, 255, 0.35) inset;
+    0 6px 18px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  box-sizing: border-box;
+  text-align: left;
 }
 
-.download-btn:active {
-  transform: translateY(1px) scale(0.99);
-  box-shadow: 0 6px 16px rgba(234, 88, 12, 0.35);
+.c888-badge-icon-wrap {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.download-btn-icon {
+.c888-badge-icon {
   width: 22px;
   height: 22px;
+  display: block;
+}
+
+.c888-badge-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.c888-badge-title {
+  font-size: 12.5px;
+  font-weight: 800;
+  color: #ffffff;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+  line-height: 1.25;
+}
+
+.c888-badge-sub {
+  font-size: 11px;
+  color: #94a3b8;
+  font-weight: 500;
+  white-space: nowrap;
+  line-height: 1.2;
+}
+
+/* 6. Primary DOWNLOAD APK Button */
+.c888-download-btn {
+  width: 100%;
+  max-width: 410px;
+  min-height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background: linear-gradient(90deg, #ff1744 0%, #e11d48 20%, #9333ea 50%, #2563eb 80%, #00b0ff 100%);
+  color: #ffffff;
+  font-size: clamp(17px, 4.5vw, 20px);
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  text-decoration: none;
+  padding: 16px 24px;
+  border-radius: 18px;
+  border: 1.5px solid rgba(255, 255, 255, 0.45);
+  box-shadow:
+    0 0 28px rgba(255, 23, 68, 0.5),
+    0 0 35px rgba(0, 176, 255, 0.5),
+    0 10px 24px rgba(0, 0, 0, 0.6),
+    inset 0 1px 2px rgba(255, 255, 255, 0.65);
+  cursor: pointer;
+  box-sizing: border-box;
+  transition: transform 0.16s ease, filter 0.16s ease, box-shadow 0.16s ease;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  margin-bottom: 22px;
+}
+
+.c888-download-btn:hover {
+  transform: translateY(-2px) scale(1.01);
+  filter: brightness(1.12);
+  box-shadow:
+    0 0 36px rgba(255, 23, 68, 0.65),
+    0 0 45px rgba(0, 176, 255, 0.65),
+    0 14px 30px rgba(0, 0, 0, 0.7),
+    inset 0 1px 2px rgba(255, 255, 255, 0.8);
+}
+
+.c888-download-btn:active {
+  transform: translateY(1px) scale(0.99);
+  box-shadow:
+    0 0 18px rgba(255, 23, 68, 0.4),
+    0 0 22px rgba(0, 176, 255, 0.4),
+    0 6px 16px rgba(0, 0, 0, 0.5);
+}
+
+.c888-btn-icon {
+  width: 24px;
+  height: 24px;
   flex-shrink: 0;
   transition: transform 0.2s ease;
 }
 
-.download-btn:hover .download-btn-icon {
+.c888-download-btn:hover .c888-btn-icon {
   transform: translateY(2px);
 }
 
-/* Installation Helper Card */
-.download-note-box {
+/* 7. Installation Note Card */
+.c888-install-note {
   width: 100%;
-  background: rgba(245, 158, 11, 0.08);
-  border: 1px solid rgba(245, 158, 11, 0.25);
-  border-radius: 14px;
-  padding: 14px 16px;
-  box-sizing: border-box;
-  text-align: left;
+  max-width: 410px;
   display: flex;
   align-items: flex-start;
   gap: 12px;
-  margin-bottom: 20px;
+  padding: 14px 16px;
+  background: rgba(8, 14, 26, 0.88);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 16px;
+  box-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  box-sizing: border-box;
+  text-align: left;
 }
 
-.download-note-icon {
-  width: 18px;
-  height: 18px;
-  color: #f59e0b;
+.c888-note-icon-wrap {
   flex-shrink: 0;
-  margin-top: 2px;
+  margin-top: 1px;
 }
 
-.download-note-text {
-  margin: 0;
-  font-size: 12px;
-  line-height: 1.5;
-  color: #e2e8f0;
-}
-
-.download-note-text strong {
-  color: #fbbf24;
-}
-
-/* Quick 3-Step Guide */
-.download-steps {
-  width: 100%;
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
-  padding-top: 14px;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
-  margin-bottom: 20px;
-}
-
-.download-step-item {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-}
-
-.download-step-num {
+.c888-note-icon {
   width: 22px;
   height: 22px;
-  border-radius: 50%;
-  background: rgba(168, 85, 247, 0.2);
-  border: 1px solid rgba(168, 85, 247, 0.4);
-  color: #c084fc;
-  font-size: 11px;
+  display: block;
+}
+
+.c888-note-content {
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: #e2e8f0;
+  margin: 0;
+}
+
+.c888-note-lead {
+  color: #fbbf24;
   font-weight: 800;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 6px;
-}
-
-.download-step-label {
-  font-size: 11px;
-  color: #94a3b8;
-  line-height: 1.3;
-}
-
-/* Footer / Web Lobby Link */
-.download-footer-links {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 16px;
-}
-
-.download-web-link {
-  color: #a78bfa;
-  font-size: 13px;
-  font-weight: 600;
-  text-decoration: none;
-  transition: color 0.15s ease;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.download-web-link:hover {
-  color: #c084fc;
-  text-decoration: underline;
 }
 
 /* ───────────────────────────────────────────────────────────
-   Mobile Adjustments
+   Mobile Responsive Adjustments
    ─────────────────────────────────────────────────────────── */
 @media (max-width: 480px) {
-  .download-card {
-    padding: 28px 18px 24px;
-    border-radius: 20px;
+  .c888-download-root {
+    padding: 12px 10px;
   }
 
-  .download-logo-wrap {
-    width: 84px;
-    height: 84px;
-    border-radius: 18px;
-    margin-bottom: 16px;
+  .c888-poster-frame {
+    padding: 18px 14px 20px;
+    border-radius: 22px;
   }
 
-  .download-title {
-    font-size: 24px;
+  .c888-logo-img {
+    max-height: 200px;
   }
 
-  .download-subtitle {
-    font-size: 13px;
+  .c888-title {
+    font-size: 28px;
+    margin-bottom: 2px;
   }
 
-  .download-desc {
-    font-size: 13px;
+  .c888-subtitle {
+    font-size: 12px;
+    margin-bottom: 10px;
+  }
+
+  .c888-desc {
+    font-size: 13.5px;
     margin-bottom: 18px;
   }
 
-  .download-btn {
-    font-size: 16px;
-    padding: 14px 20px;
+  .c888-badges-row {
+    gap: 8px;
+    margin-bottom: 20px;
+  }
+
+  .c888-badge {
+    padding: 8px 10px;
+    border-radius: 12px;
+    gap: 8px;
+  }
+
+  .c888-badge-title {
+    font-size: 11.5px;
+  }
+
+  .c888-badge-sub {
+    font-size: 10px;
+  }
+
+  .c888-badge-icon {
+    width: 19px;
+    height: 19px;
+  }
+
+  .c888-download-btn {
+    min-height: 54px;
+    font-size: 16.5px;
+    padding: 14px 18px;
+    margin-bottom: 18px;
+    border-radius: 16px;
+  }
+
+  .c888-btn-icon {
+    width: 21px;
+    height: 21px;
+  }
+
+  .c888-install-note {
+    padding: 12px 14px;
+    border-radius: 14px;
+  }
+
+  .c888-note-icon {
+    width: 20px;
+    height: 20px;
+  }
+
+  .c888-note-content {
+    font-size: 12px;
   }
 }

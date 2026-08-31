@@ -138,19 +138,29 @@ export function AviatorPage() {
 
       {/* Top Header */}
       <header className="aviator-top-nav">
-        <div className="aviator-logo">
-          <span className="plane-icon">✈️</span>
-          <span className="logo-text">AVIATOR</span>
-          <span
-            className={`w-2 h-2 rounded-full inline-block ml-1 ${
-              isConnected
-                ? 'bg-emerald-400 animate-pulse'
-                : isConnecting
-                ? 'bg-amber-400 animate-ping'
-                : 'bg-rose-500'
-            }`}
-            title={isConnected ? 'Radar Connected' : isConnecting ? 'Reconnecting...' : 'Disconnected'}
-          />
+        <div className="aviator-nav-left">
+          <button
+            type="button"
+            onClick={() => navigate('/dashboard')}
+            className="aviator-btn-back"
+          >
+            ← Exit
+          </button>
+
+          <div className="aviator-logo">
+            <span className="plane-icon">✈️</span>
+            <span className="logo-text">AVIATOR</span>
+            <span
+              className={`w-2 h-2 rounded-full inline-block ml-1 ${
+                isConnected
+                  ? 'bg-emerald-400 animate-pulse'
+                  : isConnecting
+                  ? 'bg-amber-400 animate-ping'
+                  : 'bg-rose-500'
+              }`}
+              title={isConnected ? 'Radar Connected' : isConnecting ? 'Reconnecting...' : 'Disconnected'}
+            />
+          </div>
         </div>
 
         <div className="aviator-nav-right">
@@ -163,14 +173,6 @@ export function AviatorPage() {
               })}
             </span>
           </div>
-
-          <button
-            type="button"
-            onClick={() => navigate('/dashboard')}
-            className="aviator-btn-back"
-          >
-            Exit
-          </button>
         </div>
       </header>
 

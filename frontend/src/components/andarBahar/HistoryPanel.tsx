@@ -1,12 +1,24 @@
 import { cardLabel } from "../../game/andarBahar/deck";
 import type { HistoryEntry } from "../../services/andarBahar";
 
-export function HistoryPanel({ entries, onClose }: { entries: HistoryEntry[]; onClose?: () => void }) {
+export function HistoryPanel({ entries, onClose, className }: { entries: HistoryEntry[]; onClose?: () => void; className?: string }) {
   return (
-    <div className="history-sidebar">
+    <div className={`history-sidebar ${className || ""}`}>
       <div className="history-title-row">
         <span className="history-title">Server Round History</span>
-        {onClose && <button className="history-close" onClick={onClose}>✕</button>}
+        {onClose && (
+          <button
+            type="button"
+            className="history-close"
+            onClick={(e) => {
+              e.stopPropagation();
+              onClose();
+            }}
+            aria-label="Close History"
+          >
+            ✕
+          </button>
+        )}
       </div>
       {entries.length === 0 ? (
         <div className="history-empty">No rounds yet.</div>

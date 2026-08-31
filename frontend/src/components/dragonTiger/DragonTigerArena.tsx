@@ -93,6 +93,7 @@ export function DragonTigerArena({
   showPlayer,
   playerWon,
   playerAmountLabel,
+  winnerResult,
 }: {
   phase: ArenaPhase;
   dragonCard?: string | null;
@@ -102,6 +103,7 @@ export function DragonTigerArena({
   showPlayer: boolean;
   playerWon: boolean | null;
   playerAmountLabel?: string;
+  winnerResult?: 'DRAGON' | 'TIGER' | 'TIE' | null;
 }) {
   const classes = ['dvt-arena', phase];
   if (showPlayer) classes.push('show-player');
@@ -114,7 +116,13 @@ export function DragonTigerArena({
         <Side kind="tiger" card={tigerCard} flipped={tigerFlipped} />
       </div>
       <div className="dvt-banner">
-        {phase === 'tie-result' && <div className="dvt-tie-banner">✨ TIE ✨</div>}
+        {winnerResult && (
+          <div className={`dvt-winner-banner dvt-winner-${winnerResult.toLowerCase()}`}>
+            {winnerResult === 'DRAGON' && '🐉 DRAGON WINS'}
+            {winnerResult === 'TIGER' && '🐯 TIGER WINS'}
+            {winnerResult === 'TIE' && 'TIE'}
+          </div>
+        )}
         {showPlayer && playerWon === true && (
           <div className="dvt-player-banner dvt-player-win">🎉 YOU WON {playerAmountLabel}</div>
         )}
