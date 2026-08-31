@@ -11,7 +11,7 @@ from pathlib import Path
 from .config import settings
 from .utils.exceptions import http_exception_handler, validation_exception_handler
 from .middleware.rate_limiter import limiter
-from .routers import auth, users, wallet, transactions, deposits, withdrawals, payments, admin, fees, games, referral
+from .routers import auth, users, wallet, transactions, deposits, withdrawals, payments, admin, fees, games, referral, rewards
 from .services.game_engine import start_engine, stop_engine
 from .websocket.manager import game_ws_manager
 
@@ -64,6 +64,7 @@ app.include_router(admin.router, prefix=PREFIX)
 app.include_router(fees.router, prefix=PREFIX)
 app.include_router(games.router, prefix=PREFIX)
 app.include_router(referral.router, prefix=PREFIX)
+app.include_router(rewards.router, prefix=PREFIX)
 from .routers import ludo, rummy, teen_patti, aviator, poker, chicken_road, triple_777, roulette
 from .websocket import teen_patti_ws, aviator_ws, poker_ws
 app.include_router(ludo.router, prefix=PREFIX)
