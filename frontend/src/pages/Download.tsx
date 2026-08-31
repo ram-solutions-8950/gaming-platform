@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import corona888Logo from '../assets/corona888-logo.webp';
 import '../styles/download-page.css';
 
-const APK_DOWNLOAD_URL = 'http://76.13.177.44/GameStack.apk';
+const APK_DOWNLOAD_URL = 'http://76.13.177.44/Corona888.apk';
 
 export const DownloadPage: React.FC = () => {
   return (
