@@ -1,8 +1,16 @@
 import axios from 'axios';
 
+const configuredApiUrl = import.meta.env.VITE_API_URL?.trim();
+
+const isLocalHost =
+  window.location.hostname === 'localhost' ||
+  window.location.hostname === '127.0.0.1';
+
 export const API_BASE_URL =
-  import.meta.env.VITE_API_URL?.trim() ||
-  (import.meta.env.PROD ? 'http://76.13.177.44/api/v1' : 'http://127.0.0.1:8000/api/v1');
+  configuredApiUrl ||
+  (isLocalHost
+    ? 'http://127.0.0.1:8000/api/v1'
+    : `${window.location.protocol}//${window.location.hostname}/api/v1`);
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -11,10 +19,12 @@ const api = axios.create({
 
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('access_token');
+
   if (token) {
     config.headers = config.headers ?? {};
     config.headers.Authorization = `Bearer ${token}`;
   }
+
   return config;
 });
 
@@ -22,25 +32,42 @@ api.interceptors.response.use(
   (res) => res,
   async (error) => {
     const original = error.config;
+
     if (error.response?.status === 401 && !original._retry) {
       original._retry = true;
+
       const refresh_token = localStorage.getItem('refresh_token');
+
       if (refresh_token) {
         try {
-          const res = await axios.post(`${api.defaults.baseURL}/auth/refresh`, { refresh_token });
-          const { access_token, refresh_token: new_refresh } = res.data.data;
+          const res = await axios.post(
+            `${api.defaults.baseURL}/auth/refresh`,
+            { refresh_token },
+          );
+
+          const {
+            access_token,
+            refresh_token: new_refresh,
+          } = res.data.data;
+
           localStorage.setItem('access_token', access_token);
           localStorage.setItem('refresh_token', new_refresh);
+
           original.headers = original.headers ?? {};
           original.headers.Authorization = `Bearer ${access_token}`;
+
           return api(original);
         } catch {
           localStorage.removeItem('access_token');
           localStorage.removeItem('refresh_token');
-          if (typeof window !== 'undefined') window.location.href = '/login';
+
+          if (typeof window !== 'undefined') {
+            window.location.href = '/login';
+          }
         }
       }
     }
+
     return Promise.reject(error);
   },
 );
