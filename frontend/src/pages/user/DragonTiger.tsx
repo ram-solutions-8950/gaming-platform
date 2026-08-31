@@ -39,13 +39,18 @@ export function DragonTigerPage() {
   // Initialize audio hook
   const audio = useAudio();
 
-  // Unlock AudioContext on first user interaction & lock orientation
+  // Unlock AudioContext & start background music on interaction / mount
   useEffect(() => {
+    // Start background music and unlock audio immediately
+    audio.unlock();
+    audio.playTheme();
+
     const unlock = () => {
-      audio.unlock(); audio.playTheme();
+      audio.unlock();
+      audio.playTheme();
       window.removeEventListener('click', unlock);
       window.removeEventListener('keydown', unlock);
-      
+
       // Attempt to lock native screen orientation to landscape
       try {
         if (screen.orientation && (screen.orientation as any).lock) {
@@ -60,8 +65,7 @@ export function DragonTigerPage() {
     return () => {
       window.removeEventListener('click', unlock);
       window.removeEventListener('keydown', unlock);
-      audio.stopTheme();
-      // Unlock orientation on unmount
+      // Unlock orientation on unmount without stopping global background music
       try {
         if (screen.orientation && screen.orientation.unlock) {
           screen.orientation.unlock();
@@ -78,14 +82,11 @@ export function DragonTigerPage() {
   const [tigerFlipped, setTigerFlipped] = useState(false);
   const [showPlayer, setShowPlayer] = useState(false);
 
-  // Play flip sound when cards are flipped
+  // Keep myBets ref synchronized for animation callbacks
+  const myBetsRef = useRef(myBets);
   useEffect(() => {
-    if (dragonFlipped) audio.playFlip();
-  }, [dragonFlipped]);
-
-  useEffect(() => {
-    if (tigerFlipped) audio.playFlip();
-  }, [tigerFlipped]);
+    myBetsRef.current = myBets;
+  }, [myBets]);
 
   /**
    * displayRound holds the completed round whose result is currently being
@@ -151,13 +152,22 @@ export function DragonTigerPage() {
   }, [gameState?.round?.id, gameState?.round?.status]);
 
   const prevCountdown = useRef<number>(-1);
-  // Play countdown tick sound for values 5-1
+  // Play countdown tick sound for values 5-1 only during active betting (never during result/reveal)
   useEffect(() => {
-    if (countdown !== prevCountdown.current && countdown >= 1 && countdown <= 5) {
+    if (
+      !displayRound &&
+      !animatingRef.current &&
+      phase === 'waiting' &&
+      gameState?.round?.status === 'BETTING' &&
+      !isBettingLocked &&
+      countdown !== prevCountdown.current &&
+      countdown >= 1 &&
+      countdown <= 5
+    ) {
       audio.play('countdown_tick');
     }
     prevCountdown.current = countdown;
-  }, [countdown]);
+  }, [countdown, gameState?.round?.status, isBettingLocked, displayRound, phase]);
 
   /* ── WebSocket (with robust URL resolution for Android APK WebView & auto-reconnect) ── */
   useEffect(() => {
@@ -244,15 +254,44 @@ export function DragonTigerPage() {
   const round = gameState?.round;
   const isBetting = round?.status === 'BETTING' && !isBettingLocked && countdown > 0;
   const isCalculating = round?.status === 'CALCULATING';
-  // Detect round start for audio
-  const prevRoundStatus = useRef<string | null>(null);
+  // Strict Event Synchronization: Betting Start & Betting Stop
+  const lastRoundStartRoundId = useRef<string | null>(null);
+  const lastBettingStopRoundId = useRef<string | null>(null);
+
   useEffect(() => {
-    if (round?.status === 'BETTING' && prevRoundStatus.current !== 'BETTING') {
-      audio.playRoundStart();
+    // CRITICAL: Never trigger betting start or betting stop while a round result is actively displaying/animating!
+    if (displayRound || animatingRef.current || phase !== 'waiting') {
+      return;
     }
-    prevRoundStatus.current = round?.status || null;
-  }, [round?.status]);
-  
+
+    if (!round?.id) return;
+
+    // 1. Betting Start: ONLY when current visual state is genuinely BETTING,
+    // betting is open, countdown > 0, and this new round has not yet played betting_start.
+    if (round.status === 'BETTING' && !isBettingLocked && countdown > 0) {
+      if (lastRoundStartRoundId.current !== round.id) {
+        audio.playRoundStart();
+        lastRoundStartRoundId.current = round.id;
+      }
+    }
+    // 2. Betting Stop: When betting locks or countdown expires for this active betting round.
+    else if (
+      (isBettingLocked || countdown <= 0 || round.status === 'CALCULATING') &&
+      lastRoundStartRoundId.current === round.id &&
+      lastBettingStopRoundId.current !== round.id
+    ) {
+      audio.play('betting_stop');
+      lastBettingStopRoundId.current = round.id;
+    }
+  }, [
+    round?.id,
+    round?.status,
+    isBettingLocked,
+    countdown,
+    displayRound,
+    phase,
+  ]);
+
   // Stop betting overlay flag — shown when betting locks or timer reaches 0 during BETTING status
   const showStopBettingOverlay = round?.status === 'BETTING' && (isBettingLocked || countdown <= 0);
   // Calculating overlay flag (when in CALCULATING phase without result data yet)
@@ -316,18 +355,20 @@ export function DragonTigerPage() {
       setTigerFlipped(false);
       setShowPlayer(false);
 
-      // Dragon card slide + flip
-      await delay(500);
+      // Dragon card slide + flip (faster reveal: 200ms lead-in)
+      await delay(200);
       if (cancelled) return;
       setDragonFlipped(true);
+      audio.playFlip();
 
-      // Tiger card slide + flip
-      await delay(900);
+      // Tiger card slide + flip (faster reveal: 450ms deal & flip)
+      await delay(450);
       if (cancelled) return;
       setTigerFlipped(true);
+      audio.playFlip();
 
-      // Both cards visible — show winner
-      await delay(700);
+      // Both cards visible — brief pause before result display (450ms)
+      await delay(450);
       if (cancelled) return;
 
       if (resVal === 'DRAGON') {
@@ -340,13 +381,27 @@ export function DragonTigerPage() {
         setPhase('tie-result');
       }
 
-      // Winner animation plays for a moment, then show player result
-      await delay(1400);
+      // Winner animation plays, then show player outcome banner & win/loss sound
+      await delay(600);
       if (cancelled) return;
       setShowPlayer(true);
 
-      // Hold everything on screen for 4 seconds
-      await delay(4000);
+      const roundId = displayRound.id;
+      if (resultSoundPlayedRef.current !== roundId) {
+        const userBets = myBetsRef.current.filter((b) => b.round_id === roundId);
+        const isUserWin = userBets.some((b) => b.status === 'WON');
+        const isUserLoss = userBets.some((b) => b.status === 'LOST') && !isUserWin;
+        if (isUserWin) {
+          audio.playWin();
+          resultSoundPlayedRef.current = roundId;
+        } else if (isUserLoss) {
+          audio.playLoss();
+          resultSoundPlayedRef.current = roundId;
+        }
+      }
+
+      // Hold everything on screen for 2.2 seconds (reduced from 4.0s)
+      await delay(2200);
       if (cancelled) return;
 
       // Clear — next round takes over
@@ -373,18 +428,6 @@ export function DragonTigerPage() {
   );
   const wonThisRound = roundBets.some((b) => b.status === 'WON');
   const lostThisRound = roundBets.some((b) => b.status === 'LOST') && !wonThisRound;
-
-  // Play win/loss sounds based on user outcome, ensure each round triggers only once
-  useEffect(() => {
-    if (!round) return;
-    if (wonThisRound && resultSoundPlayedRef.current !== round.id) {
-      audio.playWin();
-      resultSoundPlayedRef.current = round.id;
-    } else if (lostThisRound && resultSoundPlayedRef.current !== round.id) {
-      audio.playLoss();
-      resultSoundPlayedRef.current = round.id;
-    }
-  }, [wonThisRound, lostThisRound, round?.id]);
 
   /* ── place bet ── */
   const handleBet = async (predictionKey?: string) => {
@@ -460,7 +503,7 @@ export function DragonTigerPage() {
       <div className="absolute inset-0 z-[1] bg-black/50 pointer-events-none" />
 
       {/* Layer 2: All game content */}
-      <div 
+      <div
         className="relative z-[2] w-full h-full flex flex-col justify-between overflow-hidden"
         style={{
            paddingTop: 'env(safe-area-inset-top, 0px)',
@@ -803,7 +846,7 @@ export function DragonTigerPage() {
           </div>
 
           {/* Place Bet / Rebet */}
-          <button 
+          <button
             disabled={!isBetting || !selected || betting}
             onClick={() => handleBet()}
             className={`shrink-0 px-2 sm:px-4 py-1.5 sm:py-2 rounded-lg bg-gradient-to-b from-green-400 to-green-700 border border-green-300 text-white font-black text-[9px] sm:text-xs uppercase shadow-lg active:translate-y-0.5 transition-transform h-full max-h-[44px] sm:max-h-[48px] ${

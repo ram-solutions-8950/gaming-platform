@@ -348,10 +348,10 @@
   -webkit-transform: rotateY(0deg) translate3d(0, 0, 0);
 
   transition:
-    transform 900ms cubic-bezier(0.2, 0.75, 0.2, 1);
+    transform 400ms cubic-bezier(0.2, 0.75, 0.2, 1);
 
   -webkit-transition:
-    -webkit-transform 900ms cubic-bezier(0.2, 0.75, 0.2, 1);
+    -webkit-transform 400ms cubic-bezier(0.2, 0.75, 0.2, 1);
 
   will-change: transform;
 }
@@ -717,7 +717,7 @@
 .dvt-arena.revealing .dvt-side-dragon {
   animation:
     dvt-dragon-deal
-    650ms
+    400ms
     cubic-bezier(0.2, 0.8, 0.2, 1)
     both;
 }
@@ -726,9 +726,9 @@
 .dvt-arena.revealing .dvt-side-tiger {
   animation:
     dvt-tiger-deal
-    650ms
+    400ms
     cubic-bezier(0.2, 0.8, 0.2, 1)
-    900ms
+    450ms
     both;
 }
 
@@ -736,9 +736,9 @@
 .dvt-arena.revealing .dvt-vs {
   animation:
     dvt-vs-pulse
-    700ms
+    500ms
     ease
-    600ms
+    250ms
     both;
 }
 

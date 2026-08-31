@@ -167,28 +167,32 @@ class CentralSoundManager {
 
   // ──────────────────── Public API ─────────────────────────────
 
+  /** Start or resume background music */
+  startMusic() {
+    if (this._muted) return;
+    if (this._musicStarted && this.bgMusic?.playing()) return;
+    if (!this.bgMusic) {
+      this.bgMusic = new Howl({
+        src: ["/assets/sounds/kgf.mp3"],
+        html5: true, // Use HTML5 audio for large background music to stream it
+        loop: true,
+        volume: this._musicVolume,
+        preload: true,
+      });
+    }
+    if (!this.bgMusic.playing()) {
+      this.bgMusic.play();
+    }
+    this._musicStarted = true;
+  }
+
   /** Call once after first user interaction to unlock audio on mobile and start background music */
   init() {
     // Resume Howler's internal AudioContext
     Howler.ctx?.resume?.();
     // Also resume our oscillator context
     this.getAudioContext();
-
-    if (!this._musicStarted) {
-      this._musicStarted = true;
-      if (!this.bgMusic) {
-        this.bgMusic = new Howl({
-          src: ["/assets/sounds/kgf.mp3"],
-          html5: true, // Use HTML5 audio for large background music to stream it
-          loop: true,
-          volume: this._musicVolume,
-          preload: true,
-        });
-      }
-      if (!this.bgMusic.playing()) {
-        this.bgMusic.play();
-      }
-    }
+    this.startMusic();
   }
 
   /** Pause or stop background music when leaving the casino application */
@@ -259,6 +263,7 @@ class CentralSoundManager {
   unmute() {
     this._muted = false;
     Howler.mute(false);
+    this.startMusic();
     try {
       localStorage.setItem("casinoSoundMuted", "false");
     } catch { /* ignore */ }

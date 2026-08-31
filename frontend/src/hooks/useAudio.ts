@@ -22,11 +22,11 @@ export const useAudio = () => {
 
   // Convenience helpers matching the old API surface
   const playTheme = useCallback(() => {
-    // Theme is not in the standard set – no-op unless added
+    soundManager.startMusic();
   }, []);
 
   const stopTheme = useCallback(() => {
-    // Theme is not in the standard set – no-op unless added
+    // Keep background music running unless explicitly asked
   }, []);
 
   const playChip = useCallback(() => {
