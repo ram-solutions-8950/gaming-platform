@@ -9,9 +9,9 @@ import useAudio from '../../hooks/useAudio';
 import { ChipLayer } from '../../components/dragonTiger/ChipLayer';
 import { getWebSocketUrl } from '../../utils/ws';
 
-import bgImg from '../../assets/dragon-tiger-bg.jpeg';
-import dragonImg from '../../assets/dragon-3d.png';
-import tigerImg from '../../assets/tiger-3d.png';
+import bgImg from '../../assets/dragon-tiger-bg.webp';
+import dragonImg from '../../assets/dragon-3d.webp';
+import tigerImg from '../../assets/tiger-3d.webp';
 
 const SLUG = 'dragon-tiger';
 

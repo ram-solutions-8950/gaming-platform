@@ -14,8 +14,17 @@ from ..models.deposit import Deposit
 from ..models.withdrawal import Withdrawal
 from ..models.transaction import WalletTransaction
 from ..models.payment import PaymentConfiguration
-from ..services import wallet_service, audit_service, withdrawal_service
+from ..services import wallet_service, audit_service, withdrawal_service, reward_service
 from ..models.transaction import WalletTransactionType
+from ..schemas.reward import (
+    LuckySpinSegmentUpdateIn,
+    DailyRewardSettingsUpdateIn,
+    DailyRewardConfigUpdateIn,
+    BonusCreateIn,
+    BonusUpdateIn,
+    JackpotUpdateIn,
+    VipBonusUpdateIn,
+)
 from ..security.permissions import require_admin, require_super_admin
 from ..utils.responses import success_response, error_response
 from ..middleware.rate_limiter import limiter
@@ -548,3 +557,141 @@ def update_referral_settings_endpoint(
         "is_active": settings.is_active
     })
 
+
+# -- Rewards & Promotions Management -------------------------------------------
+@router.get("/rewards/lucky-spin")
+def admin_get_lucky_spin(admin: User = Depends(require_admin), db: Session = Depends(get_db)):
+    items = reward_service.get_admin_lucky_spin(db)
+    return success_response(items)
+
+
+@router.put("/rewards/lucky-spin/{segment_index}")
+def admin_update_lucky_spin_segment(
+    segment_index: int,
+    data: LuckySpinSegmentUpdateIn,
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    try:
+        updated = reward_service.update_admin_lucky_spin_segment(db, segment_index, data)
+        return success_response(updated)
+    except ValueError as e:
+        return error_response("UPDATE_ERROR", str(e), status_code=400)
+
+
+@router.get("/rewards/7days")
+def admin_get_7days(admin: User = Depends(require_admin), db: Session = Depends(get_db)):
+    data = reward_service.get_admin_7days(db)
+    return success_response(data)
+
+
+@router.put("/rewards/7days/settings")
+def admin_update_7day_settings(
+    data: DailyRewardSettingsUpdateIn,
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    try:
+        updated = reward_service.update_admin_7day_settings(db, data)
+        return success_response(updated)
+    except ValueError as e:
+        return error_response("UPDATE_ERROR", str(e), status_code=400)
+
+
+@router.put("/rewards/7days/{day_number}")
+def admin_update_7day_day(
+    day_number: int,
+    data: DailyRewardConfigUpdateIn,
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    try:
+        updated = reward_service.update_admin_7day_day(db, day_number, data)
+        return success_response(updated)
+    except ValueError as e:
+        return error_response("UPDATE_ERROR", str(e), status_code=400)
+
+
+@router.get("/rewards/bonuses")
+def admin_get_bonuses(admin: User = Depends(require_admin), db: Session = Depends(get_db)):
+    items = reward_service.get_admin_bonuses(db)
+    return success_response(items)
+
+
+@router.post("/rewards/bonuses")
+def admin_create_bonus(
+    data: BonusCreateIn,
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    try:
+        created = reward_service.create_admin_bonus(db, data)
+        return success_response(created)
+    except ValueError as e:
+        return error_response("CREATE_ERROR", str(e), status_code=400)
+
+
+@router.put("/rewards/bonuses/{bonus_id}")
+def admin_update_bonus(
+    bonus_id: UUID,
+    data: BonusUpdateIn,
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    try:
+        updated = reward_service.update_admin_bonus(db, bonus_id, data)
+        return success_response(updated)
+    except ValueError as e:
+        return error_response("UPDATE_ERROR", str(e), status_code=400)
+
+
+@router.delete("/rewards/bonuses/{bonus_id}")
+def admin_delete_bonus(
+    bonus_id: UUID,
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    try:
+        res = reward_service.delete_admin_bonus(db, bonus_id)
+        return success_response(res)
+    except ValueError as e:
+        return error_response("DELETE_ERROR", str(e), status_code=400)
+
+
+@router.get("/rewards/jackpot")
+def admin_get_jackpot(admin: User = Depends(require_admin), db: Session = Depends(get_db)):
+    data = reward_service.get_admin_jackpot(db)
+    return success_response(data)
+
+
+@router.put("/rewards/jackpot")
+def admin_update_jackpot(
+    data: JackpotUpdateIn,
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    try:
+        updated = reward_service.update_admin_jackpot(db, data)
+        return success_response(updated)
+    except ValueError as e:
+        return error_response("UPDATE_ERROR", str(e), status_code=400)
+
+
+@router.get("/rewards/vip")
+def admin_get_vip(admin: User = Depends(require_admin), db: Session = Depends(get_db)):
+    items = reward_service.get_admin_vip(db)
+    return success_response(items)
+
+
+@router.put("/rewards/vip/{vip_level}")
+def admin_update_vip(
+    vip_level: int,
+    data: VipBonusUpdateIn,
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    try:
+        updated = reward_service.update_admin_vip_tier(db, vip_level, data)
+        return success_response(updated)
+    except ValueError as e:
+        return error_response("UPDATE_ERROR", str(e), status_code=400)

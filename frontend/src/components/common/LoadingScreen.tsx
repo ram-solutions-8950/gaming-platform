@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import splashBg from '../../assets/corona888-logo.jpg';
+import splashBg from '../../assets/corona888-logo.webp';
 import '../../styles/loading-screen.css';
 
 interface LoadingScreenProps {

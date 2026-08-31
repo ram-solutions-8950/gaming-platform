@@ -5,7 +5,7 @@ import { Eye, EyeOff, Mail, Lock } from 'lucide-react';
 import { authService } from '../../services/auth';
 import { useAuthStore } from '../../store/authStore';
 import { GlitterRain } from '../../components/common/GlitterRain';
-import splashBg from '../../assets/corona888-logo.jpg';
+import splashBg from '../../assets/corona888-logo.webp';
 import '../../styles/login-page.css';
 
 interface FormData {

@@ -47,7 +47,8 @@ export const VipBonusModal: React.FC<Props> = ({ onClose, onWalletRefresh, onDep
       if (onWalletRefresh) onWalletRefresh();
       await fetchVip();
     } catch (err: any) {
-      setMsg({ text: err.response?.data?.message || err.message || 'VIP claim failed.', isError: true });
+      const errorText = err.response?.data?.error?.message || err.response?.data?.message || err.message || 'VIP claim failed.';
+      setMsg({ text: errorText, isError: true });
     } finally {
       setClaimingLevel(null);
     }

@@ -10,7 +10,7 @@ import { HistoryModal } from '../../components/triple777/HistoryModal';
 import { soundManager } from '../../services/triple777/soundManager';
 import { haptics } from '../../services/triple777/haptics';
 import { REEL_STOPS_MS, REVEAL_BUFFER_MS, spinPace } from '../../services/triple777/spinTiming';
-import triple777Logo from '../../assets/triple-777-logo.png';
+import triple777Logo from '../../assets/triple-777-logo.webp';
 import { setNativePortrait, setNativeLandscape } from '../../utils/nativeOrientation';
 import '../../styles/triple-777.css';
 

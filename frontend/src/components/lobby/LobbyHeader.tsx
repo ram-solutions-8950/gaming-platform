@@ -5,15 +5,17 @@ import { soundManager } from '../../services/soundManager';
 import { authService } from '../../services/auth';
 import { useAuthStore } from '../../store/authStore';
 
+import { useRewardStore } from '../../store/rewardStore';
+
 interface Props {
   user: User | null;
   wallet: Wallet | null;
 }
 
 const headerShortcuts = [
-  { label: 'Bonus', emoji: '🎁' },
-  { label: 'Free', emoji: '🎯' },
-  { label: '7-Days', emoji: '📅' },
+  { label: 'Bonus', emoji: '🎁', action: 'bonus' as const },
+  { label: 'Free', emoji: '🎯', action: 'free' as const },
+  { label: '7-Days', emoji: '📅', action: '7days' as const },
 ];
 
 export const LobbyHeader: React.FC<Props> = ({ user, wallet }) => {
@@ -107,6 +109,21 @@ export const LobbyHeader: React.FC<Props> = ({ user, wallet }) => {
           <button
             key={s.label}
             type="button"
+            onClick={() => {
+              soundManager.play('button_click');
+              if (s.action === 'bonus') {
+                useRewardStore.getState().openModal('bonus');
+              } else if (s.action === '7days') {
+                useRewardStore.getState().openModal('7days');
+              } else if (s.action === 'free') {
+                if (window.location.pathname !== '/dashboard') {
+                  navigate('/dashboard');
+                  setTimeout(() => window.dispatchEvent(new CustomEvent('open-free-popup')), 100);
+                } else {
+                  window.dispatchEvent(new CustomEvent('open-free-popup'));
+                }
+              }
+            }}
             className="flex items-center gap-1 bg-purple-950/60 hover:bg-purple-900/80 px-2 py-0.5 rounded-full border border-purple-400/30 text-white active:scale-95 transition cursor-pointer shadow-sm"
           >
             <span className="text-xs">{s.emoji}</span>

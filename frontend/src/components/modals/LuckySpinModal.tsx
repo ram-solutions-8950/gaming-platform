@@ -107,7 +107,8 @@ export const LuckySpinModal: React.FC<Props> = ({ onClose, onWalletRefresh, onOp
       }, 4900);
     } catch (err: any) {
       setIsSpinning(false);
-      setErrorMsg(err.response?.data?.message || err.message || 'Spin failed.');
+      const msg = err.response?.data?.error?.message || err.response?.data?.message || err.message || 'Spin failed.';
+      setErrorMsg(msg);
     }
   };
 

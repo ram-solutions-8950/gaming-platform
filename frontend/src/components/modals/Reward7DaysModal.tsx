@@ -51,7 +51,8 @@ export const Reward7DaysModal: React.FC<Props> = ({ onClose, onWalletRefresh, on
       await fetchStatus();
     } catch (err: any) {
       setClaimSuccess(false);
-      setClaimMessage(err.response?.data?.message || err.message || 'Failed to claim reward.');
+      const errMsg = err.response?.data?.error?.message || err.response?.data?.message || err.message || 'Failed to claim reward.';
+      setClaimMessage(errMsg);
     } finally {
       setClaiming(false);
     }

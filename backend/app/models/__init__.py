@@ -16,6 +16,18 @@ from .teen_patti import TeenPattiTable, TeenPattiHandHistory, TeenPattiTableMode
 from .aviator import AviatorRound, AviatorBet, AviatorRoundStatus, AviatorBetStatus
 from .poker import PokerTable, PokerHand, PokerPlayer, PokerAction
 from .referral import Referral, ReferralSettings, ReferralStatus
+from .reward import (
+    DailyRewardConfig,
+    DailyRewardSettings,
+    UserRewardProfile,
+    UserDailyRewardClaim,
+    LuckySpinSegmentConfig,
+    UserLuckySpinLog,
+    BonusConfig,
+    UserBonusClaim,
+    JackpotConfig,
+    VipBonusConfig,
+)
 
 __all__ = [
     "User", "UserRole", "UserStatus",
@@ -36,4 +48,7 @@ __all__ = [
     "AviatorRound", "AviatorBet", "AviatorRoundStatus", "AviatorBetStatus",
     "PokerTable", "PokerHand", "PokerPlayer", "PokerAction",
     "Referral", "ReferralSettings", "ReferralStatus",
+    "DailyRewardConfig", "DailyRewardSettings", "UserRewardProfile", "UserDailyRewardClaim",
+    "LuckySpinSegmentConfig", "UserLuckySpinLog", "BonusConfig", "UserBonusClaim",
+    "JackpotConfig", "VipBonusConfig",
 ]

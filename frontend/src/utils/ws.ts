@@ -4,33 +4,30 @@
 
 export function getWebSocketUrl(path: string, token?: string): string {
   const cleanPath = path.replace(/^\/+/, '');
+  const configuredWsUrl = import.meta.env.VITE_WS_URL?.trim();
+  const configuredApiUrl = import.meta.env.VITE_API_URL?.trim();
 
-  const isHttps = window.location.protocol === 'https:';
-  const wsProtocol = isHttps ? 'wss:' : 'ws:';
-
-  let wsBase: string;
-
-  const envApiUrl = import.meta.env.VITE_API_URL?.trim() || 'http://76.13.177.44/api/v1';
-  const isDevHost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-
-  if (isDevHost) {
-    wsBase = `${wsProtocol}//127.0.0.1:8000/api/v1`;
-  } else {
+  let wsBase = '';
+  if (configuredWsUrl) {
+    wsBase = configuredWsUrl;
+  } else if (configuredApiUrl) {
     try {
-      const url = new URL(envApiUrl);
-      const targetPort = url.port || '8000'; // Default to 8000 if not specified
+      const url = new URL(configuredApiUrl);
+      const wsProtocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
+      const targetPort = url.port || '8000';
       wsBase = `${wsProtocol}//${url.hostname}:${targetPort}/api/v1`;
-    } catch (e) {
-      wsBase = `${wsProtocol}//76.13.177.44:8000/api/v1`;
+    } catch {
+      wsBase = import.meta.env.PROD ? 'ws://76.13.177.44:8000/api/v1' : 'ws://127.0.0.1:8000/api/v1';
     }
+  } else {
+    wsBase = import.meta.env.PROD ? 'ws://76.13.177.44:8000/api/v1' : 'ws://127.0.0.1:8000/api/v1';
   }
 
   wsBase = wsBase.replace(/\/+$/, '');
-
   let fullUrl = `${wsBase}/${cleanPath}`;
 
   if (token) {
-    fullUrl += `?token=${encodeURIComponent(token)}`;
+    fullUrl += (fullUrl.includes('?') ? '&' : '?') + `token=${encodeURIComponent(token)}`;
   }
 
   return fullUrl;

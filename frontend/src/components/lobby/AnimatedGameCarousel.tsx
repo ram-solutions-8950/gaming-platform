@@ -1,12 +1,12 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import aviatorImg from '../../assets/aviator-3d.png';
-import dragonImg from '../../assets/dragon-hero.png';
-import andarBaharHero from '../../assets/andar-bahar-hero.png';
-import chickenRoadHero from '../../assets/chicken-road-3d.jpg';
-import triple777Logo from '../../assets/triple-777-logo.png';
-import pokerHero from '../../assets/poker-hero.jpg';
-import teenPattiHero from '../../assets/teen-patti-hero.jpg';
-import rummyHero from '../../assets/casino-cards-3d-emblem.png';
+import aviatorImg from '../../assets/aviator-3d.webp';
+import dragonImg from '../../assets/dragon-hero.webp';
+import andarBaharHero from '../../assets/andar-bahar-hero.webp';
+import chickenRoadHero from '../../assets/chicken-road-3d.webp';
+import triple777Logo from '../../assets/triple-777-logo.webp';
+import pokerHero from '../../assets/poker-hero.webp';
+import teenPattiHero from '../../assets/teen-patti-hero.webp';
+import rummyHero from '../../assets/casino-cards-3d-emblem.webp';
 import { AnimatedCasinoGameLogo } from './AnimatedCasinoGameLogo';
 
 /* ─── Types ─── */

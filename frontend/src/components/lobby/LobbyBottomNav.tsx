@@ -1,5 +1,6 @@
 import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
+import { useRewardStore } from '../../store/rewardStore';
 
 interface NavItem {
   to?: string;
@@ -99,7 +100,7 @@ export const LobbyBottomNav: React.FC = () => {
         break;
 
       case 'VIP BONUS':
-        console.log('VIP Bonus clicked');
+        useRewardStore.getState().openModal('vip');
         break;
 
       case 'Service':
@@ -107,7 +108,7 @@ export const LobbyBottomNav: React.FC = () => {
         break;
 
       case 'Jackpot':
-        console.log('Jackpot clicked');
+        useRewardStore.getState().openModal('jackpot');
         break;
 
       default:

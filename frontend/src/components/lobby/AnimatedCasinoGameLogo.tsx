@@ -1,7 +1,7 @@
 import React from 'react';
-import casinoCardsEmblem from '../../assets/casino-cards-3d-emblem.png';
-import pokerHero from '../../assets/poker-hero.jpg';
-import teenPattiHero from '../../assets/teen-patti-hero.jpg';
+import casinoCardsEmblem from '../../assets/casino-cards-3d-emblem.webp';
+import pokerHero from '../../assets/poker-hero.webp';
+import teenPattiHero from '../../assets/teen-patti-hero.webp';
 import '../../styles/animated-casino-logo.css';
 
 export interface AnimatedCasinoGameLogoProps {

@@ -10,6 +10,7 @@ import { LudoPlayerPanel } from '../../components/ludo/LudoPlayerPanel';
 import { LudoLobby } from '../../components/ludo/LudoLobby';
 import { LudoWinnerModal } from '../../components/ludo/LudoWinnerModal';
 import { soundManager } from '../../services/soundManager';
+import { getWebSocketUrl } from '../../utils/ws';
 
 export const Ludo: React.FC = () => {
   const { user } = useAuthStore();
@@ -139,12 +140,8 @@ export const Ludo: React.FC = () => {
       wsRef.current.close();
     }
 
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const host = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-      ? '127.0.0.1:8000'
-      : (import.meta.env.VITE_WS_URL || window.location.host);
-
-    const wsUrl = `${protocol}//${host}/api/v1/ludo/ws/${matchId}`;
+    const token = localStorage.getItem('access_token');
+    const wsUrl = getWebSocketUrl(`ludo/ws/${matchId}`, token || undefined);
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
 
@@ -243,12 +240,7 @@ export const Ludo: React.FC = () => {
     const token = localStorage.getItem('access_token');
 
     // 1. Connect matchmaking WebSocket FIRST
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const host = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-      ? '127.0.0.1:8000'
-      : (import.meta.env.VITE_WS_URL || window.location.host);
-
-    const mmWsUrl = `${protocol}//${host}/api/v1/ludo/ws/matchmaking?token=${token}`;
+    const mmWsUrl = getWebSocketUrl('ludo/ws/matchmaking', token || undefined);
 
     try {
       const mmWs = await new Promise<WebSocket>((resolve, reject) => {

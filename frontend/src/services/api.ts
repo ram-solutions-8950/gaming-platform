@@ -1,10 +1,11 @@
 import axios from 'axios';
 
+export const API_BASE_URL =
+  import.meta.env.VITE_API_URL?.trim() ||
+  (import.meta.env.PROD ? 'http://76.13.177.44/api/v1' : 'http://127.0.0.1:8000/api/v1');
+
 const api = axios.create({
-  baseURL:
-    window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-      ? 'http://127.0.0.1:8000/api/v1'
-      : ((import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.trim() : '') || 'http://76.13.177.44/api/v1'),
+  baseURL: API_BASE_URL,
   headers: { 'Content-Type': 'application/json' },
 });
 

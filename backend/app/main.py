@@ -18,7 +18,16 @@ from .websocket.manager import game_ws_manager
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Startup: launch the game engine.  Shutdown: cancel it."""
+    """Startup: initialize DB tables & default rewards, launch the game engine. Shutdown: cancel it."""
+    try:
+        from .database import engine, SessionLocal
+        from .models.reward import Base
+        Base.metadata.create_all(bind=engine)
+        from .services.reward_service import seed_default_reward_configs
+        with SessionLocal() as db:
+            seed_default_reward_configs(db)
+    except Exception as e:
+        pass
     start_engine(broadcast_fn=game_ws_manager.broadcast)
     yield
     stop_engine()

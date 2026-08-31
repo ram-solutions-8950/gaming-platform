@@ -46,7 +46,8 @@ export const BonusModal: React.FC<Props> = ({ onClose, onWalletRefresh }) => {
       if (onWalletRefresh) onWalletRefresh();
       await fetchBonuses();
     } catch (err: any) {
-      setMsg({ text: err.response?.data?.message || err.message || 'Claim failed.', isError: true });
+      const errorText = err.response?.data?.error?.message || err.response?.data?.message || err.message || 'Claim failed.';
+      setMsg({ text: errorText, isError: true });
     } finally {
       setClaimingId(null);
     }

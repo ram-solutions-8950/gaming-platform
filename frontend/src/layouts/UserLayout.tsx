@@ -8,6 +8,12 @@ import type { Wallet } from '../types';
 import { LobbyHeader } from '../components/lobby/LobbyHeader';
 import { LobbyBottomNav } from '../components/lobby/LobbyBottomNav';
 import { CasinoLogo } from '../components/common/CasinoLogo';
+import { useRewardStore } from '../store/rewardStore';
+import { Reward7DaysModal } from '../components/modals/Reward7DaysModal';
+import { LuckySpinModal } from '../components/modals/LuckySpinModal';
+import { BonusModal } from '../components/modals/BonusModal';
+import { JackpotModal } from '../components/modals/JackpotModal';
+import { VipBonusModal } from '../components/modals/VipBonusModal';
 
 const navItems = [
   { to: '/dashboard', label: 'Dashboard', icon: '📊' },
@@ -21,12 +27,17 @@ export function UserLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const [wallet, setWallet] = useState<Wallet | null>(null);
+  const { activeModal, openModal, closeModal } = useRewardStore();
 
   const isDashboard = location.pathname === '/dashboard';
   const isLudo = location.pathname === '/games/ludo';
 
-  useEffect(() => {
+  const refreshWallet = () => {
     walletService.getWallet().then(setWallet).catch(() => {});
+  };
+
+  useEffect(() => {
+    refreshWallet();
   }, []);
 
   const handleLogout = async () => {
@@ -137,6 +148,47 @@ export function UserLayout() {
           <LobbyBottomNav />
         </div>
       </div>
+
+      {/* ─── Global Reward Modals ─── */}
+      {activeModal === '7days' && (
+        <Reward7DaysModal
+          onClose={closeModal}
+          onWalletRefresh={refreshWallet}
+          onOpenLuckySpin={() => openModal('lucky_spin')}
+        />
+      )}
+      {activeModal === 'lucky_spin' && (
+        <LuckySpinModal
+          onClose={closeModal}
+          onWalletRefresh={refreshWallet}
+          onOpen7Days={() => openModal('7days')}
+        />
+      )}
+      {activeModal === 'bonus' && (
+        <BonusModal
+          onClose={closeModal}
+          onWalletRefresh={refreshWallet}
+        />
+      )}
+      {activeModal === 'jackpot' && (
+        <JackpotModal
+          onClose={closeModal}
+          onPlayGame={(path) => {
+            closeModal();
+            navigate(path);
+          }}
+        />
+      )}
+      {activeModal === 'vip' && (
+        <VipBonusModal
+          onClose={closeModal}
+          onWalletRefresh={refreshWallet}
+          onDeposit={() => {
+            closeModal();
+            navigate('/deposit');
+          }}
+        />
+      )}
     </div>
   );
 }

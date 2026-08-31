@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { Card } from '../../components/common/Card';
 import { Badge } from '../../components/common/Badge';
 import { Loader } from '../../components/common/Loader';
-import api from '../../services/api';
+import api, { API_BASE_URL } from '../../services/api';
 
 interface PaymentConfig {
   id: string; provider: string; display_name: string; upi_id: string | null;
@@ -195,7 +195,7 @@ export function AdminPaymentSettingsPage() {
             <div className="flex flex-col items-center justify-center border border-gray-700 rounded-lg p-4 bg-gray-800">
               <p className="text-gray-400 text-sm mb-2">QR Code Preview</p>
               {c.qr_code_reference ? (
-                <img src={`http://localhost:8000${c.qr_code_reference}`} alt="QR Code" className="max-h-32 object-contain" />
+                <img src={`${API_BASE_URL.replace(/\/api\/v1\/?$/, '')}${c.qr_code_reference}`} alt="QR Code" className="max-h-32 object-contain" />
               ) : (
                 <p className="text-gray-500 italic text-sm">No QR code uploaded</p>
               )}

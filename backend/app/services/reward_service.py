@@ -151,8 +151,8 @@ def check_user_qualifying_bet(db: Session, user_id: UUID, min_bet_paisa: int) ->
     """Checks if the user has completed at least one valid bet of >= min_bet_paisa (Rs 1+)."""
     tx = db.query(WalletTransaction).filter(
         WalletTransaction.user_id == user_id,
-        WalletTransaction.type == WalletTransactionType.GAME_ENTRY,
-        WalletTransaction.status == WalletTransactionStatus.COMPLETED,
+        WalletTransaction.type.in_([WalletTransactionType.GAME_ENTRY, "GAME_ENTRY"]),
+        WalletTransaction.status.in_([WalletTransactionStatus.COMPLETED, "COMPLETED"]),
         WalletTransaction.amount >= min_bet_paisa,
     ).first()
     return tx is not None
@@ -166,11 +166,15 @@ def get_7day_reward_status(db: Session, user_id: UUID) -> Dict[str, Any]:
     profile = get_or_create_user_reward_profile(db, user_id)
     today = datetime.now(timezone.utc).date()
 
-    # Determine if today has been claimed
-    claimed_today = profile.last_claim_date == today
+    # Determine if today has been claimed by querying the audit claims table
+    today_claim = db.query(UserDailyRewardClaim).filter(
+        UserDailyRewardClaim.user_id == user_id,
+        UserDailyRewardClaim.claimed_date == today,
+    ).first()
+    claimed_today = today_claim is not None or (profile.last_claim_date == today)
 
-    # Check for streak reset: if last claim was earlier than yesterday, streak resets to Day 1
-    if profile.last_claim_date is not None and (today - profile.last_claim_date).days > 1:
+    # Check for streak reset: if last claim was earlier than yesterday and not claimed today, streak resets to Day 1
+    if not claimed_today and profile.last_claim_date is not None and (today - profile.last_claim_date).days > 1:
         profile.current_day = 1
         db.commit()
         db.refresh(profile)
@@ -186,12 +190,15 @@ def get_7day_reward_status(db: Session, user_id: UUID) -> Dict[str, Any]:
     day_configs = db.query(DailyRewardConfig).order_by(DailyRewardConfig.day_number).all()
     days_out = []
 
+    # If claimed today, what was the last day number claimed?
+    last_claimed_day_num = today_claim.day_number if today_claim else (profile.current_day - 1 if profile.current_day > 1 else 7)
+
     for cfg in day_configs:
         d_num = cfg.day_number
         label = f"₹{cfg.amount_paisa / 100:.0f}" if cfg.reward_type == "CASH" else "FREE SPIN"
 
         if claimed_today:
-            if d_num <= profile.current_day:
+            if d_num <= last_claimed_day_num:
                 status = "CLAIMED"
             else:
                 status = "LOCKED"
@@ -228,13 +235,20 @@ def claim_7day_reward(db: Session, user_id: UUID, day_number: int) -> Dict[str, 
 
     # 1. Verify qualifying bet
     if not check_user_qualifying_bet(db, user_id, min_bet_paisa):
-        raise ValueError(f"Place at least ₹{min_bet_paisa / 100:.0f} bet to unlock 7-Day Rewards.")
+        raise ValueError(f"Place at least ₹{min_bet_paisa / 100:.0f} bet in any game to unlock 7-Day Rewards.")
 
-    profile = get_or_create_user_reward_profile(db, user_id)
+    profile = db.query(UserRewardProfile).filter(UserRewardProfile.user_id == user_id).with_for_update().first()
+    if not profile:
+        profile = get_or_create_user_reward_profile(db, user_id)
+
     today = datetime.now(timezone.utc).date()
 
     # 2. Prevent duplicate claim today
-    if profile.last_claim_date == today:
+    existing_claim = db.query(UserDailyRewardClaim).filter(
+        UserDailyRewardClaim.user_id == user_id,
+        UserDailyRewardClaim.claimed_date == today,
+    ).first()
+    if existing_claim or profile.last_claim_date == today:
         raise ValueError("You have already claimed today's reward. Please return tomorrow!")
 
     # 3. Check streak reset if missed
@@ -339,7 +353,9 @@ def get_lucky_spin_status(db: Session, user_id: UUID) -> Dict[str, Any]:
 
 
 def execute_lucky_spin(db: Session, user_id: UUID) -> Dict[str, Any]:
-    profile = get_or_create_user_reward_profile(db, user_id)
+    profile = db.query(UserRewardProfile).filter(UserRewardProfile.user_id == user_id).with_for_update().first()
+    if not profile:
+        profile = get_or_create_user_reward_profile(db, user_id)
 
     # 1. Require at least 1 free spin
     if profile.free_lucky_spins <= 0:
@@ -510,7 +526,7 @@ def get_vip_info(db: Session, user_id: UUID) -> Dict[str, Any]:
     # Calculate lifetime completed deposits
     total_dep_paisa = db.query(func.coalesce(func.sum(Deposit.amount), 0)).filter(
         Deposit.user_id == user_id,
-        Deposit.status == DepositStatus.COMPLETED,
+        Deposit.status == DepositStatus.SUCCESS,
     ).scalar() or 0
 
     tiers = db.query(VipBonusConfig).filter(VipBonusConfig.is_active == True).order_by(VipBonusConfig.vip_level).all()
@@ -567,7 +583,7 @@ def claim_vip_tier_bonus(db: Session, user_id: UUID, vip_level: int) -> Dict[str
 
     total_dep_paisa = db.query(func.coalesce(func.sum(Deposit.amount), 0)).filter(
         Deposit.user_id == user_id,
-        Deposit.status == DepositStatus.COMPLETED,
+        Deposit.status == DepositStatus.SUCCESS,
     ).scalar() or 0
 
     if total_dep_paisa < tier.min_deposit_paisa:
@@ -602,4 +618,250 @@ def claim_vip_tier_bonus(db: Session, user_id: UUID, vip_level: int) -> Dict[str
         "reward_amount_inr": float(tier.reward_amount_paisa) / 100.0,
         "wallet_balance_inr": wallet_bal_inr,
         "message": f"Claimed VIP {tier.level_name} bonus of ₹{tier.reward_amount_paisa / 100:.0f}!",
+    }
+
+
+# ─── Admin Management ───
+def get_admin_lucky_spin(db: Session) -> List[Dict[str, Any]]:
+    segments = db.query(LuckySpinSegmentConfig).order_by(LuckySpinSegmentConfig.segment_index).all()
+    return [{
+        "segment_index": s.segment_index,
+        "label": s.label,
+        "reward_type": s.reward_type,
+        "amount_inr": float(s.amount_paisa) / 100.0,
+        "free_spins": s.free_spins,
+        "weight": s.weight,
+        "color": s.color,
+        "is_enabled": s.is_enabled,
+    } for s in segments]
+
+
+def update_admin_lucky_spin_segment(db: Session, segment_index: int, data: Any) -> Dict[str, Any]:
+    seg = db.query(LuckySpinSegmentConfig).filter(LuckySpinSegmentConfig.segment_index == segment_index).first()
+    if not seg:
+        raise ValueError(f"Segment {segment_index} not found")
+    if getattr(data, "label", None) is not None:
+        seg.label = data.label
+    if getattr(data, "reward_type", None) is not None:
+        seg.reward_type = data.reward_type
+    if getattr(data, "amount_inr", None) is not None:
+        seg.amount_paisa = int(data.amount_inr * 100)
+    if getattr(data, "free_spins", None) is not None:
+        seg.free_spins = data.free_spins
+    if getattr(data, "weight", None) is not None:
+        seg.weight = data.weight
+    if getattr(data, "color", None) is not None:
+        seg.color = data.color
+    if getattr(data, "is_enabled", None) is not None:
+        seg.is_enabled = data.is_enabled
+    db.commit()
+    db.refresh(seg)
+    return {
+        "segment_index": seg.segment_index,
+        "label": seg.label,
+        "reward_type": seg.reward_type,
+        "amount_inr": float(seg.amount_paisa) / 100.0,
+        "free_spins": seg.free_spins,
+        "weight": seg.weight,
+        "color": seg.color,
+        "is_enabled": seg.is_enabled,
+    }
+
+
+def get_admin_7days(db: Session) -> Dict[str, Any]:
+    settings = db.query(DailyRewardSettings).first()
+    min_bet = float(settings.min_qualifying_bet_paisa) / 100.0 if settings else 1.0
+    is_active = settings.is_active if settings else True
+    days = db.query(DailyRewardConfig).order_by(DailyRewardConfig.day_number).all()
+    return {
+        "settings": {
+            "min_qualifying_bet_inr": min_bet,
+            "is_active": is_active,
+        },
+        "days": [{
+            "day_number": d.day_number,
+            "label": f"DAY {d.day_number}",
+            "reward_type": d.reward_type,
+            "amount_inr": float(d.amount_paisa) / 100.0,
+            "free_spins_count": d.free_spins_count,
+            "is_enabled": d.is_enabled,
+        } for d in days],
+    }
+
+
+def update_admin_7day_settings(db: Session, data: Any) -> Dict[str, Any]:
+    settings = db.query(DailyRewardSettings).first()
+    if not settings:
+        settings = DailyRewardSettings(min_qualifying_bet_paisa=int(data.min_qualifying_bet_inr * 100), is_active=data.is_active)
+        db.add(settings)
+    else:
+        settings.min_qualifying_bet_paisa = int(data.min_qualifying_bet_inr * 100)
+        settings.is_active = data.is_active
+    db.commit()
+    return {"min_qualifying_bet_inr": float(settings.min_qualifying_bet_paisa) / 100.0, "is_active": settings.is_active}
+
+
+def update_admin_7day_day(db: Session, day_number: int, data: Any) -> Dict[str, Any]:
+    day = db.query(DailyRewardConfig).filter(DailyRewardConfig.day_number == day_number).first()
+    if not day:
+        raise ValueError(f"Day {day_number} config not found")
+    if getattr(data, "amount_inr", None) is not None:
+        day.amount_paisa = int(data.amount_inr * 100)
+    if getattr(data, "reward_type", None) is not None:
+        day.reward_type = data.reward_type
+    if getattr(data, "free_spins_count", None) is not None:
+        day.free_spins_count = data.free_spins_count
+    if getattr(data, "is_enabled", None) is not None:
+        day.is_enabled = data.is_enabled
+    db.commit()
+    return {
+        "day_number": day.day_number,
+        "amount_inr": float(day.amount_paisa) / 100.0,
+        "reward_type": day.reward_type,
+        "free_spins_count": day.free_spins_count,
+        "is_enabled": day.is_enabled,
+    }
+
+
+def get_admin_bonuses(db: Session) -> List[Dict[str, Any]]:
+    bonuses = db.query(BonusConfig).order_by(BonusConfig.created_at.desc()).all()
+    return [{
+        "id": str(b.id),
+        "title": b.title,
+        "description": b.description,
+        "bonus_type": b.bonus_type,
+        "amount_inr": float(b.amount_paisa) / 100.0,
+        "is_active": b.is_active,
+        "claim_limit": b.claim_limit,
+    } for b in bonuses]
+
+
+def create_admin_bonus(db: Session, data: Any) -> Dict[str, Any]:
+    bonus = BonusConfig(
+        title=data.title,
+        description=data.description,
+        bonus_type=data.bonus_type,
+        amount_paisa=int(data.amount_inr * 100),
+        is_active=data.is_active,
+        claim_limit=data.claim_limit,
+    )
+    db.add(bonus)
+    db.commit()
+    db.refresh(bonus)
+    return {
+        "id": str(bonus.id),
+        "title": bonus.title,
+        "description": bonus.description,
+        "bonus_type": bonus.bonus_type,
+        "amount_inr": float(bonus.amount_paisa) / 100.0,
+        "is_active": bonus.is_active,
+        "claim_limit": bonus.claim_limit,
+    }
+
+
+def update_admin_bonus(db: Session, bonus_id: UUID, data: Any) -> Dict[str, Any]:
+    bonus = db.query(BonusConfig).filter(BonusConfig.id == bonus_id).first()
+    if not bonus:
+        raise ValueError("Bonus not found")
+    if getattr(data, "title", None) is not None:
+        bonus.title = data.title
+    if getattr(data, "description", None) is not None:
+        bonus.description = data.description
+    if getattr(data, "amount_inr", None) is not None:
+        bonus.amount_paisa = int(data.amount_inr * 100)
+    if getattr(data, "is_active", None) is not None:
+        bonus.is_active = data.is_active
+    if getattr(data, "claim_limit", None) is not None:
+        bonus.claim_limit = data.claim_limit
+    db.commit()
+    return {
+        "id": str(bonus.id),
+        "title": bonus.title,
+        "description": bonus.description,
+        "bonus_type": bonus.bonus_type,
+        "amount_inr": float(bonus.amount_paisa) / 100.0,
+        "is_active": bonus.is_active,
+        "claim_limit": bonus.claim_limit,
+    }
+
+
+def delete_admin_bonus(db: Session, bonus_id: UUID) -> Dict[str, Any]:
+    bonus = db.query(BonusConfig).filter(BonusConfig.id == bonus_id).first()
+    if not bonus:
+        raise ValueError("Bonus not found")
+    db.delete(bonus)
+    db.commit()
+    return {"success": True, "message": "Bonus deleted"}
+
+
+def get_admin_jackpot(db: Session) -> Dict[str, Any]:
+    jackpot = db.query(JackpotConfig).first()
+    if not jackpot:
+        jackpot = JackpotConfig(title="Grand Progressive Jackpot", current_amount_paisa=5000000, seed_amount_paisa=1000000, is_active=True)
+        db.add(jackpot)
+        db.commit()
+    return {
+        "title": jackpot.title,
+        "current_amount_inr": float(jackpot.current_amount_paisa) / 100.0,
+        "seed_amount_inr": float(jackpot.seed_amount_paisa) / 100.0,
+        "description": jackpot.description,
+        "is_active": jackpot.is_active,
+    }
+
+
+def update_admin_jackpot(db: Session, data: Any) -> Dict[str, Any]:
+    jackpot = db.query(JackpotConfig).first()
+    if not jackpot:
+        jackpot = JackpotConfig(title="Grand Progressive Jackpot", current_amount_paisa=5000000, seed_amount_paisa=1000000, is_active=True)
+        db.add(jackpot)
+    if getattr(data, "title", None) is not None:
+        jackpot.title = data.title
+    if getattr(data, "current_amount_inr", None) is not None:
+        jackpot.current_amount_paisa = int(data.current_amount_inr * 100)
+    if getattr(data, "seed_amount_inr", None) is not None:
+        jackpot.seed_amount_paisa = int(data.seed_amount_inr * 100)
+    if getattr(data, "is_active", None) is not None:
+        jackpot.is_active = data.is_active
+    if getattr(data, "description", None) is not None:
+        jackpot.description = data.description
+    db.commit()
+    return {
+        "title": jackpot.title,
+        "current_amount_inr": float(jackpot.current_amount_paisa) / 100.0,
+        "seed_amount_inr": float(jackpot.seed_amount_paisa) / 100.0,
+        "description": jackpot.description,
+        "is_active": jackpot.is_active,
+    }
+
+
+def get_admin_vip(db: Session) -> List[Dict[str, Any]]:
+    tiers = db.query(VipBonusConfig).order_by(VipBonusConfig.vip_level).all()
+    return [{
+        "vip_level": t.vip_level,
+        "level_name": t.level_name,
+        "min_deposit_inr": float(t.min_deposit_paisa) / 100.0,
+        "reward_amount_inr": float(t.reward_amount_paisa) / 100.0,
+        "is_active": t.is_active,
+    } for t in tiers]
+
+
+def update_admin_vip_tier(db: Session, vip_level: int, data: Any) -> Dict[str, Any]:
+    tier = db.query(VipBonusConfig).filter(VipBonusConfig.vip_level == vip_level).first()
+    if not tier:
+        raise ValueError(f"VIP level {vip_level} not found")
+    if getattr(data, "level_name", None) is not None:
+        tier.level_name = data.level_name
+    if getattr(data, "min_deposit_inr", None) is not None:
+        tier.min_deposit_paisa = int(data.min_deposit_inr * 100)
+    if getattr(data, "reward_amount_inr", None) is not None:
+        tier.reward_amount_paisa = int(data.reward_amount_inr * 100)
+    if getattr(data, "is_active", None) is not None:
+        tier.is_active = data.is_active
+    db.commit()
+    return {
+        "vip_level": tier.vip_level,
+        "level_name": tier.level_name,
+        "min_deposit_inr": float(tier.min_deposit_paisa) / 100.0,
+        "reward_amount_inr": float(tier.reward_amount_paisa) / 100.0,
+        "is_active": tier.is_active,
     }

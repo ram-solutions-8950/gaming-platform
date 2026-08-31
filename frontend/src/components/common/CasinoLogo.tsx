@@ -1,5 +1,5 @@
 import React from 'react';
-import corona888Logo from '../../assets/corona888-logo.jpg';
+import corona888Logo from '../../assets/corona888-logo.webp';
 import '../../styles/casino-logo.css';
 
 interface CasinoLogoProps {
@@ -25,6 +25,8 @@ export const CasinoLogo: React.FC<CasinoLogoProps> = ({
           src={corona888Logo}
           alt="Corona 888"
           className="casino-logo-svg"
+          loading="eager"
+          decoding="sync"
           style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: '12%' }}
         />
       </div>

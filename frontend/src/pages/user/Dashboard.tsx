@@ -10,6 +10,7 @@ import '../../styles/lobby.css';
 import '../../styles/startup-promotions.css';
 import { FreeRewardPopup } from '../../components/modals/FreeRewardPopup';
 import { ReferWinPopup } from '../../components/modals/ReferWinPopup';
+import { useRewardStore } from '../../store/rewardStore';
 
 /* ─── Game card definitions ─── */
 interface GameCardDef {
@@ -101,8 +102,15 @@ export function DashboardPage() {
     const handleOpenRefer = () => {
       setActivePopup('refer');
     };
+    const handleOpenFree = () => {
+      setActivePopup('free');
+    };
     window.addEventListener('open-refer-popup', handleOpenRefer);
-    return () => window.removeEventListener('open-refer-popup', handleOpenRefer);
+    window.addEventListener('open-free-popup', handleOpenFree);
+    return () => {
+      window.removeEventListener('open-refer-popup', handleOpenRefer);
+      window.removeEventListener('open-free-popup', handleOpenFree);
+    };
   }, []);
 
   const handleCloseFree = () => {
@@ -158,7 +166,17 @@ export function DashboardPage() {
 
   {/* LEFT PROMO / FEATURED */}
   <aside className="lobby-sidebar-promos">
-    <SidePromos />
+    <SidePromos
+      onSelectPromo={(promo) => {
+        if (promo === 'lucky_spin') {
+          useRewardStore.getState().openModal('lucky_spin');
+        } else if (promo === 'cash_card') {
+          useRewardStore.getState().openModal('7days');
+        } else if (promo === '30_cards') {
+          navigate('/games/andar-bahar');
+        }
+      }}
+    />
 
     <div className="lobby-featured-card">
       <div className="featured-game__content">

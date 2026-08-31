@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import freeRewardBg from '../../assets/free-reward-bg.png';
+import freeRewardBg from '../../assets/free-reward-bg.webp';
 
 interface FreeRewardPopupProps {
   onClose: () => void;
@@ -61,6 +61,8 @@ export function FreeRewardPopup({ onClose }: FreeRewardPopupProps) {
             src={freeRewardBg}
             alt=""
             className="free-popup-casino-art"
+            loading="lazy"
+            decoding="async"
           />
 
           {/* Outer sloped/angled gold casino frame layer */}
