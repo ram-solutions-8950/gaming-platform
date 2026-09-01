@@ -53,7 +53,7 @@ def upgrade() -> None:
             {
                 "id": ab_game_id,
                 "config": """{
-                  "round_duration_seconds": 30,
+                  "round_duration_seconds": 18,
                   "betting_duration_seconds": 15,
                   "allowed_bets": {"andar": true, "bahar": true},
                   "payouts": {"andar": 0.9, "bahar": 1.0}

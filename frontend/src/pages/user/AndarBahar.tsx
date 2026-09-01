@@ -514,7 +514,11 @@ export function AndarBaharPage() {
     }
 
     const id = window.setTimeout(() => {
-      setCalcCountdown((c) => (c !== null && c > 0 ? c - 1 : 0));
+      setCalcCountdown((c) => {
+        const next = c !== null && c > 0 ? c - 1 : 0;
+        calcCountdownRef.current = next;
+        return next;
+      });
     }, 1000);
     return () => window.clearTimeout(id);
   }, [phase, calcCountdown, animateServerDeal]);

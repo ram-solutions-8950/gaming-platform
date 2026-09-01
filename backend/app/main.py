@@ -26,6 +26,15 @@ async def lifespan(app: FastAPI):
         from .services.reward_service import seed_default_reward_configs
         with SessionLocal() as db:
             seed_default_reward_configs(db)
+            from .models.game_catalog import Game
+            ab = db.query(Game).filter(Game.slug == "andar-bahar").first()
+            if ab:
+                cfg = dict(ab.config or {})
+                if cfg.get("round_duration_seconds") != 18 or cfg.get("betting_duration_seconds") != 15:
+                    cfg["round_duration_seconds"] = 18
+                    cfg["betting_duration_seconds"] = 15
+                    ab.config = cfg
+                    db.commit()
     except Exception as e:
         pass
     start_engine(broadcast_fn=game_ws_manager.broadcast)
