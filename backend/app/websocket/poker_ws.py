@@ -1,6 +1,7 @@
 import json
 import asyncio
-from typing import Dict, Set
+import random
+from typing import Dict, Set, Optional, Tuple
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query, status
 from sqlalchemy.orm import Session
 from ..database import SessionLocal
@@ -54,6 +55,72 @@ class PokerConnectionManager:
 
 poker_ws_manager = PokerConnectionManager()
 
+BOT_NAMES = ["Bot Aarav", "Bot Vihaan", "Bot Kabir", "Bot Zara", "Bot Meera", "Bot Rohan"]
+
+def _seat_practice_bots(engine: PokerEngine, table: PokerTable):
+    """Fills remaining seats at a practice table with bot players so the user always has opponents."""
+    if not table.is_practice:
+        return
+    buy_in = table.min_buy_in or 2000
+    idx = 0
+    while len(engine.players) < engine.max_players and idx < len(BOT_NAMES):
+        bot_id = f"bot_{engine.table_id}_{idx}"
+        if not engine.get_player_by_id(bot_id):
+            engine.add_player(user_id=bot_id, username=BOT_NAMES[idx], buy_in_amount=buy_in, is_bot=True)
+        idx += 1
+
+def _decide_bot_action(engine: PokerEngine, player) -> Tuple[str, int]:
+    """Simple weighted-random bot strategy: mostly calls/checks, occasionally raises or folds."""
+    call_amount = engine.current_high_bet - player.current_bet
+    max_total = player.stack + player.current_bet
+    r = random.random()
+
+    if call_amount <= 0:
+        if r < 0.70 or max_total <= engine.current_high_bet + engine.min_raise_amount:
+            return 'check', 0
+        return 'raise', min(engine.current_high_bet + engine.min_raise_amount, max_total)
+
+    if call_amount >= player.stack:
+        return ('call', 0) if r < 0.55 else ('fold', 0)
+
+    if r < 0.12:
+        return 'fold', 0
+    if r < 0.85:
+        return 'call', 0
+
+    raise_to = min(engine.current_high_bet + engine.min_raise_amount, max_total)
+    if raise_to <= engine.current_high_bet:
+        return 'call', 0
+    return 'raise', raise_to
+
+async def run_bot_turns(engine: PokerEngine, db: Session):
+    """Drives bot actions for the current hand, and iteratively progresses through
+    settlement + subsequent auto-started hands as long as it stays a bot's turn."""
+    while True:
+        while engine.phase not in ('WAITING', 'SETTLEMENT'):
+            seat = engine.current_turn_seat_idx
+            player = next((p for p in engine.players if p.seat_index == seat), None) if seat is not None else None
+            if not player or not player.is_bot:
+                return
+            await asyncio.sleep(random.uniform(0.8, 1.6))
+            action, amount = _decide_bot_action(engine, player)
+            ok, _ = engine.process_action(user_id=player.user_id, action=action, amount=amount)
+            if not ok:
+                engine.process_action(user_id=player.user_id, action='fold')
+            await poker_ws_manager.broadcast_table_state(engine)
+
+        if engine.phase != 'SETTLEMENT':
+            return
+
+        await persist_hand_result(engine, db)
+        await asyncio.sleep(4)
+        if len(engine.players) < 2:
+            return
+        ok, _ = engine.start_hand()
+        if not ok:
+            return
+        await broadcast_hand_start(engine)
+
 def _authenticate(token: str) -> str:
     payload = decode_access_token(token)
     user_id = payload.get("sub")
@@ -104,6 +171,9 @@ async def poker_websocket_endpoint(
             buy_in = table.min_buy_in if table.min_buy_in else 2000
             engine.add_player(user_id=user_id, username=username, buy_in_amount=buy_in)
 
+        # Fill remaining seats with bots on practice tables
+        _seat_practice_bots(engine, table)
+
         # Send initial sync payload with private hole card isolation
         await poker_ws_manager.send_to_user(table_id, user_id, {
             "type": "sync",
@@ -123,6 +193,7 @@ async def poker_websocket_endpoint(
             ok, _ = engine.start_hand()
             if ok:
                 await broadcast_hand_start(engine)
+                await run_bot_turns(engine, db)
 
         while True:
             data_text = await ws.receive_text()
@@ -143,6 +214,7 @@ async def poker_websocket_endpoint(
                         ok, err_msg = engine.start_hand()
                         if ok:
                             await broadcast_hand_start(engine)
+                            await run_bot_turns(engine, db)
                         else:
                             await poker_ws_manager.send_to_user(table_id, user_id, {
                                 "type": "error",
@@ -169,9 +241,9 @@ async def poker_websocket_endpoint(
                     # Broadcast updated table state to all clients
                     await poker_ws_manager.broadcast_table_state(engine)
 
-                    # If hand completed, handle DB persistence & automatic next hand
-                    if engine.phase == 'SETTLEMENT':
-                        await handle_settlement(engine, db)
+                    # Drive any bot turns that follow, and handle settlement +
+                    # automatic next-hand progression (persists DB, applies cooldown)
+                    await run_bot_turns(engine, db)
 
             except json.JSONDecodeError:
                 await poker_ws_manager.send_to_user(table_id, user_id, {
@@ -206,8 +278,8 @@ async def broadcast_hand_start(engine: PokerEngine):
                 "hole_cards": [c.to_str() for c in p.hole_cards]
             })
 
-async def handle_settlement(engine: PokerEngine, db: Session):
-    """Persists hand result to DB and automatically starts next hand after cooldown."""
+async def persist_hand_result(engine: PokerEngine, db: Session):
+    """Persists a completed hand's result to the database."""
     try:
         db_hand = PokerHand(
             id=engine.hand_id or f"hand_{int(asyncio.get_event_loop().time())}",
@@ -223,10 +295,3 @@ async def handle_settlement(engine: PokerEngine, db: Session):
         db.commit()
     except Exception as e:
         print(f"[POKER DB SAVE ERROR] {e}")
-
-    # Brief cooldown before next hand
-    await asyncio.sleep(4)
-    if len(engine.players) >= 2:
-        ok, _ = engine.start_hand()
-        if ok:
-            await broadcast_hand_start(engine)

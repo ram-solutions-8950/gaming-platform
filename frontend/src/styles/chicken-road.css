@@ -4,8 +4,16 @@
 
 .cr-arcade-container {
   width: 100vw;
+  /* Fallback chain: plain vh -> dvh (better mobile support) -> JS-measured
+     visualViewport height (most reliable on Android WebViews where dvh can
+     be stale while system bars/safe-area settle after mount). This is what
+     previously let the bottom betting panel get pushed off-screen. */
+  height: 100vh;
   height: 100dvh;
+  height: var(--cr-app-height, 100dvh);
+  max-height: 100vh;
   max-height: 100dvh;
+  max-height: var(--cr-app-height, 100dvh);
   display: flex;
   flex-direction: column;
   background: #181818;
@@ -16,6 +24,12 @@
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
   user-select: none;
   -webkit-user-select: none;
+  /* Respect notches / camera cutouts / gesture-nav bars in landscape
+     (viewport-fit=cover is set in index.html, enabling these env() vars) */
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 /* ───────────────────────────────────────────────────────────

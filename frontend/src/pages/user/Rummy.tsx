@@ -52,6 +52,7 @@ export function RummyPage() {
   const [joinCodeInput, setJoinCodeInput] = useState("");
   const [joinError, setJoinError] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
+  const [isJoining, setIsJoining] = useState(false);
 
   const [createForm, setCreateForm] = useState<RummyTableCreate>({
     name: "VIP Table",
@@ -195,6 +196,7 @@ export function RummyPage() {
   const handleJoinByCode = async (e: React.FormEvent) => {
     e.preventDefault();
     setJoinError(null);
+    setIsJoining(true);
     try {
       const table = await RummyApi.joinByCode(joinCodeInput.trim().toUpperCase());
       setJoinModalOpen(false);
@@ -202,6 +204,8 @@ export function RummyPage() {
       setActiveTableId(table.id);
     } catch (err: any) {
       setJoinError(err.response?.data?.detail || "Invalid or expired table code");
+    } finally {
+      setIsJoining(false);
     }
   };
 
@@ -314,14 +318,16 @@ export function RummyPage() {
           <div className="rummy-actions-group flex items-center gap-3">
             <button
               onClick={() => setJoinModalOpen(true)}
-              className="rummy-join-btn px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-200 border border-white/10 flex items-center gap-2 transition-all shadow-md"
+              disabled={joinModalOpen || isJoining}
+              className="rummy-join-btn px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-200 border border-white/10 flex items-center gap-2 transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Key size={14} className="text-amber-400" />
               Join Private Table
             </button>
             <button
               onClick={() => setCreateModalOpen(true)}
-              className="rummy-create-btn px-4 py-2 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-xs font-bold text-white flex items-center gap-2 transition-all shadow-lg shadow-purple-600/30"
+              disabled={createModalOpen || isCreating}
+              className="rummy-create-btn px-4 py-2 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-xs font-bold text-white flex items-center gap-2 transition-all shadow-lg shadow-purple-600/30 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Plus size={14} />
               Create Custom Table
@@ -633,15 +639,17 @@ export function RummyPage() {
                 <button
                   type="button"
                   onClick={() => { setJoinModalOpen(false); setJoinError(null); }}
-                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs flex-1 font-semibold"
+                  disabled={isJoining}
+                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs flex-1 font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 text-slate-950 text-xs font-bold flex-1"
+                  disabled={isJoining}
+                  className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 text-slate-950 text-xs font-bold flex-1 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Join Room
+                  {isJoining ? "Joining..." : "Join Room"}
                 </button>
               </div>
             </form>

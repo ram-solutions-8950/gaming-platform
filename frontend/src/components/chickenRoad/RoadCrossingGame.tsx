@@ -293,31 +293,55 @@ export const RoadCrossingGame: React.FC<RoadCrossingGameProps> = ({
       { type: 'bus', width: 40, height: 104, color: '#F97316', roofColor: '#EA580C', wheelColor: '#0F172A' },
     ];
 
+    // Speed scales up with difficulty; both tiers raised so wide, easy gaps
+    // no longer dominate (was 1.35 / 1.75 — too forgiving to require real timing)
     const speedMultipliers: Record<Difficulty, number> = {
-      MEDIUM: 1.35,
-      HARD:   1.75,
+      MEDIUM: 1.55,
+      HARD:   2.10,
+    };
+
+    // Traffic density (vehicles per lane) now scales with difficulty too —
+    // previously fixed at 2 regardless of difficulty, which left huge safe
+    // gaps to walk through and made every difficulty equally (too) easy.
+    const vehicleCountByDifficulty: Record<Difficulty, number> = {
+      MEDIUM: 3,
+      HARD:   4,
     };
 
     const speedFactor = speedMultipliers[difficulty] || 1.0;
+    const numVehicles = vehicleCountByDifficulty[difficulty] || 3;
+    // Minimum required clearance (beyond vehicle body length) between two
+    // vehicles sharing a lane, used to bound spawn jitter so vehicles are
+    // never placed within overlapping distance of one another.
+    const VEHICLE_SAFE_GAP = 40;
 
     for (let lane = 1; lane <= totalLanes; lane++) {
       // Alternating vertical direction: odd lanes move DOWN, even lanes move UP
       const direction: 1 | -1 = lane % 2 === 1 ? 1 : -1;
       const laneCenterX = START_ZONE_WIDTH + (lane - 0.5) * LANE_WIDTH;
 
-      // Base vertical speed
-      const baseSpeed = (2.2 + (lane % 3) * 0.4 + Math.random() * 0.4) * speedFactor;
+      // Progressive difficulty: speed climbs steadily from the first lane to
+      // the last (was `lane % 3`, which cycled rather than escalated), so
+      // later lanes near the finish are genuinely harder than early ones.
+      const laneProgress = totalLanes > 1 ? (lane - 1) / (totalLanes - 1) : 0;
+      const baseSpeed = (2.3 + laneProgress * 1.8 + Math.random() * 0.4) * speedFactor;
 
-      // 2 vehicles per vertical lane spaced out to guarantee crossing gaps
-      const numVehicles = 2;
+      // Vehicles per vertical lane, spaced out to guarantee crossing gaps
       const laneSpacing = (WORLD_HEIGHT + 240) / numVehicles;
 
       for (let i = 0; i < numVehicles; i++) {
         const template = vehicleTemplates[(lane + i * 2) % vehicleTemplates.length];
-        const startY =
+        const idealY =
           direction === 1
-            ? -100 + i * laneSpacing + (Math.random() * 30 - 15)
-            : WORLD_HEIGHT + 100 - i * laneSpacing - (Math.random() * 30 - 15);
+            ? -100 + i * laneSpacing
+            : WORLD_HEIGHT + 100 - i * laneSpacing;
+
+        // Bound the random jitter so it can never shrink the gap to a
+        // neighboring vehicle below VEHICLE_SAFE_GAP — validated spacing
+        // instead of a pure visual workaround.
+        const maxJitter = Math.max(0, Math.min(15, (laneSpacing - template.height - VEHICLE_SAFE_GAP) / 2));
+        const jitter = maxJitter > 0 ? (Math.random() * 2 - 1) * maxJitter : 0;
+        const startY = idealY + jitter;
 
         vehicles.push({
           id: idCounter++,
@@ -326,7 +350,11 @@ export const RoadCrossingGame: React.FC<RoadCrossingGameProps> = ({
           y: startY,
           width: template.width,
           height: template.height,
-          speed: baseSpeed + i * 0.15,
+          // All vehicles in the same lane now share identical speed — a
+          // per-vehicle offset here (previously `+ i * 0.15`) caused faster
+          // cars to drift into and overtake slower ones in the same lane
+          // over time, which was the root cause of visible car overlap.
+          speed: baseSpeed,
           direction,
           type: template.type,
           color: template.color,
@@ -357,13 +385,15 @@ export const RoadCrossingGame: React.FC<RoadCrossingGameProps> = ({
     const roadBottom = WORLD_HEIGHT - 45;
 
     // Per-lane probability and max slot count by difficulty
+    // (raised slightly alongside traffic density so easy "no obstacle" lanes
+    // are less common — part of the overall difficulty pass)
     const chancePerSlot: Record<Difficulty, number> = {
-      MEDIUM: 0.58,
-      HARD:   0.80,
+      MEDIUM: 0.65,
+      HARD:   0.88,
     };
     const slotsPerLane: Record<Difficulty, number> = {
-      MEDIUM: 4,
-      HARD:   6,
+      MEDIUM: 5,
+      HARD:   7,
     };
 
     const chance = chancePerSlot[stateRef.current.difficulty];
@@ -487,6 +517,23 @@ export const RoadCrossingGame: React.FC<RoadCrossingGameProps> = ({
 
     updateCanvasSize();
     window.addEventListener('resize', updateCanvasSize);
+    window.addEventListener('orientationchange', updateCanvasSize);
+
+    // Observe the container itself (not just window resize) — Android
+    // WebViews can change the container's actual box size (safe-area insets
+    // settling after mount, system bar show/hide, split-screen) without
+    // firing a window 'resize' event, which previously left the canvas's
+    // raster buffer stale relative to its true on-screen size and caused
+    // the bottom of the game to appear clipped.
+    let resizeObserver: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== 'undefined' && containerRef.current) {
+      resizeObserver = new ResizeObserver(() => updateCanvasSize());
+      resizeObserver.observe(containerRef.current);
+    }
+
+    // Re-measure shortly after mount in case Android's system bars / safe
+    // area haven't settled to their final size on the very first layout pass
+    const settleTimer = window.setTimeout(updateCanvasSize, 300);
 
     // Particle spawn helper
     const spawnFeathers = (x: number, y: number) => {
@@ -553,11 +600,32 @@ export const RoadCrossingGame: React.FC<RoadCrossingGameProps> = ({
       // Update vertical traffic
       s.vehicles.forEach((v) => {
         v.y += v.speed * v.direction * dt;
-        if (v.direction === 1 && v.y > WORLD_HEIGHT + 120) {
-          v.y = -120;
-        } else if (v.direction === -1 && v.y < -120) {
-          v.y = WORLD_HEIGHT + 120;
+      });
+
+      // Wrap-around respawn, validated against same-lane neighbors so a
+      // vehicle never reappears overlapping (or too close to) another car
+      // already near the spawn point — delays respawn by holding the
+      // vehicle just past the edge until a safe gap opens, instead of
+      // blindly resetting its position.
+      s.vehicles.forEach((v) => {
+        const goingDown = v.direction === 1;
+        const pastEdge = goingDown ? v.y > WORLD_HEIGHT + 120 : v.y < -120;
+        if (!pastEdge) return;
+
+        const resetY = goingDown ? -120 : WORLD_HEIGHT + 120;
+        let nearestGap = Infinity;
+        for (const other of s.vehicles) {
+          if (other === v || other.lane !== v.lane || other.direction !== v.direction) continue;
+          const gap = Math.abs(other.y - resetY);
+          if (gap < nearestGap) nearestGap = gap;
         }
+
+        const minGap = Math.max(v.height, 40) + 40;
+        if (nearestGap >= minGap) {
+          v.y = resetY;
+        }
+        // else: hold position just past the edge (invisible, off-screen)
+        // and re-check next frame once the lane clears
       });
 
       // Update chicken if ACTIVE (Horizontal movement only)
@@ -1154,6 +1222,11 @@ export const RoadCrossingGame: React.FC<RoadCrossingGameProps> = ({
     return () => {
       cancelAnimationFrame(animId);
       window.removeEventListener('resize', updateCanvasSize);
+      window.removeEventListener('orientationchange', updateCanvasSize);
+      if (resizeObserver) {
+        resizeObserver.disconnect();
+      }
+      window.clearTimeout(settleTimer);
     };
   }, [onLaneCross, onCollision, onFinish, multipliers, fixedY]);
 

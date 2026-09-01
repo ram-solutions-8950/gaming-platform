@@ -181,7 +181,10 @@ export function RoulettePage() {
         target,
         amount: selectedChip,
       }]);
-      fetchState();
+      await fetchState();
+      // Server now reflects this bet in my_bets; drop the optimistic local
+      // copy so betsByTarget doesn't double-count it
+      setLocalBets((prev) => prev.filter((b) => b !== newBet));
     } catch (err: any) {
       // Revert if rejected
       setBalance((prev) => prev + selectedChip);
@@ -232,9 +235,10 @@ export function RoulettePage() {
         })));
       }
       setBetHistoryStack(stack);
-      setLocalBets(stack);
       refreshBalance();
-      fetchState();
+      await fetchState();
+      // Server now reflects the re-placed bets; clear local copies to avoid double-counting
+      setLocalBets([]);
     } catch {
       // fallback
     }
@@ -263,10 +267,11 @@ export function RoulettePage() {
         target: b.target,
         amount: b.amount,
       })));
-      setLocalBets([...previousRoundBets]);
       setBetHistoryStack([...previousRoundBets]);
       refreshBalance();
-      fetchState();
+      await fetchState();
+      // Server now reflects the repeated bets; clear local copies to avoid double-counting
+      setLocalBets([]);
     } catch (err: any) {
       const msg = err.response?.data?.message || 'Failed repeating bet';
       setToastMessage(msg);
@@ -276,10 +281,10 @@ export function RoulettePage() {
 
   // Save current bets before round ends for repeat bet support
   useEffect(() => {
-    if (serverState?.phase === 'STOP_BETTING' && localBets.length > 0) {
-      setPreviousRoundBets([...localBets]);
+    if (serverState?.phase === 'STOP_BETTING' && betHistoryStack.length > 0) {
+      setPreviousRoundBets([...betHistoryStack]);
     }
-  }, [serverState?.phase, localBets]);
+  }, [serverState?.phase, betHistoryStack]);
 
   const winNum = serverState?.winning_number;
   const isResultPhase = serverState?.phase === 'RESULT' || serverState?.phase === 'SPINNING';

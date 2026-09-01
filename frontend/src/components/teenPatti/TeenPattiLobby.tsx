@@ -17,7 +17,6 @@ export const TeenPattiLobby: React.FC<TeenPattiLobbyProps> = ({ onJoinTable }) =
   const navigate = useNavigate();
   const [tables, setTables] = useState<TeenPattiTable[]>([]);
   const [loading, setLoading] = useState(true);
-  const [joinCodeInput, setJoinCodeInput] = useState('');
   const [joinError, setJoinError] = useState('');
   const [creatingTable, setCreatingTable] = useState(false);
 
@@ -72,26 +71,6 @@ export const TeenPattiLobby: React.FC<TeenPattiLobbyProps> = ({ onJoinTable }) =
     }
   };
 
-  const handleJoinByCode = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!joinCodeInput.trim()) return;
-    try {
-      setJoinError('');
-      const tbl = await teenPattiService.joinByCode(joinCodeInput.trim().toUpperCase());
-      onJoinTable(tbl.id);
-    } catch (e: any) {
-      const detail = e.response?.data?.detail;
-      const status = e.response?.status;
-      let msg = 'Invalid or expired room code';
-      if (status === 401) {
-        msg = 'Authentication failure. Please log in again.';
-      } else if (detail) {
-        msg = detail;
-      }
-      setJoinError(msg);
-    }
-  };
-
   return (
     <div className="w-full max-w-5xl mx-auto p-3 sm:p-4 pb-32 text-white space-y-4">
       {/* Sticky Header Bar */}
@@ -125,30 +104,6 @@ export const TeenPattiLobby: React.FC<TeenPattiLobbyProps> = ({ onJoinTable }) =
           </button>
         </div>
       )}
-
-      {/* Private Room Code Input */}
-      <div className="bg-dark-900/90 border border-gold-500/30 rounded-2xl p-3 sm:p-4 flex flex-wrap items-center justify-between gap-3 shadow-lg">
-        <div>
-          <div className="font-extrabold text-sm text-slate-100">Private Join Code</div>
-          <div className="text-[11px] text-slate-400">Enter room code to play with friends</div>
-        </div>
-        <form onSubmit={handleJoinByCode} className="flex gap-2 items-center">
-          <input
-            type="text"
-            placeholder="JOIN78"
-            maxLength={8}
-            value={joinCodeInput}
-            onChange={(e) => setJoinCodeInput(e.target.value)}
-            className="bg-dark-800 border border-dark-700 rounded-xl px-3 py-1.5 text-white font-mono font-bold text-xs uppercase focus:ring-2 focus:ring-gold-400 w-28 sm:w-36"
-          />
-          <button
-            type="submit"
-            className="tp-btn tp-btn-chaal px-4 py-1.5 text-xs font-extrabold rounded-xl"
-          >
-            Join Room
-          </button>
-        </form>
-      </div>
 
       {/* Quick Play Stakes Grid */}
       <div>

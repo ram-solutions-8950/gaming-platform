@@ -98,6 +98,34 @@ export function ChickenRoadPage() {
     syncState();
   }, [syncState]);
 
+  // Dynamic viewport-height fallback for Android landscape fitting.
+  // `100dvh` alone can be unreliable in some Android WebViews (Capacitor)
+  // while system bars / safe-area insets settle after mount or the on-screen
+  // keyboard toggles, which previously left the bottom betting panel clipped
+  // outside the visible area. This tracks the actual visual viewport height
+  // and exposes it as a CSS var the container prefers over plain `dvh`.
+  useEffect(() => {
+    const root = document.documentElement;
+    const setAppHeight = () => {
+      const vh = window.visualViewport?.height || window.innerHeight;
+      root.style.setProperty('--cr-app-height', `${vh}px`);
+    };
+    setAppHeight();
+    const settleTimer = window.setTimeout(setAppHeight, 300);
+
+    window.addEventListener('resize', setAppHeight);
+    window.addEventListener('orientationchange', setAppHeight);
+    window.visualViewport?.addEventListener('resize', setAppHeight);
+
+    return () => {
+      window.clearTimeout(settleTimer);
+      window.removeEventListener('resize', setAppHeight);
+      window.removeEventListener('orientationchange', setAppHeight);
+      window.visualViewport?.removeEventListener('resize', setAppHeight);
+      root.style.removeProperty('--cr-app-height');
+    };
+  }, []);
+
   // Difficulty change handler
   const handleDifficultyChange = (diff: Difficulty) => {
     if (gameState === 'ACTIVE') return;
