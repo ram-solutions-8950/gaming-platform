@@ -26,8 +26,14 @@ class PokerConnectionManager:
             self.connections[table_id] = {}
         self.connections[table_id][user_id] = ws
 
-    def disconnect(self, table_id: str, user_id: str):
-        if table_id in self.connections:
+    def disconnect(self, table_id: str, user_id: str, ws: WebSocket):
+        # Only remove if `ws` is still the currently-registered connection
+        # for this user. A stale/superseded connection's cleanup must never
+        # evict a newer, still-live connection from the same user — this
+        # happens whenever a client reconnects quickly (e.g. React
+        # StrictMode's dev-mode double-connect), and previously caused the
+        # game to silently stop broadcasting updates to the live socket.
+        if table_id in self.connections and self.connections[table_id].get(user_id) is ws:
             self.connections[table_id].pop(user_id, None)
 
     async def send_to_user(self, table_id: str, user_id: str, payload: dict):
@@ -93,33 +99,46 @@ def _decide_bot_action(engine: PokerEngine, player) -> Tuple[str, int]:
         return 'call', 0
     return 'raise', raise_to
 
+_bot_turns_active: Set[str] = set()
+
 async def run_bot_turns(engine: PokerEngine, db: Session):
     """Drives bot actions for the current hand, and iteratively progresses through
     settlement + subsequent auto-started hands as long as it stays a bot's turn."""
-    while True:
-        while engine.phase not in ('WAITING', 'SETTLEMENT'):
-            seat = engine.current_turn_seat_idx
-            player = next((p for p in engine.players if p.seat_index == seat), None) if seat is not None else None
-            if not player or not player.is_bot:
+    # Guard against two coroutines (e.g. two connections, or a connect racing
+    # an in-flight action) concurrently driving the same table's bots — with
+    # bots now resumed on every reconnect, this race became meaningfully more
+    # likely. Whichever runner is already active will pick up state changes
+    # on its own next loop iteration, so a concurrent call is safe to skip.
+    if engine.table_id in _bot_turns_active:
+        return
+    _bot_turns_active.add(engine.table_id)
+    try:
+        while True:
+            while engine.phase not in ('WAITING', 'SETTLEMENT'):
+                seat = engine.current_turn_seat_idx
+                player = next((p for p in engine.players if p.seat_index == seat), None) if seat is not None else None
+                if not player or not player.is_bot:
+                    return
+                await asyncio.sleep(random.uniform(0.8, 1.6))
+                action, amount = _decide_bot_action(engine, player)
+                ok, _ = engine.process_action(user_id=player.user_id, action=action, amount=amount)
+                if not ok:
+                    engine.process_action(user_id=player.user_id, action='fold')
+                await poker_ws_manager.broadcast_table_state(engine)
+
+            if engine.phase != 'SETTLEMENT':
                 return
-            await asyncio.sleep(random.uniform(0.8, 1.6))
-            action, amount = _decide_bot_action(engine, player)
-            ok, _ = engine.process_action(user_id=player.user_id, action=action, amount=amount)
+
+            await persist_hand_result(engine, db)
+            await asyncio.sleep(4)
+            if len(engine.players) < 2:
+                return
+            ok, _ = engine.start_hand()
             if not ok:
-                engine.process_action(user_id=player.user_id, action='fold')
-            await poker_ws_manager.broadcast_table_state(engine)
-
-        if engine.phase != 'SETTLEMENT':
-            return
-
-        await persist_hand_result(engine, db)
-        await asyncio.sleep(4)
-        if len(engine.players) < 2:
-            return
-        ok, _ = engine.start_hand()
-        if not ok:
-            return
-        await broadcast_hand_start(engine)
+                return
+            await broadcast_hand_start(engine)
+    finally:
+        _bot_turns_active.discard(engine.table_id)
 
 def _authenticate(token: str) -> str:
     payload = decode_access_token(token)
@@ -193,7 +212,16 @@ async def poker_websocket_endpoint(
             ok, _ = engine.start_hand()
             if ok:
                 await broadcast_hand_start(engine)
-                await run_bot_turns(engine, db)
+
+        # Resume bot turns on (re)connect if it's currently a bot's turn
+        # mid-hand (e.g. page refresh while a bot is up) — previously
+        # nothing re-triggered the bots in that case since it's not the
+        # human's turn either, so the game would sit deadlocked. SETTLEMENT
+        # is deliberately excluded: that transient cooldown window is
+        # already being driven by whichever connection just finished the
+        # hand, and re-entering it here could double-persist/double-start.
+        if engine.phase not in ('WAITING', 'SETTLEMENT'):
+            await run_bot_turns(engine, db)
 
         while True:
             data_text = await ws.receive_text()
@@ -253,7 +281,7 @@ async def poker_websocket_endpoint(
 
     except WebSocketDisconnect:
         print(f"[POKER WS] User {user_id} disconnected from table {table_id}")
-        poker_ws_manager.disconnect(table_id, user_id)
+        poker_ws_manager.disconnect(table_id, user_id, ws)
         # Notify remaining table players
         if table_id in poker_ws_manager.connections:
             engine = poker_manager.get_table(table_id)
@@ -261,7 +289,7 @@ async def poker_websocket_endpoint(
                 await poker_ws_manager.broadcast_table_state(engine)
     except Exception as e:
         print(f"[POKER WS EXCEPTION] {e}")
-        poker_ws_manager.disconnect(table_id, user_id)
+        poker_ws_manager.disconnect(table_id, user_id, ws)
     finally:
         db.close()
 

@@ -293,19 +293,20 @@ export const RoadCrossingGame: React.FC<RoadCrossingGameProps> = ({
       { type: 'bus', width: 40, height: 104, color: '#F97316', roofColor: '#EA580C', wheelColor: '#0F172A' },
     ];
 
-    // Speed scales up with difficulty; both tiers raised so wide, easy gaps
-    // no longer dominate (was 1.35 / 1.75 — too forgiving to require real timing)
+    // Speed scales up with difficulty (eased back slightly from 1.55 / 2.10
+    // — still noticeably harder than the original 1.35 / 1.75, but winning
+    // no longer requires razor-sharp timing on every single lane).
     const speedMultipliers: Record<Difficulty, number> = {
-      MEDIUM: 1.55,
-      HARD:   2.10,
+      MEDIUM: 1.40,
+      HARD:   1.80,
     };
 
-    // Traffic density (vehicles per lane) now scales with difficulty too —
-    // previously fixed at 2 regardless of difficulty, which left huge safe
-    // gaps to walk through and made every difficulty equally (too) easy.
+    // Traffic density (vehicles per lane) scales with difficulty. HARD eased
+    // back from 4 to 3 vehicles/lane; MEDIUM stays at 3 (still denser than
+    // the original fixed 2, but no longer maxed out).
     const vehicleCountByDifficulty: Record<Difficulty, number> = {
       MEDIUM: 3,
-      HARD:   4,
+      HARD:   3,
     };
 
     const speedFactor = speedMultipliers[difficulty] || 1.0;
@@ -321,10 +322,10 @@ export const RoadCrossingGame: React.FC<RoadCrossingGameProps> = ({
       const laneCenterX = START_ZONE_WIDTH + (lane - 0.5) * LANE_WIDTH;
 
       // Progressive difficulty: speed climbs steadily from the first lane to
-      // the last (was `lane % 3`, which cycled rather than escalated), so
-      // later lanes near the finish are genuinely harder than early ones.
+      // the last, so later lanes near the finish are harder than early ones
+      // (progression eased from +1.8 to +1.3 across the run).
       const laneProgress = totalLanes > 1 ? (lane - 1) / (totalLanes - 1) : 0;
-      const baseSpeed = (2.3 + laneProgress * 1.8 + Math.random() * 0.4) * speedFactor;
+      const baseSpeed = (2.1 + laneProgress * 1.3 + Math.random() * 0.4) * speedFactor;
 
       // Vehicles per vertical lane, spaced out to guarantee crossing gaps
       const laneSpacing = (WORLD_HEIGHT + 240) / numVehicles;
@@ -385,15 +386,15 @@ export const RoadCrossingGame: React.FC<RoadCrossingGameProps> = ({
     const roadBottom = WORLD_HEIGHT - 45;
 
     // Per-lane probability and max slot count by difficulty
-    // (raised slightly alongside traffic density so easy "no obstacle" lanes
-    // are less common — part of the overall difficulty pass)
+    // (eased back slightly from 0.65/5 and 0.88/7 — still a bit denser than
+    // the original 0.58/4 and 0.80/6, but "no obstacle" lanes are more common again)
     const chancePerSlot: Record<Difficulty, number> = {
-      MEDIUM: 0.65,
-      HARD:   0.88,
+      MEDIUM: 0.60,
+      HARD:   0.82,
     };
     const slotsPerLane: Record<Difficulty, number> = {
-      MEDIUM: 5,
-      HARD:   7,
+      MEDIUM: 4,
+      HARD:   6,
     };
 
     const chance = chancePerSlot[stateRef.current.difficulty];

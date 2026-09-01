@@ -1,14 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
-  Trophy, Play, Plus, Key, ArrowLeft, RotateCcw,
+  Trophy, Play, ArrowLeft, RotateCcw,
   BookOpen, History, Flame, Zap
 } from "lucide-react";
 import GameTable from "../../components/rummy/RummyTable";
 import MatchSearchOverlay from "../../components/rummy/MatchSearchOverlay";
 import RulesModal from "../../components/rummy/RulesModal";
 import { useRummyMatchmaking } from "../../hooks/useRummyMatchmaking";
-import { RummyApi, type RummyTableOut, type RummyTableCreate } from "../../services/rummy";
+import { RummyApi, type RummyTableOut } from "../../services/rummy";
 import { authStorage } from "../../services/authStorage";
 import api from "../../services/api";
 import "../../styles/rummy.css";
@@ -48,22 +48,6 @@ export function RummyPage() {
   const [rulesOpen, setRulesOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [history, setHistory] = useState<any[]>([]);
-  const [createModalOpen, setCreateModalOpen] = useState(false);
-  const [joinModalOpen, setJoinModalOpen] = useState(false);
-  const [joinCodeInput, setJoinCodeInput] = useState("");
-  const [joinError, setJoinError] = useState<string | null>(null);
-  const [isCreating, setIsCreating] = useState(false);
-  const [isJoining, setIsJoining] = useState(false);
-
-  const [createForm, setCreateForm] = useState<RummyTableCreate>({
-    name: "VIP Table",
-    mode: "real_money",
-    max_players: 2,
-    num_deals: 2,
-    entry_fee_paise: 8000,
-    pool_limit: null,
-    is_private: true,
-  });
 
   const token = authStorage.getAccessToken();
   const navigate = useNavigate();
@@ -178,38 +162,6 @@ export function RummyPage() {
     });
   };
 
-  const handleCreatePrivateTable = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsCreating(true);
-    setJoinError(null);
-    try {
-      const created = await RummyApi.createTable(createForm);
-      setCreateModalOpen(false);
-      setSearchParams({ tableId: created.id });
-      setActiveTableId(created.id);
-    } catch (err: any) {
-      setJoinError(err.response?.data?.detail || "Failed to create private table");
-    } finally {
-      setIsCreating(false);
-    }
-  };
-
-  const handleJoinByCode = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setJoinError(null);
-    setIsJoining(true);
-    try {
-      const table = await RummyApi.joinByCode(joinCodeInput.trim().toUpperCase());
-      setJoinModalOpen(false);
-      setSearchParams({ tableId: table.id });
-      setActiveTableId(table.id);
-    } catch (err: any) {
-      setJoinError(err.response?.data?.detail || "Invalid or expired table code");
-    } finally {
-      setIsJoining(false);
-    }
-  };
-
   const handleLeaveTable = () => {
     setActiveTableId(null);
     setSearchParams({});
@@ -313,25 +265,6 @@ export function RummyPage() {
             >
               <Zap size={16} />
               Practice (Free)
-            </button>
-          </div>
-
-          <div className="rummy-actions-group flex items-center gap-3">
-            <button
-              onClick={() => setJoinModalOpen(true)}
-              disabled={joinModalOpen || isJoining}
-              className="rummy-join-btn px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-200 border border-white/10 flex items-center gap-2 transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <Key size={14} className="text-amber-400" />
-              Join Private Table
-            </button>
-            <button
-              onClick={() => setCreateModalOpen(true)}
-              disabled={createModalOpen || isCreating}
-              className="rummy-create-btn px-4 py-2 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-xs font-bold text-white flex items-center gap-2 transition-all shadow-lg shadow-purple-600/30 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <Plus size={14} />
-              Create Custom Table
             </button>
           </div>
         </div>
@@ -538,122 +471,6 @@ export function RummyPage() {
                 ))
               )}
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* Create Private Table Modal */}
-      {createModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-          <div className="bg-slate-900 border border-amber-500/30 rounded-2xl w-full max-w-md p-6 shadow-2xl">
-            <h2 className="text-lg font-bold text-amber-400 mb-4 flex items-center gap-2">
-              <Plus size={18} /> Create Private Table
-            </h2>
-            {joinError && <p className="text-xs text-red-400 mb-3">{joinError}</p>}
-            <form onSubmit={handleCreatePrivateTable} className="space-y-4 text-xs">
-              <div>
-                <label className="block text-slate-400 mb-1">Table Name</label>
-                <input
-                  type="text"
-                  value={createForm.name}
-                  onChange={(e) => setCreateForm({ ...createForm, name: e.target.value })}
-                  className="w-full bg-slate-800 border border-white/10 rounded-xl px-3 py-2 text-slate-100 focus:outline-none focus:border-amber-500"
-                  required
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-slate-400 mb-1">Mode</label>
-                  <select
-                    value={createForm.mode}
-                    onChange={(e) => setCreateForm({ ...createForm, mode: e.target.value as any })}
-                    className="w-full bg-slate-800 border border-white/10 rounded-xl px-3 py-2 text-slate-100 focus:outline-none focus:border-amber-500"
-                  >
-                    <option value="real_money">Real Money</option>
-                    <option value="free">Practice</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-slate-400 mb-1">Max Players</label>
-                  <select
-                    value={createForm.max_players}
-                    onChange={(e) => setCreateForm({ ...createForm, max_players: parseInt(e.target.value) })}
-                    className="w-full bg-slate-800 border border-white/10 rounded-xl px-3 py-2 text-slate-100 focus:outline-none focus:border-amber-500"
-                  >
-                    <option value="2">2 Players</option>
-                    <option value="4">4 Players</option>
-                  </select>
-                </div>
-              </div>
-              <div>
-                <label className="block text-slate-400 mb-1">Entry Fee (INR)</label>
-                <input
-                  type="number"
-                  value={createForm.entry_fee_paise / 100}
-                  onChange={(e) => setCreateForm({ ...createForm, entry_fee_paise: Math.max(0, parseInt(e.target.value || "0") * 100) })}
-                  className="w-full bg-slate-800 border border-white/10 rounded-xl px-3 py-2 text-slate-100 focus:outline-none focus:border-amber-500 font-mono"
-                  min="0"
-                  disabled={createForm.mode === "free"}
-                />
-              </div>
-              <div className="flex gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setCreateModalOpen(false)}
-                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 flex-1 font-semibold"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isCreating}
-                  className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 text-slate-950 font-bold flex-1"
-                >
-                  {isCreating ? "Creating..." : "Create Table"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Join Private Table Modal */}
-      {joinModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-          <div className="bg-slate-900 border border-amber-500/30 rounded-2xl w-full max-w-sm p-6 shadow-2xl text-center">
-            <h2 className="text-lg font-bold text-amber-400 mb-2 flex items-center justify-center gap-2">
-              <Key size={18} /> Join Private Table
-            </h2>
-            <p className="text-xs text-slate-400 mb-4">Enter the 6-character room code shared by your friend</p>
-            {joinError && <p className="text-xs text-red-400 mb-3">{joinError}</p>}
-            <form onSubmit={handleJoinByCode} className="space-y-4">
-              <input
-                type="text"
-                placeholder="e.g. ABC123"
-                value={joinCodeInput}
-                onChange={(e) => setJoinCodeInput(e.target.value.toUpperCase())}
-                maxLength={8}
-                className="w-full text-center tracking-widest text-lg font-mono font-bold bg-slate-800 border border-white/10 rounded-xl px-4 py-2 text-amber-400 focus:outline-none focus:border-amber-500 uppercase"
-                required
-              />
-              <div className="flex gap-3">
-                <button
-                  type="button"
-                  onClick={() => { setJoinModalOpen(false); setJoinError(null); }}
-                  disabled={isJoining}
-                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs flex-1 font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isJoining}
-                  className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 text-slate-950 text-xs font-bold flex-1 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isJoining ? "Joining..." : "Join Room"}
-                </button>
-              </div>
-            </form>
           </div>
         </div>
       )}

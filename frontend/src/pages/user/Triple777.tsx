@@ -136,6 +136,33 @@ export function Triple777Page() {
     };
   }, []);
 
+  // 1b. Dynamic viewport-height fallback for reliable portrait fitting.
+  // `100dvh` alone can misreport on some Android browsers/WebViews when the
+  // OS gesture-navigation bar is present, which previously left the bottom
+  // spin panel pushed below the visible fold. This tracks the actual visual
+  // viewport height and exposes it as a CSS var the container prefers.
+  useEffect(() => {
+    const root = document.documentElement;
+    const setAppHeight = () => {
+      const vh = window.visualViewport?.height || window.innerHeight;
+      root.style.setProperty('--t777-app-height', `${vh}px`);
+    };
+    setAppHeight();
+    const settleTimer = window.setTimeout(setAppHeight, 300);
+
+    window.addEventListener('resize', setAppHeight);
+    window.addEventListener('orientationchange', setAppHeight);
+    window.visualViewport?.addEventListener('resize', setAppHeight);
+
+    return () => {
+      window.clearTimeout(settleTimer);
+      window.removeEventListener('resize', setAppHeight);
+      window.removeEventListener('orientationchange', setAppHeight);
+      window.visualViewport?.removeEventListener('resize', setAppHeight);
+      root.style.removeProperty('--t777-app-height');
+    };
+  }, []);
+
   // 2. Fetch initial config, jackpot, and wallet balance
   useEffect(() => {
     let isMounted = true;

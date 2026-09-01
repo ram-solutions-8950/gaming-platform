@@ -8,8 +8,14 @@
   height: 100%;
   min-width: 0;
   min-height: 0;
+  /* Fallback chain: dvh -> JS-measured visualViewport height. dvh alone can
+     misreport on some Android browsers/WebViews when the OS gesture-nav bar
+     is present, leaving the bottom spin panel pushed below the visible
+     fold — the JS-measured var (set in Triple777Page) is the reliable source. */
   min-height: 100dvh;
+  min-height: var(--t777-app-height, 100dvh);
   max-height: 100dvh;
+  max-height: var(--t777-app-height, 100dvh);
   display: flex;
   flex-direction: column;
   background: #0d0b12;
