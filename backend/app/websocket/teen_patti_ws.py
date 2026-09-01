@@ -63,6 +63,7 @@ router = APIRouter()
 _turn_timers: Dict[str, asyncio.Task] = {}
 _bot_timers: Dict[str, asyncio.Task] = {}
 _start_timers: Dict[str, asyncio.Task] = {}
+_bot_join_timers: Dict[str, asyncio.Task] = {}
 _pending_side_show: Dict[str, Dict[str, str]] = {}
 _processed_actions: Dict[str, set] = defaultdict(set)
 _rng_per_table: Dict[str, random.Random] = {}
@@ -238,6 +239,51 @@ async def _turn_timeout(table_id: str, expected_user: str, seconds: int) -> None
         except GameError:
             return
         await _after_action(table_id)
+
+
+_MIN_PLAYERS_TO_START = 2
+
+def _schedule_bot_fill(table_id: str) -> None:
+    """Schedules bots to fill up to the minimum player count if the table is
+    still short after a delay. This was previously dead code — the
+    _BOT_JOIN_DELAY_SECONDS / _BOT_NAMES constants existed but nothing ever
+    called add_seat(is_bot=True), so a lone player just sat waiting forever.
+
+    Only fills up to _MIN_PLAYERS_TO_START (not all the way to max_players):
+    real players can still join a WAITING table afterwards, and topping it
+    all the way up with bots would needlessly displace genuine opponents —
+    bots never get credited on a win, so a bot winning against real players
+    would just make their stakes vanish for nothing."""
+    hand = teen_patti_manager.get(table_id)
+    if hand is None or hand.phase != Phase.WAITING:
+        return
+    if len(hand.seats) >= _MIN_PLAYERS_TO_START:
+        return
+    _cancel(_bot_join_timers, table_id)
+    _bot_join_timers[table_id] = asyncio.create_task(_bot_fill_task(table_id))
+
+
+async def _bot_fill_task(table_id: str) -> None:
+    try:
+        await asyncio.sleep(_BOT_JOIN_DELAY_SECONDS)
+    except asyncio.CancelledError:
+        return
+    lock = _get_table_lock(table_id)
+    async with lock:
+        hand = teen_patti_manager.get(table_id)
+        if hand is None or hand.phase != Phase.WAITING:
+            return
+        idx = 0
+        target = min(hand.config.max_players, _MIN_PLAYERS_TO_START)
+        while len(hand.seats) < target and idx < len(_BOT_NAMES):
+            bot_id = f"bot_{table_id}_{idx}"
+            if not any(s.id == bot_id for s in hand.seats):
+                try:
+                    hand.add_seat(bot_id, _BOT_NAMES[idx], is_bot=True)
+                except GameError:
+                    break
+            idx += 1
+        await _broadcast_state(table_id)
 
 
 def _maybe_trigger_bot_turn(table_id: str) -> None:
@@ -531,6 +577,11 @@ async def teen_patti_socket(websocket: WebSocket, table_id: str) -> None:
                 await websocket.send_json({"type": "error", "message": str(ge)})
                 await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
                 return
+
+            # If still short of players after joining, fill remaining seats
+            # with bots after a short delay so the table doesn't sit waiting
+            # forever for another real player.
+            _schedule_bot_fill(table_id)
 
         await manager.connect(table_id, user_id, websocket)
         await manager.send_to_user(table_id, user_id, {"type": "event", "event": "joined"})
