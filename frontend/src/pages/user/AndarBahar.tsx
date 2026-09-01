@@ -30,7 +30,7 @@ const RULES_COPY = {
     title: "How to Play Andar Bahar",
     items: [
       "1. Choose your bet amount using the chip selector or stepper.",
-      "2. Select ANDAR (blue) or BAHAR (red) and click Confirm Bet before the timer runs out.",
+      "2. Select ANDAR (blue) or BAHAR (red) to place your bet immediately before the timer runs out.",
       "3. The server reveals the Open Card (the target) once betting closes.",
       "4. Cards are dealt alternately to Andar and Bahar by the server.",
       "5. The first side to receive a card matching the rank of the Open Card wins!",
@@ -67,10 +67,12 @@ export function AndarBaharPage() {
   const [andar, setAndar] = useState<Card[]>([]);
   const [bahar, setBahar] = useState<Card[]>([]);
   const [result, setResult] = useState<{ won: boolean; text: string } | null>(null);
+  const [winningSide, setWinningSide] = useState<Side | null>(null);
   const [timeLeft, setTimeLeft] = useState(15);
+  const [calcCountdown, setCalcCountdown] = useState<number | null>(null);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [showHistory, setShowHistory] = useState(false);
-  const [soundOn, setSoundOn] = useState(true);
+  const [soundOn, setSoundOn] = useState(() => !soundManager.isMuted());
   const [rulesPopup, setRulesPopup] = useState<"how" | "rules" | null>(null);
   const [confirmLeave, setConfirmLeave] = useState(false);
 
@@ -81,6 +83,7 @@ export function AndarBaharPage() {
   const lastProcessedResultRef = useRef<string | null>(null);
   const currentRoundIdRef = useRef<string | null>(null);
   const myBetRef = useRef<{ side: Side; amount: number; roundId: string } | null>(null);
+  const isPlacingBetRef = useRef(false);
   const pendingRoundStartRef = useRef<{
     roundId: string;
     gameId?: string;
@@ -89,6 +92,39 @@ export function AndarBaharPage() {
     secondsRemaining?: number;
   } | null>(null);
   const pendingResultRef = useRef<{ rd: any; roundId: string } | null>(null);
+  const storedServerResultRef = useRef<{ rd: any; roundId: string } | null>(null);
+  const calcCountdownRef = useRef<number | null>(null);
+  const phaseRef = useRef<Phase>("betting");
+
+  useEffect(() => {
+    calcCountdownRef.current = calcCountdown;
+  }, [calcCountdown]);
+
+  useEffect(() => {
+    phaseRef.current = phase;
+  }, [phase]);
+
+  // Sync and toggle sound through central soundManager
+  const handleToggleSound = () => {
+    const isMuted = soundManager.toggleMute();
+    setSoundOn(!isMuted);
+  };
+
+  // Unlock AudioContext and sync sound manager on interaction
+  useEffect(() => {
+    setSoundOn(!soundManager.isMuted());
+    const unlock = () => {
+      soundManager.init();
+      window.removeEventListener("click", unlock);
+      window.removeEventListener("keydown", unlock);
+    };
+    window.addEventListener("click", unlock);
+    window.addEventListener("keydown", unlock);
+    return () => {
+      window.removeEventListener("click", unlock);
+      window.removeEventListener("keydown", unlock);
+    };
+  }, []);
 
   // Refresh balance from server
   const refreshBalance = useCallback(async () => {
@@ -139,10 +175,16 @@ export function AndarBaharPage() {
       setAndar([]);
       setBahar([]);
       setResult(null);
+      setWinningSide(null);
       setMyBet(null);
       myBetRef.current = null;
       setSelectedSide(null);
       setServerError(null);
+      setCalcCountdown(null);
+      calcCountdownRef.current = null;
+      storedServerResultRef.current = null;
+      isAnimatingRef.current = false;
+      activeAnimatingRoundIdRef.current = null;
 
       // Calculate authoritative remaining time
       const closesAt = data.bettingClosesAt ? new Date(data.bettingClosesAt).getTime() : 0;
@@ -156,11 +198,15 @@ export function AndarBaharPage() {
 
       if (remainingSec > 0) {
         setPhase("betting");
+        phaseRef.current = "betting";
         setTimeLeft(remainingSec);
         soundManager.play("betting_start");
       } else {
         setPhase("closed");
+        phaseRef.current = "closed";
         setTimeLeft(0);
+        setCalcCountdown(3);
+        calcCountdownRef.current = 3;
         soundManager.play("betting_stop");
       }
     },
@@ -185,19 +231,56 @@ export function AndarBaharPage() {
       activeAnimatingRoundIdRef.current = roundId;
       lastProcessedResultRef.current = roundId;
 
+      // Authoritative result arrived: dismiss calculation indicator & stored result
+      setCalcCountdown(null);
+      calcCountdownRef.current = null;
+      storedServerResultRef.current = null;
+
       // Clear any prior timeouts
       timers.current.forEach(clearTimeout);
       timers.current = [];
 
-      setPhase("dealing");
+      // 1. Reveal open card immediately
       setMiddle(rd.middle);
       soundManager.play("card_deal");
       setAndar([]);
       setBahar([]);
-      setResult(null);
 
-      const steps = rd.steps || [];
+      // 2. Reveal winner & player outcome immediately
       const winner = String(rd.winner || "").toLowerCase() as Side;
+      setWinningSide(winner);
+      const bet = myBetRef.current;
+      const didWin = bet && bet.roundId === roundId && bet.side === winner;
+      const didLose = bet && bet.roundId === roundId && bet.side !== winner;
+
+      if (didWin) {
+        const payout = Math.round(bet.amount * (PAYOUT[winner] || 1.0));
+        setResult({
+          won: true,
+          text: `YOU WON! ${winner.toUpperCase()} WINS (+₹${payout})`,
+        });
+        soundManager.play("win_clap");
+      } else if (didLose) {
+        setResult({
+          won: false,
+          text: `${winner.toUpperCase()} WINS (-₹${bet.amount})`,
+        });
+        soundManager.play("loss");
+      } else {
+        setResult({
+          won: true,
+          text: `${winner.toUpperCase()} WINS!`,
+        });
+      }
+      setPhase("result");
+      phaseRef.current = "result";
+
+      refreshBalance();
+      getRoundHistory(20).then((h) => setHistory(formatHistory(h)));
+
+      // 3. Deal the winning card sequence onto the table smoothly and quickly
+      const steps = rd.steps || [];
+      const stepDelay = Math.max(35, Math.min(75, Math.round(500 / Math.max(1, steps.length))));
 
       let i = 0;
       const step = () => {
@@ -207,36 +290,7 @@ export function AndarBaharPage() {
         }
 
         if (i >= steps.length) {
-          // Cards finished dealing -> Show Winner & Result
-          setPhase("result");
-          const bet = myBetRef.current;
-          const didWin = bet && bet.roundId === roundId && bet.side === winner;
-          const didLose = bet && bet.roundId === roundId && bet.side !== winner;
-
-          if (didWin) {
-            const payout = Math.round(bet.amount * (PAYOUT[winner] || 1.0));
-            setResult({
-              won: true,
-              text: `YOU WON! ${winner.toUpperCase()} WINS (+₹${payout})`,
-            });
-            soundManager.play("win_clap");
-          } else if (didLose) {
-            setResult({
-              won: false,
-              text: `${winner.toUpperCase()} WINS (-₹${bet.amount})`,
-            });
-            soundManager.play("loss");
-          } else {
-            setResult({
-              won: true,
-              text: `${winner.toUpperCase()} WINS!`,
-            });
-          }
-
-          refreshBalance();
-          getRoundHistory(20).then((h) => setHistory(formatHistory(h)));
-
-          // RESULT HOLD: Hold winner on screen so user sees the outcome before next round
+          // Cards finished dealing -> Hold winner on screen (~2s) before allowing next round transition
           const holdTimer = window.setTimeout(() => {
             if (activeAnimatingRoundIdRef.current !== roundId) {
               return;
@@ -270,12 +324,12 @@ export function AndarBaharPage() {
         soundManager.play("card_deal");
         i += 1;
 
-        const nextStepTimer = window.setTimeout(step, 280);
+        const nextStepTimer = window.setTimeout(step, stepDelay);
         timers.current.push(nextStepTimer);
       };
 
-      const leadInTimer = window.setTimeout(step, 360);
-      timers.current.push(leadInTimer);
+      // Start card animation immediately with zero lead-in delay
+      step();
     },
     [applyRoundStart, formatHistory, refreshBalance]
   );
@@ -301,9 +355,11 @@ export function AndarBaharPage() {
         if (state.round.status === "BETTING") {
           setPhase("betting");
           setTimeLeft(Math.max(0, Math.round(state.seconds_remaining)));
+          setCalcCountdown(null);
         } else if (state.round.status === "CALCULATING") {
           setPhase("closed");
           setTimeLeft(0);
+          setCalcCountdown((c) => (c === null ? 3 : c));
         }
       }
     } catch {
@@ -372,12 +428,25 @@ export function AndarBaharPage() {
               } else if (!isAnimatingRef.current && currentRoundIdRef.current === data.round_id) {
                 soundManager.play("betting_stop");
                 setPhase("closed");
+                phaseRef.current = "closed";
                 setTimeLeft(0);
+                setCalcCountdown(3);
+                calcCountdownRef.current = 3;
               }
             }
 
             if (data.type === "round_result" && data.result_data) {
-              animateServerDeal(data.result_data, data.round_id);
+              const rd = data.result_data;
+              const roundId = data.round_id;
+
+              // If calculation countdown already reached 0 (or not in closed phase), reveal IMMEDIATELY!
+              if (calcCountdownRef.current === 0 || phaseRef.current !== "closed") {
+                storedServerResultRef.current = null;
+                animateServerDeal(rd, roundId);
+              } else {
+                // Calculation countdown is still ticking (3, 2, or 1): store it so it triggers reveal at 0!
+                storedServerResultRef.current = { rd, roundId };
+              }
             }
           } catch {
             // ignore
@@ -415,9 +484,40 @@ export function AndarBaharPage() {
   // Local Countdown ticker while betting
   useEffect(() => {
     if (phase !== "betting" || timeLeft <= 0) return;
-    const id = window.setTimeout(() => setTimeLeft((t) => Math.max(0, t - 1)), 1000);
+    const id = window.setTimeout(() => {
+      setTimeLeft((t) => {
+        const next = Math.max(0, t - 1);
+        if (next === 0 && phase === "betting") {
+          setPhase("closed");
+          phaseRef.current = "closed";
+          setCalcCountdown(3);
+          calcCountdownRef.current = 3;
+        }
+        return next;
+      });
+    }, 1000);
     return () => window.clearTimeout(id);
   }, [phase, timeLeft]);
+
+  // Visual Calculation countdown while phase === "closed" (3 -> 2 -> 1 -> 0)
+  useEffect(() => {
+    if (phase !== "closed" || calcCountdown === null) return;
+
+    if (calcCountdown === 0) {
+      // Countdown reached 0! If authoritative server result is already stored, immediately reveal!
+      if (storedServerResultRef.current) {
+        const { rd, roundId } = storedServerResultRef.current;
+        storedServerResultRef.current = null;
+        animateServerDeal(rd, roundId);
+      }
+      return;
+    }
+
+    const id = window.setTimeout(() => {
+      setCalcCountdown((c) => (c !== null && c > 0 ? c - 1 : 0));
+    }, 1000);
+    return () => window.clearTimeout(id);
+  }, [phase, calcCountdown, animateServerDeal]);
 
   // Mobile landscape check
   const [portraitPhone, setPortraitPhone] = useState(false);
@@ -440,19 +540,39 @@ export function AndarBaharPage() {
     };
   }, []);
 
-  // Place Server Bet
-  async function handleConfirmBet() {
-    if (!selectedSide || !currentRoundId || phase !== "betting" || stake > balance || isPlacingBet) return;
+  // Place Server Bet immediately on side selection (No Confirm Bet button required)
+  async function handlePlaceBet(side: Side) {
+    if (
+      !side ||
+      !currentRoundId ||
+      phase !== "betting" ||
+      isPlacingBetRef.current ||
+      !!myBetRef.current
+    ) {
+      return;
+    }
 
+    if (stake > balance) {
+      setServerError("Insufficient wallet balance for this bet amount.");
+      return;
+    }
+
+    isPlacingBetRef.current = true;
     setIsPlacingBet(true);
+    setSelectedSide(side);
     setServerError(null);
 
     try {
       const paiseAmount = stake * 100;
-      await placeBetApi(currentRoundId, selectedSide === "andar" ? "ANDAR" : "BAHAR", paiseAmount, currentGameId || undefined);
+      await placeBetApi(
+        currentRoundId,
+        side === "andar" ? "ANDAR" : "BAHAR",
+        paiseAmount,
+        currentGameId || undefined
+      );
 
       soundManager.play("bet_coin");
-      const placedBet = { side: selectedSide, amount: stake, roundId: currentRoundId };
+      const placedBet = { side, amount: stake, roundId: currentRoundId };
       setMyBet(placedBet);
       myBetRef.current = placedBet;
       setBalance((b) => b - stake);
@@ -460,7 +580,9 @@ export function AndarBaharPage() {
     } catch (err: any) {
       const msg = err.response?.data?.error?.message || err.message || "Failed to place bet";
       setServerError(msg);
+      setSelectedSide(null);
     } finally {
+      isPlacingBetRef.current = false;
       setIsPlacingBet(false);
     }
   }
@@ -468,8 +590,6 @@ export function AndarBaharPage() {
   function adjustStake(delta: number) {
     setStake((s) => Math.max(STAKE_STEP, Math.min(balance, s + delta)));
   }
-
-  const canConfirm = phase === "betting" && selectedSide !== null && stake <= balance && !myBet && !isPlacingBet;
 
   if (portraitPhone) {
     return (
@@ -500,11 +620,22 @@ export function AndarBaharPage() {
               <small>₹</small> {balance}
             </span>
             <span className="live-badge">● LIVE</span>
-            <span className={`timer-box${phase === "betting" && timeLeft <= 5 ? " warn" : ""}`}>
-              <small>BETTING TIME</small>
-              {phase === "betting" ? `${String(timeLeft).padStart(2, "0")}s` : "--"}
+            <span className={`timer-box${phase === "betting" && timeLeft <= 5 ? " warn" : phase === "closed" ? " calc" : ""}`}>
+              <small>{phase === "betting" ? "BETTING TIME" : phase === "closed" ? "CALCULATING" : phase === "result" ? "RESULT" : "STATUS"}</small>
+              {phase === "betting"
+                ? `${String(timeLeft).padStart(2, "0")}s`
+                : phase === "closed"
+                ? `${calcCountdown !== null && calcCountdown > 0 ? `${calcCountdown}s` : "0s"}`
+                : phase === "result"
+                ? (winningSide ? winningSide.toUpperCase() : "WIN")
+                : "--"}
             </span>
-            <button className="iconbtn" aria-label="Toggle Sound" onClick={() => setSoundOn((v) => !v)}>
+            <button
+              className={`iconbtn${!soundOn ? " muted" : ""}`}
+              aria-label={soundOn ? "Mute Sound" : "Unmute Sound"}
+              title={soundOn ? "Sound ON (Click to Mute)" : "Sound OFF (Click to Unmute)"}
+              onClick={handleToggleSound}
+            >
               {soundOn ? "🔊" : "🔇"}
             </button>
           </div>
@@ -532,7 +663,7 @@ export function AndarBaharPage() {
 
         <div className="table-wrap">
           <div className="table-oval">
-            <div className={`side-col andar${phase === "result" && result?.won && myBet?.side === "andar" ? " win" : ""}`}>
+            <div className={`side-col andar${phase === "result" && winningSide === "andar" ? " win" : ""}`}>
               <span className="side-name andar">ANDAR</span>
               <span className="side-count">
                 {andar.length} card{andar.length === 1 ? "" : "s"}
@@ -546,11 +677,21 @@ export function AndarBaharPage() {
 
             <div className="middle-wrap">
               <span className="middle-label">Open Card</span>
-              {middle ? <CardView card={middle} /> : <div className="card-back" />}
+              {middle ? (
+                <CardView card={middle} />
+              ) : phase === "closed" ? (
+                <div className="card-back calc-pulse">
+                  <span className="text-yellow-400 font-black text-xs">
+                    {calcCountdown !== null && calcCountdown > 0 ? `⏳ ${calcCountdown}` : "⏳ ..."}
+                  </span>
+                </div>
+              ) : (
+                <div className="card-back" />
+              )}
               {middle && <span className="target-rank">TARGET RANK: {rankLabel(middle.rank)}</span>}
             </div>
 
-            <div className={`side-col bahar${phase === "result" && result?.won && myBet?.side === "bahar" ? " win" : ""}`}>
+            <div className={`side-col bahar${phase === "result" && winningSide === "bahar" ? " win" : ""}`}>
               <span className="side-name bahar">BAHAR</span>
               <span className="side-count">
                 {bahar.length} card{bahar.length === 1 ? "" : "s"}
@@ -565,13 +706,24 @@ export function AndarBaharPage() {
 
           <div className={`result ${result ? (result.won ? "win" : "lose") : ""}`}>
             {result?.text ??
-              (phase === "dealing"
-                ? "Server dealing cards…"
-                : phase === "closed"
-                ? "STOP BETTING — Calculating…"
-                : myBet
-                ? `Bet Placed on ${myBet.side.toUpperCase()} (₹${myBet.amount}) — Waiting for Deal…`
-                : "Place your bet on Andar or Bahar")}
+              (phase === "dealing" ? (
+                "Server dealing cards…"
+              ) : phase === "closed" ? (
+                <div className="calc-banner">
+                  <span className="calc-spinner">⚙</span>
+                  <span>
+                    {calcCountdown !== null && calcCountdown > 0 ? (
+                      <>CALCULATING RESULT... <strong>{calcCountdown}</strong></>
+                    ) : (
+                      "WAITING FOR RESULT..."
+                    )}
+                  </span>
+                </div>
+              ) : myBet ? (
+                `Bet Placed on ${myBet.side.toUpperCase()} (₹${myBet.amount}) — Waiting for Deal…`
+              ) : (
+                "Select ANDAR or BAHAR to place your bet"
+              ))}
           </div>
           {serverError && <div className="result lose">{serverError}</div>}
         </div>
@@ -639,34 +791,27 @@ export function AndarBaharPage() {
             </div>
 
             <button
-              className={`bet andar${selectedSide === "andar" ? " selected" : ""}`}
-              disabled={phase !== "betting" || !!myBet}
-              onClick={() => setSelectedSide((s) => (s === "andar" ? null : "andar"))}
+              className={`bet andar${(myBet?.side === "andar" || selectedSide === "andar") ? " selected" : ""}`}
+              disabled={phase !== "betting" || !!myBet || isPlacingBet}
+              onClick={() => handlePlaceBet("andar")}
             >
-              ANDAR<small>pays {PAYOUT.andar}×</small>
+              ANDAR<small>{myBet?.side === "andar" ? `BET LOCKED ₹${myBet.amount}` : isPlacingBet && selectedSide === "andar" ? "PLACING…" : `pays ${PAYOUT.andar}×`}</small>
             </button>
             <button
-              className={`bet bahar${selectedSide === "bahar" ? " selected" : ""}`}
-              disabled={phase !== "betting" || !!myBet}
-              onClick={() => setSelectedSide((s) => (s === "bahar" ? null : "bahar"))}
+              className={`bet bahar${(myBet?.side === "bahar" || selectedSide === "bahar") ? " selected" : ""}`}
+              disabled={phase !== "betting" || !!myBet || isPlacingBet}
+              onClick={() => handlePlaceBet("bahar")}
             >
-              BAHAR<small>pays {PAYOUT.bahar}×</small>
-            </button>
-            <button
-              className="confirm-bet"
-              disabled={!canConfirm}
-              onClick={handleConfirmBet}
-            >
-              {isPlacingBet ? "Placing…" : myBet ? "Bet Locked" : "Confirm Bet"}
+              BAHAR<small>{myBet?.side === "bahar" ? `BET LOCKED ₹${myBet.amount}` : isPlacingBet && selectedSide === "bahar" ? "PLACING…" : `pays ${PAYOUT.bahar}×`}</small>
             </button>
           </div>
 
           <p className="hint">
             {myBet
-              ? `Bet of ₹${myBet.amount} locked on ${myBet.side.toUpperCase()}. Waiting for round to resolve…`
+              ? `Bet of ₹${myBet.amount} placed on ${myBet.side.toUpperCase()}. Waiting for round to resolve…`
               : stake > balance
               ? "Not enough balance — please lower your bet amount or deposit."
-              : "Server-authoritative live game. All bets and outcomes settle securely on the server."}
+              : "Tap ANDAR or BAHAR to place your bet immediately. Settle securely on the server."}
           </p>
 
           <div className="progress-row">
