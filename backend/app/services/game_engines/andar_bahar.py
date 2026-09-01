@@ -25,7 +25,7 @@ from ...models.transaction import WalletTransactionType
 from ...services.wallet_service import debit_wallet, credit_wallet
 
 DEFAULT_CONFIG = {
-    "round_duration_seconds": 30,
+    "round_duration_seconds": 18,
     "betting_duration_seconds": 15,
     "allowed_bets": {"andar": True, "bahar": True},
     "payouts": {"andar": 0.9, "bahar": 1.0},
@@ -130,6 +130,9 @@ def merge_andar_bahar_config(game: Game) -> dict:
     for key in ("round_duration_seconds", "betting_duration_seconds"):
         if key in incoming and incoming[key] is not None:
             cfg[key] = incoming[key]
+    # Enforce synchronized 15s betting + 3s calculation = 18s total round lifecycle
+    cfg["round_duration_seconds"] = 18
+    cfg["betting_duration_seconds"] = 15
     cfg["allowed_bets"] = {**cfg["allowed_bets"], **(incoming.get("allowed_bets") or {})}
     cfg["payouts"] = {**cfg["payouts"], **(incoming.get("payouts") or {})}
     cfg["min_bet"] = int(incoming["min_bet"]) if incoming.get("min_bet") is not None else int(game.min_bet)
@@ -138,24 +141,28 @@ def merge_andar_bahar_config(game: Game) -> dict:
 
 
 def _get_fee_config(db: Session) -> Tuple[Decimal, Decimal]:
-    row = db.query(FeeConfiguration).first()
-    if not row:
-        return Decimal("0"), Decimal("0")
-    return Decimal(str(row.game_entry_fee_percent)), Decimal(str(row.winning_fee_percent))
+    cfg = db.query(FeeConfiguration).first()
+    if not cfg:
+        return Decimal("0.02"), Decimal("0.05")
+    return (
+        Decimal(str(cfg.game_entry_fee_percent)) / Decimal("100"),
+        Decimal(str(cfg.winning_fee_percent)) / Decimal("100"),
+    )
 
 
-def _calc_entry_fee(amount: int, pct: Decimal) -> Tuple[int, int]:
-    fee = (Decimal(amount) * (pct / Decimal("100"))).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
-    fee_i = int(fee)
-    return fee_i, amount - fee_i
+def _calc_entry_fee(amount: int, fee_pct: Decimal) -> Tuple[int, int]:
+    fee = (Decimal(amount) * fee_pct).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
+    fee_int = int(fee)
+    stake_int = amount - fee_int
+    return fee_int, stake_int
 
 
-def _calc_winning_fee(gross_win: int, pct: Decimal) -> Tuple[int, int]:
-    if gross_win <= 0:
+def _calc_winning_fee(gross_profit: int, fee_pct: Decimal) -> Tuple[int, int]:
+    if gross_profit <= 0:
         return 0, 0
-    fee = (Decimal(gross_win) * (pct / Decimal("100"))).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
-    fee_i = int(fee)
-    return fee_i, gross_win - fee_i
+    fee = (Decimal(gross_profit) * fee_pct).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
+    fee_int = int(fee)
+    return fee_int, gross_profit - fee_int
 
 
 def calculate_payout_gross(
@@ -164,8 +171,7 @@ def calculate_payout_gross(
     winner: str,
     payout_configuration: dict,
 ) -> int:
-    """Gross return in paise: stake + (stake * multiplier) on win, 0 on loss."""
-    if bet_type.upper() != winner.upper():
+    if bet_type.lower() != winner.lower():
         return 0
     key = bet_type.lower()
     if key not in payout_configuration:
@@ -181,8 +187,11 @@ class AndarBaharEngine(GameEngine):
     def _get_or_create_game(self, db: Session) -> Game:
         game = db.query(Game).filter(Game.slug == self.slug).first()
         if game:
-            if game.config is None:
-                game.config = copy.deepcopy(DEFAULT_CONFIG)
+            cfg = dict(game.config or copy.deepcopy(DEFAULT_CONFIG))
+            if cfg.get("round_duration_seconds") != 18 or cfg.get("betting_duration_seconds") != 15:
+                cfg["round_duration_seconds"] = 18
+                cfg["betting_duration_seconds"] = 15
+                game.config = cfg
                 db.commit()
                 db.refresh(game)
             return game
