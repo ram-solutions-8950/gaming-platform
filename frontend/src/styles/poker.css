@@ -437,8 +437,13 @@
   inset: 0;
   background-color: rgba(0, 0, 0, 0.8);
   display: flex;
-  align-items: center;
+  /* flex-start (not center) + overflow-y so the modal's own header/close
+     button is always reachable on short/landscape viewports — centering
+     with no scroll fallback was pushing the close button off-screen when
+     the modal content was taller than the viewport */
+  align-items: flex-start;
   justify-content: center;
+  overflow-y: auto;
   z-index: 100;
   padding: 1rem;
 }

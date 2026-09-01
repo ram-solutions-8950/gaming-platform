@@ -170,6 +170,16 @@ export function PokerPage() {
     loadTables();
   };
 
+  const handleExitToDashboard = async () => {
+    if (activeTableId) {
+      try {
+        await pokerService.leaveTable(activeTableId);
+      } catch (e) {}
+    }
+    setActiveTableId(null);
+    navigate('/dashboard');
+  };
+
   return (
     <div className="poker-game-wrapper">
       {/* Mobile Landscape Orientation Banner */}
@@ -203,6 +213,7 @@ export function PokerPage() {
           currentUserId={currentUserId}
           onSendAction={sendAction}
           onLeaveTable={handleLeaveTable}
+          onExit={handleExitToDashboard}
           onStartHand={startHand}
           onOpenRules={() => setShowRulesModal(true)}
         />
