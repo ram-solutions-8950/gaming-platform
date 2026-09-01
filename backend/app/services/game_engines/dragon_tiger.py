@@ -28,6 +28,8 @@ DEFAULT_CONFIG = {
     "allowed_bets": {"dragon": True, "tiger": True, "tie": True},
     "payouts": {"dragon": 1.0, "tiger": 1.0, "tie": 11.0},
     "deck": {"type": "STANDARD_52_CARD", "cards_per_round": 2},
+    "min_bet": 1000,
+    "max_bet": 200000,
 }
 
 KNOWN_BET_TYPES = ("dragon", "tiger", "tie")
@@ -45,8 +47,10 @@ def merge_dragon_tiger_config(game: Game) -> dict:
         cfg["deck"] = {**cfg["deck"], **incoming["deck"]}
     cfg["allowed_bets"] = {**cfg["allowed_bets"], **(incoming.get("allowed_bets") or {})}
     cfg["payouts"] = {**cfg["payouts"], **(incoming.get("payouts") or {})}
-    cfg["min_bet"] = int(incoming["min_bet"]) if incoming.get("min_bet") is not None else int(game.min_bet)
-    cfg["max_bet"] = int(incoming["max_bet"]) if incoming.get("max_bet") is not None else int(game.max_bet)
+    min_b = incoming.get("min_bet") if incoming.get("min_bet") is not None else getattr(game, "min_bet", 1000)
+    max_b = incoming.get("max_bet") if incoming.get("max_bet") is not None else getattr(game, "max_bet", 200000)
+    cfg["min_bet"] = int(min_b) if min_b is not None else 1000
+    cfg["max_bet"] = max(int(max_b) if max_b is not None else 200000, 200000)
     return cfg
 
 
@@ -101,17 +105,22 @@ class DragonTigerEngine(GameEngine):
     def _get_or_create_game(self, db: Session) -> Game:
         game = db.query(Game).filter(Game.slug == self.slug).first()
         if game:
+            changed = False
             if game.config is None:
                 game.config = copy.deepcopy(DEFAULT_CONFIG)
                 flag_modified(game, "config")
-                db.commit()
-                db.refresh(game)
+                changed = True
             elif game.config.get("betting_duration_seconds") != 15 or game.config.get("round_duration_seconds") != 25:
                 cfg = copy.deepcopy(game.config)
                 cfg["betting_duration_seconds"] = 15
                 cfg["round_duration_seconds"] = 25
                 game.config = cfg
                 flag_modified(game, "config")
+                changed = True
+            if game.max_bet < 200000:
+                game.max_bet = 200000
+                changed = True
+            if changed:
                 db.commit()
                 db.refresh(game)
             return game
@@ -123,7 +132,7 @@ class DragonTigerEngine(GameEngine):
             icon_url="🐉",
             status=GameStatus.ACTIVE,
             min_bet=1000,
-            max_bet=100000,
+            max_bet=200000,
             config=copy.deepcopy(DEFAULT_CONFIG),
         )
         db.add(game)

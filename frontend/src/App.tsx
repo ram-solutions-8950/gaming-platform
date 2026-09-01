@@ -37,6 +37,7 @@ import { AdminGamesPage } from './pages/admin/Games';
 import { LoadingScreen } from './components/common/LoadingScreen';
 import { useAuthStore } from './store/authStore';
 import { authService } from './services/auth';
+import { authStorage } from './services/authStorage';
 import { soundManager } from './services/soundManager';
 
 function ProtectedRoute({ adminOnly = false }: { adminOnly?: boolean }) {
@@ -52,21 +53,84 @@ function App() {
   const [isSplashDone, setIsSplashDone] = useState(false);
 
   useEffect(() => {
-    const token = localStorage.getItem('access_token');
-    if (!token) {
-      setUser(null);
-      setLoading(false);
-      return;
-    }
+    let isCancelled = false;
 
-    authService.me()
-      .then((me) => setUser(me))
-      .catch(() => {
-        localStorage.removeItem('access_token');
-        localStorage.removeItem('refresh_token');
-        setUser(null);
-      })
-      .finally(() => setLoading(false));
+    const restoreSession = async () => {
+      // 1. First restore persisted authentication tokens and cached user
+      const token = authStorage.getAccessToken();
+      const refreshToken = authStorage.getRefreshToken();
+      const cachedUser = authStorage.getCachedUser();
+
+      if (!token && !refreshToken) {
+        if (!isCancelled) {
+          setUser(null);
+          setLoading(false);
+        }
+        return;
+      }
+
+      // If cached user exists from a previous session, restore it immediately so ProtectedRoute
+      // doesn't flash login while the network request is completing
+      if (cachedUser && !isCancelled) {
+        setUser(cachedUser);
+      }
+
+      // 2. Validate/refresh session with backend
+      try {
+        const me = await authService.me();
+        if (!isCancelled) {
+          setUser(me);
+          setLoading(false);
+        }
+      } catch (err: any) {
+        if (isCancelled) return;
+
+        // If backend explicitly rejected the token with 401 or 403
+        if (err.response && (err.response.status === 401 || err.response.status === 403)) {
+          // Attempt silent token refresh using refreshToken
+          if (refreshToken) {
+            try {
+              const refreshOk = await authService.refreshSession();
+              if (refreshOk) {
+                const refreshedMe = await authService.me();
+                setUser(refreshedMe);
+                setLoading(false);
+                return;
+              }
+            } catch (refreshErr: any) {
+              if (refreshErr.response && (refreshErr.response.status === 401 || refreshErr.response.status === 403)) {
+                // Backend definitively confirmed the session is invalid
+                authStorage.clearTokens();
+                setUser(null);
+                setLoading(false);
+                return;
+              }
+            }
+          }
+          // Definitively invalid session
+          authStorage.clearTokens();
+          setUser(null);
+          setLoading(false);
+        } else {
+          // Network error, timeout, server unreachable, or offline:
+          // CRITICAL: DO NOT clear saved tokens! Keep session active
+          console.warn('Network issue during session validation. Preserving authenticated state.');
+          if (cachedUser) {
+            setUser(cachedUser);
+          } else if (token || refreshToken) {
+            // Keep minimal user object so ProtectedRoute stays on protected content
+            setUser({ id: 'persisted_user', name: 'Player' } as any);
+          }
+          setLoading(false);
+        }
+      }
+    };
+
+    restoreSession();
+
+    return () => {
+      isCancelled = true;
+    };
   }, [setLoading, setUser]);
 
   const isDownloadPath = typeof window !== 'undefined' && window.location.pathname.toLowerCase().includes('download');

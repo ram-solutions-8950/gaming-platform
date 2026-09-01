@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { authStorage } from './authStorage';
 
 const configuredApiUrl = import.meta.env.VITE_API_URL?.trim();
 
@@ -15,10 +16,11 @@ export const API_BASE_URL =
 const api = axios.create({
   baseURL: API_BASE_URL,
   headers: { 'Content-Type': 'application/json' },
+  timeout: 20000,
 });
 
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('access_token');
+  const token = authStorage.getAccessToken();
 
   if (token) {
     config.headers = config.headers ?? {};
@@ -33,16 +35,24 @@ api.interceptors.response.use(
   async (error) => {
     const original = error.config;
 
-    if (error.response?.status === 401 && !original._retry) {
+    // Intercept 401 only if not retried yet and not the refresh/login endpoint
+    if (
+      error.response?.status === 401 &&
+      original &&
+      !original._retry &&
+      !original.url?.includes('/auth/refresh') &&
+      !original.url?.includes('/auth/login')
+    ) {
       original._retry = true;
 
-      const refresh_token = localStorage.getItem('refresh_token');
+      const refresh_token = authStorage.getRefreshToken();
 
       if (refresh_token) {
         try {
           const res = await axios.post(
             `${api.defaults.baseURL}/auth/refresh`,
             { refresh_token },
+            { timeout: 15000 }
           );
 
           const {
@@ -50,20 +60,40 @@ api.interceptors.response.use(
             refresh_token: new_refresh,
           } = res.data.data;
 
-          localStorage.setItem('access_token', access_token);
-          localStorage.setItem('refresh_token', new_refresh);
+          authStorage.setTokens(access_token, new_refresh || refresh_token);
 
           original.headers = original.headers ?? {};
           original.headers.Authorization = `Bearer ${access_token}`;
 
           return api(original);
-        } catch {
-          localStorage.removeItem('access_token');
-          localStorage.removeItem('refresh_token');
+        } catch (refreshError: any) {
+          // CRITICAL: Only clear tokens if the server explicitly confirmed the session is invalid (401 or 403).
+          // NEVER clear tokens on network failure, timeout, 5xx server error, or connection refusal.
+          if (
+            refreshError.response &&
+            (refreshError.response.status === 401 || refreshError.response.status === 403)
+          ) {
+            authStorage.clearTokens();
 
-          if (typeof window !== 'undefined') {
-            window.location.href = '/login';
+            if (
+              typeof window !== 'undefined' &&
+              !window.location.pathname.startsWith('/download') &&
+              !window.location.pathname.startsWith('/login')
+            ) {
+              window.location.href = '/login';
+            }
           }
+          return Promise.reject(refreshError);
+        }
+      } else {
+        // No refresh token available at all and received 401
+        authStorage.clearTokens();
+        if (
+          typeof window !== 'undefined' &&
+          !window.location.pathname.startsWith('/download') &&
+          !window.location.pathname.startsWith('/login')
+        ) {
+          window.location.href = '/login';
         }
       }
     }

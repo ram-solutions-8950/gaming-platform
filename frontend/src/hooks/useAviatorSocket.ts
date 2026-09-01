@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useAuthStore } from '../store/authStore';
+import { authStorage } from '../services/authStorage';
 import { getWebSocketUrl } from '../utils/ws';
 
 export type AviatorPhase = 'BETTING' | 'FLYING' | 'CRASHED' | 'SETTLED' | 'COOLDOWN' | 'DISCONNECTED';
@@ -37,7 +38,7 @@ export interface UseAviatorSocketOptions {
 
 export function useAviatorSocket(options: UseAviatorSocketOptions = {}) {
   const user = useAuthStore((state) => state.user);
-  const token = localStorage.getItem('access_token');
+  const token = authStorage.getAccessToken();
 
   const [isConnected, setIsConnected] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
