@@ -26,6 +26,7 @@ from ..services.teen_patti.engine import GameConfig, Phase, PlayerStatus, Seat, 
 from ..services.teen_patti.hand_rank import category_of
 from ..services.teen_patti.manager import teen_patti_manager
 from ..services.wallet_service import credit_wallet, debit_wallet, get_balance
+from ..services.settlement_service import settle_winning_bet
 class TeenPattiConnectionManager:
     def __init__(self) -> None:
         self._tables: Dict[str, Dict[str, WebSocket]] = defaultdict(dict)
@@ -433,13 +434,16 @@ def _settle_hand(table_id: str, hand: TeenPattiHand) -> None:
                     )
 
                 if is_real and won_this and payout > 0:
-                    credit_wallet(
+                    gross_profit = max(0, payout - s.total_bet)
+                    calc, _ = settle_winning_bet(
                         db=db,
                         user_id=uid,
-                        amount=payout,
-                        tx_type=WalletTransactionType.GAME_WIN,
+                        original_bet=s.total_bet,
+                        gross_profit=gross_profit,
                         reference_type="TEEN_PATTI_PAYOUT",
                         reference_id=f"tp_payout_{hand_key}",
+                        game_slug="teen-patti",
+                        metadata={"hand_key": hand_key, "pot": hand.pot},
                     )
             sp.commit()
         except Exception as e:

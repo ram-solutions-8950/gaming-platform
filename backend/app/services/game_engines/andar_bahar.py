@@ -23,6 +23,7 @@ from ...models.game import GameRound, GameRoundStatus, GameBet, GameBetStatus, G
 from ...models.game_catalog import Game, GameStatus
 from ...models.transaction import WalletTransactionType
 from ...services.wallet_service import debit_wallet, credit_wallet
+from ...services.settlement_service import settle_winning_bet
 
 DEFAULT_CONFIG = {
     "round_duration_seconds": 18,
@@ -367,50 +368,28 @@ class AndarBaharEngine(GameEngine):
         rd.ended_at = datetime.now(timezone.utc)
         db.flush()
 
-        _, winning_fee_pct = _get_fee_config(db)
-        bets = (
-            db.query(GameBet)
-            .filter(GameBet.round_id == round_id, GameBet.status == GameBetStatus.PENDING)
-            .all()
-        )
+        bets = db.query(GameBet).filter(
+            GameBet.round_id == round_id, GameBet.status == GameBetStatus.PENDING
+        ).all()
         for bet in bets:
-            gross_return = calculate_payout_gross(
-                bet_amount=bet.stake_amount,
-                bet_type=bet.prediction.value,
-                winner=winner,
-                payout_configuration=cfg["payouts"],
-            )
             bet.settled_at = rd.ended_at
-            if gross_return > 0:
-                net_profit = gross_return - bet.stake_amount
-                w_fee, _ = _calc_winning_fee(net_profit, winning_fee_pct)
-                final_credit = gross_return - w_fee
-
-                bet.gross_win_amount = gross_return
-                bet.winning_fee_amount = w_fee
-                bet.net_win_amount = final_credit
+            if bet.prediction.value.upper() == winner.upper():
+                mult = Decimal(str(cfg["payouts"].get(winner.lower(), 1.0)))
+                gross_profit = int((Decimal(bet.stake_amount) * mult).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+                calc, _ = settle_winning_bet(
+                    db=db,
+                    user_id=bet.user_id,
+                    original_bet=bet.stake_amount,
+                    gross_profit=gross_profit,
+                    reference_type="game_win",
+                    reference_id=str(bet.id),
+                    game_slug=self.slug,
+                    metadata={"round_id": str(round_id), "winner": winner},
+                )
+                bet.gross_win_amount = calc.original_bet + calc.gross_profit
+                bet.winning_fee_amount = calc.winning_fee
+                bet.net_win_amount = calc.total_return
                 bet.status = GameBetStatus.WON
-
-                if final_credit > 0:
-                    try:
-                        credit_wallet(
-                            db,
-                            user_id=bet.user_id,
-                            amount=final_credit,
-                            tx_type=WalletTransactionType.GAME_WIN,
-                            reference_type="game_win",
-                            reference_id=str(bet.id),
-                            metadata={
-                                "round_id": str(round_id),
-                                "gross_win": gross_return,
-                                "winning_fee": w_fee,
-                                "net_win": final_credit,
-                                "winner": winner,
-                            },
-                        )
-                    except ValueError as exc:
-                        if "Duplicate transaction reference" not in str(exc):
-                            raise
             else:
                 bet.gross_win_amount = 0
                 bet.winning_fee_amount = 0

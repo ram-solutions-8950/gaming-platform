@@ -17,6 +17,7 @@ from ..security.permissions import require_user
 from ..models.user import User
 from ..models.transaction import WalletTransactionType
 from ..services import wallet_service
+from ..services.settlement_service import settle_winning_bet
 from ..utils.responses import success_response, error_response
 
 router = APIRouter(prefix="/games/chicken-road", tags=["Chicken Road"])
@@ -243,22 +244,22 @@ def finish_game(
 
     # Credit winnings atomically
     ref_id = f"cr_{rnd.round_id[:8]}_{uuid.uuid4().hex[:6]}_win"
-    wallet_service.credit_wallet(
+    gross_profit = max(0, win_paisa - rnd.bet_paisa)
+    calc, _ = settle_winning_bet(
         db=db,
         user_id=user.id,
-        amount=win_paisa,
-        tx_type=WalletTransactionType.GAME_WIN,
+        original_bet=rnd.bet_paisa,
+        gross_profit=gross_profit,
         reference_type="chicken_road_win",
         reference_id=ref_id,
+        game_slug="chicken_road",
         metadata={
-            "game": "chicken_road",
             "round_id": rnd.round_id,
-            "bet_paisa": rnd.bet_paisa,
             "final_multiplier": final_multiplier,
-            "won_amount": win_paisa / 100,
             "difficulty": rnd.difficulty,
         },
     )
+    win_paisa = calc.total_return
     db.commit()
 
     wallet = wallet_service.get_balance(db, user.id)
@@ -332,22 +333,23 @@ def cashout_game(
 
     # Credit winnings atomically
     ref_id = f"cr_{rnd.round_id[:8]}_{uuid.uuid4().hex[:6]}_win"
-    wallet_service.credit_wallet(
+    gross_profit = max(0, win_paisa - rnd.bet_paisa)
+    calc, _ = settle_winning_bet(
         db=db,
         user_id=user.id,
-        amount=win_paisa,
-        tx_type=WalletTransactionType.GAME_WIN,
+        original_bet=rnd.bet_paisa,
+        gross_profit=gross_profit,
         reference_type="chicken_road_win",
         reference_id=ref_id,
+        game_slug="chicken_road",
+        is_refund=(win_paisa >= rnd.bet_paisa and gross_profit == 0),
         metadata={
-            "game": "chicken_road",
             "round_id": rnd.round_id,
-            "bet_paisa": rnd.bet_paisa,
             "cashout_multiplier": cashout_mult,
-            "won_amount": win_paisa / 100,
             "difficulty": rnd.difficulty,
         },
     )
+    win_paisa = calc.total_return
     db.commit()
 
     wallet = wallet_service.get_balance(db, user.id)

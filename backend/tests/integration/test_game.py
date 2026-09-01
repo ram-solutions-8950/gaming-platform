@@ -302,15 +302,15 @@ def test_winning_bet_payout(db: Session, auth_headers, fee_config):
         
         db.refresh(bet)
         assert bet.status == GameBetStatus.WON
-        # Stake: 9500. Multiplier for RED: 2x. Gross win: 19000
+        # Stake: 9500. Multiplier for RED: 2x (total return 19000, profit 9500)
         assert bet.gross_win_amount == 19000
-        # Winning fee: 10% of 19000 = 1900
-        assert bet.winning_fee_amount == 1900
-        # Net win: 17100
-        assert bet.net_win_amount == 17100
+        # Winning fee: 10% of 9500 profit = 950
+        assert bet.winning_fee_amount == 950
+        # Net win return: 9500 stake + 8550 net profit = 18050
+        assert bet.net_win_amount == 18050
         
         db.refresh(wallet)
-        assert wallet.balance == initial_balance + 17100
+        assert wallet.balance == initial_balance + 18050
     finally:
         secrets.randbelow = original_rand
 

@@ -17,6 +17,7 @@ from ..security.permissions import require_user
 from ..models.user import User
 from ..models.transaction import WalletTransactionType, WalletTransaction
 from ..services import wallet_service
+from ..services.settlement_service import settle_winning_bet
 from ..utils.responses import success_response, error_response
 
 router = APIRouter(prefix="/games/triple-777", tags=["Triple 777"])
@@ -171,25 +172,27 @@ def spin(
 
         # 4. Credit wallet if won
         if won and payout_paisa > 0:
+            gross_profit = max(0, payout_paisa - bet_paisa)
             try:
-                wallet_service.credit_wallet(
+                calc, _ = settle_winning_bet(
                     db=db,
                     user_id=user.id,
-                    amount=payout_paisa,
-                    tx_type=WalletTransactionType.GAME_WIN,
+                    original_bet=bet_paisa,
+                    gross_profit=gross_profit,
                     reference_type="TRIPLE_777_WIN",
                     reference_id=win_ref_id,
+                    game_slug="triple_777",
                     metadata={
-                        "game": "triple_777",
                         "stake": stake_inr,
                         "reels": reels,
                         "multiplier": multiplier,
-                        "payout": payout_inr,
                         "tier": tier,
                         "jackpot_won": jackpot_won_inr,
                         "round_id": round_id,
                     },
                 )
+                payout_paisa = calc.total_return
+                payout_inr = round(payout_paisa / 100, 2)
             except ValueError as e:
                 # Duplicate prevention triggered
                 raise HTTPException(

@@ -24,6 +24,7 @@ from ...dependencies.database import SessionLocal
 from ...models.transaction import WalletTransactionType
 from ...models.user import User
 from ...services.wallet_service import debit_wallet, credit_wallet, get_balance
+from ...services.settlement_service import settle_winning_bet
 
 logger = logging.getLogger(__name__)
 
@@ -293,28 +294,32 @@ class RouletteEngine:
 
         db = SessionLocal()
         try:
-            user_wins: Dict[str, int] = {}
+            user_stakes: Dict[str, int] = {}
+            user_profits: Dict[str, int] = {}
             for b in rnd.bets:
                 is_win, mult = check_bet_win(b.bet_type, b.target, win_num)
                 if is_win:
-                    # Gross win = stake + (stake * multiplier)
-                    gross = b.amount_paise * (mult + 1)
+                    profit = b.amount_paise * mult
                     b.is_won = True
-                    b.win_paise = gross
-                    user_wins[b.user_id] = user_wins.get(b.user_id, 0) + gross
+                    b.win_paise = b.amount_paise + profit
+                    user_stakes[b.user_id] = user_stakes.get(b.user_id, 0) + b.amount_paise
+                    user_profits[b.user_id] = user_profits.get(b.user_id, 0) + profit
 
-            # Credit users
-            for user_id_str, total_win in user_wins.items():
-                if total_win > 0:
+            # Credit users atomically via central settlement service
+            for user_id_str, profit in user_profits.items():
+                if profit > 0 or user_stakes.get(user_id_str, 0) > 0:
                     try:
                         uid = UUID(user_id_str)
-                        credit_wallet(
-                            db,
+                        stake = user_stakes.get(user_id_str, 0)
+                        calc, _ = settle_winning_bet(
+                            db=db,
                             user_id=uid,
-                            amount=total_win,
-                            tx_type=WalletTransactionType.GAME_WIN,
+                            original_bet=stake,
+                            gross_profit=profit,
                             reference_type="roulette_win",
-                            reference_id=f"roulette_{rnd.round_id}_{uid}"
+                            reference_id=f"roulette_{rnd.round_id}_{uid}",
+                            game_slug="roulette",
+                            metadata={"round_id": rnd.round_id, "winning_number": win_num},
                         )
                         db.commit()
                     except Exception as exc:

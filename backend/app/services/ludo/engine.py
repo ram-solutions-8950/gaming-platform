@@ -12,6 +12,7 @@ from ...models.ludo import (
 )
 from ...models.transaction import WalletTransactionType
 from ..wallet_service import credit_wallet
+from ..settlement_service import settle_winning_bet
 from .board import HOME_STEP, get_absolute_position
 from .rules import (
     get_target_step,
@@ -299,15 +300,17 @@ class LudoEngine:
             return
 
         ref_id = f"ludo_win_{match.id}_{winner_user_id}"
+        gross_profit = max(0, match.prize_pool - match.entry_fee)
         try:
-            credit_wallet(
+            calc, _ = settle_winning_bet(
                 db=self.db,
                 user_id=winner_user_id,
-                amount=match.prize_pool,
-                tx_type=WalletTransactionType.GAME_WIN,
+                original_bet=match.entry_fee,
+                gross_profit=gross_profit,
                 reference_type="ludo_win",
                 reference_id=ref_id,
-                metadata={"match_id": str(match.id)},
+                game_slug="ludo",
+                metadata={"match_id": str(match.id), "prize_pool": match.prize_pool},
             )
             match.is_settled = True
         except ValueError as e:

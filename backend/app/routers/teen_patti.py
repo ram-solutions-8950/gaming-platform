@@ -23,6 +23,7 @@ from ..services.teen_patti.cards import Card, new_server_seed, server_seed_hash
 from ..services.teen_patti.engine import GameConfig, Phase, PlayerStatus, TeenPattiHand
 from ..services.teen_patti.manager import teen_patti_manager
 from ..services.wallet_service import credit_wallet, debit_wallet, get_balance
+from ..services.settlement_service import settle_winning_bet
 
 router = APIRouter(prefix="/teen-patti", tags=["teen-patti"])
 
@@ -117,14 +118,19 @@ def play_instant_hand(
     payout = hand.pot if user_won else 0
 
     if user_won and req.mode == "real":
-        credit_wallet(
+        user_bet = hand.seats[0].total_bet
+        gross_profit = max(0, payout - user_bet)
+        calc, _ = settle_winning_bet(
             db=db,
             user_id=current_user.id,
-            amount=payout,
-            tx_type=WalletTransactionType.GAME_WIN,
+            original_bet=user_bet,
+            gross_profit=gross_profit,
             reference_type="TEEN_PATTI_PAYOUT",
             reference_id=f"payout_{ref_id}",
+            game_slug="teen-patti",
+            metadata={"pot": hand.pot},
         )
+        payout = calc.total_return
 
     # Record history
     history = TeenPattiHandHistory(

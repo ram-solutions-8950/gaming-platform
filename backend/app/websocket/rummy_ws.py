@@ -25,6 +25,7 @@ from ..services.rummy.deals_rummy import DealsRummyGame, GameConfig, Phase, Play
 from ..services.rummy.errors import GameError
 from ..services.rummy.game_manager import game_manager
 from ..services.wallet_service import credit_wallet, debit_wallet, get_balance
+from ..services.settlement_service import settle_winning_bet
 
 logger = logging.getLogger(__name__)
 
@@ -357,14 +358,15 @@ def _settle_real_money(table_id: str, game: DealsRummyGame) -> None:
 
             if total_credit > 0 and not _is_bot(game.winner_id):
                 winner_uid = uuid.UUID(game.winner_id)
-                credit_wallet(
+                calc, _ = settle_winning_bet(
                     db=db,
                     user_id=winner_uid,
-                    amount=total_credit,
-                    tx_type=WalletTransactionType.GAME_WIN,
+                    original_bet=0,
+                    gross_profit=total_credit,
                     reference_type="RUMMY_PAYOUT",
                     reference_id=f"rummy_payout_{deal_key}",
-                    metadata={"table_id": table_id, "deal_number": game.deal_number, "prize_pool": total_credit}
+                    game_slug="rummy",
+                    metadata={"table_id": table_id, "deal_number": game.deal_number, "prize_pool": total_credit},
                 )
             sp.commit()
         except Exception as e:

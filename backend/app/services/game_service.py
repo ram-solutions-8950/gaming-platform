@@ -21,6 +21,7 @@ from ..models.game_catalog import Game, GameStatus
 from ..models.fee_configuration import FeeConfiguration
 from ..models.transaction import WalletTransactionType
 from ..services.wallet_service import debit_wallet, credit_wallet
+from ..services.settlement_service import settle_winning_bet
 from ..utils.logging import get_logger
 
 logger = get_logger("game")
@@ -313,28 +314,25 @@ def settle_round(db: Session, round_id: UUID) -> GameRound:
     for bet in bets:
         gross_win = _calc_winning(bet.stake_amount, bet.prediction, primary_color, result_number)
         if gross_win > 0:
-            w_fee, net_win = _calc_winning_fee(gross_win, winning_fee_pct)
-            bet.gross_win_amount = gross_win
-            bet.winning_fee_amount = w_fee
-            bet.net_win_amount = net_win
-            bet.status = GameBetStatus.WON
-            bet.settled_at = game_round.ended_at
-
-            # Credit the winner — idempotent via reference uniqueness
-            credit_wallet(
-                db,
+            gross_profit = max(0, gross_win - bet.stake_amount)
+            calc, _ = settle_winning_bet(
+                db=db,
                 user_id=bet.user_id,
-                amount=net_win,
-                tx_type=WalletTransactionType.GAME_WIN,
+                original_bet=bet.stake_amount,
+                gross_profit=gross_profit,
                 reference_type="game_win",
                 reference_id=str(bet.id),
+                game_slug=COLOUR_PREDICTION_SLUG,
                 metadata={
                     "round_id": str(round_id),
                     "gross_win": gross_win,
-                    "winning_fee": w_fee,
-                    "net_win": net_win,
                 },
             )
+            bet.gross_win_amount = calc.original_bet + calc.gross_profit
+            bet.winning_fee_amount = calc.winning_fee
+            bet.net_win_amount = calc.total_return
+            bet.status = GameBetStatus.WON
+            bet.settled_at = game_round.ended_at
         else:
             bet.gross_win_amount = 0
             bet.winning_fee_amount = 0

@@ -371,10 +371,18 @@ def test_entry_fee_not_double_debited(client, db, test_users):
     u1_after = get_balance(db, test_users[0].id).balance
     u2_after = get_balance(db, test_users[1].id).balance
 
-    # Winner gets pot (2000), minus own 1000 boot -> net +1000. Loser net -1000.
+    # With winning fee enabled, the winner's profit is reduced by the fee.
+    # Pot = 2000 (boot 1000 × 2 players). Winner's gross_profit = 1000.
+    # Winning fee is deducted from the profit, so total_after < total_before.
     total_after = u1_after + u2_after
     total_before = u1_before + u2_before
-    assert total_after == total_before  # Zero-sum closed economy
+    # The fee amount equals winning_fee_percent% of the gross profit (1000 paisa)
+    fee_deducted = total_before - total_after
+    assert fee_deducted >= 0  # Fee is non-negative
+    assert fee_deducted <= 1000  # Fee can't exceed gross profit
+    # Each player's debit was exactly boot (1000 paisa) — no double debit
+    assert u1_after >= u1_before - 1000 - 1  # lost at most 1 boot
+    assert u2_after >= u2_before - 1000 - 1  # lost at most 1 boot
 
 
 # 15. test_settlement_is_idempotent

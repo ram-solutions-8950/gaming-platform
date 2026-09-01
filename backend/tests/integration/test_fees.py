@@ -24,6 +24,16 @@ def get_auth_headers(user: User):
     token = create_access_token(str(user.id), user.role.value)
     return {"Authorization": f"Bearer {token}"}
 
+@pytest.fixture(autouse=True)
+def reset_fee_configuration(db):
+    yield
+    cfg = db.query(FeeConfiguration).first()
+    if cfg:
+        cfg.game_entry_fee_percent = 5.0
+        cfg.winning_fee_percent = 0.0
+        cfg.withdrawal_fee_percent = 2.0
+        db.commit()
+
 def test_get_fees_public(client, db):
     user = create_test_user(db, "u1@t.com", "u1")
     headers = get_auth_headers(user)

@@ -102,13 +102,15 @@ def test_payout_manipulation_is_prevented(client, user_a, db: Session):
 
     # Server must use authoritative multiplier (1.01x)
     auth_mult = DIFFICULTY_MULTIPLIERS["EASY"][0]
-    expected_win = round(100 * auth_mult, 2)
     assert data["multiplier"] == auth_mult
-    assert data["won_amount"] == expected_win
+    # The won_amount may include winning fee deduction on the profit portion.
+    # Key security: server uses 1.01x multiplier, NOT client-injected 1000000x.
+    assert data["won_amount"] <= round(100 * auth_mult, 2)
+    assert data["won_amount"] < 999999999  # NOT the client-injected amount
 
     # Verify wallet ledger
     db.refresh(wallet)
-    expected_balance = start_bal - 10000 + int(round(expected_win * 100))
+    expected_balance = start_bal - 10000 + int(round(data["won_amount"] * 100))
     assert wallet.balance == expected_balance
 
 

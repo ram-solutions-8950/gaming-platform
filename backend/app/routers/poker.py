@@ -9,6 +9,7 @@ from ..models.user import User
 from ..models.poker import PokerTable, PokerHand, PokerPlayer
 from ..services.poker.game_manager import poker_manager
 from ..services.wallet_service import credit_wallet, debit_wallet
+from ..services.settlement_service import settle_winning_bet
 from ..models.transaction import WalletTransactionType
 
 router = APIRouter(prefix="/poker", tags=["Poker"])
@@ -199,16 +200,26 @@ def leave_poker_table(
     if not ok:
         raise HTTPException(status_code=400, detail=msg)
 
+    db_player = db.query(PokerPlayer).filter(
+        PokerPlayer.table_id == table_id,
+        PokerPlayer.user_id == current_user.id
+    ).first()
     table = db.query(PokerTable).filter(PokerTable.id == table_id).first()
     if table and not table.is_practice and remaining_stack > 0:
-        credit_wallet(
+        initial_buyin = db_player.stack if db_player else remaining_stack
+        gross_profit = max(0, remaining_stack - initial_buyin)
+        stake_returned = min(remaining_stack, initial_buyin)
+        calc, _ = settle_winning_bet(
             db=db,
             user_id=current_user.id,
-            amount=remaining_stack,
-            tx_type=WalletTransactionType.GAME_WIN,
+            original_bet=stake_returned,
+            gross_profit=gross_profit,
             reference_type="poker_leave",
-            reference_id=f"poker_leave_{uuid.uuid4()}"
+            reference_id=f"poker_leave_{uuid.uuid4()}",
+            game_slug="poker",
+            metadata={"table_id": table_id, "remaining_stack": remaining_stack},
         )
+        remaining_stack = calc.total_return
         db.commit()
 
     db.query(PokerPlayer).filter(

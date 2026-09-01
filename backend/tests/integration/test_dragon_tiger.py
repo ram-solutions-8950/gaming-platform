@@ -198,10 +198,10 @@ def test_correct_payout_and_winning_fee(db: Session, auth_user, fee_config, dt_g
     engine.settle_round(db, rd.id, dragon_card="K-S", tiger_card="7-H")
     db.refresh(bet)
     db.refresh(wallet)
-    assert bet.gross_win_amount == 19000  # 9500 stake + (9500 * 1.0)
-    assert bet.winning_fee_amount == 1900
-    assert bet.net_win_amount == 17100
-    assert wallet.balance == after_debit + 17100
+    assert bet.gross_win_amount == 19000  # 9500 stake + 9500 profit
+    assert bet.winning_fee_amount == 950   # 10% of 9500 profit
+    assert bet.net_win_amount == 18050    # 9500 stake + (9500 - 950)
+    assert wallet.balance == after_debit + 18050
 
 
 def test_losing_bet_does_not_receive_payout(db: Session, auth_user, fee_config, dt_game):
@@ -228,8 +228,8 @@ def test_tie_payout_uses_configuration(db: Session, auth_user, fee_config, dt_ga
     engine.settle_round(db, rd.id, dragon_card="9-S", tiger_card="9-D")
     db.refresh(bet)
     assert bet.gross_win_amount == 85500  # 9500 stake + (9500 * 8.0)
-    assert bet.winning_fee_amount == 8550
-    assert bet.net_win_amount == 76950
+    assert bet.winning_fee_amount == 7600  # 10% of 76000 profit
+    assert bet.net_win_amount == 77900    # 9500 stake + (76000 - 7600)
 
 
 def test_settlement_is_idempotent(db: Session, auth_user, fee_config, dt_game):

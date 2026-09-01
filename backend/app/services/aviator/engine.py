@@ -19,6 +19,7 @@ from sqlalchemy.orm import Session
 
 from ...models.aviator import AviatorRound, AviatorBet, AviatorRoundStatus, AviatorBetStatus
 from ...services.wallet_service import credit_wallet, debit_wallet
+from ...services.settlement_service import settle_winning_bet
 from ...models.transaction import WalletTransactionType
 from ...utils.logging import get_logger
 from .models import LiveRound, LiveBet, RoundPhase, BetStatus
@@ -346,24 +347,29 @@ class AviatorEngine:
         now: datetime,
     ) -> tuple[LiveBet, float]:
         """Internal: settle a single bet at the given multiplier."""
-        payout = int(bet.amount * multiplier)
-        bet.status = BetStatus.CASHED_OUT
-        bet.cashout_multiplier = multiplier
-        bet.payout = payout
-        bet.cashed_out_at = now
-
-        # Credit wallet
+        gross_return = int(bet.amount * multiplier)
+        gross_profit = max(0, gross_return - bet.amount)
         ref_id = f"aviator-win-{rnd.round_id}-{bet.user_id}-{bet.slot}"
-        credit_wallet(
-            db, bet.user_id, payout,
-            WalletTransactionType.GAME_WIN,
-            "aviator_win", ref_id,
+        calc, _ = settle_winning_bet(
+            db=db,
+            user_id=bet.user_id,
+            original_bet=bet.amount,
+            gross_profit=gross_profit,
+            reference_type="aviator_win",
+            reference_id=ref_id,
+            game_slug="aviator",
+            is_refund=(gross_return >= bet.amount and gross_profit == 0),
             metadata={
                 "round_id": str(rnd.round_id),
                 "slot": bet.slot,
                 "multiplier": multiplier,
             },
         )
+        payout = calc.total_return
+        bet.status = BetStatus.CASHED_OUT
+        bet.cashout_multiplier = multiplier
+        bet.payout = payout
+        bet.cashed_out_at = now
 
         # Update DB
         db.query(AviatorBet).filter(
