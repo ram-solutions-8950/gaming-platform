@@ -46,7 +46,7 @@ def upgrade() -> None:
                     '🐉',
                     'ACTIVE',
                     1000,
-                    100000,
+                    200000,
                     CAST(:config AS json),
                     NOW(),
                     NOW()

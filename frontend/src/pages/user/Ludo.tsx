@@ -10,6 +10,7 @@ import { LudoPlayerPanel } from '../../components/ludo/LudoPlayerPanel';
 import { LudoLobby } from '../../components/ludo/LudoLobby';
 import { LudoWinnerModal } from '../../components/ludo/LudoWinnerModal';
 import { soundManager } from '../../services/soundManager';
+import { authStorage } from '../../services/authStorage';
 import { getWebSocketUrl } from '../../utils/ws';
 
 export const Ludo: React.FC = () => {
@@ -140,7 +141,7 @@ export const Ludo: React.FC = () => {
       wsRef.current.close();
     }
 
-    const token = localStorage.getItem('access_token');
+    const token = authStorage.getAccessToken();
     const wsUrl = getWebSocketUrl(`ludo/ws/${matchId}`, token || undefined);
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
@@ -237,7 +238,7 @@ export const Ludo: React.FC = () => {
     // Reset transition guard
     matchTransitionRef.current = null;
 
-    const token = localStorage.getItem('access_token');
+    const token = authStorage.getAccessToken();
 
     // 1. Connect matchmaking WebSocket FIRST
     const mmWsUrl = getWebSocketUrl('ludo/ws/matchmaking', token || undefined);

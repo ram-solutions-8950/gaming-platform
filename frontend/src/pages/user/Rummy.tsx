@@ -9,6 +9,7 @@ import MatchSearchOverlay from "../../components/rummy/MatchSearchOverlay";
 import RulesModal from "../../components/rummy/RulesModal";
 import { useRummyMatchmaking } from "../../hooks/useRummyMatchmaking";
 import { RummyApi, type RummyTableOut, type RummyTableCreate } from "../../services/rummy";
+import { authStorage } from "../../services/authStorage";
 import api from "../../services/api";
 import "../../styles/rummy.css";
 
@@ -63,7 +64,7 @@ export function RummyPage() {
     is_private: true,
   });
 
-  const token = localStorage.getItem("access_token");
+  const token = authStorage.getAccessToken();
   const navigate = useNavigate();
 
   const matchmaking = useRummyMatchmaking(token);

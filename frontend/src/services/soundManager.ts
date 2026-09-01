@@ -1,9 +1,7 @@
 // src/services/soundManager.ts
 // Centralized Casino Sound Manager – ONE manager for the entire platform.
+// Provides reliable lifecycle-controlled audio state across Android APK and Web.
 import { Howl, Howler } from "howler";
-
-// All sound events used across the platform
-
 
 // All sound events used across the platform
 export type SoundEvent =
@@ -64,6 +62,8 @@ class CentralSoundManager {
   private _volume: number = 0.7;
   private _musicVolume: number = 0.3;
   private _musicStarted: boolean = false;
+  private _isAppInForeground: boolean = true;
+  private _wasMusicPlayingBeforePause: boolean = false;
   private audioCtx: AudioContext | null = null;
 
   constructor() {
@@ -78,7 +78,45 @@ class CentralSoundManager {
     } catch {
       // localStorage unavailable – use defaults
     }
+
     this.loadHowlerSounds();
+    this.setupLifecycleListeners();
+  }
+
+  // ──────────────────── Lifecycle Listeners ────────────────────
+
+  private setupLifecycleListeners() {
+    if (typeof window === "undefined") return;
+
+    // 1. Web Page Visibility API (switched tabs, minimized browser)
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "hidden") {
+        this.pauseAll();
+      } else if (document.visibilityState === "visible") {
+        this.resumeFromBackground();
+      }
+    });
+
+    // 2. Page Hide event
+    window.addEventListener("pagehide", () => {
+      this.pauseAll();
+    });
+
+    // 3. Native Android Activity Lifecycle hooks invoked by MainActivity
+    (window as any).__onAndroidPause = () => {
+      this.pauseAll();
+    };
+
+    (window as any).__onAndroidStop = () => {
+      this.pauseAll();
+    };
+
+    (window as any).__onAndroidResume = () => {
+      this.resumeFromBackground();
+    };
+
+    // Expose reference for direct bridge calls
+    (window as any).soundManager = this;
   }
 
   // ──────────────────── Howler-based sounds ────────────────────
@@ -102,13 +140,15 @@ class CentralSoundManager {
       const Ctx = window.AudioContext || (window as any).webkitAudioContext;
       if (Ctx) this.audioCtx = new Ctx();
     }
-    if (this.audioCtx && this.audioCtx.state === "suspended") {
+    if (this.audioCtx && this.audioCtx.state === "suspended" && this._isAppInForeground) {
       this.audioCtx.resume().catch(() => {});
     }
     return this.audioCtx;
   }
 
   private playOscillator(key: SoundEvent) {
+    if (!this._isAppInForeground || this._muted) return;
+
     try {
       const ctx = this.getAudioContext();
       if (!ctx) return;
@@ -167,10 +207,86 @@ class CentralSoundManager {
 
   // ──────────────────── Public API ─────────────────────────────
 
+  /** Immediately stop/pause all audio when app goes to background / Recent Apps */
+  pauseAll() {
+    this._isAppInForeground = false;
+
+    // Track whether music was playing so we can restore it on foreground return
+    if (this._musicStarted && !this._muted && this.bgMusic) {
+      this._wasMusicPlayingBeforePause = this.bgMusic.playing();
+    }
+
+    // Immediately stop or pause background music
+    if (this.bgMusic) {
+      try {
+        this.bgMusic.pause();
+      } catch {}
+    }
+
+    // Stop all Howler effects
+    try {
+      Howler.stop();
+    } catch {}
+
+    // Suspend audio context
+    if (this.audioCtx && this.audioCtx.state === "running") {
+      try {
+        this.audioCtx.suspend().catch(() => {});
+      } catch {}
+    }
+  }
+
+  /** Complete hard stop of all audio */
+  stopAll() {
+    this._musicStarted = false;
+    this._wasMusicPlayingBeforePause = false;
+    if (this.bgMusic) {
+      try {
+        this.bgMusic.stop();
+      } catch {}
+    }
+    try {
+      Howler.stop();
+    } catch {}
+    if (this.audioCtx) {
+      try {
+        this.audioCtx.suspend().catch(() => {});
+      } catch {}
+    }
+  }
+
+  /** Resumes background music and audio processing when app returns to foreground */
+  resumeFromBackground() {
+    this._isAppInForeground = true;
+
+    // Resume Howler AudioContext
+    try {
+      Howler.ctx?.resume?.();
+    } catch {}
+
+    // Resume oscillator context
+    this.getAudioContext();
+
+    // Only resume music if user had it playing and is not muted
+    if (!this._muted && this._wasMusicPlayingBeforePause) {
+      this.startMusic();
+    }
+    this._wasMusicPlayingBeforePause = false;
+  }
+
   /** Start or resume background music */
   startMusic() {
     if (this._muted) return;
+
+    // If app is currently in background, DO NOT start playing now — queue for return
+    if (!this._isAppInForeground) {
+      this._wasMusicPlayingBeforePause = true;
+      return;
+    }
+
+    // Prevent duplicate instances or multiple copies playing
     if (this._musicStarted && this.bgMusic?.playing()) return;
+
     if (!this.bgMusic) {
       this.bgMusic = new Howl({
         src: ["/assets/sounds/kgf.mp3"],
@@ -180,16 +296,24 @@ class CentralSoundManager {
         preload: true,
       });
     }
+
     if (!this.bgMusic.playing()) {
-      this.bgMusic.play();
+      try {
+        this.bgMusic.play();
+      } catch {}
     }
     this._musicStarted = true;
   }
 
   /** Call once after first user interaction to unlock audio on mobile and start background music */
   init() {
+    if (!this._isAppInForeground) return;
+
     // Resume Howler's internal AudioContext
-    Howler.ctx?.resume?.();
+    try {
+      Howler.ctx?.resume?.();
+    } catch {}
+
     // Also resume our oscillator context
     this.getAudioContext();
     this.startMusic();
@@ -198,13 +322,16 @@ class CentralSoundManager {
   /** Pause or stop background music when leaving the casino application */
   stopMusic() {
     this._musicStarted = false;
+    this._wasMusicPlayingBeforePause = false;
     if (this.bgMusic) {
-      this.bgMusic.stop();
+      try {
+        this.bgMusic.stop();
+      } catch {}
     }
   }
 
   play(event: SoundEvent) {
-    if (this._muted) return;
+    if (this._muted || !this._isAppInForeground) return;
 
     if (OSCILLATOR_EVENTS.has(event)) {
       this.playOscillator(event);
@@ -212,10 +339,8 @@ class CentralSoundManager {
     }
 
     const howl = this.howls.get(event);
-    if (!howl) {
-      // Sound file not yet downloaded – silently ignore
-      return;
-    }
+    if (!howl) return;
+
     try {
       howl.volume(this._volume);
       howl.play();
@@ -254,7 +379,9 @@ class CentralSoundManager {
 
   mute() {
     this._muted = true;
-    Howler.mute(true); // Mutes both game effects and bgMusic globally
+    try {
+      Howler.mute(true); // Mutes both game effects and bgMusic globally
+    } catch {}
     try {
       localStorage.setItem("casinoSoundMuted", "true");
     } catch { /* ignore */ }
@@ -262,8 +389,12 @@ class CentralSoundManager {
 
   unmute() {
     this._muted = false;
-    Howler.mute(false);
-    this.startMusic();
+    try {
+      Howler.mute(false);
+    } catch {}
+    if (this._isAppInForeground) {
+      this.startMusic();
+    }
     try {
       localStorage.setItem("casinoSoundMuted", "false");
     } catch { /* ignore */ }
@@ -281,8 +412,10 @@ class CentralSoundManager {
   isMuted(): boolean {
     return this._muted;
   }
+
+  isForeground(): boolean {
+    return this._isAppInForeground;
+  }
 }
 
 export const soundManager = new CentralSoundManager();
-
-

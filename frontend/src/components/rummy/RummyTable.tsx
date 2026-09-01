@@ -13,6 +13,7 @@ import { RummyApi, type RummyTableOut } from "../../services/rummy";
 import type { TableState } from "../../types/rummy";
 import { useAuthStore } from "../../store/authStore";
 import { soundManager } from "../../services/soundManager";
+import { authStorage } from "../../services/authStorage";
 
 const FIRST_DROP_POINTS = 20;
 const MIDDLE_DROP_POINTS = 40;
@@ -146,7 +147,7 @@ function ResultOverlay({
 export default function GameTable({ onBack, customTableId }: { onBack?: () => void; customTableId?: string } = {}) {
   const { tableId: paramTableId } = useParams();
   const tableId = customTableId || paramTableId || "";
-  const token = localStorage.getItem("access_token") || "";
+  const token = authStorage.getAccessToken() || "";
   const user = useAuthStore((s) => s.user);
   const myUsername = user?.username || user?.name || "Player";
   const navigate = useNavigate();

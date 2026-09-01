@@ -3,6 +3,7 @@
  */
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useAuthStore } from '../store/authStore';
+import { authStorage } from '../services/authStorage';
 import type { TeenPattiGameState } from '../services/teenPatti';
 import { getWebSocketUrl } from '../utils/ws';
 
@@ -14,7 +15,7 @@ export interface UseTeenPattiSocketOptions {
 
 export function useTeenPattiSocket({ tableId, onEvent, onError }: UseTeenPattiSocketOptions) {
   const user = useAuthStore((state) => state.user);
-  const token = localStorage.getItem('access_token');
+  const token = authStorage.getAccessToken();
   const [gameState, setGameState] = useState<TeenPattiGameState | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
