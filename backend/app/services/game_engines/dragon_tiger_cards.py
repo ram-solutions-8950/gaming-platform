@@ -1,6 +1,14 @@
 """Isolated card generation for Dragon Tiger.
 
 Swap `draw_cards` later for an auditable RNG without changing settlement logic.
+
+Outcome probabilities are a fixed, natural consequence of drawing 2 cards without
+replacement from a standard 52-card deck (13 ranks x 4 suits) via a CSPRNG
+(secrets.SystemRandom) — there is no dynamic weighting or profit-based manipulation
+anywhere in this module or in DragonTigerEngine.settle_round(). Given any first card,
+3 of the remaining 51 cards share its rank, so:
+    P(TIE)            = 3/51 ~= 5.88%
+    P(DRAGON or TIGER) = 48/51 ~= 94.12%, split evenly between DRAGON and TIGER by symmetry.
 """
 
 from __future__ import annotations

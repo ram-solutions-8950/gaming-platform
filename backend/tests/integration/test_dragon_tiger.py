@@ -62,7 +62,7 @@ def dt_game(db: Session):
         "round_duration_seconds": 25,
         "betting_duration_seconds": 15,
         "allowed_bets": {"dragon": True, "tiger": True, "tie": True},
-        "payouts": {"dragon": 1.0, "tiger": 1.0, "tie": 11.0},
+        "payouts": {"dragon": 2.0, "tiger": 2.0, "tie": 10.0},
         "deck": {"type": "STANDARD_52_CARD", "cards_per_round": 2},
     }
     flag_modified(game, "config")
@@ -198,7 +198,8 @@ def test_correct_payout_and_winning_fee(db: Session, auth_user, fee_config, dt_g
     engine.settle_round(db, rd.id, dragon_card="K-S", tiger_card="7-H")
     db.refresh(bet)
     db.refresh(wallet)
-    assert bet.gross_win_amount == 19000  # 9500 stake + 9500 profit
+    # 2x total-return multiplier -> profit = 1x stake (same math as the old 1x-profit config)
+    assert bet.gross_win_amount == 19000  # 9500 stake + 9500 profit (= 9500 * 2.0 total return)
     assert bet.winning_fee_amount == 950   # 10% of 9500 profit
     assert bet.net_win_amount == 18050    # 9500 stake + (9500 - 950)
     assert wallet.balance == after_debit + 18050
@@ -220,16 +221,65 @@ def test_losing_bet_does_not_receive_payout(db: Session, auth_user, fee_config, 
 
 def test_tie_payout_uses_configuration(db: Session, auth_user, fee_config, dt_game):
     _, user, _ = auth_user
-    dt_game.config["payouts"]["tie"] = 8.0
+    dt_game.config["payouts"]["tie"] = 8.0  # admin override: 8x total return
     flag_modified(dt_game, "config")
     db.commit()
     rd = engine.create_round(db)
     bet = engine.place_bet(db, user.id, rd.id, "TIE", 10000, game_id=dt_game.id)
     engine.settle_round(db, rd.id, dragon_card="9-S", tiger_card="9-D")
     db.refresh(bet)
-    assert bet.gross_win_amount == 85500  # 9500 stake + (9500 * 8.0)
-    assert bet.winning_fee_amount == 7600  # 10% of 76000 profit
-    assert bet.net_win_amount == 77900    # 9500 stake + (76000 - 7600)
+    assert bet.gross_win_amount == 76000  # 9500 stake * 8.0 total return (= 9500 stake + 66500 profit)
+    assert bet.winning_fee_amount == 6650  # 10% of 66500 profit
+    assert bet.net_win_amount == 69350    # 9500 stake + (66500 - 6650)
+
+
+def test_hundred_rupee_dragon_bet_pays_two_hundred_total(db: Session, auth_user, fee_config, dt_game):
+    """Rs.100 Dragon bet at 2x must return Rs.200 total, never Rs.300 (stake counted twice)."""
+    _, user, _ = auth_user
+    dt_game.config["allowed_bets"] = {"dragon": True, "tiger": True, "tie": True}
+    flag_modified(dt_game, "config")
+    dt_game.min_bet = 100
+    db.commit()
+    rd = engine.create_round(db)
+    bet = engine.place_bet(db, user.id, rd.id, "DRAGON", 10000, game_id=dt_game.id)  # Rs.100, no entry fee configured beyond fee_config's 5%
+    engine.settle_round(db, rd.id, dragon_card="K-S", tiger_card="7-H")
+    db.refresh(bet)
+    assert bet.gross_win_amount == bet.stake_amount * 2
+    assert bet.gross_win_amount != bet.stake_amount * 3
+
+
+def test_hundred_rupee_tiger_bet_pays_two_hundred_total(db: Session, auth_user, fee_config, dt_game):
+    _, user, _ = auth_user
+    rd = engine.create_round(db)
+    bet = engine.place_bet(db, user.id, rd.id, "TIGER", 10000, game_id=dt_game.id)
+    engine.settle_round(db, rd.id, dragon_card="4-D", tiger_card="Q-C")
+    db.refresh(bet)
+    assert bet.gross_win_amount == bet.stake_amount * 2
+    assert bet.gross_win_amount != bet.stake_amount * 3
+
+
+def test_hundred_rupee_tie_bet_pays_10x_total(db: Session, auth_user, fee_config, dt_game):
+    _, user, _ = auth_user
+    rd = engine.create_round(db)
+    bet = engine.place_bet(db, user.id, rd.id, "TIE", 10000, game_id=dt_game.id)
+    engine.settle_round(db, rd.id, dragon_card="9-S", tiger_card="9-H")
+    db.refresh(bet)
+    assert bet.gross_win_amount == bet.stake_amount * 10
+    assert bet.status == GameBetStatus.WON
+
+
+def test_tie_bet_loses_when_dragon_or_tiger_wins(db: Session, auth_user, fee_config, dt_game):
+    _, user, wallet = auth_user
+    rd = engine.create_round(db)
+    bet = engine.place_bet(db, user.id, rd.id, "TIE", 10000, game_id=dt_game.id)
+    after_debit = wallet.balance
+    engine.settle_round(db, rd.id, dragon_card="K-S", tiger_card="7-H")
+    db.refresh(bet)
+    db.refresh(wallet)
+    assert bet.status == GameBetStatus.LOST
+    assert bet.gross_win_amount == 0
+    assert bet.net_win_amount == 0
+    assert wallet.balance == after_debit
 
 
 def test_settlement_is_idempotent(db: Session, auth_user, fee_config, dt_game):

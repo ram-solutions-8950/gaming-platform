@@ -342,6 +342,45 @@
   z-index: 20;
 }
 
+.cr-cashout-wrap {
+  position: absolute;
+  bottom: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 25;
+  pointer-events: none;
+}
+
+.cr-cashout-btn {
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: none;
+  border-radius: 999px;
+  padding: 10px 20px;
+  font-size: clamp(12px, 2vw, 14px);
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: #1A1A1A;
+  cursor: pointer;
+  background: linear-gradient(180deg, #FBBF24, #F59E0B);
+  box-shadow: 0 6px 18px rgba(245, 158, 11, 0.5), 0 0 0 2px rgba(255, 255, 255, 0.15) inset;
+  white-space: nowrap;
+  animation: cr-cashout-pulse 1.6s ease-in-out infinite;
+}
+
+.cr-cashout-btn:disabled {
+  opacity: 0.75;
+  cursor: default;
+  animation: none;
+}
+
+@keyframes cr-cashout-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.045); }
+}
+
 .cr-steer-btn {
   pointer-events: auto;
   width: clamp(40px, 7vw, 48px);

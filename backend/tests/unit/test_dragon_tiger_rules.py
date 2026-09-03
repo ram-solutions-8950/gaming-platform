@@ -26,17 +26,21 @@ def test_rank_order_ace_high():
     assert determine_result("A-S", "K-S") == "DRAGON"
 
 
+def test_default_payouts_are_2x_dragon_tiger_10x_tie():
+    assert DEFAULT_CONFIG["payouts"] == {"dragon": 2.0, "tiger": 2.0, "tie": 10.0}
+
+
 def test_payout_uses_configuration_not_hardcoded_tie():
-    payouts = {"dragon": 1.0, "tiger": 1.0, "tie": 11.0}
-    assert calculate_payout_gross(9500, "TIE", "TIE", payouts) == 114000
-    custom = {"dragon": 1.0, "tiger": 1.0, "tie": 8.0}
-    assert calculate_payout_gross(9500, "TIE", "TIE", custom) == 85500
+    payouts = {"dragon": 2.0, "tiger": 2.0, "tie": 10.0}
+    assert calculate_payout_gross(9500, "TIE", "TIE", payouts) == 95000
+    custom = {"dragon": 2.0, "tiger": 2.0, "tie": 8.0}
+    assert calculate_payout_gross(9500, "TIE", "TIE", custom) == 76000
 
 
 def test_payout_dragon_and_tiger_from_config():
-    payouts = {"dragon": "1.0", "tiger": "2.5", "tie": "11.0"}
+    payouts = {"dragon": "2.0", "tiger": "3.0", "tie": "10.0"}
     assert calculate_payout_gross(10000, "DRAGON", "DRAGON", payouts) == 20000
-    assert calculate_payout_gross(10000, "TIGER", "TIGER", payouts) == 35000
+    assert calculate_payout_gross(10000, "TIGER", "TIGER", payouts) == 30000
 
 
 def test_losing_bet_payout_is_zero():
@@ -44,10 +48,16 @@ def test_losing_bet_payout_is_zero():
     assert calculate_payout_gross(10000, "DRAGON", "TIGER", payouts) == 0
 
 
+def test_tie_bet_loses_when_result_is_dragon_or_tiger():
+    payouts = DEFAULT_CONFIG["payouts"]
+    assert calculate_payout_gross(10000, "TIE", "DRAGON", payouts) == 0
+    assert calculate_payout_gross(10000, "TIE", "TIGER", payouts) == 0
+
+
 def test_payout_uses_decimal_rounding():
-    payouts = {"dragon": Decimal("1.5"), "tiger": 1.0, "tie": 11.0}
-    # 10001 + round(10001 * 1.5) = 10001 + 15002 = 25003 ROUND_HALF_UP
-    assert calculate_payout_gross(10001, "DRAGON", "DRAGON", payouts) == 25003
+    payouts = {"dragon": Decimal("1.5"), "tiger": 2.0, "tie": 10.0}
+    # round(10001 * 1.5) = round(15001.5) = 15002 (ROUND_HALF_UP)
+    assert calculate_payout_gross(10001, "DRAGON", "DRAGON", payouts) == 15002
 
 
 def test_draw_cards_returns_two_unique_from_standard_deck():
@@ -58,3 +68,20 @@ def test_draw_cards_returns_two_unique_from_standard_deck():
         rank, suit = card.split("-")
         assert rank in RANK_ORDER
         assert suit in ("S", "H", "D", "C")
+
+
+# --- Explicit payout-multiplier requirements -------------------------------------------
+# Multiplier semantics: total return INCLUDING stake, not profit added on top of stake.
+# A winning Rs.100 (10000 paise) bet at 2x must return Rs.200 (20000 paise) total, never
+# Rs.300 (which would happen if the stake were mistakenly added a second time).
+
+def test_hundred_rupee_dragon_bet_returns_two_hundred_total():
+    assert calculate_payout_gross(10000, "DRAGON", "DRAGON", DEFAULT_CONFIG["payouts"]) == 20000
+
+
+def test_hundred_rupee_tiger_bet_returns_two_hundred_total():
+    assert calculate_payout_gross(10000, "TIGER", "TIGER", DEFAULT_CONFIG["payouts"]) == 20000
+
+
+def test_hundred_rupee_tie_bet_returns_thousand_total_at_10x():
+    assert calculate_payout_gross(10000, "TIE", "TIE", DEFAULT_CONFIG["payouts"]) == 100000

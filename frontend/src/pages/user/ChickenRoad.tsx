@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -11,6 +11,7 @@ import {
   ChevronRight,
   Sparkles,
   Flame,
+  Wallet,
 } from 'lucide-react';
 import {
   chickenRoadService,
@@ -22,9 +23,16 @@ import { RoadCrossingGame } from '../../components/chickenRoad/RoadCrossingGame'
 import { soundManager } from '../../services/soundManager';
 import '../../styles/chicken-road.css';
 
+// Multiplier progression: Road 1 = 1.00x (base), then +0.03x per road crossed after that
+// (1 + (crossings - 1) * 0.03). Must exactly match DIFFICULTY_MULTIPLIERS in
+// backend/app/routers/chicken_road.py. Used only as a pre-fetch fallback; the
+// authoritative values always come from the API.
+const buildMultiplierTable = (count: number, step = 0.03): number[] =>
+  Array.from({ length: count }, (_, i) => Math.round((1 + step * i) * 100) / 100);
+
 const DEFAULT_MULTIPLIERS: Record<Difficulty, number[]> = {
-  MEDIUM: [1.03, 1.08, 1.15, 1.25, 1.38, 1.55, 1.75, 2.05, 2.45, 3.00],
-  HARD: [1.05, 1.15, 1.30, 1.55, 1.90, 2.40, 3.10, 4.20, 6.00, 10.00],
+  MEDIUM: buildMultiplierTable(10),
+  HARD: buildMultiplierTable(10),
 };
 
 const QUICK_BETS = [5, 10, 20, 30];
@@ -42,15 +50,28 @@ export function ChickenRoadPage() {
   const [multipliers, setMultipliers] = useState<number[]>(DEFAULT_MULTIPLIERS.MEDIUM);
   const [currentMultiplier, setCurrentMultiplier] = useState<number>(1.0);
   const [nextMultiplier, setNextMultiplier] = useState<number>(DEFAULT_MULTIPLIERS.MEDIUM[0]);
+  // Exact amount Cash Out would pay right now — always sourced from the backend
+  // (never computed client-side), so it can never drift from what /cashout
+  // actually credits (the backend applies the same winning-fee calculation to
+  // both, see _preview_total_return_paisa in chicken_road.py).
+  const [potentialWin, setPotentialWin] = useState<number>(0);
 
   const [winAmount, setWinAmount] = useState<number>(0);
   const [lossLane, setLossLane] = useState<number | null>(null);
   const [isActionLoading, setIsActionLoading] = useState<boolean>(false);
+  const [isCashoutLoading, setIsCashoutLoading] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [showHowToPlay, setShowHowToPlay] = useState<boolean>(false);
 
   // Mobile steering button state
   const [externalSteer, setExternalSteer] = useState<'left' | 'right' | null>(null);
+
+  // Guards against Cash Out / collision / finish firing more than once for the
+  // same round (e.g. a collision detected in the same frame a Cash Out click is
+  // processed). Whichever settlement path starts first wins; the backend's own
+  // ROUND_LOCK + status check is the final authority, this just stops the
+  // frontend from firing duplicate/overlapping requests and flickering the UI.
+  const settlementInFlightRef = useRef(false);
 
   // Sync state on load
   const syncState = useCallback(async () => {
@@ -80,6 +101,9 @@ export function ChickenRoadPage() {
           setNextMultiplier(
             gameStateData.next_multiplier || DEFAULT_MULTIPLIERS[gameStateData.difficulty || 'MEDIUM'][0]
           );
+          if (typeof gameStateData.potential_win === 'number') {
+            setPotentialWin(gameStateData.potential_win);
+          }
 
           if (gameStateData.bet_amount) {
             setBetAmount(gameStateData.bet_amount);
@@ -146,6 +170,7 @@ export function ChickenRoadPage() {
     setErrorMessage(null);
     setWinAmount(0);
     setLossLane(null);
+    settlementInFlightRef.current = false; // fresh round, no settlement pending yet
 
     try {
       const res = await chickenRoadService.startGame(betAmount, difficulty);
@@ -155,6 +180,7 @@ export function ChickenRoadPage() {
       setCurrentLane(0);
       setCurrentMultiplier(1.0);
       setNextMultiplier(res.next_multiplier || multipliers[0]);
+      setPotentialWin(res.potential_win ?? betAmount);
 
       if (res.wallet_balance !== undefined) {
         setBalance(res.wallet_balance);
@@ -169,9 +195,12 @@ export function ChickenRoadPage() {
     }
   };
 
-  // Safe lane crossed callback from canvas
+  // Safe lane crossed callback from canvas. Only meaningful while the round is
+  // still ACTIVE and no settlement (cashout/collision/finish) has started —
+  // once one has, further crossings are ignored so a late frame can't keep
+  // advancing state past a round that's already ending.
   const handleLaneCross = async (laneIndex: number) => {
-    if (!activeRoundId || gameState !== 'ACTIVE') return;
+    if (!activeRoundId || gameState !== 'ACTIVE' || settlementInFlightRef.current) return;
 
     try {
       const res = await chickenRoadService.crossLane(activeRoundId, laneIndex);
@@ -179,15 +208,19 @@ export function ChickenRoadPage() {
       setCurrentLane(res.current_lane);
       setCurrentMultiplier(res.current_multiplier);
       setNextMultiplier(res.next_multiplier);
-
+      setPotentialWin(res.potential_win);
     } catch (err) {
       console.error('Failed to register lane cross:', err);
     }
   };
 
-  // Collision callback from canvas
+  // Collision callback from canvas. This is one of three mutually-exclusive
+  // settlement paths (collision / cashout / finish) — settlementInFlightRef
+  // ensures only the first one to fire actually settles the round; the
+  // backend's own status check + lock is the final authority either way.
   const handleCollision = async (laneIndex: number) => {
-    if (!activeRoundId || gameState !== 'ACTIVE') return;
+    if (!activeRoundId || gameState !== 'ACTIVE' || settlementInFlightRef.current) return;
+    settlementInFlightRef.current = true;
 
     setGameState('LOST');
     setLossLane(laneIndex);
@@ -195,15 +228,17 @@ export function ChickenRoadPage() {
 
     try {
       await chickenRoadService.reportCollision(activeRoundId, laneIndex);
-      setActiveRoundId(null);
     } catch (err) {
       console.error('Failed to report collision:', err);
+    } finally {
+      setActiveRoundId(null);
     }
   };
 
-  // Finish safe line reached callback from canvas
+  // Finish safe line reached callback from canvas.
   const handleFinish = async () => {
-    if (!activeRoundId || gameState !== 'ACTIVE') return;
+    if (!activeRoundId || gameState !== 'ACTIVE' || settlementInFlightRef.current) return;
+    settlementInFlightRef.current = true;
 
     try {
       const res = await chickenRoadService.finishGame(activeRoundId);
@@ -217,16 +252,58 @@ export function ChickenRoadPage() {
       setActiveRoundId(null);
     } catch (err) {
       console.error('Failed to complete finish:', err);
+      // Don't strand activeRoundId/the lock on a network error — the canvas is
+      // already frozen (isWon set internally the moment onFinish fired), and a
+      // refresh will re-sync against the backend's authoritative round state.
+      settlementInFlightRef.current = false;
+    }
+  };
+
+  // Cash Out — only reachable once the player has crossed at least one lane
+  // (see the button's disabled/visibility logic below and the backend's own
+  // current_lane >= 1 guard, which is the authoritative check).
+  const handleCashout = async () => {
+    if (!activeRoundId || gameState !== 'ACTIVE' || currentLane < 1) return;
+    if (settlementInFlightRef.current) return;
+    settlementInFlightRef.current = true;
+    setIsCashoutLoading(true);
+
+    // Freeze movement immediately (optimistic) — the canvas stops updating
+    // the instant gameState leaves 'ACTIVE', so no further lane-cross or
+    // collision events can fire while the request is in flight.
+    setGameState('CASHED_OUT');
+
+    try {
+      const res = await chickenRoadService.cashout(activeRoundId);
+      soundManager.play('win_clap');
+      setWinAmount(res.won_amount);
+      setCurrentMultiplier(res.multiplier);
+      if (res.wallet_balance !== undefined) {
+        setBalance(res.wallet_balance);
+      }
+    } catch (err: any) {
+      // Extremely rare: a collision reached the backend a moment earlier and
+      // won the race under the server's round lock. Trust the backend, not
+      // the optimistic client state — re-sync to find out what really happened.
+      console.error('Cashout failed, re-syncing authoritative state:', err);
+      const msg = err.response?.data?.detail || 'Cash out failed — round may have already ended.';
+      setErrorMessage(msg);
+      await syncState();
+    } finally {
+      setActiveRoundId(null);
+      setIsCashoutLoading(false);
     }
   };
 
   // Play again
   const handlePlayAgain = () => {
+    settlementInFlightRef.current = false;
     setGameState('READY');
     setActiveRoundId(null);
     setCurrentLane(0);
     setCurrentMultiplier(1.0);
     setNextMultiplier(multipliers[0]);
+    setPotentialWin(0);
 
     setWinAmount(0);
     setLossLane(null);
@@ -314,7 +391,7 @@ export function ChickenRoadPage() {
               <span className="cr-hud-val cr-hud-val--green">
                 {gameState === 'ACTIVE' && currentLane < multipliers.length
                   ? `${nextMultiplier.toFixed(2)}x`
-                  : `${multipliers[0]?.toFixed(2) || '1.03'}x`}
+                  : `${multipliers[0]?.toFixed(2) || '1.00'}x`}
               </span>
             </div>
 
@@ -330,6 +407,27 @@ export function ChickenRoadPage() {
             onFinish={handleFinish}
             externalSteer={externalSteer}
           />
+
+          {/* Cash Out — only shown once the round is active AND at least one
+              lane has been successfully crossed (currentLane comes from the
+              server's response to /cross-lane, not client-side position). */}
+          {gameState === 'ACTIVE' && currentLane >= 1 && (
+            <div className="cr-cashout-wrap">
+              <button
+                type="button"
+                disabled={isCashoutLoading}
+                onClick={handleCashout}
+                className="cr-cashout-btn"
+              >
+                <Wallet size={16} />
+                <span>
+                  {isCashoutLoading
+                    ? 'CASHING OUT...'
+                    : `CASH OUT ₹${potentialWin.toFixed(2)}`}
+                </span>
+              </button>
+            </div>
+          )}
 
           {/* Floating Touch Controls (Mobile) */}
           <div className="cr-mobile-controls">
@@ -376,6 +474,44 @@ export function ChickenRoadPage() {
               <div className="cr-arcade-modal cr-arcade-modal--win">
                 <div className="cr-modal-badge">🏆</div>
                 <h2 className="cr-modal-heading">YOU WON</h2>
+                <div className="cr-modal-stat-row">
+                  <div className="cr-modal-stat">
+                    <span className="cr-modal-stat-label">Multiplier</span>
+                    <span className="cr-modal-stat-val text-yellow-400">
+                      {currentMultiplier.toFixed(2)}x
+                    </span>
+                  </div>
+                  <div className="cr-modal-stat">
+                    <span className="cr-modal-stat-label">Bet</span>
+                    <span className="cr-modal-stat-val">₹{betAmount}</span>
+                  </div>
+                </div>
+
+                <div className="cr-modal-payout-box">
+                  <span className="text-[11px] font-bold text-emerald-300 uppercase">Payout</span>
+                  <span className="text-2xl font-black text-emerald-400">
+                    ₹{winAmount.toFixed(2)}
+                  </span>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handlePlayAgain}
+                  className="cr-modal-action-btn cr-modal-action-btn--green"
+                >
+                  <RotateCcw size={16} />
+                  <span>PLAY AGAIN</span>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Cashed Out Modal */}
+          {gameState === 'CASHED_OUT' && (
+            <div className="cr-overlay-backdrop">
+              <div className="cr-arcade-modal cr-arcade-modal--win">
+                <div className="cr-modal-badge">💰</div>
+                <h2 className="cr-modal-heading">CASHED OUT</h2>
                 <div className="cr-modal-stat-row">
                   <div className="cr-modal-stat">
                     <span className="cr-modal-stat-label">Multiplier</span>
@@ -609,7 +745,7 @@ export function ChickenRoadPage() {
             <span className="cr-btn-icon-slot">
               {gameState === 'READY' && <Play size={15} fill="#FFFFFF" />}
               {gameState === 'ACTIVE' && <span className="cr-btn-pulse-dot" />}
-              {(gameState === 'WON' || gameState === 'LOST') && <RotateCcw size={15} />}
+              {(gameState === 'WON' || gameState === 'LOST' || gameState === 'CASHED_OUT') && <RotateCcw size={15} />}
             </span>
             <span className="cr-btn-label">
               {gameState === 'READY'

@@ -7,6 +7,7 @@ from __future__ import annotations
 import uuid
 import random
 import threading
+from decimal import Decimal, ROUND_HALF_UP
 from typing import Dict, List, Optional
 from pydantic import BaseModel, Field
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -17,16 +18,60 @@ from ..security.permissions import require_user
 from ..models.user import User
 from ..models.transaction import WalletTransactionType
 from ..services import wallet_service
-from ..services.settlement_service import settle_winning_bet
+from ..services.settlement_service import settle_winning_bet, calculate_winning_settlement
 from ..utils.responses import success_response, error_response
 
 router = APIRouter(prefix="/games/chicken-road", tags=["Chicken Road"])
 
+# Multiplier progression: the game starts at 1.00x, Road 1 is worth 1.00x, and every
+# road crossed AFTER that adds +0.03x.
+#   currentMultiplier = 1 + ((successfulCrossings - 1) * 0.03)
+# Road 1 = 1.00x, Road 2 = 1.03x, Road 3 = 1.06x, Road 4 = 1.09x, ... continuing the
+# same step for every subsequent road. Same formula applies to every difficulty tier
+# so the risk is entirely in how many roads the player chooses to cross, not a
+# per-tier curve. multipliers[i] (0-indexed) is the payout for having crossed road i+1.
+MULTIPLIER_STEP = Decimal("0.03")
+TOTAL_LANES = 10
+
+
+def _build_multiplier_table(count: int, step: Decimal = MULTIPLIER_STEP) -> List[float]:
+    """Formula-driven multiplier table, quantized to 2dp via Decimal to avoid float drift."""
+    return [
+        float((Decimal("1") + step * i).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
+        for i in range(count)
+    ]
+
+
+_LANE_MULTIPLIERS = _build_multiplier_table(TOTAL_LANES)
 DIFFICULTY_MULTIPLIERS = {
-    "EASY": [1.01, 1.03, 1.06, 1.10, 1.15, 1.19, 1.24, 1.30, 1.40, 1.50],
-    "MEDIUM": [1.03, 1.08, 1.15, 1.25, 1.38, 1.55, 1.75, 2.05, 2.45, 3.00],
-    "HARD": [1.05, 1.15, 1.30, 1.55, 1.90, 2.40, 3.10, 4.20, 6.00, 10.00],
+    "EASY": _LANE_MULTIPLIERS,
+    "MEDIUM": _LANE_MULTIPLIERS,
+    "HARD": _LANE_MULTIPLIERS,
 }
+
+
+def _payout_paisa(bet_paisa: int, multiplier: float) -> int:
+    """Total return in paise for a given multiplier, computed via Decimal for exactness."""
+    return int(
+        (Decimal(bet_paisa) * Decimal(str(multiplier))).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
+    )
+
+
+def _preview_total_return_paisa(db: Session, bet_paisa: int, multiplier: float) -> int:
+    """Exact preview (read-only, no wallet/DB side effects) of what /cashout or
+    /finish would actually pay right now at this multiplier — routed through the
+    SAME calculate_winning_settlement() used by real settlement (including
+    whatever platform winning fee is currently configured), so the previewed
+    amount and the real payout can never drift apart."""
+    win_paisa = _payout_paisa(bet_paisa, multiplier)
+    gross_profit = max(0, win_paisa - bet_paisa)
+    calc = calculate_winning_settlement(
+        db=db,
+        original_bet=bet_paisa,
+        gross_profit=gross_profit,
+        is_refund=(win_paisa >= bet_paisa and gross_profit == 0),
+    )
+    return calc.total_return
 
 class ActiveChickenRound:
     def __init__(self, round_id: str, user_id: uuid.UUID, bet_paisa: int, difficulty: str = "EASY"):
@@ -92,7 +137,7 @@ def get_game_state(
                 "current_multiplier": curr_mult,
                 "next_multiplier": next_mult,
                 "multipliers": rnd.multipliers,
-                "potential_win": (rnd.bet_paisa * curr_mult) / 100 if rnd.current_lane > 0 else rnd.bet_paisa / 100,
+                "potential_win": (_preview_total_return_paisa(db, rnd.bet_paisa, curr_mult) / 100) if rnd.current_lane > 0 else rnd.bet_paisa / 100,
                 "wallet_balance": (wallet.balance / 100) if wallet else 0.0,
             })
     
@@ -188,6 +233,7 @@ def start_game(
 @router.post("/cross-lane")
 def cross_lane(
     data: CrossLaneIn,
+    db: Session = Depends(get_db),
     user: User = Depends(require_user),
 ):
     """Player successfully crosses a traffic lane."""
@@ -208,7 +254,7 @@ def cross_lane(
         rnd.current_lane = max(rnd.current_lane, data.lane_index)
         curr_mult = rnd.multipliers[rnd.current_lane - 1]
         next_mult = rnd.multipliers[rnd.current_lane] if rnd.current_lane < rnd.total_lanes else rnd.multipliers[-1]
-        potential_win = round((rnd.bet_paisa * curr_mult) / 100, 2)
+        potential_win = _preview_total_return_paisa(db, rnd.bet_paisa, curr_mult) / 100
 
     return success_response({
         "round_id": rnd.round_id,
@@ -237,7 +283,7 @@ def finish_game(
             )
 
         final_multiplier = rnd.multipliers[-1]
-        win_paisa = int(round(rnd.bet_paisa * final_multiplier))
+        win_paisa = _payout_paisa(rnd.bet_paisa, final_multiplier)
         rnd.status = "WON"
         rnd.current_lane = rnd.total_lanes
         USER_ACTIVE_ROUND.pop(user.id, None)
@@ -321,13 +367,17 @@ def cashout_game(
                 detail=f"Cannot cash out round with status {rnd.status}.",
             )
 
+        # Backend is authoritative: never trust the frontend's Cash Out button state.
+        # A round can only be cashed out after at least one lane has actually been
+        # crossed (and recorded server-side via /cross-lane), never at the start pad.
         if rnd.current_lane == 0:
-            # At start sidewalk, refund/cashout 1.00x
-            cashout_mult = 1.0
-        else:
-            cashout_mult = rnd.multipliers[rnd.current_lane - 1]
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cross at least one lane before cashing out.",
+            )
 
-        win_paisa = int(round(rnd.bet_paisa * cashout_mult))
+        cashout_mult = rnd.multipliers[rnd.current_lane - 1]
+        win_paisa = _payout_paisa(rnd.bet_paisa, cashout_mult)
         rnd.status = "CASHED_OUT"
         USER_ACTIVE_ROUND.pop(user.id, None)
 

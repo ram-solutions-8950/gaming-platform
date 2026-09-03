@@ -270,7 +270,7 @@ export function AdminGamesPage() {
                 <textarea
                   value={configText}
                   onChange={(e) => setConfigText(e.target.value)}
-                  placeholder='{"round_duration_seconds":60,"payouts":{"dragon":1.0}}'
+                  placeholder='{"round_duration_seconds":60,"payouts":{"dragon":2.0,"tiger":2.0,"tie":10.0}}'
                   className="bg-dark-800 border border-dark-700 text-white rounded-md px-4 py-2 w-full focus:ring-brand-500 focus:border-brand-500 h-28 font-mono text-xs"
                 />
               </div>

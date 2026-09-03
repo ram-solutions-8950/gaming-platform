@@ -19,11 +19,23 @@ const START_ZONE_WIDTH = 130;
 const LANE_WIDTH = 130;
 const FINISH_ZONE_WIDTH = 150;
 
+// Collision hitboxes are derived from the SAME dimensions used to render each
+// sprite, with only a small forgiving inset (not the previous arbitrary
+// ~30-50% shrink) — so "visibly touching" reliably means "collides" and vice
+// versa. Chicken half-extents approximate its solid body circle (radius 18,
+// see DRAW CHICKEN HERO below) rather than its decorative beak/tail/comb tips.
+const CHICKEN_HITBOX_HALF_WIDTH = 16;
+const CHICKEN_HITBOX_HALF_HEIGHT = 16;
+const CHICKEN_POTHOLE_RADIUS = 14;
+const VEHICLE_HITBOX_INSET_X = 2;
+const VEHICLE_HITBOX_INSET_Y = 2;
+
 interface Vehicle {
   id: number;
   lane: number;
   x: number;
   y: number;
+  prevY: number; // previous frame's Y, used for continuous (swept) collision checks
   width: number; // horizontal width
   height: number; // vertical length
   speed: number;
@@ -261,7 +273,10 @@ export const RoadCrossingGame: React.FC<RoadCrossingGameProps> = ({
       s.screenShake = 0;
     } else if (gameState === 'LOST') {
       stateRef.current.chicken.isHit = true;
-    } else if (gameState === 'WON') {
+    } else if (gameState === 'WON' || gameState === 'CASHED_OUT') {
+      // Cash Out freezes the chicken safely in place (same idle pose as WON,
+      // no crash) — movement/collision checks already stop the instant
+      // gameState leaves 'ACTIVE', this just makes the frozen pose explicit.
       stateRef.current.chicken.isWon = true;
     }
   }, [gameState, fixedY]);
@@ -349,6 +364,7 @@ export const RoadCrossingGame: React.FC<RoadCrossingGameProps> = ({
           lane,
           x: laneCenterX,
           y: startY,
+          prevY: startY,
           width: template.width,
           height: template.height,
           // All vehicles in the same lane now share identical speed — a
@@ -598,8 +614,11 @@ export const RoadCrossingGame: React.FC<RoadCrossingGameProps> = ({
       // 1. UPDATE GAME PHYSICS & MOVEMENT
       // ──────────────────────────────────────────
 
-      // Update vertical traffic
+      // Update vertical traffic. prevY is captured before the move so the
+      // collision check below can sweep the full distance covered this
+      // frame, not just the vehicle's final resting position.
       s.vehicles.forEach((v) => {
+        v.prevY = v.y;
         v.y += v.speed * v.direction * dt;
       });
 
@@ -624,6 +643,9 @@ export const RoadCrossingGame: React.FC<RoadCrossingGameProps> = ({
         const minGap = Math.max(v.height, 40) + 40;
         if (nearestGap >= minGap) {
           v.y = resetY;
+          // Teleport, not movement — reset the sweep baseline so the collision
+          // check below never treats this jump as a giant swept path.
+          v.prevY = resetY;
         }
         // else: hold position just past the edge (invisible, off-screen)
         // and re-check next frame once the lane clears
@@ -676,29 +698,33 @@ export const RoadCrossingGame: React.FC<RoadCrossingGameProps> = ({
         }
 
         // ──────────────────────────────────────────
-        // 2. FORGIVING COLLISION DETECTION
+        // 2. COLLISION DETECTION
+        // Hitboxes are sized from the actual rendered sprite dimensions (see
+        // CHICKEN_HITBOX_* / VEHICLE_HITBOX_INSET_* above) so a visible touch
+        // reliably registers and a visible gap reliably does not. Each
+        // vehicle's check sweeps the full vertical distance it moved this
+        // frame (prevY -> y), not just its final position, so a fast vehicle
+        // can't visually skip over the chicken between two animation frames.
         // ──────────────────────────────────────────
         const chickenBox = {
-          left: s.chicken.x - 12,
-          right: s.chicken.x + 12,
-          top: s.chicken.y - 12,
-          bottom: s.chicken.y + 12,
+          left: s.chicken.x - CHICKEN_HITBOX_HALF_WIDTH,
+          right: s.chicken.x + CHICKEN_HITBOX_HALF_WIDTH,
+          top: s.chicken.y - CHICKEN_HITBOX_HALF_HEIGHT,
+          bottom: s.chicken.y + CHICKEN_HITBOX_HALF_HEIGHT,
         };
 
         for (const v of s.vehicles) {
-          const vBox = {
-            left: v.x - v.width / 2 + 6,
-            right: v.x + v.width / 2 - 6,
-            top: v.y - v.height / 2 + 10,
-            bottom: v.y + v.height / 2 - 10,
-          };
+          const vLeft = v.x - v.width / 2 + VEHICLE_HITBOX_INSET_X;
+          const vRight = v.x + v.width / 2 - VEHICLE_HITBOX_INSET_X;
+          const sweepTop = Math.min(v.prevY, v.y) - v.height / 2 + VEHICLE_HITBOX_INSET_Y;
+          const sweepBottom = Math.max(v.prevY, v.y) + v.height / 2 - VEHICLE_HITBOX_INSET_Y;
 
-          // AABB Box intersection
+          // Swept AABB intersection (continuous collision across this frame's movement)
           if (
-            chickenBox.left < vBox.right &&
-            chickenBox.right > vBox.left &&
-            chickenBox.top < vBox.bottom &&
-            chickenBox.bottom > vBox.top
+            chickenBox.left < vRight &&
+            chickenBox.right > vLeft &&
+            chickenBox.top < sweepBottom &&
+            chickenBox.bottom > sweepTop
           ) {
             s.chicken.isHit = true;
             s.screenShake = 16;
@@ -709,13 +735,13 @@ export const RoadCrossingGame: React.FC<RoadCrossingGameProps> = ({
           }
         }
 
-        // ── Pothole collision (static circular obstacles) ──
+        // ── Pothole collision (static, visible circular obstacles — see
+        // DRAW POTHOLES below; radius here matches the drawn radius exactly) ──
         if (!s.chicken.isHit) {
           for (const ph of s.potholes) {
             const dx = s.chicken.x - ph.x;
             const dy = s.chicken.y - ph.y;
-            // chicken radius ~10, add pothole radius for combined hit zone
-            if (dx * dx + dy * dy < (ph.radius + 10) * (ph.radius + 10)) {
+            if (dx * dx + dy * dy < (ph.radius + CHICKEN_POTHOLE_RADIUS) * (ph.radius + CHICKEN_POTHOLE_RADIUS)) {
               s.chicken.isHit = true;
               s.screenShake = 14;
               spawnFeathers(s.chicken.x, s.chicken.y);
@@ -912,7 +938,10 @@ export const RoadCrossingGame: React.FC<RoadCrossingGameProps> = ({
         ctx.fillText(dir, laneCenterX, roadBottom - 20);
 
         // Pothole / Manhole Multiplier Checkpoint embedded in asphalt
-        const mult = multipliers[lane - 1] || 1.0 + lane * 0.05;
+        // Fallback only fires if the backend's multipliers array is shorter than totalLanes;
+        // matches the Road-1-is-1.00x, +0.03x-per-road-after formula in
+        // backend/app/routers/chicken_road.py.
+        const mult = multipliers[lane - 1] || Math.round((1 + (lane - 1) * 0.03) * 100) / 100;
         const isCrossed = s.highestLaneCrossed >= lane;
         const markerX = laneCenterX;
         const markerY = fixedY;
@@ -992,6 +1021,36 @@ export const RoadCrossingGame: React.FC<RoadCrossingGameProps> = ({
         ctx.fillStyle = '#22C55E';
         ctx.fill();
       }
+
+      // ──────────────────────────────────────────
+      // 3.5 DRAW POTHOLES (visible, avoidable hazards — radius matches the
+      // collision check exactly, see CHICKEN_POTHOLE_RADIUS above). These
+      // were previously invisible: they still killed the player on overlap
+      // but were never rendered, which looked like an unfair random death
+      // with no vehicle nearby.
+      // ──────────────────────────────────────────
+      s.potholes.forEach((ph) => {
+        ctx.save();
+        ctx.translate(ph.x, ph.y);
+        const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, ph.radius);
+        grad.addColorStop(0, '#0A0A0A');
+        grad.addColorStop(0.7, '#1C1C1C');
+        grad.addColorStop(1, '#3A3A3A');
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(0, 0, ph.radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.6)';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        // Warning rim so it reads clearly against dark asphalt
+        ctx.strokeStyle = 'rgba(251, 191, 36, 0.35)';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(0, 0, ph.radius - 1.5, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+      });
 
       // ──────────────────────────────────────────
       // 4. DRAW VERTICAL VEHICLES (Moving UP/DOWN)
@@ -1212,7 +1271,58 @@ export const RoadCrossingGame: React.FC<RoadCrossingGameProps> = ({
         ctx.restore();
       });
 
+      // ──────────────────────────────────────────
+      // 7. DEV-ONLY DEBUG HITBOX OVERLAY (world space — never rendered in
+      // production builds; verifies visual sprites and collision boxes align)
+      // ──────────────────────────────────────────
+      if (import.meta.env.DEV) {
+        ctx.save();
+        ctx.strokeStyle = '#22D3EE';
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(
+          s.chicken.x - CHICKEN_HITBOX_HALF_WIDTH,
+          s.chicken.y - CHICKEN_HITBOX_HALF_HEIGHT,
+          CHICKEN_HITBOX_HALF_WIDTH * 2,
+          CHICKEN_HITBOX_HALF_HEIGHT * 2
+        );
+        ctx.strokeStyle = '#F87171';
+        s.vehicles.forEach((v) => {
+          ctx.strokeRect(
+            v.x - v.width / 2 + VEHICLE_HITBOX_INSET_X,
+            v.y - v.height / 2 + VEHICLE_HITBOX_INSET_Y,
+            v.width - VEHICLE_HITBOX_INSET_X * 2,
+            v.height - VEHICLE_HITBOX_INSET_Y * 2
+          );
+        });
+        ctx.strokeStyle = '#FBBF24';
+        s.potholes.forEach((ph) => {
+          ctx.beginPath();
+          ctx.arc(ph.x, ph.y, ph.radius + CHICKEN_POTHOLE_RADIUS, 0, Math.PI * 2);
+          ctx.stroke();
+        });
+        ctx.restore();
+      }
+
       ctx.restore();
+
+      // Screen-space debug text (unaffected by camera/scale) — dev only.
+      if (import.meta.env.DEV) {
+        ctx.save();
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.font = '11px monospace';
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+        ctx.fillRect(4, 4, 260, 92);
+        ctx.fillStyle = '#22D3EE';
+        const lines = [
+          `state: ${s.gameState}  lane: ${s.currentLane}/${s.totalLanes}`,
+          `chicken: (${s.chicken.x.toFixed(1)}, ${s.chicken.y.toFixed(1)}) hit:${s.chicken.isHit} won:${s.chicken.isWon}`,
+          `highestLaneCrossed: ${s.highestLaneCrossed}`,
+          `vehicles: ${s.vehicles.length}  potholes: ${s.potholes.length}`,
+          `cashout eligible: ${s.currentLane >= 1 && s.gameState === 'ACTIVE'}`,
+        ];
+        lines.forEach((line, i) => ctx.fillText(line, 10, 18 + i * 14));
+        ctx.restore();
+      }
 
       // Request next frame
       animId = requestAnimationFrame(renderLoop);

@@ -23,11 +23,18 @@ from ...services.wallet_service import debit_wallet, credit_wallet
 from ...services.settlement_service import settle_winning_bet
 
 # Authoritative defaults: 15-second betting window + 10-second calculation/animation = 25s total round
+#
+# Payout multiplier semantics: each value is the TOTAL RETURN multiplier, i.e. it already
+# includes the original stake. total_return = stake * multiplier.
+#   dragon/tiger = 2.0  -> a winning bet returns 2x stake (1x stake back + 1x stake profit).
+#                          A Rs.100 bet returns Rs.200 total, not Rs.300.
+#   tie          = 10.0 -> a winning bet returns 10x stake (1x stake back + 9x stake profit).
+# See calculate_payout_gross() and settle_round() below, which both implement this formula.
 DEFAULT_CONFIG = {
     "round_duration_seconds": 25,
     "betting_duration_seconds": 15,
     "allowed_bets": {"dragon": True, "tiger": True, "tie": True},
-    "payouts": {"dragon": 1.0, "tiger": 1.0, "tie": 11.0},
+    "payouts": {"dragon": 2.0, "tiger": 2.0, "tie": 10.0},
     "deck": {"type": "STANDARD_52_CARD", "cards_per_round": 2},
     "min_bet": 1000,
     "max_bet": 200000,
@@ -82,15 +89,15 @@ def calculate_payout_gross(
     result: str,
     payout_configuration: dict,
 ) -> int:
-    """Gross return in paise: stake + (stake * multiplier) on win, 0 on loss."""
+    """Total return in paise: stake * multiplier on win (stake included), 0 on loss."""
     if bet_type.upper() != result.upper():
         return 0
     key = bet_type.lower()
     if key not in payout_configuration:
         raise ValueError(f"No payout configured for bet type: {bet_type}")
     mult = Decimal(str(payout_configuration[key]))
-    net_win = (Decimal(bet_amount) * mult).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
-    return int(Decimal(bet_amount) + net_win)
+    total_return = (Decimal(bet_amount) * mult).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
+    return int(total_return)
 
 
 def _parse_prediction(prediction: str) -> GamePrediction:
@@ -305,8 +312,10 @@ class DragonTigerEngine(GameEngine):
             bet.settled_at = rd.ended_at
             if bet.prediction.value.upper() == result.upper():
                 key = bet.prediction.value.lower()
-                mult = Decimal(str(cfg["payouts"].get(key, 1.0)))
-                gross_profit = int((Decimal(bet.stake_amount) * mult).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+                # cfg["payouts"][key] is a TOTAL RETURN multiplier (stake included).
+                # settle_winning_bet() wants profit only, so subtract 1x stake here.
+                mult = Decimal(str(cfg["payouts"].get(key, 2.0)))
+                gross_profit = int((Decimal(bet.stake_amount) * (mult - Decimal("1"))).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
                 calc, _ = settle_winning_bet(
                     db=db,
                     user_id=bet.user_id,

@@ -148,7 +148,7 @@ export function DragonTigerPage() {
 
   const game = gameState?.game || catalogGame;
   const cfg = game?.config || {};
-  const payouts = cfg.payouts || { dragon: 1, tiger: 1, tie: 11 };
+  const payouts = cfg.payouts || { dragon: 2, tiger: 2, tie: 10 };
   const allowed = cfg.allowed_bets || { dragon: true, tiger: true, tie: true };
 
   /* ── data fetching ── */
