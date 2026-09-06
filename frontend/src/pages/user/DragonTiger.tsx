@@ -682,9 +682,9 @@ export function DragonTigerPage() {
 
   /* ── DRAGON | TIE | TIGER order (matches reference) ── */
   const options = [
-    { key: 'DRAGON', enabled: allowed.dragon !== false, payout: payouts.dragon },
-    { key: 'TIE', enabled: allowed.tie !== false, payout: payouts.tie },
-    { key: 'TIGER', enabled: allowed.tiger !== false, payout: payouts.tiger },
+    { key: 'DRAGON', enabled: allowed.dragon !== false, payout: payouts.dragon, displayMultiplier: '2X' },
+    { key: 'TIE', enabled: allowed.tie !== false, payout: payouts.tie, displayMultiplier: '10X' },
+    { key: 'TIGER', enabled: allowed.tiger !== false, payout: payouts.tiger, displayMultiplier: '2X' },
   ];
 
   /* ── countdown status label & styling ── */
@@ -1014,7 +1014,7 @@ export function DragonTigerPage() {
                 {/* Bottom: name + multiplier */}
                 <div className="flex flex-col items-center pb-2 z-10">
                   <span className="text-sm sm:text-lg font-black tracking-[0.15em] uppercase text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">{opt.key}</span>
-                  <span className="text-base sm:text-xl font-black text-yellow-400 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)] leading-none">{opt.payout}X</span>
+                  <span className="text-base sm:text-xl font-black text-yellow-400 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)] leading-none">{opt.displayMultiplier}</span>
                 </div>
               </button>
             );
