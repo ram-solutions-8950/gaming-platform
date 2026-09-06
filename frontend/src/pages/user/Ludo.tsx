@@ -12,6 +12,8 @@ import { LudoWinnerModal } from '../../components/ludo/LudoWinnerModal';
 import { soundManager } from '../../services/soundManager';
 import { authStorage } from '../../services/authStorage';
 import { getWebSocketUrl } from '../../utils/ws';
+import { lockLandscape } from '../../utils/nativeOrientation';
+import { ArrowLeft } from 'lucide-react';
 
 export const Ludo: React.FC = () => {
   const { user } = useAuthStore();
@@ -19,6 +21,7 @@ export const Ludo: React.FC = () => {
 
   const [walletBalance, setWalletBalance] = useState<number>(0);
   const [matchState, setMatchState] = useState<LudoMatchState | null>(null);
+  const [showExitConfirm, setShowExitConfirm] = useState<boolean>(false);
 
   // Matchmaking State
   const [searching, setSearching] = useState<boolean>(false);
@@ -35,6 +38,11 @@ export const Ludo: React.FC = () => {
 
   // Guard against duplicate match transitions
   const matchTransitionRef = useRef<string | null>(null);
+
+  // Lock orientation to landscape
+  useEffect(() => {
+    lockLandscape().catch(() => {});
+  }, []);
 
   // Fetch balance
   const refreshWallet = useCallback(async () => {
@@ -349,14 +357,40 @@ export const Ludo: React.FC = () => {
     }
   };
 
-  const handleLeaveMatch = async () => {
-    if (!matchState) return;
-    if (window.confirm('Are you sure you want to forfeit this match? Your entry fee will not be refunded.')) {
+  const handleExitLobby = async () => {
+    if (searching) {
+      await handleCancelMatchmaking();
+    }
+    navigate('/dashboard');
+  };
+
+  const handleConfirmExitActiveMatch = async () => {
+    setShowExitConfirm(false);
+    if (matchState) {
       try {
         await ludoService.leaveMatch(matchState.id);
-        refreshWallet();
       } catch {}
     }
+    if (wsRef.current) {
+      try {
+        wsRef.current.close();
+      } catch {}
+      wsRef.current = null;
+    }
+    if (mmWsRef.current) {
+      try {
+        mmWsRef.current.close();
+      } catch {}
+      mmWsRef.current = null;
+    }
+    if (pollIntervalRef.current) {
+      clearInterval(pollIntervalRef.current);
+      pollIntervalRef.current = null;
+    }
+    setMatchState(null);
+    matchTransitionRef.current = null;
+    refreshWallet();
+    navigate('/dashboard');
   };
 
   const handleReturnToLobby = () => {
@@ -384,8 +418,10 @@ export const Ludo: React.FC = () => {
       style={{
         WebkitOverflowScrolling: 'touch',
         touchAction: 'pan-y',
-        paddingLeft: 'max(env(safe-area-inset-left, 0px), 8px)',
-        paddingRight: 'max(env(safe-area-inset-right, 0px), 8px)',
+        paddingLeft: 'max(var(--safe-left), 8px)',
+        paddingRight: 'max(var(--safe-right), 8px)',
+        paddingTop: 'max(var(--safe-top), 4px)',
+        paddingBottom: 'max(var(--safe-bottom), 8px)',
       }}
     >
       {/* 1. LOBBY VIEW */}
@@ -398,24 +434,28 @@ export const Ludo: React.FC = () => {
             searchElapsedSeconds={searchElapsedSeconds}
             searchRemainingSeconds={searchRemainingSeconds}
             onCancelMatchmaking={handleCancelMatchmaking}
+            onExit={handleExitLobby}
           />
         </div>
       )}
 
       {/* 2. ACTIVE MATCH VIEW */}
       {matchState && (
-        <div className="ludo-active-match w-full max-w-4xl flex flex-col gap-3 sm:gap-4 items-center">
+        <div className="ludo-active-match w-full max-w-5xl h-full flex flex-col gap-2 items-center justify-between overflow-hidden">
           {/* Header Bar */}
-          <div className="ludo-game-header w-full flex items-center justify-between p-3 bg-slate-900/80 backdrop-blur-md rounded-2xl border border-slate-800 shadow-md">
+          <div className="ludo-game-header w-full flex items-center justify-between px-3 py-1.5 bg-slate-900/80 backdrop-blur-md rounded-xl border border-slate-800 shadow-md shrink-0">
             <div className="flex items-center gap-3">
               <button
-                onClick={() => navigate('/dashboard')}
-                className="text-xs font-bold px-2.5 py-1 bg-slate-800 hover:bg-slate-700 rounded-lg text-slate-300 transition"
+                type="button"
+                onClick={() => setShowExitConfirm(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800/90 hover:bg-slate-700 active:scale-95 border border-slate-700 rounded-xl text-slate-200 text-xs font-bold transition shadow-sm cursor-pointer shrink-0"
+                aria-label="Exit Game"
               >
-                ← Lobby
+                <ArrowLeft size={16} />
+                <span>Exit</span>
               </button>
               <div>
-                <h1 className="text-base sm:text-lg font-black text-amber-400 leading-tight">
+                <h1 className="text-sm sm:text-base font-black text-amber-400 leading-tight">
                   LUDO {matchState.players.length}P
                 </h1>
                 <span className="text-[10px] text-slate-400">
@@ -426,30 +466,17 @@ export const Ludo: React.FC = () => {
 
             <div className="flex items-center gap-2">
               <button
-                onClick={handleLeaveMatch}
-                className="text-xs font-bold px-3 py-1.5 bg-red-950/80 hover:bg-red-900 border border-red-500/40 text-red-300 rounded-xl transition"
+                type="button"
+                onClick={() => setShowExitConfirm(true)}
+                className="text-xs font-bold px-3 py-1 bg-red-950/80 hover:bg-red-900 border border-red-500/40 text-red-300 rounded-lg transition active:scale-95 cursor-pointer"
               >
                 Forfeit
               </button>
             </div>
           </div>
 
-          {/* Opponents Section */}
-          <div className="ludo-opponents-grid w-full grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
-            {matchState.players
-              .filter((p) => p.user_id !== user?.id)
-              .map((p) => (
-                <LudoPlayerPanel
-                  key={p.id}
-                  player={p}
-                  isCurrentTurn={matchState.current_turn_color === p.color}
-                  isMe={false}
-                />
-              ))}
-          </div>
-
-          {/* Center Stage: Board & Dice */}
-          <div className="ludo-board-control-row w-full flex flex-col md:flex-row items-center justify-center gap-4">
+          {/* Center Stage: Board & Controls Side Panel */}
+          <div className="ludo-board-control-row w-full flex-1 flex flex-row items-center justify-center gap-3 sm:gap-6 overflow-hidden min-h-0">
             {/* Ludo Board */}
             <LudoBoard
               players={matchState.players}
@@ -460,9 +487,9 @@ export const Ludo: React.FC = () => {
             />
 
             {/* Controls Side Panel */}
-            <div className="ludo-controls-side-panel flex flex-col items-center gap-3 w-full max-w-[280px]">
-              {/* Landscape Mode: All Players Compact List */}
-              <div className="ludo-landscape-players-list w-full hidden flex-col gap-1.5">
+            <div className="ludo-controls-side-panel flex flex-col items-center justify-center gap-1.5 w-full max-w-[280px] shrink-0 h-full max-h-full overflow-y-auto">
+              {/* All Players List */}
+              <div className="w-full flex flex-col gap-1">
                 {matchState.players.map((p) => (
                   <LudoPlayerPanel
                     key={p.id}
@@ -472,17 +499,6 @@ export const Ludo: React.FC = () => {
                   />
                 ))}
               </div>
-
-              {/* My Player Info */}
-              {myPlayer && (
-                <div className="ludo-my-player-wrapper w-full">
-                  <LudoPlayerPanel
-                    player={myPlayer}
-                    isCurrentTurn={isMyTurn}
-                    isMe={true}
-                  />
-                </div>
-              )}
 
               {/* Dice & Timer Box */}
               <LudoDice
@@ -505,6 +521,55 @@ export const Ludo: React.FC = () => {
               onReturnToLobby={handleReturnToLobby}
             />
           )}
+        </div>
+      )}
+
+      {/* 3. EXIT CONFIRMATION MODAL */}
+      {showExitConfirm && (
+        <div
+          className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/85 backdrop-blur-md p-4 animate-fade-in select-none"
+          onClick={() => setShowExitConfirm(false)}
+        >
+          <div
+            className="relative w-full max-w-sm bg-gradient-to-b from-[#1c0836] via-[#120324] to-[#0a0117] border-2 border-amber-500/60 rounded-3xl p-5 sm:p-6 shadow-[0_0_40px_rgba(0,0,0,0.85)] text-white text-center flex flex-col items-center gap-3.5 my-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Warning Icon Badge */}
+            <div className="w-14 h-14 rounded-full bg-gradient-to-br from-red-600/30 via-red-900/40 to-slate-900 border-2 border-red-500/50 flex items-center justify-center text-3xl shadow-inner">
+              ⚠️
+            </div>
+
+            {/* Title & Copy */}
+            <div className="space-y-1">
+              <h3 className="text-lg font-black text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-yellow-200 to-amber-500 uppercase tracking-wide">
+                Exit Game?
+              </h3>
+              <p className="text-xs text-slate-300 font-medium">
+                Are you sure you want to leave the current game?
+              </p>
+              <span className="text-[11px] text-red-400 font-semibold block pt-0.5">
+                Leaving an active match will forfeit your entry fee.
+              </span>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="grid grid-cols-2 gap-3 w-full pt-1">
+              <button
+                type="button"
+                onClick={() => setShowExitConfirm(false)}
+                className="py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 active:scale-95 text-xs font-bold text-slate-200 border border-slate-700 transition cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmExitActiveMatch}
+                className="py-2.5 px-4 rounded-xl bg-gradient-to-r from-red-600 via-rose-600 to-red-700 hover:brightness-110 active:scale-95 text-xs font-black text-white shadow-lg shadow-red-900/40 border border-red-400/50 transition cursor-pointer uppercase tracking-wider"
+              >
+                Exit Game
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

@@ -2,12 +2,17 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { TeenPattiLobby } from '../../components/teenPatti/TeenPattiLobby';
 import { TeenPattiTable } from '../../components/teenPatti/TeenPattiTable';
+import { setNativeLandscape } from '../../utils/nativeOrientation';
 import '../../styles/teen-patti.css';
 
 export const TeenPatti: React.FC = () => {
   const { tableId: urlTableId } = useParams<{ tableId?: string }>();
   const navigate = useNavigate();
   const [activeTableId, setActiveTableId] = useState<string | null>(urlTableId || null);
+
+  useEffect(() => {
+    setNativeLandscape().catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (urlTableId) {

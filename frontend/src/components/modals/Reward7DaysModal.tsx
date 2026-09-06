@@ -65,7 +65,7 @@ export const Reward7DaysModal: React.FC<Props> = ({ onClose, onWalletRefresh, on
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="relative w-full max-w-lg bg-gradient-to-b from-[#2a0b5a] via-[#1b053c] to-[#100224] rounded-2xl border-2 border-amber-400/80 shadow-[0_0_40px_rgba(245,158,11,0.35)] overflow-hidden text-white flex flex-col max-h-[90vh]">
+      <div className="relative w-full max-w-lg bg-gradient-to-b from-[#2a0b5a] via-[#1b053c] to-[#100224] rounded-2xl border-2 border-amber-400/80 shadow-[0_0_40px_rgba(245,158,11,0.35)] overflow-hidden text-white flex flex-col max-h-[calc(100dvh-var(--safe-top)-var(--safe-bottom)-24px)]">
         {/* Header Ribbon / Banner */}
         <div className="relative bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-600 px-6 py-3 flex items-center justify-between shadow-md">
           <div className="flex items-center gap-2">

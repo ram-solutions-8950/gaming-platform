@@ -8,6 +8,7 @@ import { PokerTable } from '../../components/poker/PokerTable';
 import { PokerResult } from '../../components/poker/PokerResult';
 import { RulesModal } from '../../components/poker/RulesModal';
 import { soundManager } from '../../services/soundManager';
+import { setNativeLandscape } from '../../utils/nativeOrientation';
 import '../../styles/poker.css';
 
 export function PokerPage() {
@@ -25,21 +26,9 @@ export function PokerPage() {
     setActiveTableId(paramTableId || null);
   }, [paramTableId]);
 
-  // Landscape orientation locking on mobile (unlocked on unmount)
+  // Landscape orientation locking on mobile
   useEffect(() => {
-    try {
-      if (screen.orientation && (screen.orientation as any).lock) {
-        (screen.orientation as any).lock('landscape').catch(() => {});
-      }
-    } catch {}
-
-    return () => {
-      try {
-        if (screen.orientation && screen.orientation.unlock) {
-          screen.orientation.unlock();
-        }
-      } catch {}
-    };
+    setNativeLandscape().catch(() => {});
   }, []);
 
   const refreshWallet = useCallback(async () => {

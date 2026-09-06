@@ -20,6 +20,7 @@ import {
 import { walletService } from '../../services/wallet';
 import { RoadCrossingGame } from '../../components/chickenRoad/RoadCrossingGame';
 import { soundManager } from '../../services/soundManager';
+import { lockLandscape } from '../../utils/nativeOrientation';
 import '../../styles/chicken-road.css';
 
 const DEFAULT_MULTIPLIERS: Record<Difficulty, number[]> = {
@@ -95,6 +96,7 @@ export function ChickenRoadPage() {
   }, []);
 
   useEffect(() => {
+    lockLandscape().catch(() => {});
     syncState();
   }, [syncState]);
 

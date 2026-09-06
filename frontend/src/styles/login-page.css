@@ -1,18 +1,18 @@
-/* ───────────────────────────────────────────────────────────
+/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
    Corona 888 CASINO LOGIN & SIGNUP PAGE THEME
-   ─────────────────────────────────────────────────────────── */
+   â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 .auth-page-wrapper {
-  min-height: 100vh;
   min-height: 100dvh;
   width: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 20px;
+  padding: max(var(--safe-top), 16px) max(var(--safe-right), 16px) max(var(--safe-bottom), 16px) max(var(--safe-left), 16px);
   box-sizing: border-box;
   position: relative;
   overflow-x: hidden;
+  overflow-y: auto;
   background-color: #040713;
   background-image:
     linear-gradient(rgba(3, 6, 16, 0.15), rgba(3, 6, 16, 0.30)),
@@ -26,6 +26,8 @@
 .casino-login-card {
   width: 100%;
   max-width: 410px;
+  max-height: calc(100dvh - var(--safe-top) - var(--safe-bottom) - 24px);
+  overflow-y: auto;
   background: rgba(11, 15, 27, 0.78);
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 18px;
@@ -260,10 +262,10 @@
   text-decoration: underline;
 }
 
-/* ───────────────────────────────────────────────────────────
-   MOBILE LANDSCAPE (844 × 390, 800 × 360, 812 × 375, etc.)
+/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+   MOBILE LANDSCAPE (844 Ã— 390, 800 Ã— 360, 812 Ã— 375, etc.)
    Aligns form to the right so Corona 888 crest is visible on left
-   ─────────────────────────────────────────────────────────── */
+   â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 @media (orientation: landscape) and (max-height: 550px) {
   .auth-page-wrapper {
     padding: 10px 4% !important;
@@ -361,14 +363,15 @@
   }
 }
 
-/* ───────────────────────────────────────────────────────────
-   PORTRAIT MOBILE (390 × 844, 412 × 915, etc.)
+/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+   PORTRAIT MOBILE (390 Ã— 844, 412 Ã— 915, etc.)
    Aligns form towards bottom so Corona 888 crest is visible above
-   ─────────────────────────────────────────────────────────── */
+   â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 @media (orientation: portrait) {
   .auth-page-wrapper {
-    align-items: flex-end;
-    padding-bottom: 5vh;
+    align-items: center;
+    justify-content: center;
+    padding-bottom: max(var(--safe-bottom), 20px);
     background-size: cover;
     background-position: center top;
   }

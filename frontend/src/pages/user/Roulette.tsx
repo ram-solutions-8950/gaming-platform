@@ -4,6 +4,7 @@ import { rouletteService, type RouletteState } from '../../services/roulette';
 import { walletService } from '../../services/wallet';
 import { soundManager } from '../../services/soundManager';
 import { RouletteWheel } from '../../components/roulette/RouletteWheel';
+import { setNativeLandscape } from '../../utils/nativeOrientation';
 import '../../styles/roulette.css';
 
 // European Roulette Red Numbers
@@ -119,6 +120,7 @@ export function RoulettePage() {
   };
 
   useEffect(() => {
+    setNativeLandscape().catch(() => {});
     refreshBalance();
     fetchState();
     pollIntervalRef.current = window.setInterval(fetchState, 700);

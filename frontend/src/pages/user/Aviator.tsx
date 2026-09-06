@@ -8,6 +8,7 @@ import { AviatorBetPanel } from '../../components/aviator/AviatorBetPanel';
 import { AviatorHistory } from '../../components/aviator/AviatorHistory';
 import { AviatorPlayers } from '../../components/aviator/AviatorPlayers';
 import { soundManager } from '../../services/soundManager';
+import { setNativeLandscape } from '../../utils/nativeOrientation';
 import '../../styles/aviator.css';
 
 export function AviatorPage() {
@@ -44,24 +45,11 @@ export function AviatorPage() {
     }
   }, []);
 
-  // Landscape orientation locking (game-specific, unlocked on unmount)
+  // Landscape orientation locking
   useEffect(() => {
-    try {
-      if (screen.orientation && (screen.orientation as any).lock) {
-        (screen.orientation as any).lock('landscape').catch(() => {});
-      }
-    } catch {}
-
+    setNativeLandscape().catch(() => {});
     refreshWallet();
     loadInitialData();
-
-    return () => {
-      try {
-        if (screen.orientation && screen.orientation.unlock) {
-          screen.orientation.unlock();
-        }
-      } catch {}
-    };
   }, [refreshWallet, loadInitialData]);
 
   const [actionErrorMessage, setActionErrorMessage] = useState<string | null>(null);

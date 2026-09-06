@@ -85,7 +85,7 @@ export const LudoBoard: React.FC<Props> = ({
   };
 
   return (
-    <div className="ludo-board-wrapper relative w-full max-w-[620px] aspect-square rounded-2xl p-2 sm:p-3 bg-gradient-to-br from-slate-900 via-slate-950 to-amber-950/40 shadow-2xl border border-amber-500/30 overflow-hidden flex items-center justify-center">
+    <div className="ludo-board-wrapper relative w-full max-w-[min(90vw,calc(100dvh-var(--safe-top)-var(--safe-bottom)-72px),440px)] aspect-square rounded-2xl p-2 sm:p-2.5 bg-gradient-to-br from-slate-900 via-slate-950 to-amber-950/40 shadow-2xl border border-amber-500/30 overflow-hidden flex items-center justify-center shrink-0">
       <svg
         viewBox="0 0 1500 1500"
         className="w-full h-full select-none rounded-xl drop-shadow-lg"

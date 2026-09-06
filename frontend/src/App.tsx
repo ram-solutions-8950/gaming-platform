@@ -194,10 +194,10 @@ function App() {
           <Route path="/games/roulette" element={<RoulettePage />} />
           <Route path="/games/chicken-road" element={<ChickenRoadPage />} />
           <Route path="/games/triple-777" element={<Triple777Page />} />
+          <Route path="/games/ludo" element={<Ludo />} />
           <Route element={<UserLayout />}>
             <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/games-catalog" element={<GameCatalogPage />} />
-            <Route path="/games/ludo" element={<Ludo />} />
             <Route path="/wallet" element={<WalletPage />} />
             <Route path="/transactions" element={<TransactionsPage />} />
             <Route path="/deposit" element={<DepositPage />} />

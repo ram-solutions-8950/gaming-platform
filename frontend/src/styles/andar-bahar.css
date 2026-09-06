@@ -69,7 +69,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 12px;
+  padding: var(--safe-top) max(var(--safe-right), 12px) 0 max(var(--safe-left), 12px);
+  min-height: calc(44px + var(--safe-top));
   background: linear-gradient(180deg, #32105F, #21003F);
   border-bottom: 1px solid rgba(255, 210, 26, 0.25);
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
@@ -194,7 +195,7 @@
   flex-direction: column;
   align-items: center;
   gap: 8px;
-  padding: 10px 4px;
+  padding: 10px 4px 10px max(var(--safe-left), 4px);
   background: rgba(4, 16, 10, 0.6);
   border-right: 1px solid rgba(255,255,255,0.06);
   z-index: 25;
@@ -526,7 +527,7 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
-  padding: 8px 16px;
+  padding: 6px max(var(--safe-right), 16px) max(var(--safe-bottom), 6px) max(var(--safe-left), 16px);
   background: rgba(4, 16, 10, 0.95);
   border-top: 1px solid rgba(244, 208, 104, 0.25);
   z-index: 10;
@@ -1100,4 +1101,55 @@
 
 .andar-bahar-container .history-close:hover {
   background: rgba(255, 255, 255, 0.25);
+}
+
+/* Compact Landscape scaling for Android mobile screens */
+@media (max-height: 480px) {
+  .andar-bahar-container {
+    --header-h: calc(36px + var(--safe-top));
+    --rail-w: 52px;
+  }
+  .andar-bahar-container .table-wrap {
+    padding: 2px 4px;
+  }
+  .andar-bahar-container .table-oval {
+    height: min(200px, 92%);
+    padding: 6px 14px;
+    gap: 6px;
+  }
+  .andar-bahar-container .side-col {
+    padding: 4px;
+  }
+  .andar-bahar-container .side-name {
+    font-size: 11px;
+  }
+  .andar-bahar-container .pile {
+    max-height: 80px;
+    gap: 2px;
+  }
+  .andar-bahar-container .card {
+    width: 34px;
+    height: 48px;
+    padding: 2px 1px;
+  }
+  .andar-bahar-container .card .r,
+  .andar-bahar-container .card .s {
+    font-size: 11px;
+  }
+  .andar-bahar-container .card-back {
+    width: 34px;
+    height: 48px;
+  }
+  .andar-bahar-container .app-footer {
+    padding: 4px max(var(--safe-right), 12px) max(var(--safe-bottom), 4px) max(var(--safe-left), 12px);
+    gap: 4px;
+  }
+  .andar-bahar-container .bet {
+    padding: 6px 14px;
+    font-size: 12px;
+    min-width: 90px;
+  }
+  .andar-bahar-container .hint {
+    font-size: 9px;
+  }
 }

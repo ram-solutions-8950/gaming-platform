@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
+import { ArrowLeft } from 'lucide-react';
 
 interface Props {
   userBalance: number; // in paise
@@ -8,6 +9,7 @@ interface Props {
   searchElapsedSeconds: number;
   searchRemainingSeconds: number;
   onCancelMatchmaking: () => void;
+  onExit?: () => void;
 }
 
 interface Tier {
@@ -31,6 +33,7 @@ export const LudoLobby: React.FC<Props> = ({
   searchElapsedSeconds,
   searchRemainingSeconds,
   onCancelMatchmaking,
+  onExit,
 }) => {
   const [playerCount, setPlayerCount] = useState<2 | 4>(2);
   const [selectedTier, setSelectedTier] = useState<Tier>(TIERS[0]);
@@ -40,16 +43,29 @@ export const LudoLobby: React.FC<Props> = ({
   return (
     <div className="ludo-lobby-card w-full max-w-lg mx-auto flex flex-col gap-6 p-4 sm:p-6 bg-slate-900/90 backdrop-blur-xl rounded-3xl border border-amber-500/30 shadow-2xl">
       {/* Header */}
-      <div className="ludo-lobby-header flex items-center justify-between border-b border-slate-800 pb-4">
-        <div>
-          <h2 className="ludo-lobby-title text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-amber-400 via-yellow-200 to-amber-500">
-            LUDO ARENA
-          </h2>
-          <p className="ludo-lobby-subtitle text-xs text-slate-400">Authoritative Real Multiplayer Battle</p>
+      <div className="ludo-lobby-header flex items-center justify-between border-b border-slate-800 pb-4 gap-3">
+        <div className="flex items-center gap-3">
+          {onExit && (
+            <button
+              type="button"
+              onClick={onExit}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800/90 hover:bg-slate-700 active:scale-95 border border-slate-700 rounded-xl text-slate-200 text-xs font-bold transition shadow-sm cursor-pointer shrink-0"
+              aria-label="Exit to Lobby"
+            >
+              <ArrowLeft size={16} />
+              <span>Exit</span>
+            </button>
+          )}
+          <div>
+            <h2 className="ludo-lobby-title text-xl sm:text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-amber-400 via-yellow-200 to-amber-500 leading-tight">
+              LUDO ARENA
+            </h2>
+            <p className="ludo-lobby-subtitle text-[11px] sm:text-xs text-slate-400">Authoritative Real Multiplayer Battle</p>
+          </div>
         </div>
-        <div className="flex flex-col items-end">
+        <div className="flex flex-col items-end shrink-0">
           <span className="ludo-balance-lbl text-[10px] text-slate-400 font-medium">Your Balance</span>
-          <span className="ludo-balance-val text-base font-black text-amber-400">
+          <span className="ludo-balance-val text-sm sm:text-base font-black text-amber-400">
             ₹{(userBalance / 100).toFixed(2)}
           </span>
         </div>

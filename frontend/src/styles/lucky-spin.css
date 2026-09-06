@@ -7,7 +7,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 12px;
+  padding: calc(12px + var(--safe-top)) calc(12px + var(--safe-right)) calc(12px + var(--safe-bottom)) calc(12px + var(--safe-left));
   background: rgba(4, 0, 12, 0.88);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
@@ -31,7 +31,7 @@
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  max-height: 94vh;
+  max-height: calc(100dvh - var(--safe-top) - var(--safe-bottom) - 16px);
   color: #ffffff;
 }
 
@@ -39,7 +39,7 @@
 @media (max-height: 520px) and (orientation: landscape) {
   .lucky-spin-card {
     max-width: 680px;
-    max-height: 96vh;
+    max-height: calc(100dvh - var(--safe-top) - var(--safe-bottom) - 12px);
   }
   .lucky-spin-body {
     flex-direction: row !important;

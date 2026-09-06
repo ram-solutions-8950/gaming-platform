@@ -84,8 +84,30 @@ public class MainActivity extends BridgeActivity {
         }
 
         @JavascriptInterface
+        public void lockPortrait() {
+            runOnUiThread(() -> {
+                setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
+            });
+        }
+
+        @JavascriptInterface
         public void setLandscape() {
             runOnUiThread(() -> {
+                setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
+            });
+        }
+
+        @JavascriptInterface
+        public void lockLandscape() {
+            runOnUiThread(() -> {
+                setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
+            });
+        }
+
+        @JavascriptInterface
+        public void unlockOrientation() {
+            runOnUiThread(() -> {
+                // Default app state is strictly landscape locked
                 setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
             });
         }

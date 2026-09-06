@@ -360,7 +360,7 @@
     height: 100dvh;
     max-height: 100dvh;
     overflow: hidden;
-    padding: 4px 8px 6px 8px;
+    padding: var(--safe-top) max(var(--safe-right), 8px) max(var(--safe-bottom), 6px) max(var(--safe-left), 8px);
     display: flex;
     flex-direction: column;
     justify-content: space-between;
@@ -370,7 +370,7 @@
 
   .tp-table-oval {
     width: min(92vw, 880px);
-    height: calc(100dvh - 70px);
+    height: calc(100dvh - 70px - var(--safe-top) - var(--safe-bottom));
     max-height: 280px;
     min-height: 175px;
     margin: 0 auto;
@@ -456,7 +456,7 @@
   .tp-action-dock {
     width: min(92vw, 640px);
     margin-top: 2px;
-    padding: 0.25rem 0.6rem;
+    padding: 0.25rem 0.6rem max(var(--safe-bottom), 4px) 0.6rem;
     gap: 6px;
     border-radius: 12px;
     flex-shrink: 0;

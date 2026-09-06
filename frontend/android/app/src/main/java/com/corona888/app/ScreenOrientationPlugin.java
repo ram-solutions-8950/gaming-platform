@@ -24,4 +24,12 @@ public class ScreenOrientationPlugin extends Plugin {
             call.resolve();
         });
     }
+
+    @PluginMethod
+    public void unlock(PluginCall call) {
+        getActivity().runOnUiThread(() -> {
+            getActivity().setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
+            call.resolve();
+        });
+    }
 }

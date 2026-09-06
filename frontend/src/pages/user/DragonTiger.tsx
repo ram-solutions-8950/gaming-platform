@@ -49,6 +49,8 @@ function paiseToRupees(p: number): string {
   return (p / 100).toFixed(2);
 }
 
+import { setNativeLandscape } from '../../utils/nativeOrientation';
+
 export function DragonTigerPage() {
   const navigate = useNavigate();
   /* ── core data ── */
@@ -69,9 +71,9 @@ export function DragonTigerPage() {
   // Initialize audio hook
   const audio = useAudio();
 
-  // Unlock AudioContext & start background music on interaction / mount
+  // Lock orientation to landscape on mount & start theme audio
   useEffect(() => {
-    // Start background music and unlock audio immediately
+    setNativeLandscape().catch(() => {});
     audio.unlock();
     audio.playTheme();
 
@@ -80,29 +82,13 @@ export function DragonTigerPage() {
       audio.playTheme();
       window.removeEventListener('click', unlock);
       window.removeEventListener('keydown', unlock);
-
-      // Attempt to lock native screen orientation to landscape
-      try {
-        if (screen.orientation && (screen.orientation as any).lock) {
-          (screen.orientation as any).lock('landscape').catch(() => {});
-        }
-      } catch (e) {
-        /* ignore */
-      }
     };
     window.addEventListener('click', unlock);
     window.addEventListener('keydown', unlock);
+
     return () => {
       window.removeEventListener('click', unlock);
       window.removeEventListener('keydown', unlock);
-      // Unlock orientation on unmount without stopping global background music
-      try {
-        if (screen.orientation && screen.orientation.unlock) {
-          screen.orientation.unlock();
-        }
-      } catch (e) {
-        /* ignore */
-      }
     };
   }, []);
 
@@ -739,10 +725,10 @@ export function DragonTigerPage() {
       <div
         className="relative z-[2] w-full h-full flex flex-col justify-between overflow-hidden"
         style={{
-           paddingTop: 'env(safe-area-inset-top, 0px)',
-           paddingBottom: 'env(safe-area-inset-bottom, 0px)',
-           paddingLeft: 'env(safe-area-inset-left, 0px)',
-           paddingRight: 'env(safe-area-inset-right, 0px)',
+           paddingTop: 'var(--safe-top)',
+           paddingBottom: 'max(var(--safe-bottom), 2px)',
+           paddingLeft: 'max(var(--safe-left), 8px)',
+           paddingRight: 'max(var(--safe-right), 8px)',
         }}
       >
 

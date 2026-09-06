@@ -11,6 +11,7 @@ import { useRummyMatchmaking } from "../../hooks/useRummyMatchmaking";
 import { RummyApi, type RummyTableOut } from "../../services/rummy";
 import { authStorage } from "../../services/authStorage";
 import api from "../../services/api";
+import { setNativeLandscape } from "../../utils/nativeOrientation";
 import "../../styles/rummy.css";
 
 type Mode = "real_money" | "free" | "pool";
@@ -81,6 +82,7 @@ export function RummyPage() {
   };
 
   useEffect(() => {
+    setNativeLandscape().catch(() => {});
     fetchBalance();
     fetchTables();
     const timer = setInterval(() => {
@@ -88,7 +90,9 @@ export function RummyPage() {
         fetchTables();
       }
     }, 5000);
-    return () => clearInterval(timer);
+    return () => {
+      clearInterval(timer);
+    };
   }, [activeTableId]);
 
   const loadHistory = async () => {

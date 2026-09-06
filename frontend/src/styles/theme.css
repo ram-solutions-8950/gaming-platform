@@ -19,6 +19,17 @@
 }
 
 :root {
+  --safe-top: max(env(safe-area-inset-top, 0px), 0px);
+  --safe-bottom: max(env(safe-area-inset-bottom, 0px), 0px);
+  --safe-left: max(env(safe-area-inset-left, 0px), 0px);
+  --safe-right: max(env(safe-area-inset-right, 0px), 0px);
+  --sat: var(--safe-top);
+  --sar: var(--safe-right);
+  --sab: var(--safe-bottom);
+  --sal: var(--safe-left);
+  --app-height: 100dvh;
+  --bottom-nav-height: calc(48px + var(--safe-bottom));
+
   --casino-bg: #18002F;
   --casino-bg-deep: #10001F;
   --casino-purple-dark: #200044;
@@ -36,7 +47,7 @@
 
 *, *::before, *::after { box-sizing: border-box; }
 
-/* ─── Corona 888 Casino Global Styles ─── */
+/* â”€â”€â”€ Corona 888 Casino Global Styles â”€â”€â”€ */
 .casino-theme-bg,
 .game-catalog-page,
 .games-page {
@@ -178,7 +189,7 @@
 html, body, #root {
   width: 100%;
   height: 100%;
-  max-width: 100dvw;
+  min-height: 100dvh;
   max-height: 100dvh;
   margin: 0;
   padding: 0;
@@ -192,10 +203,8 @@ body {
   background-color: var(--color-dark-950);
   color: #e2e8f0;
   -webkit-font-smoothing: antialiased;
-  padding-top: env(safe-area-inset-top, 0px);
-  padding-right: env(safe-area-inset-right, 0px);
-  padding-bottom: env(safe-area-inset-bottom, 0px);
-  padding-left: env(safe-area-inset-left, 0px);
+  padding: 0;
+  margin: 0;
 }
 
 /* Custom scrollbar */
@@ -239,7 +248,7 @@ body {
 }
 
 /* =========================================================
-   AUTH PAGES (LOGIN / SIGNUP) — MOBILE LANDSCAPE AUTHORITY
+   AUTH PAGES (LOGIN / SIGNUP) â€” MOBILE LANDSCAPE AUTHORITY
    ========================================================= */
 
 @media (orientation: landscape) and (max-height: 500px) {
@@ -375,12 +384,12 @@ body {
     line-height: 1 !important;
   }
 
-  /* ── UserLayout Main Content Padding in Landscape ── */
+  /* â”€â”€ UserLayout Main Content Padding in Landscape â”€â”€ */
   main > div.max-w-7xl {
     padding: 4px 10px !important;
   }
 
-  /* ── Deposit Page Mobile Landscape ── */
+  /* â”€â”€ Deposit Page Mobile Landscape â”€â”€ */
   .deposit-page {
     width: min(580px, calc(100vw - 32px)) !important;
     max-width: 580px !important;
@@ -481,7 +490,7 @@ body {
     margin-top: 3px !important;
   }
 
-  /* ── Withdrawal Page Mobile Landscape ── */
+  /* â”€â”€ Withdrawal Page Mobile Landscape â”€â”€ */
   .withdrawal-page {
     width: min(600px, calc(100vw - 32px)) !important;
     max-width: 600px !important;
@@ -624,7 +633,7 @@ body {
     display: none !important;
   }
 
-  /* ── Profile Page Mobile Landscape ── */
+  /* â”€â”€ Profile Page Mobile Landscape â”€â”€ */
   .profile-page {
     width: min(680px, calc(100vw - 32px)) !important;
     max-width: 680px !important;
@@ -775,9 +784,9 @@ body {
   }
 }
 
-/* ───────────────────────────────────────────────────────────
+/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
    UNIVERSAL MOBILE RESPONSIVENESS & SAFE-AREA STANDARDS
-   ─────────────────────────────────────────────────────────── */
+   â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 :root {
   --sat: env(safe-area-inset-top, 0px);
   --sar: env(safe-area-inset-right, 0px);
@@ -812,7 +821,7 @@ html, body {
   min-height: 44px;
 }
 
-/* ── Ludo Responsive Lobby & Viewport ── */
+/* â”€â”€ Ludo Responsive Lobby & Viewport â”€â”€ */
 .ludo-page-container {
   width: 100% !important;
   height: 100% !important;
@@ -836,7 +845,7 @@ html, body {
   box-sizing: border-box !important;
 }
 
-/* ── Ludo Mobile Landscape Viewport (Single Screen, No Scroll) ── */
+/* â”€â”€ Ludo Mobile Landscape Viewport (Single Screen, No Scroll) â”€â”€ */
 @media (orientation: landscape) and (max-height: 600px) {
   .ludo-page-container {
     height: 100% !important;
@@ -955,7 +964,7 @@ html, body {
     letter-spacing: 0.5px !important;
   }
 
-  /* ── LUDO ACTIVE GAME: Single-Screen Mobile Landscape ── */
+  /* â”€â”€ LUDO ACTIVE GAME: Single-Screen Mobile Landscape â”€â”€ */
   .is-ludo-page {
     overflow: hidden !important;
   }
@@ -1174,4 +1183,3 @@ html, body {
     font-size: 8.5px !important;
   }
 }
-

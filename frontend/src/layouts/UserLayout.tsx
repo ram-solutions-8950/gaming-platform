@@ -137,7 +137,7 @@ export function UserLayout() {
           <div className={
             isDashboard || isLudo
               ? "h-full w-full p-0 flex flex-col flex-1 min-h-0"
-              : "min-h-full w-full max-w-7xl mx-auto p-3 sm:p-5 lg:p-8"
+              : "min-h-full w-full max-w-7xl mx-auto p-3 sm:p-5 lg:p-8 pb-[calc(var(--bottom-nav-height)+20px)]"
           }>
             <Outlet />
           </div>

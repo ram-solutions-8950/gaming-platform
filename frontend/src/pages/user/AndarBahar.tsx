@@ -18,6 +18,7 @@ import {
 import type { GameRound } from "../../types";
 import { soundManager } from "../../services/soundManager";
 import { getWebSocketUrl } from "../../utils/ws";
+import { setNativeLandscape } from "../../utils/nativeOrientation";
 import "../../styles/andar-bahar.css";
 
 type Phase = "betting" | "closed" | "dealing" | "result";
@@ -109,9 +110,9 @@ export function AndarBaharPage() {
     const isMuted = soundManager.toggleMute();
     setSoundOn(!isMuted);
   };
-
-  // Unlock AudioContext and sync sound manager on interaction
+  // Lock orientation to landscape on mount and handle sound manager
   useEffect(() => {
+    setNativeLandscape().catch(() => {});
     setSoundOn(!soundManager.isMuted());
     const unlock = () => {
       soundManager.init();

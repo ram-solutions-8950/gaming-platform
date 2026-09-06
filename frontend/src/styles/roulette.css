@@ -17,8 +17,10 @@
 .roulette-screen {
   position: fixed;
   inset: 0;
-  width: 100vw;
-  height: 100vh;
+  width: 100dvw;
+  max-width: 100dvw;
+  height: 100dvh;
+  max-height: 100dvh;
   background: radial-gradient(circle at 50% 40%, var(--felt-green-bg) 0%, var(--felt-green-dark) 80%, #022015 100%);
   color: #ffffff;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -37,9 +39,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  height: 38px;
-  min-height: 38px;
-  padding: 4px 12px;
+  min-height: calc(36px + var(--safe-top));
+  padding: var(--safe-top) max(var(--safe-right), 12px) 0 max(var(--safe-left), 12px);
   background: rgba(3, 30, 20, 0.65);
   backdrop-filter: blur(8px);
   border-bottom: 1px solid rgba(255, 255, 255, 0.12);
@@ -689,9 +690,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  height: 48px;
-  min-height: 48px;
-  padding: 4px 12px;
+  min-height: calc(44px + var(--safe-bottom));
+  padding: 4px max(var(--safe-right), 12px) max(var(--safe-bottom), 4px) max(var(--safe-left), 12px);
   background: rgba(3, 30, 20, 0.85);
   backdrop-filter: blur(8px);
   border-top: 1px solid rgba(255, 255, 255, 0.15);

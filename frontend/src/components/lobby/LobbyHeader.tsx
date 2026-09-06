@@ -35,8 +35,8 @@ export const LobbyHeader: React.FC<Props> = ({ user, wallet }) => {
 
   return (
     <header
-      className="lobby-header flex items-center justify-between px-2 sm:px-3 py-1 bg-gradient-to-r from-[#2d0c61] via-[#1e0744] to-[#12032b] border-b border-[#a855f7]/40 shadow-xl select-none shrink-0 min-h-[40px] z-30 relative overflow-x-auto scrollbar-hide"
-      style={{ paddingTop: 'max(env(safe-area-inset-top, 0px), 4px)', paddingLeft: 'max(env(safe-area-inset-left, 0px), 8px)', paddingRight: 'max(env(safe-area-inset-right, 0px), 8px)' }}
+      className="lobby-header flex items-center justify-between px-2 sm:px-3 py-1 bg-gradient-to-r from-[#2d0c61] via-[#1e0744] to-[#12032b] border-b border-[#a855f7]/40 shadow-xl select-none shrink-0 z-30 relative overflow-x-auto scrollbar-hide"
+      style={{ paddingTop: 'max(var(--safe-top), 4px)', paddingLeft: 'max(var(--safe-left), 8px)', paddingRight: 'max(var(--safe-right), 8px)', minHeight: 'calc(40px + var(--safe-top))' }}
     >
       {/* Left: Profile / Back Button / ID Logout */}
       <div className="flex items-center gap-1.5 min-w-0">
