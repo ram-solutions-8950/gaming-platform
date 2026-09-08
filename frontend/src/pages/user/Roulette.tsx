@@ -679,7 +679,7 @@ export function RoulettePage() {
         <div className="roulette-status-panel">
           <div className="roulette-metric-total">
             <span className="metric-label">TOTAL BET:</span>
-            <span className="metric-val">{serverState?.total_bet_pool_inr ? Math.round(serverState.total_bet_pool_inr) : 17020}</span>
+            <span className="metric-val">{serverState?.total_bet_pool_inr ? Math.round(serverState.total_bet_pool_inr) : 0}</span>
           </div>
 
           <div className="roulette-countdown-pill">

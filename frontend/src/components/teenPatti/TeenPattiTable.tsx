@@ -1,10 +1,11 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { useTeenPattiSocket } from '../../hooks/useTeenPattiSocket';
 import { PlayerSeat } from './PlayerSeat';
 import { BettingControls } from './BettingControls';
 import { SideShowDialog } from './SideShowDialog';
 import { ShowdownOverlay } from './ShowdownOverlay';
 import { soundManager } from '../../services/soundManager';
+import { walletService } from '../../services/wallet';
 import './TeenPattiTable.css';
 
 interface TeenPattiTableProps {
@@ -16,6 +17,15 @@ export const TeenPattiTable: React.FC<TeenPattiTableProps> = ({
   tableId,
   onLeaveTable,
 }) => {
+  const [walletBalance, setWalletBalance] = useState<number | null>(null);
+
+  const refreshWallet = useCallback(() => {
+    walletService.getWallet().then((w) => setWalletBalance(w.balance || 0)).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    refreshWallet();
+  }, [refreshWallet]);
   const {
     gameState,
     isConnected,
@@ -130,6 +140,16 @@ export const TeenPattiTable: React.FC<TeenPattiTableProps> = ({
           >
             ← Lobby
           </button>
+
+          <div style={{
+            background: 'rgba(15, 23, 42, 0.85)', padding: '3px 12px', borderRadius: 16,
+            border: '1px solid rgba(212, 175, 55, 0.4)', display: 'flex', gap: '6px', alignItems: 'center'
+          }}>
+            <span style={{ fontSize: '0.65rem', color: '#94a3b8', fontWeight: 600 }}>TOTAL BALANCE:</span>
+            <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#fbbf24' }}>
+              ₹{walletBalance !== null ? (walletBalance / 100).toFixed(2) : '...'}
+            </span>
+          </div>
 
           <div style={{
             background: 'rgba(15, 23, 42, 0.85)', padding: '3px 10px', borderRadius: 16,

@@ -66,22 +66,26 @@ def compute_crash_point(server_seed: str, nonce: int) -> float:
         # Avoid division by zero — instant crash
         return 1.0
     raw = (e / (e - h)) * (1 - HOUSE_EDGE)
-    # Round to 2 decimal places
-    return max(1.0, math.floor(raw * 100) / 100)
+    # Round to 2 decimal places, starting at 0.1x minimum
+    return max(0.1, math.floor(raw * 100) / 100)
 
 
 def time_for_multiplier(multiplier: float) -> float:
-    """Seconds from flight start to reach a given multiplier."""
-    if multiplier <= 1.0:
+    """Seconds from flight start to reach a given multiplier (starting from 0.1x)."""
+    if multiplier <= 0.1:
         return 0.0
-    return math.log(multiplier) / GROWTH_RATE
+    if multiplier < 1.0:
+        return (multiplier - 0.1) / 0.9
+    return 1.0 + (math.log(multiplier) / GROWTH_RATE)
 
 
 def multiplier_at_time(elapsed: float) -> float:
-    """Multiplier at a given elapsed time (seconds) from flight start."""
+    """Multiplier at a given elapsed time (seconds) from flight start. Starts from 0.1x."""
     if elapsed <= 0:
-        return 1.0
-    return math.exp(elapsed * GROWTH_RATE)
+        return 0.1
+    if elapsed < 1.0:
+        return round(0.1 + 0.9 * elapsed, 2)
+    return round(math.exp((elapsed - 1.0) * GROWTH_RATE), 2)
 
 
 # ──────────────────────────────────────────────────────────────

@@ -44,7 +44,7 @@ const RULES_COPY = {
       "Target rank: Determined by the Open Card revealed at the start.",
       "Dealing order: A black Open Card (♠/♣) deals to Andar first; a red Open Card (♥/♦) deals to Bahar first.",
       "First match wins: The round ends immediately on the first matching card.",
-      "Payouts: Andar pays 0.9× stake (net win), Bahar pays 1.0× stake (net win).",
+      "Payouts: Both Andar and Bahar pay 1.8× total return (0.8× net win).",
       "No tie: Every round produces exactly one winning side.",
       "Server-Authoritative: Every deal, winner calculation, and wallet settlement is executed securely on the server.",
     ],
@@ -255,10 +255,11 @@ export function AndarBaharPage() {
       const didLose = bet && bet.roundId === roundId && bet.side !== winner;
 
       if (didWin) {
-        const payout = Math.round(bet.amount * (PAYOUT[winner] || 1.0));
+        const netProfit = Math.round(bet.amount * (PAYOUT[winner] ?? 0.8));
+        const totalReturn = bet.amount + netProfit;
         setResult({
           won: true,
-          text: `YOU WON! ${winner.toUpperCase()} WINS (+₹${payout})`,
+          text: `YOU WON! ${winner.toUpperCase()} WINS (+₹${totalReturn})`,
         });
         soundManager.play("win_clap");
       } else if (didLose) {
@@ -800,14 +801,14 @@ export function AndarBaharPage() {
               disabled={phase !== "betting" || !!myBet || isPlacingBet}
               onClick={() => handlePlaceBet("andar")}
             >
-              ANDAR<small>{myBet?.side === "andar" ? `BET LOCKED ₹${myBet.amount}` : isPlacingBet && selectedSide === "andar" ? "PLACING…" : `pays ${PAYOUT.andar}×`}</small>
+              ANDAR<small>{myBet?.side === "andar" ? `BET LOCKED ₹${myBet.amount}` : isPlacingBet && selectedSide === "andar" ? "PLACING…" : "pays 1.8×"}</small>
             </button>
             <button
               className={`bet bahar${(myBet?.side === "bahar" || selectedSide === "bahar") ? " selected" : ""}`}
               disabled={phase !== "betting" || !!myBet || isPlacingBet}
               onClick={() => handlePlaceBet("bahar")}
             >
-              BAHAR<small>{myBet?.side === "bahar" ? `BET LOCKED ₹${myBet.amount}` : isPlacingBet && selectedSide === "bahar" ? "PLACING…" : `pays ${PAYOUT.bahar}×`}</small>
+              BAHAR<small>{myBet?.side === "bahar" ? `BET LOCKED ₹${myBet.amount}` : isPlacingBet && selectedSide === "bahar" ? "PLACING…" : "pays 1.8×"}</small>
             </button>
           </div>
 

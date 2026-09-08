@@ -36,7 +36,7 @@
   width: 100%;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 4px 6px;
+  padding: 4px 6px calc(var(--bottom-nav-height, 56px) + 24px) 6px;
   scroll-behavior: smooth;
   -webkit-overflow-scrolling: touch;
 }
@@ -662,7 +662,7 @@
   }
 
   .game-lobby__content {
-    padding: 3px 6px;
+    padding: 3px 6px 40px 6px;
     gap: 2px;
   }
 
@@ -866,7 +866,7 @@
     display: flex;
     flex-direction: column;
     gap: 10px;
-    padding: 0 2px;
+    padding: 0 2px 24px 2px;
   }
 
   .side-promos {

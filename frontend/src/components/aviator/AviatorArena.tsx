@@ -106,7 +106,9 @@ export const AviatorArena: React.FC<AviatorArenaProps> = ({
 
       // 3. Draw flight curve
       if (phase === 'FLYING' || phase === 'CRASHED' || phase === 'SETTLED') {
-        const flightTime = Math.max(0, Math.log(multiplier) / 0.1);
+        const flightTime = multiplier < 1.0
+          ? Math.max(0, (multiplier - 0.1) / 0.9)
+          : 1.0 + Math.max(0, Math.log(multiplier) / 0.1);
         progress = Math.min(1, flightTime / 15); // Normalize progress across arena
 
         const startX = width * 0.08;

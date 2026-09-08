@@ -413,16 +413,21 @@ export function DragonTigerPage() {
                   setDisplayRound(syntheticRound);
                 }
 
-                // Update settlement data immediately
-                Promise.all([
-                  walletService.getWallet(),
-                  gameService.getMyBets(1, 10, SLUG),
-                  gameService.getHistory(12, SLUG),
-                ]).then(([w, b, h]) => {
-                  setWallet(w);
-                  setMyBets(b.items);
-                  setHistory(h);
-                }).catch(() => {});
+                // Update settlement data immediately and with a short delay for DB commit
+                const syncSettlement = () => {
+                  Promise.all([
+                    walletService.getWallet(),
+                    gameService.getMyBets(1, 10, SLUG),
+                    gameService.getHistory(12, SLUG),
+                  ]).then(([w, b, h]) => {
+                    setWallet(w);
+                    setMyBets(b.items);
+                    setHistory(h);
+                  }).catch(() => {});
+                };
+                syncSettlement();
+                setTimeout(syncSettlement, 1200);
+                setTimeout(syncSettlement, 3000);
               }
             }
           } catch {
@@ -620,6 +625,7 @@ export function DragonTigerPage() {
       setTigerFlipped(false);
       setShowPlayer(false);
       setWinnerResult(null);
+      fetchAll();
 
       // If a new round was buffered during presentation, transition cleanly now!
       if (pendingRoundStartRef.current) {
@@ -646,8 +652,27 @@ export function DragonTigerPage() {
     () => myBets.filter((b) => displayRoundId && b.round_id === displayRoundId),
     [myBets, displayRoundId],
   );
-  const wonThisRound = roundBets.some((b) => b.status === 'WON');
-  const lostThisRound = roundBets.some((b) => b.status === 'LOST') && !wonThisRound;
+  const activeWinnerSide = winnerResult || (displayRound?.result_data?.result as WinningSide | null);
+  const wonThisRound = roundBets.some((b) =>
+    b.status === 'WON' || (activeWinnerSide && b.prediction === activeWinnerSide)
+  );
+  const lostThisRound = roundBets.some((b) =>
+    b.status === 'LOST' || (activeWinnerSide && b.prediction !== activeWinnerSide && !wonThisRound)
+  );
+
+  const userWinningAmountPaise = useMemo(() => {
+    return roundBets.reduce((sum, b) => {
+      if (b.status === 'WON' && b.net_win_amount) {
+        return sum + b.net_win_amount;
+      }
+      if (activeWinnerSide && b.prediction === activeWinnerSide) {
+        // Return original bet + winning amount (2x gross return, 10x for tie)
+        const mult = activeWinnerSide === 'TIE' ? 10 : 2;
+        return sum + (b.amount * mult);
+      }
+      return sum;
+    }, 0);
+  }, [roundBets, activeWinnerSide]);
 
   /* ── place bet ── */
   const handleBet = async (predictionKey?: string) => {
@@ -894,7 +919,7 @@ export function DragonTigerPage() {
               tigerFlipped={tigerFlipped}
               showPlayer={showPlayer && (wonThisRound || lostThisRound)}
               playerWon={wonThisRound ? true : lostThisRound ? false : null}
-              playerAmountLabel={wonThisRound ? `+₹${paiseToRupees(roundBets.reduce((sum, b) => sum + (b.net_win_amount || 0), 0))}` : undefined}
+              playerAmountLabel={wonThisRound ? `+₹${paiseToRupees(userWinningAmountPaise)}` : undefined}
               winnerResult={winnerResult}
             />
           </div>
@@ -1064,16 +1089,6 @@ export function DragonTigerPage() {
               );
             })}
           </div>
-
-          {/* Place Bet / Rebet */}
-          <button
-            disabled={!isBetting || !selected || betting}
-            onClick={() => handleBet()}
-            className={`shrink-0 px-2 sm:px-4 py-1.5 sm:py-2 rounded-lg bg-gradient-to-b from-green-400 to-green-700 border border-green-300 text-white font-black text-[9px] sm:text-xs uppercase shadow-lg active:translate-y-0.5 transition-transform h-full max-h-[44px] sm:max-h-[48px] ${
-              !isBetting || !selected || betting ? 'opacity-50 cursor-not-allowed saturate-0' : 'hover:brightness-110'
-            }`}>
-            {selected ? 'PLACE BET' : 'REBET'}
-          </button>
         </div>
       </div>
 

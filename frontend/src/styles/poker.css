@@ -466,25 +466,43 @@
     height: 36px !important;
     min-height: 36px !important;
   }
+  .poker-felt-table {
+    padding: 2px 8px !important;
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+  }
   .poker-felt-inner {
-    height: clamp(220px, 64dvh, 360px) !important;
-    border-width: 6px !important;
-    border-radius: 180px !important;
+    height: min(50dvh, 195px) !important;
+    max-height: 195px !important;
+    border-width: 5px !important;
+    border-radius: 140px !important;
+  }
+  .poker-table-center {
+    transform: scale(0.85);
   }
   .poker-footer {
-    padding: 0.35rem 0.75rem !important;
+    padding: 0.25rem 0.75rem !important;
+    flex-shrink: 0 !important;
+    z-index: 50 !important;
+  }
+  .poker-action-dock {
+    gap: 0.25rem !important;
+  }
+  .poker-raise-control-bar {
+    gap: 0.5rem !important;
   }
   .btn-poker {
-    padding: 0.4rem 0.4rem !important;
+    padding: 0.35rem 0.6rem !important;
     font-size: 0.75rem !important;
+    min-height: 32px !important;
   }
   .poker-card.md {
-    width: 36px !important;
-    height: 52px !important;
+    width: 32px !important;
+    height: 46px !important;
   }
   .poker-card.sm {
-    width: 28px !important;
-    height: 42px !important;
+    width: 24px !important;
+    height: 36px !important;
   }
 }
 

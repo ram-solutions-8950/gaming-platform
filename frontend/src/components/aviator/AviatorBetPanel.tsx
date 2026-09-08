@@ -22,10 +22,11 @@ export const AviatorBetPanel: React.FC<AviatorBetPanelProps> = ({
   onPlaceBet,
   onCashout,
 }) => {
-  const [amountRupees, setAmountRupees] = useState<number>(10);
+  const [amountInput, setAmountInput] = useState<string>('10');
   const [autoCashoutEnabled, setAutoCashoutEnabled] = useState<boolean>(false);
-  const [autoCashoutMultiplier, setAutoCashoutMultiplier] = useState<number>(2.0);
+  const [autoCashoutInput, setAutoCashoutInput] = useState<string>('2.0');
 
+  const amountRupees = parseInt(amountInput, 10) || 0;
   const amountPaise = Math.round(amountRupees * 100);
   const isBettingPhase = phase === 'BETTING';
   const isFlyingPhase = phase === 'FLYING';
@@ -39,27 +40,33 @@ export const AviatorBetPanel: React.FC<AviatorBetPanelProps> = ({
 
   const handlePresetClick = (val: number) => {
     if (hasActiveBet) return;
-    setAmountRupees((prev) => Math.max(1, prev + val));
+    const current = parseInt(amountInput, 10) || 0;
+    setAmountInput(String(Math.max(1, current + val)));
   };
 
   const handleDouble = () => {
     if (hasActiveBet) return;
-    setAmountRupees((prev) => prev * 2);
+    const current = parseInt(amountInput, 10) || 0;
+    setAmountInput(String(Math.max(1, current * 2)));
   };
 
   const handleHalf = () => {
     if (hasActiveBet) return;
-    setAmountRupees((prev) => Math.max(1, Math.floor(prev / 2)));
+    const current = parseInt(amountInput, 10) || 0;
+    setAmountInput(String(Math.max(1, Math.floor(current / 2))));
   };
 
   const handleActionClick = () => {
     if (isBettingPhase) {
       if (!myBet) {
         // Place bet
+        const effectiveAmountRupees = Math.max(1, parseInt(amountInput, 10) || 10);
+        const effectiveAmountPaise = Math.round(effectiveAmountRupees * 100);
+        const effectiveAutoMult = autoCashoutEnabled ? (parseFloat(autoCashoutInput) || 2.0) : null;
         onPlaceBet(
           slot,
-          amountPaise,
-          autoCashoutEnabled ? autoCashoutMultiplier : null
+          effectiveAmountPaise,
+          effectiveAutoMult
         );
       }
     } else if (isFlyingPhase && hasActiveBet) {
@@ -87,13 +94,17 @@ export const AviatorBetPanel: React.FC<AviatorBetPanelProps> = ({
           {autoCashoutEnabled && (
             <div className="auto-input-wrap">
               <input
-                type="number"
-                step="0.1"
-                min="1.01"
-                max="1000"
+                type="text"
+                inputMode="decimal"
                 disabled={hasActiveBet}
-                value={autoCashoutMultiplier}
-                onChange={(e) => setAutoCashoutMultiplier(parseFloat(e.target.value) || 1.01)}
+                value={autoCashoutInput}
+                onChange={(e) => setAutoCashoutInput(e.target.value)}
+                onBlur={() => {
+                  const val = parseFloat(autoCashoutInput);
+                  if (!val || val < 1.01) {
+                    setAutoCashoutInput('1.01');
+                  }
+                }}
                 className="auto-mult-input"
               />
               <span className="auto-x">x</span>
@@ -109,12 +120,20 @@ export const AviatorBetPanel: React.FC<AviatorBetPanelProps> = ({
           <div className="amount-input-row">
             <span className="currency-symbol">₹</span>
             <input
-              type="number"
-              min="1"
-              max="50000"
+              type="text"
+              inputMode="numeric"
               disabled={hasActiveBet || !isBettingPhase}
-              value={amountRupees}
-              onChange={(e) => setAmountRupees(Math.max(1, parseInt(e.target.value) || 0))}
+              value={amountInput}
+              onChange={(e) => {
+                const clean = e.target.value.replace(/[^0-9]/g, '');
+                setAmountInput(clean);
+              }}
+              onBlur={() => {
+                const val = parseInt(amountInput, 10);
+                if (!val || val < 1) {
+                  setAmountInput('10');
+                }
+              }}
               className="amount-input"
             />
           </div>

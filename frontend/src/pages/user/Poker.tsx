@@ -200,6 +200,7 @@ export function PokerPage() {
           tableState={tableState}
           myHoleCards={myHoleCards}
           currentUserId={currentUserId}
+          walletBalancePaise={walletBalancePaise}
           onSendAction={sendAction}
           onLeaveTable={handleLeaveTable}
           onExit={handleExitToDashboard}

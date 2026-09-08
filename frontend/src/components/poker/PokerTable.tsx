@@ -9,6 +9,7 @@ interface PokerTableProps {
   tableState: PokerTableState;
   myHoleCards: string[];
   currentUserId: string | null;
+  walletBalancePaise?: number;
   onSendAction: (action: string, amount?: number) => void;
   onLeaveTable: () => void;
   onExit: () => void;
@@ -20,6 +21,7 @@ export function PokerTable({
   tableState,
   myHoleCards,
   currentUserId,
+  walletBalancePaise = 0,
   onSendAction,
   onLeaveTable,
   onExit,
@@ -66,7 +68,14 @@ export function PokerTable({
           </span>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
+          {/* Total Balance */}
+          <div className="flex items-center gap-1.5 px-2.5 sm:px-3.5 py-1 bg-black/70 rounded-full border border-yellow-500/50 shadow-inner">
+            <span className="text-[10px] text-zinc-400 font-semibold hidden xs:inline uppercase">Balance:</span>
+            <span className="text-xs sm:text-sm font-black text-yellow-400">
+              ₹{(walletBalancePaise / 100).toFixed(2)}
+            </span>
+          </div>
           <button
             type="button"
             onClick={onOpenRules}

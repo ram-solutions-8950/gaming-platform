@@ -78,9 +78,8 @@ export function playRoundFromSeed(seed: string): RoundResult {
   return playRoundFromDeck(deck);
 }
 
-// ---- Betting / payouts ---------------------------------------------------------------
-// Traditional edge: Andar (which usually receives the first card) pays a touch less.
-export const PAYOUT = { andar: 0.9, bahar: 1.0 } as const;
+// Payout multiplier: 0.8 net win (1.8x total gross return)
+export const PAYOUT = { andar: 0.8, bahar: 0.8 } as const;
 
 export interface Settlement {
   won: boolean;

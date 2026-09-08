@@ -338,8 +338,8 @@ class RouletteEngine:
             my_bet_total_paise = 0
             total_bet_paise = sum(b.amount_paise for b in rnd.bets)
 
-            # Simulated live active bets from other players for rich live atmosphere
-            simulated_active_pool = 17020 * 100 + (total_bet_paise * 3)
+            # Real live active bets pool from all players
+            active_pool = total_bet_paise
 
             if user_id:
                 for b in rnd.bets:
@@ -388,7 +388,7 @@ class RouletteEngine:
                 "history": copy.deepcopy(self.history),
                 "my_bets": my_bets,
                 "my_total_bet_inr": my_bet_total_paise / 100,
-                "total_bet_pool_inr": simulated_active_pool / 100,
+                "total_bet_pool_inr": active_pool / 100,
                 "vip_players": vip_players,
                 "server_time": datetime.now(timezone.utc).isoformat()
             }

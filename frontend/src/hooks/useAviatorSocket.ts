@@ -49,7 +49,7 @@ export function useAviatorSocket(options: UseAviatorSocketOptions = {}) {
     phase: 'DISCONNECTED',
     nonce: 0,
     server_seed_hash: '',
-    multiplier: 1.0,
+    multiplier: 0.1,
     betting_duration: 10.0,
     bets: [],
   });
@@ -124,7 +124,7 @@ export function useAviatorSocket(options: UseAviatorSocketOptions = {}) {
             server_seed_hash: msg.server_seed_hash || '',
             server_seed: msg.server_seed,
             crash_point: msg.crash_point,
-            multiplier: msg.multiplier || 1.0,
+            multiplier: msg.multiplier || 0.1,
             betting_duration: 10.0,
             flight_started_at: msg.flight_started_at,
             bets: msg.bets || [],
@@ -143,7 +143,7 @@ export function useAviatorSocket(options: UseAviatorSocketOptions = {}) {
             server_seed_hash: msg.server_seed_hash,
             server_seed: null,
             crash_point: null,
-            multiplier: 1.0,
+            multiplier: 0.1,
             betting_duration: msg.betting_duration || 10.0,
             flight_started_at: null,
             bets: [],
@@ -154,7 +154,7 @@ export function useAviatorSocket(options: UseAviatorSocketOptions = {}) {
             ...prev,
             round_id: msg.round_id,
             phase: 'FLYING',
-            multiplier: 1.0,
+            multiplier: 0.1,
             flight_started_at: msg.flight_started_at || msg.timestamp,
           }));
         } else if (type === 'multiplier_update') {
@@ -313,8 +313,10 @@ export function useAviatorSocket(options: UseAviatorSocketOptions = {}) {
     flightIntervalRef.current = setInterval(() => {
       if (!flightStartTimeRef.current) return;
       const elapsedSec = (Date.now() - flightStartTimeRef.current) / 1000;
-      if (elapsedSec > 0) {
-        const estMult = Math.exp(elapsedSec * 0.1);
+      if (elapsedSec >= 0) {
+        const estMult = elapsedSec < 1.0
+          ? (0.1 + 0.9 * elapsedSec)
+          : Math.exp((elapsedSec - 1.0) * 0.1);
         setRoundState((prev) => {
           if (prev.phase !== 'FLYING') return prev;
           // Keep highest or close to estimate

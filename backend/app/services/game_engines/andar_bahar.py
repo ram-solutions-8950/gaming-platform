@@ -29,7 +29,7 @@ DEFAULT_CONFIG = {
     "round_duration_seconds": 18,
     "betting_duration_seconds": 15,
     "allowed_bets": {"andar": True, "bahar": True},
-    "payouts": {"andar": 0.9, "bahar": 1.0},
+    "payouts": {"andar": 0.8, "bahar": 0.8},
     "min_bet": 1000,
     "max_bet": 500000,
 }
@@ -189,9 +189,16 @@ class AndarBaharEngine(GameEngine):
         game = db.query(Game).filter(Game.slug == self.slug).first()
         if game:
             cfg = dict(game.config or copy.deepcopy(DEFAULT_CONFIG))
+            changed = False
             if cfg.get("round_duration_seconds") != 18 or cfg.get("betting_duration_seconds") != 15:
                 cfg["round_duration_seconds"] = 18
                 cfg["betting_duration_seconds"] = 15
+                changed = True
+            current_payouts = cfg.get("payouts") or {}
+            if current_payouts.get("bahar") != 0.8 or current_payouts.get("andar") != 0.8:
+                cfg["payouts"] = {"andar": 0.8, "bahar": 0.8}
+                changed = True
+            if changed:
                 game.config = cfg
                 db.commit()
                 db.refresh(game)
