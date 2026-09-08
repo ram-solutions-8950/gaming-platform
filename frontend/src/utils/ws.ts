@@ -7,6 +7,12 @@ export function getWebSocketUrl(path: string, token?: string): string {
   const configuredWsUrl = import.meta.env.VITE_WS_URL?.trim();
   const configuredApiUrl = import.meta.env.VITE_API_URL?.trim();
 
+  const isCapacitor =
+    typeof (window as any).Capacitor !== 'undefined' ||
+    (typeof window !== 'undefined' &&
+      (window.location.protocol === 'capacitor:' ||
+        window.location.protocol === 'ionic:'));
+
   let wsBase = '';
   if (configuredWsUrl) {
     wsBase = configuredWsUrl;
@@ -17,10 +23,10 @@ export function getWebSocketUrl(path: string, token?: string): string {
       const targetPort = url.port || '8000';
       wsBase = `${wsProtocol}//${url.hostname}:${targetPort}/api/v1`;
     } catch {
-      wsBase = import.meta.env.PROD ? 'ws://76.13.177.44:8000/api/v1' : 'ws://127.0.0.1:8000/api/v1';
+      wsBase = (import.meta.env.PROD || isCapacitor) ? 'ws://76.13.177.44:8000/api/v1' : 'ws://127.0.0.1:8000/api/v1';
     }
   } else {
-    wsBase = import.meta.env.PROD ? 'ws://76.13.177.44:8000/api/v1' : 'ws://127.0.0.1:8000/api/v1';
+    wsBase = (import.meta.env.PROD || isCapacitor) ? 'ws://76.13.177.44:8000/api/v1' : 'ws://127.0.0.1:8000/api/v1';
   }
 
   wsBase = wsBase.replace(/\/+$/, '');

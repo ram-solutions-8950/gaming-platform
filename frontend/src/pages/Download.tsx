@@ -95,7 +95,7 @@ export const DownloadPage: React.FC = () => {
 
         {/* 6. Primary DOWNLOAD APK Button */}
         <a
-          href="http://76.13.177.44/Corona888.apk"
+          href="/Corona888.apk"
           download="Corona888.apk"
           className="c888-download-btn"
           id="btn-download-apk"
