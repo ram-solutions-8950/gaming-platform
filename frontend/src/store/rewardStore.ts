@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-export type RewardModalType = '7days' | 'lucky_spin' | 'bonus' | 'jackpot' | 'vip' | null;
+export type RewardModalType = '7days' | 'lucky_spin' | 'bonus' | 'jackpot' | 'vip' | 'service' | null;
 
 interface RewardStoreState {
   activeModal: RewardModalType;

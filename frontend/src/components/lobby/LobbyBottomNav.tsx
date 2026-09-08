@@ -104,7 +104,7 @@ export const LobbyBottomNav: React.FC = () => {
         break;
 
       case 'Service':
-        console.log('Service clicked');
+        useRewardStore.getState().openModal('service');
         break;
 
       case 'Jackpot':

@@ -14,6 +14,7 @@ import { LuckySpinModal } from '../components/modals/LuckySpinModal';
 import { BonusModal } from '../components/modals/BonusModal';
 import { JackpotModal } from '../components/modals/JackpotModal';
 import { VipBonusModal } from '../components/modals/VipBonusModal';
+import { ServiceModal } from '../components/modals/ServiceModal';
 
 const navItems = [
   { to: '/dashboard', label: 'Dashboard', icon: '📊' },
@@ -104,6 +105,13 @@ export function UserLayout() {
           >
             <span className="text-lg">🎁</span> Refer & Earn
           </button>
+          <button
+            type="button"
+            onClick={() => openModal('service')}
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-gray-400 hover:bg-dark-800 hover:text-purple-300 transition-all duration-200"
+          >
+            <span className="text-lg">🎧</span> 24/7 Support
+          </button>
         </nav>
 
         <div className="p-4 border-t border-dark-700">
@@ -187,6 +195,11 @@ export function UserLayout() {
             closeModal();
             navigate('/deposit');
           }}
+        />
+      )}
+      {activeModal === 'service' && (
+        <ServiceModal
+          onClose={closeModal}
         />
       )}
     </div>
