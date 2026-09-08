@@ -8,6 +8,11 @@ const config: CapacitorConfig = {
     cleartext: true,
     androidScheme: 'http',
   },
+  android: {
+    allowMixedContent: true,
+    captureInput: true,
+    webContentsDebuggingEnabled: false,
+  },
 };
 
 export default config;

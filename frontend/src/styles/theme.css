@@ -186,7 +186,22 @@
   box-shadow: 0 2px 8px rgba(255,210,26,.4) !important;
 }
 
-html, body, #root {
+html {
+  width: 100%;
+  height: 100%;
+  min-height: 100dvh;
+  max-height: 100dvh;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  -webkit-text-size-adjust: 100% !important;
+  text-size-adjust: 100% !important;
+  touch-action: manipulation;
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body, #root {
   width: 100%;
   height: 100%;
   min-height: 100dvh;
