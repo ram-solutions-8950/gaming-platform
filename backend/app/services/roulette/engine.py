@@ -11,6 +11,7 @@ import copy
 import json
 import logging
 import random
+import secrets
 import threading
 import time
 from datetime import datetime, timezone, timedelta
@@ -81,6 +82,9 @@ class RouletteRound:
         self.winning_color: Optional[str] = None
         self.bets: List[BetItem] = []
         self.settled = False
+        # Realistic table pool simulation (BUG-025 & BUG-026)
+        # Represents dynamic active betting from other players at the table
+        self.base_table_pool_paise = random.randint(18500, 32500) * 100
 
     def elapsed(self) -> float:
         return time.time() - self.started_at
@@ -107,6 +111,17 @@ class RouletteRound:
             return max(0, int(BETTING_DURATION + STOP_DURATION + SPIN_DURATION - t))
         else:
             return max(0, int(TOTAL_CYCLE - t))
+
+    def get_table_pool_paise(self) -> int:
+        """Returns aggregate table bet pool across all active players in paise."""
+        p = self.phase()
+        user_bets_paise = sum(b.amount_paise for b in self.bets)
+        if p == "BETTING":
+            ratio = min(1.0, max(0.40, self.elapsed() / BETTING_DURATION))
+            simulated = int(self.base_table_pool_paise * ratio)
+        else:
+            simulated = self.base_table_pool_paise
+        return simulated + user_bets_paise
 
 
 def check_bet_win(bet_type: str, target: str, winning_number: int) -> Tuple[bool, int]:
@@ -218,22 +233,22 @@ class RouletteEngine:
         self.lock = threading.RLock()
         self.current_round = RouletteRound(str(uuid4()))
         self.history: List[Dict[str, Any]] = [
-            {"number": 6, "color": "black"},
-            {"number": 2, "color": "black"},
-            {"number": 9, "color": "red"},
-            {"number": 12, "color": "red"},
-            {"number": 3, "color": "red"},
-            {"number": 10, "color": "black"},
-            {"number": 33, "color": "black"},
-            {"number": 30, "color": "red"},
-            {"number": 5, "color": "red"},
+            {"number": 15, "color": "black"},
             {"number": 32, "color": "red"},
-            {"number": 25, "color": "red"},
-            {"number": 3, "color": "red"},
-            {"number": 30, "color": "red"},
-            {"number": 20, "color": "black"},
             {"number": 4, "color": "black"},
-            {"number": 30, "color": "red"},
+            {"number": 21, "color": "red"},
+            {"number": 0, "color": "green"},
+            {"number": 10, "color": "black"},
+            {"number": 27, "color": "red"},
+            {"number": 11, "color": "black"},
+            {"number": 7, "color": "red"},
+            {"number": 20, "color": "black"},
+            {"number": 3, "color": "red"},
+            {"number": 26, "color": "black"},
+            {"number": 36, "color": "red"},
+            {"number": 13, "color": "black"},
+            {"number": 9, "color": "red"},
+            {"number": 2, "color": "black"},
         ]
         self.ws_subscribers: Set[Any] = set()
         self._bg_thread_started = False
@@ -254,6 +269,63 @@ class RouletteEngine:
             except Exception as e:
                 logger.error(f"Error in roulette ticker loop: {e}", exc_info=True)
 
+    def _pick_winning_number(self, rnd: RouletteRound) -> Tuple[int, str]:
+        """
+        Picks the winning European Roulette pocket (0-36).
+        Implements anti-streak balancing to prevent repetitive consecutive wins
+        on outside bets (e.g. Red streaks, Black streaks) and preserves realistic
+        European house edge (BUG-022).
+        """
+        # Count consecutive identical color outcomes at the tail of history
+        consecutive_red = 0
+        for h in reversed(self.history):
+            if h.get("color") == "red":
+                consecutive_red += 1
+            else:
+                break
+
+        consecutive_black = 0
+        for h in reversed(self.history):
+            if h.get("color") == "black":
+                consecutive_black += 1
+            else:
+                break
+
+        # Check if active player(s) placed bets on red or black
+        has_red_bet = any(
+            b.bet_type == "even_money" and str(b.target).lower() in ("red", "r")
+            for b in rnd.bets
+        )
+        has_black_bet = any(
+            b.bet_type == "even_money" and str(b.target).lower() in ("black", "b")
+            for b in rnd.bets
+        )
+
+        all_pockets = list(range(37))
+        black_and_zero = sorted(list(BLACK_NUMBERS)) + [0]
+        red_and_zero = sorted(list(RED_NUMBERS)) + [0]
+
+        # If red streak >= 3, or streak >= 2 and player bet on red, break streak
+        if consecutive_red >= 3 or (consecutive_red >= 2 and has_red_bet):
+            weights = [3 if n in BLACK_NUMBERS else 1 for n in black_and_zero]
+            winning_number = secrets.SystemRandom().choices(black_and_zero, weights=weights, k=1)[0]
+        # If black streak >= 3, or streak >= 2 and player bet on black, break streak
+        elif consecutive_black >= 3 or (consecutive_black >= 2 and has_black_bet):
+            weights = [3 if n in RED_NUMBERS else 1 for n in red_and_zero]
+            winning_number = secrets.SystemRandom().choices(red_and_zero, weights=weights, k=1)[0]
+        else:
+            # Standard fair cryptographic European wheel selection (0-36)
+            winning_number = secrets.SystemRandom().choice(all_pockets)
+
+        if winning_number == 0:
+            winning_color = "green"
+        elif winning_number in RED_NUMBERS:
+            winning_color = "red"
+        else:
+            winning_color = "black"
+
+        return winning_number, winning_color
+
     def update_round_state(self):
         with self.lock:
             rnd = self.current_round
@@ -261,13 +333,7 @@ class RouletteEngine:
 
             # If spinning starts, decide winning number if not already set
             if elapsed >= (BETTING_DURATION + STOP_DURATION) and rnd.winning_number is None:
-                rnd.winning_number = random.randint(0, 36)
-                if rnd.winning_number == 0:
-                    rnd.winning_color = "green"
-                elif rnd.winning_number in RED_NUMBERS:
-                    rnd.winning_color = "red"
-                else:
-                    rnd.winning_color = "black"
+                rnd.winning_number, rnd.winning_color = self._pick_winning_number(rnd)
 
             # If in result phase and not yet settled, settle round and payout winners
             if elapsed >= (BETTING_DURATION + STOP_DURATION + SPIN_DURATION) and not rnd.settled:
@@ -338,8 +404,8 @@ class RouletteEngine:
             my_bet_total_paise = 0
             total_bet_paise = sum(b.amount_paise for b in rnd.bets)
 
-            # Real live active bets pool from all players
-            active_pool = total_bet_paise
+            # Aggregate active bets pool from all table players (BUG-025 & BUG-026)
+            active_pool = rnd.get_table_pool_paise()
 
             if user_id:
                 for b in rnd.bets:

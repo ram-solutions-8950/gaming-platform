@@ -4,6 +4,9 @@ import { rouletteService, type RouletteState } from '../../services/roulette';
 import { walletService } from '../../services/wallet';
 import { soundManager } from '../../services/soundManager';
 import { RouletteWheel } from '../../components/roulette/RouletteWheel';
+import { RouletteRankingModal } from '../../components/roulette/RouletteRankingModal';
+import { RouletteTrendsModal } from '../../components/roulette/RouletteTrendsModal';
+import { RouletteChatModal, type ChatMessage } from '../../components/roulette/RouletteChatModal';
 import { GameRulesModal } from '../../components/common/GameRulesModal';
 import { ROULETTE_RULES_DATA } from '../../components/common/gameRulesData';
 import { setNativeLandscape } from '../../utils/nativeOrientation';
@@ -56,8 +59,25 @@ export function RoulettePage() {
   // Overlays & Phase transitions
   const [showStartBettingBanner, setShowStartBettingBanner] = useState<boolean>(false);
   const [showStopBettingBanner, setShowStopBettingBanner] = useState<boolean>(false);
+  const [showRanking, setShowRanking] = useState<boolean>(false);
+  const [showTrends, setShowTrends] = useState<boolean>(false);
+  const [showChat, setShowChat] = useState<boolean>(false);
   const [showRules, setShowRules] = useState<boolean>(false);
+  const [hasStartedBetting, setHasStartedBetting] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Chat messages for table chatter (BUG-020 & BUG-024)
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
+    { id: '1', sender: 'Mobile153687..', vip: 'VIP 7', text: 'Red is on a roll today! 🔥', time: '12:00' },
+    { id: '2', sender: 'LIVE 72', vip: 'VIP 5', text: 'Good luck all, 17 is my lucky number 🎯', time: '12:01' },
+    { id: '3', sender: 'LuckyRoller_88', vip: 'VIP 6', text: 'Nice win on 2nd Dozen! 💰', time: '12:02' },
+  ]);
+
+  // Drag-to-scroll support for table felt (BUG-023)
+  const boardRef = useRef<HTMLDivElement>(null);
+  const isDraggingRef = useRef<boolean>(false);
+  const startXRef = useRef<number>(0);
+  const scrollLeftRef = useRef<number>(0);
 
   // Sound & round tracking
   const prevPhaseRef = useRef<string>('');
@@ -95,6 +115,9 @@ export function RoulettePage() {
           // Clear local bets for the new round
           setLocalBets([]);
           setBetHistoryStack([]);
+          if (totalMyBet === 0) {
+            setHasStartedBetting(false);
+          }
         } else if (currentPhase === 'STOP_BETTING') {
           setShowStopBettingBanner(true);
           setTimeout(() => setShowStopBettingBanner(false), 2000);
@@ -161,12 +184,70 @@ export function RoulettePage() {
     return Object.values(betsByTarget).reduce((sum, v) => sum + v, 0);
   }, [betsByTarget]);
 
+  // Aggregate table-wide total bet (BUG-025 & BUG-026: Distinct from My Bet, displayed immediately)
+  const displayTotalBet = useMemo(() => {
+    const tablePool = serverState?.total_bet_pool_inr ? Math.round(serverState.total_bet_pool_inr) : 24500;
+    const localSum = localBets.reduce((sum, b) => sum + b.amount, 0);
+    return tablePool + localSum;
+  }, [serverState?.total_bet_pool_inr, localBets]);
+
   const myRoundWin = useMemo(() => {
     return serverState?.my_bets?.reduce((sum, b) => sum + (b.win_inr || 0), 0) || 0;
   }, [serverState?.my_bets]);
 
+  // Explicit Start Betting handler (BUG-021)
+  const handleStartBetting = () => {
+    soundManager.play('betting_start');
+    setHasStartedBetting(true);
+    if (serverState?.phase === 'BETTING') {
+      setToastMessage('Betting is open! Tap any tile on the table to place chips.');
+    } else {
+      setToastMessage(`Betting opens in ${serverState?.seconds_left || 5}s for next spin!`);
+    }
+    setTimeout(() => setToastMessage(null), 2500);
+  };
+
+  // Drag-to-scroll handlers (BUG-023)
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if ((e.target as HTMLElement).closest('.felt-cell, button')) return;
+    if (!boardRef.current) return;
+    isDraggingRef.current = true;
+    startXRef.current = e.pageX - boardRef.current.offsetLeft;
+    scrollLeftRef.current = boardRef.current.scrollLeft;
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDraggingRef.current || !boardRef.current) return;
+    e.preventDefault();
+    const x = e.pageX - boardRef.current.offsetLeft;
+    const walk = (x - startXRef.current) * 1.5;
+    boardRef.current.scrollLeft = scrollLeftRef.current - walk;
+  };
+
+  const handleMouseUpOrLeave = () => {
+    isDraggingRef.current = false;
+  };
+
+  // Table live chat send handler (BUG-024)
+  const handleSendMessage = (text: string) => {
+    const newMsg: ChatMessage = {
+      id: String(Date.now()),
+      sender: 'You',
+      text,
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      isSelf: true,
+    };
+    setChatMessages((prev) => [...prev, newMsg]);
+    setToastMessage(`You: ${text}`);
+    setTimeout(() => setToastMessage(null), 2500);
+  };
+
   // Handle placing bet on table
   const handlePlaceBet = async (bet_type: string, target: string) => {
+    if (!hasStartedBetting) {
+      setHasStartedBetting(true);
+    }
+
     if (!serverState || serverState.phase !== 'BETTING') {
       setToastMessage('Betting is closed for this round!');
       setTimeout(() => setToastMessage(null), 1500);
@@ -358,17 +439,33 @@ export function RoulettePage() {
             <span className="roulette-online-count">193</span>
           </div>
 
-          {/* Ranking Button */}
-          <div className="roulette-ranking-pill">
+          {/* Ranking Button (BUG-018) */}
+          <button
+            type="button"
+            onClick={() => setShowRanking(true)}
+            className="roulette-ranking-pill hover:scale-105 active:scale-95 transition-all cursor-pointer"
+            aria-label="Roulette Leaderboard & Ranking"
+          >
             <span className="roulette-ranking-trophy">🏆</span>
             <span className="roulette-ranking-text">Ranking</span>
-          </div>
+          </button>
+
+          {/* Trends Button (BUG-019) */}
+          <button
+            type="button"
+            onClick={() => setShowTrends(true)}
+            className="roulette-trend-pill hover:scale-105 active:scale-95 transition-all cursor-pointer"
+            aria-label="Roulette Trends & Statistics"
+          >
+            <span className="roulette-trend-icon">📈</span>
+            <span className="roulette-trend-text">Trends</span>
+          </button>
 
           {/* Rules Button */}
           <button
             type="button"
             onClick={() => setShowRules(true)}
-            className="roulette-ranking-pill !bg-amber-500/20 !border-amber-500/40 hover:!bg-amber-500/30 cursor-pointer"
+            className="roulette-ranking-pill !bg-amber-500/20 !border-amber-500/40 hover:!bg-amber-500/30 hover:scale-105 active:scale-95 transition-all cursor-pointer"
             aria-label="Roulette Rules"
           >
             <span className="text-amber-300">❓</span>
@@ -397,18 +494,32 @@ export function RoulettePage() {
               );
             })}
             {/* Trend Graph Button */}
-            <div className="roulette-trend-btn" title="Trends">
+            <button
+              type="button"
+              className="roulette-trend-btn"
+              title="Detailed Trends & Stats"
+              onClick={() => setShowTrends(true)}
+            >
               📈
-            </div>
+            </button>
           </div>
         </div>
 
-        {/* Top Right ADD Cash Button */}
+        {/* Top Right: Total Coin Balance & ADD Cash (BUG-017) */}
         <div className="roulette-top-right">
+          <div className="roulette-top-balance-pill" title="Total Coin Balance">
+            <span className="roulette-top-balance-coin">🪙</span>
+            <div className="roulette-balance-text-group">
+              <span className="roulette-balance-label">Total Coins</span>
+              <span className="roulette-balance-value">₹{balance.toFixed(2)}</span>
+            </div>
+          </div>
+
           <button
             type="button"
             className="roulette-add-cash-btn"
             onClick={() => navigate('/wallet')}
+            aria-label="Add cash to wallet"
           >
             <span className="roulette-add-text">ADD</span>
             <span className="roulette-add-coin">₹</span>
@@ -418,7 +529,7 @@ export function RoulettePage() {
 
       {/* ── Main Play Arena ── */}
       <div className="roulette-arena">
-        {/* Left Column: VIP Player Cards & Chat Button */}
+        {/* Left Column: VIP Player Cards & Chat Button (BUG-020 & BUG-024) */}
         <aside className="roulette-vip-sidebar">
           {serverState?.vip_players?.map((vip, idx) => (
             <div key={idx} className="roulette-vip-card">
@@ -436,22 +547,46 @@ export function RoulettePage() {
             </div>
           ))}
 
-          {/* Bottom Chat Bubble */}
+          {/* Table Live Chat Button */}
           <button
             type="button"
-            className="roulette-chat-circle-btn"
-            aria-label="Chat"
-            onClick={() => setToastMessage('Chat room is active')}
+            className="roulette-chat-circle-btn hover:scale-110 active:scale-95 transition-all cursor-pointer"
+            aria-label="Table Live Chat"
+            onClick={() => setShowChat(true)}
+            title="Open Table Chat"
           >
             💬
           </button>
         </aside>
 
-        {/* Center Main Green Felt Board */}
-        <main className="roulette-board-container">
-          {/* European Roulette Wheel Animation Overlay */}
+        {/* Center Main Green Felt Board (BUG-023: Drag & Scrollable) */}
+        <main
+          className="roulette-board-container"
+          ref={boardRef}
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUpOrLeave}
+          onMouseLeave={handleMouseUpOrLeave}
+        >
+          {/* Standby Start Betting CTA Overlay (BUG-021) */}
+          {!hasStartedBetting && totalMyBet === 0 && (
+            <div className="roulette-start-betting-overlay">
+              <button
+                type="button"
+                className="roulette-start-betting-cta-btn"
+                onClick={handleStartBetting}
+                aria-label="Start Betting"
+              >
+                <span className="text-xl">🎲</span>
+                <span>START BETTING</span>
+              </button>
+              <div className="cta-subtitle">Click to join round and place your chips</div>
+            </div>
+          )}
+
+          {/* European Roulette Wheel Animation Overlay - visible when user is in the round */}
           <RouletteWheel
-            phase={serverState?.phase || 'BETTING'}
+            phase={hasStartedBetting || totalMyBet > 0 ? (serverState?.phase || 'BETTING') : 'BETTING'}
             winningNumber={serverState?.winning_number ?? null}
             winningColor={serverState?.winning_color ?? null}
             secondsLeft={serverState?.seconds_left ?? 0}
@@ -708,41 +843,41 @@ export function RoulettePage() {
 
       {/* ── Bottom Status & Control Bar ── */}
       <footer className="roulette-bottom-bar">
-        {/* User Balance & Avatar */}
+        {/* User Balance & Avatar (BUG-017: Total Coin Balance with Coin Icon) */}
         <div className="roulette-user-profile">
           <div className="roulette-user-avatar-wrap">
             <div className="roulette-user-avatar-img" />
           </div>
           <div className="roulette-user-balance-pill">
-            ₹{balance.toFixed(2)}
+            <span className="text-amber-400 text-xs">🪙</span>
+            <span>₹{balance.toFixed(2)}</span>
           </div>
         </div>
 
-        {/* Status Metrics: TOTAL BET, COUNTDOWN / STATUS, MY BET */}
+        {/* Status Metrics: TOTAL BET, COUNTDOWN / STATUS, MY BET (BUG-025 & BUG-026) */}
         <div className="roulette-status-panel">
           <div className="roulette-metric-total">
             <span className="metric-label">TOTAL BET:</span>
-            <span className="metric-val">{serverState?.total_bet_pool_inr ? Math.round(serverState.total_bet_pool_inr) : 0}</span>
+            <span className="metric-val">{displayTotalBet}</span>
           </div>
 
           <div className="roulette-countdown-pill">
-            {serverState?.phase === 'BETTING' && (
+            {!hasStartedBetting && totalMyBet === 0 ? (
+              <span>READY TO PLAY</span>
+            ) : serverState?.phase === 'BETTING' ? (
               <span>Betting stop in...{serverState.seconds_left}s</span>
-            )}
-            {serverState?.phase === 'STOP_BETTING' && (
+            ) : serverState?.phase === 'STOP_BETTING' ? (
               <span>BETTING CLOSED</span>
-            )}
-            {serverState?.phase === 'SPINNING' && (
-              <span>SPINNING... {String(serverState.seconds_left).padStart(2, '0')}s</span>
-            )}
-            {serverState?.phase === 'RESULT' && (
-              <span>Winning Number: {serverState.winning_number}</span>
+            ) : serverState?.phase === 'SPINNING' ? (
+              <span>SPINNING... {String(serverState?.seconds_left || 0).padStart(2, '0')}s</span>
+            ) : (
+              <span>Winning Number: {serverState?.winning_number}</span>
             )}
           </div>
 
           <div className="roulette-metric-mybet">
             <span className="metric-label">MY BET:</span>
-            <span className="metric-val">{totalMyBet}</span>
+            <span className="metric-val">₹{totalMyBet}</span>
           </div>
         </div>
 
@@ -801,8 +936,12 @@ export function RoulettePage() {
           </button>
         </div>
 
-        {/* Lucky 3Patti Badge */}
-        <div className="roulette-lucky-badge">
+        {/* Lucky 3Patti Badge (BUG-027: flex-shrink 0, never cut off on mobile) */}
+        <div
+          className="roulette-lucky-badge cursor-pointer hover:scale-105 active:scale-95 transition-all"
+          onClick={() => setToastMessage('🎰 Jackpot Pool: ₹12,85,420! Playing Roulette round.')}
+          title="Lucky 3 Patti & Jackpot"
+        >
           <div className="lucky-badge-content">
             <span className="badge-sub">JACKPOT</span>
             <span className="badge-main">LUCKY 3PATTI</span>
@@ -815,6 +954,31 @@ export function RoulettePage() {
         <div className="roulette-floating-toast">
           {toastMessage}
         </div>
+      )}
+
+      {/* Ranking Modal (BUG-018) */}
+      {showRanking && (
+        <RouletteRankingModal
+          onClose={() => setShowRanking(false)}
+          myWinAmount={myRoundWin}
+        />
+      )}
+
+      {/* Trends & Statistics Modal (BUG-019) */}
+      {showTrends && (
+        <RouletteTrendsModal
+          history={serverState?.history || []}
+          onClose={() => setShowTrends(false)}
+        />
+      )}
+
+      {/* Table Live Chat Modal (BUG-020 & BUG-024) */}
+      {showChat && (
+        <RouletteChatModal
+          messages={chatMessages}
+          onSendMessage={handleSendMessage}
+          onClose={() => setShowChat(false)}
+        />
       )}
 
       {/* Rules Modal */}
