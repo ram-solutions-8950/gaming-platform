@@ -125,10 +125,10 @@ export const AviatorArena: React.FC<AviatorArenaProps> = ({
         if (target > smoothMultRef.current) {
           // Catch up smoothly to server target while never stopping
           const diff = target - smoothMultRef.current;
-          smoothMultRef.current += Math.max(diff * 0.15, dt * 0.20 * smoothMultRef.current);
+          smoothMultRef.current += Math.max(diff * 0.15, dt * 0.09 * smoothMultRef.current);
         } else {
           // Extrapolate at growth rate so plane never sits still between ticks
-          smoothMultRef.current += dt * 0.20 * smoothMultRef.current;
+          smoothMultRef.current += dt * 0.09 * smoothMultRef.current;
         }
       }
 

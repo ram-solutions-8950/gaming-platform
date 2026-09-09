@@ -134,6 +134,38 @@
   border-color: rgba(255, 210, 26, 0.4);
 }
 
+.aviator-nav-bets-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+  padding: 3px 10px;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.aviator-nav-bets-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 210, 26, 0.5);
+}
+
+.aviator-nav-bets-btn .bets-badge {
+  background: #ef4444;
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 800;
+  padding: 0 5px;
+  min-width: 16px;
+  text-align: center;
+  border-radius: 9999px;
+}
+
 /* History Bar */
 .aviator-history-bar {
   display: flex;
@@ -564,9 +596,60 @@
   gap: 6px;
 }
 
+.amount-stepper-wrap {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+}
+
+.stepper-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  background: #1f293d;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 6px;
+  color: #ffffff;
+  font-size: 1.15rem;
+  font-weight: 900;
+  line-height: 1;
+  cursor: pointer;
+  transition: all 0.12s ease;
+  user-select: none;
+}
+
+.stepper-btn:hover:not(:disabled) {
+  background: #2b3954;
+  border-color: rgba(255, 210, 26, 0.5);
+  transform: scale(1.05);
+}
+
+.stepper-btn:active:not(:disabled) {
+  transform: scale(0.95);
+}
+
+.stepper-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.stepper-minus {
+  color: #f87171;
+}
+
+.stepper-plus {
+  color: #4ade80;
+}
+
 .amount-input-row {
   display: flex;
   align-items: center;
+  flex: 1;
+  min-width: 0;
   background: #0e121a;
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 6px;
@@ -584,7 +667,7 @@
   background: transparent;
   border: none;
   color: #ffffff;
-  font-size: 1rem;
+  font-size: 0.95rem;
   font-weight: 800;
   padding: 4px;
   outline: none;
@@ -598,7 +681,7 @@
 
 .chip-btn {
   background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 4px;
   padding: 2px 6px;
   font-size: 0.7rem;
@@ -616,6 +699,42 @@
 .chip-btn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+}
+
+.chip-btn.chip-minmax {
+  background: rgba(255, 210, 26, 0.14);
+  color: #ffd21a;
+  border-color: rgba(255, 210, 26, 0.35);
+  font-weight: 800;
+}
+
+.chip-btn.chip-minmax:hover:not(:disabled) {
+  background: rgba(255, 210, 26, 0.28);
+  color: #ffffff;
+}
+
+.chip-btn.chip-dec {
+  background: rgba(239, 68, 68, 0.14);
+  color: #f87171;
+  border-color: rgba(239, 68, 68, 0.32);
+  font-weight: 800;
+}
+
+.chip-btn.chip-dec:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.28);
+  color: #ffffff;
+}
+
+.chip-btn.chip-inc {
+  background: rgba(34, 197, 94, 0.12);
+  color: #4ade80;
+  border-color: rgba(34, 197, 94, 0.25);
+  font-weight: 700;
+}
+
+.chip-btn.chip-inc:hover:not(:disabled) {
+  background: rgba(34, 197, 94, 0.25);
+  color: #ffffff;
 }
 
 .chip-btn.chip-action {
@@ -724,47 +843,101 @@
 .aviator-modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.75);
-  backdrop-filter: blur(4px);
+  background: rgba(0, 0, 0, 0.82);
+  backdrop-filter: blur(5px);
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 9999;
-  padding: 16px;
+  z-index: 99999;
+  padding: 12px;
+}
+
+@keyframes aviatorModalPop {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 .aviator-modal {
   background: #131825;
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 210, 26, 0.25);
   border-radius: 12px;
   width: 100%;
-  max-width: 500px;
+  max-width: 520px;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 20px 35px rgba(0, 0, 0, 0.7);
+  animation: aviatorModalPop 0.18s ease-out;
 }
 
 .aviator-modal-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 14px 18px;
+  padding: 12px 16px;
   background: #182030;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  flex-shrink: 0;
 }
 
 .aviator-modal-close {
   background: transparent;
   border: none;
   color: #94a3b8;
-  font-size: 1.1rem;
+  font-size: 1.2rem;
   cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.aviator-modal-close:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.1);
 }
 
 .aviator-modal-body {
-  padding: 16px 18px;
+  padding: 14px 16px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
+  overflow-y: auto;
+  max-height: calc(85vh - 56px);
+}
+
+.aviator-mobile-bets-modal {
+  background: #131825;
+  border: 1px solid rgba(255, 210, 26, 0.25);
+  border-radius: 12px;
+  width: 100%;
+  max-width: 440px;
+  height: 85vh;
+  max-height: 520px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 20px 35px rgba(0, 0, 0, 0.7);
+  animation: aviatorModalPop 0.18s ease-out;
+}
+
+.aviator-mobile-bets-content {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.aviator-mobile-bets-content .aviator-players-panel {
+  display: flex !important;
+  border-right: none;
+  height: 100%;
 }
 
 .aviator-info-row {
@@ -830,12 +1003,17 @@
   .btn-sub-label {
     font-size: 0.7rem !important;
   }
+  .stepper-btn {
+    width: 24px !important;
+    height: 24px !important;
+    font-size: 0.95rem !important;
+  }
   .amount-input-row {
-    padding: 1px 6px !important;
+    padding: 1px 4px !important;
   }
   .amount-input {
     font-size: 0.85rem !important;
-    padding: 2px !important;
+    padding: 1px !important;
   }
   .quick-chips-row {
     gap: 2px !important;

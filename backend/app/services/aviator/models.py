@@ -39,6 +39,9 @@ class LiveBet:
     cashed_out_at: Optional[datetime] = None
 
 
+AVIATOR_GROWTH_RATE = 0.09  # balanced exponential growth rate
+
+
 @dataclass
 class LiveRound:
     """In-memory state of a single Aviator round."""
@@ -58,7 +61,7 @@ class LiveRound:
         """
         Calculate current multiplier based on elapsed flight time.
         Uses exponential growth: mult = e^(t * growth_rate)
-        where growth_rate is tuned so a 10× crash ≈ 23 seconds.
+        where growth_rate is tuned so 2.0× takes ~7.7s and 10× takes ~25.6s.
         """
         if self.phase != RoundPhase.FLYING or self.flight_started_at is None:
             return 1.0
@@ -66,7 +69,7 @@ class LiveRound:
         if elapsed < 0:
             return 1.0
         import math
-        mult = math.exp(elapsed * 0.20)
+        mult = math.exp(elapsed * AVIATOR_GROWTH_RATE)
         return min(mult, self.crash_point)
 
     def get_user_bets(self, user_id: UUID) -> list[LiveBet]:

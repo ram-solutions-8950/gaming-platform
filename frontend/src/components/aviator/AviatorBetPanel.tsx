@@ -11,8 +11,6 @@ interface AviatorBetPanelProps {
   onCashout: (slot: 1 | 2) => void;
 }
 
-const CHIP_PRESETS = [10, 50, 100, 500, 1000];
-
 export const AviatorBetPanel: React.FC<AviatorBetPanelProps> = ({
   slot,
   phase,
@@ -37,6 +35,24 @@ export const AviatorBetPanel: React.FC<AviatorBetPanelProps> = ({
   const livePayoutRupees = hasActiveBet
     ? ((myBet.amount * multiplier) / 100).toFixed(2)
     : '0.00';
+
+  const handleStep = (step: number) => {
+    if (hasActiveBet) return;
+    const current = parseInt(amountInput, 10) || 0;
+    setAmountInput(String(Math.max(10, current + step)));
+  };
+
+  const handleMin = () => {
+    if (hasActiveBet) return;
+    setAmountInput('10');
+  };
+
+  const handleMax = () => {
+    if (hasActiveBet) return;
+    const walletRupees = Math.floor(walletBalancePaise / 100);
+    const maxVal = Math.max(10, Math.min(10000, walletRupees || 1000));
+    setAmountInput(String(maxVal));
+  };
 
   const handlePresetClick = (val: number) => {
     if (hasActiveBet) return;
@@ -115,46 +131,112 @@ export const AviatorBetPanel: React.FC<AviatorBetPanelProps> = ({
 
       {/* Main Bet Controls */}
       <div className="aviator-bet-card-body">
-        {/* Left column: Amount input & Quick Chips */}
+        {/* Left column: Amount input with Stepper & Quick Chips */}
         <div className="aviator-amount-section">
-          <div className="amount-input-row">
-            <span className="currency-symbol">₹</span>
-            <input
-              type="text"
-              inputMode="numeric"
-              disabled={hasActiveBet || !isBettingPhase}
-              value={amountInput}
-              onChange={(e) => {
-                const clean = e.target.value.replace(/[^0-9]/g, '');
-                setAmountInput(clean);
-              }}
-              onBlur={() => {
-                const val = parseInt(amountInput, 10);
-                if (!val || val < 10) {
-                  setAmountInput('10');
-                }
-              }}
-              className="amount-input"
-            />
-          </div>
-
-          <div className="quick-chips-row">
-            {CHIP_PRESETS.map((val) => (
-              <button
-                key={val}
-                type="button"
+          <div className="amount-stepper-wrap">
+            <button
+              type="button"
+              disabled={hasActiveBet || !isBettingPhase || amountRupees <= 10}
+              onClick={() => handleStep(-10)}
+              className="stepper-btn stepper-minus"
+              aria-label="Decrease bet by ₹10"
+              title="Decrease by ₹10"
+            >
+              −
+            </button>
+            <div className="amount-input-row">
+              <span className="currency-symbol">₹</span>
+              <input
+                type="text"
+                inputMode="numeric"
                 disabled={hasActiveBet || !isBettingPhase}
-                onClick={() => handlePresetClick(val)}
-                className="chip-btn"
-              >
-                +{val}
-              </button>
-            ))}
+                value={amountInput}
+                onChange={(e) => {
+                  const clean = e.target.value.replace(/[^0-9]/g, '');
+                  setAmountInput(clean);
+                }}
+                onBlur={() => {
+                  const val = parseInt(amountInput, 10);
+                  if (!val || val < 10) {
+                    setAmountInput('10');
+                  }
+                }}
+                className="amount-input"
+              />
+            </div>
             <button
               type="button"
               disabled={hasActiveBet || !isBettingPhase}
+              onClick={() => handleStep(10)}
+              className="stepper-btn stepper-plus"
+              aria-label="Increase bet by ₹10"
+              title="Increase by ₹10"
+            >
+              +
+            </button>
+          </div>
+
+          <div className="quick-chips-row">
+            <button
+              type="button"
+              disabled={hasActiveBet || !isBettingPhase}
+              onClick={handleMin}
+              className="chip-btn chip-minmax chip-min"
+              title="Set to minimum bet (₹10)"
+            >
+              MIN
+            </button>
+            <button
+              type="button"
+              disabled={hasActiveBet || !isBettingPhase || amountRupees <= 10}
+              onClick={() => handleStep(-50)}
+              className="chip-btn chip-dec"
+              title="Decrease by ₹50"
+            >
+              -50
+            </button>
+            <button
+              type="button"
+              disabled={hasActiveBet || !isBettingPhase || amountRupees <= 10}
+              onClick={() => handleStep(-10)}
+              className="chip-btn chip-dec"
+              title="Decrease by ₹10"
+            >
+              -10
+            </button>
+            <button
+              type="button"
+              disabled={hasActiveBet || !isBettingPhase}
+              onClick={() => handlePresetClick(10)}
+              className="chip-btn chip-inc"
+              title="Increase by ₹10"
+            >
+              +10
+            </button>
+            <button
+              type="button"
+              disabled={hasActiveBet || !isBettingPhase}
+              onClick={() => handlePresetClick(50)}
+              className="chip-btn chip-inc"
+              title="Increase by ₹50"
+            >
+              +50
+            </button>
+            <button
+              type="button"
+              disabled={hasActiveBet || !isBettingPhase}
+              onClick={() => handlePresetClick(100)}
+              className="chip-btn chip-inc"
+              title="Increase by ₹100"
+            >
+              +100
+            </button>
+            <button
+              type="button"
+              disabled={hasActiveBet || !isBettingPhase || amountRupees <= 10}
               onClick={handleHalf}
               className="chip-btn chip-action"
+              title="Half bet amount"
             >
               ½
             </button>
@@ -163,8 +245,18 @@ export const AviatorBetPanel: React.FC<AviatorBetPanelProps> = ({
               disabled={hasActiveBet || !isBettingPhase}
               onClick={handleDouble}
               className="chip-btn chip-action"
+              title="Double bet amount"
             >
               2×
+            </button>
+            <button
+              type="button"
+              disabled={hasActiveBet || !isBettingPhase}
+              onClick={handleMax}
+              className="chip-btn chip-minmax chip-max"
+              title="Set to maximum bet"
+            >
+              MAX
             </button>
           </div>
         </div>

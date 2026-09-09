@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { useAviatorSocket } from '../../hooks/useAviatorSocket';
 import { aviatorService, type AviatorBetHistoryItem } from '../../services/aviator';
@@ -20,6 +21,7 @@ export function AviatorPage() {
   const [myPastBets, setMyPastBets] = useState<AviatorBetHistoryItem[]>([]);
   const [recentCrashesList, setRecentCrashesList] = useState<number[]>([]);
   const [showRules, setShowRules] = useState<boolean>(false);
+  const [showMobileBets, setShowMobileBets] = useState<boolean>(false);
 
   // Fetch current wallet balance
   const refreshWallet = useCallback(async () => {
@@ -158,6 +160,17 @@ export function AviatorPage() {
         <div className="aviator-nav-right flex items-center gap-2">
           <button
             type="button"
+            onClick={() => setShowMobileBets(true)}
+            className="aviator-nav-bets-btn"
+            aria-label="All Bets & My Bet"
+            title="View All Bets & My Bets"
+          >
+            <span className="text-xs">👥</span>
+            <span>Bets</span>
+            <span className="bets-badge">{roundState.bets.length}</span>
+          </button>
+          <button
+            type="button"
             onClick={() => setShowRules(true)}
             className="flex items-center gap-1 px-2.5 py-1 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 rounded-full text-xs font-bold transition active:scale-95 cursor-pointer shadow-sm"
             aria-label="Aviator Rules"
@@ -243,6 +256,35 @@ export function AviatorPage() {
           onClose={() => setShowRules(false)}
         />
       )}
+      {showMobileBets &&
+        createPortal(
+          <div className="aviator-modal-overlay" onClick={() => setShowMobileBets(false)}>
+            <div className="aviator-mobile-bets-modal" onClick={(e) => e.stopPropagation()}>
+              <div className="aviator-modal-header">
+                <div className="flex items-center gap-2">
+                  <span className="text-base">👥</span>
+                  <h3 className="font-bold text-sm text-white">Live Bets & Past History</h3>
+                </div>
+                <button
+                  type="button"
+                  className="aviator-modal-close"
+                  onClick={() => setShowMobileBets(false)}
+                  aria-label="Close bets panel"
+                >
+                  ✕
+                </button>
+              </div>
+              <div className="aviator-mobile-bets-content">
+                <AviatorPlayers
+                  bets={roundState.bets}
+                  myPastBets={myPastBets}
+                  currentUserId={currentUserId}
+                />
+              </div>
+            </div>
+          </div>,
+          document.body
+        )}
     </div>
   );
 }

@@ -26,11 +26,11 @@ from .models import LiveRound, LiveBet, RoundPhase, BetStatus
 
 logger = get_logger("aviator_engine")
 
-HOUSE_EDGE = 0.08          # 8% house edge
+HOUSE_EDGE = 0.03          # 3% house edge (97% RTP, matching provably fair verification)
 BETTING_DURATION = 10.0    # seconds
 COOLDOWN_DURATION = 3.0    # seconds
 MULTIPLIER_TICK_INTERVAL = 0.25   # server snapshot interval (4 per second)
-GROWTH_RATE = 0.20         # dynamic fast exponential growth rate
+GROWTH_RATE = 0.09         # dynamic balanced exponential growth rate (BUG-028 balanced timing)
 
 
 # ──────────────────────────────────────────────────────────────
@@ -49,7 +49,7 @@ def hash_server_seed(server_seed: str) -> str:
 
 def compute_crash_point(server_seed: str, nonce: int) -> float:
     """
-    Deterministic, provably fair crash point with healthy house edge.
+    Deterministic, provably fair crash point with 3% house edge (97% RTP).
     hash = HMAC-SHA256(server_seed, str(nonce))
     h = int(hash[:13], 16)    # first 52 bits
     e = 2**52
@@ -64,11 +64,6 @@ def compute_crash_point(server_seed: str, nonce: int) -> float:
     if h == e:
         # Avoid division by zero — instant crash
         return 1.00
-
-    # Approx 8% instant/early crashes below 1.15x to balance RTP and avoid guaranteed wins
-    if (h % 13) == 0:
-        early_mult = 1.00 + ((h % 15) / 100.0)
-        return round(early_mult, 2)
 
     raw = (e / (e - h)) * (1 - HOUSE_EDGE)
     # Round to 2 decimal places, starting at 1.00x minimum
