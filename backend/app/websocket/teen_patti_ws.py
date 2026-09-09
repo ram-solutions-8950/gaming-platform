@@ -138,7 +138,7 @@ def _load_config(table_id: str) -> Tuple[GameConfig, str]:
                 max_players=table.max_players,
                 turn_seconds=table.turn_seconds,
             ), table.mode.value
-    return GameConfig(boot_amount=1000, max_players=4, turn_seconds=15), "real"
+    return GameConfig(boot_amount=1000, max_players=2, turn_seconds=15), "real"
 
 
 def _already_processed(table_id: str, action_id: Optional[str]) -> bool:
@@ -245,16 +245,12 @@ async def _turn_timeout(table_id: str, expected_user: str, seconds: int) -> None
 _MIN_PLAYERS_TO_START = 2
 
 def _schedule_bot_fill(table_id: str) -> None:
-    """Schedules bots to fill up to the minimum player count if the table is
-    still short after a delay. This was previously dead code — the
-    _BOT_JOIN_DELAY_SECONDS / _BOT_NAMES constants existed but nothing ever
-    called add_seat(is_bot=True), so a lone player just sat waiting forever.
-
-    Only fills up to _MIN_PLAYERS_TO_START (not all the way to max_players):
-    real players can still join a WAITING table afterwards, and topping it
-    all the way up with bots would needlessly displace genuine opponents —
-    bots never get credited on a win, so a bot winning against real players
-    would just make their stakes vanish for nothing."""
+    """Schedules bots to fill up to the minimum player count for virtual practice tables.
+    In real-money 2-player multiplayer tables, bots are never injected so real players
+    wait for real opponents (BUG-038)."""
+    _, mode = _load_config(table_id)
+    if mode == "real":
+        return
     hand = teen_patti_manager.get(table_id)
     if hand is None or hand.phase != Phase.WAITING:
         return
@@ -400,7 +396,7 @@ async def _resolve_side_show(table_id: str, accept: bool) -> None:
 
 
 def _settle_hand(table_id: str, hand: TeenPattiHand) -> None:
-    if hand.winner_seat is None or hand.is_settled:
+    if hand.is_settled:
         return
     hand.is_settled = True
 
@@ -428,7 +424,7 @@ def _settle_hand(table_id: str, hand: TeenPattiHand) -> None:
                 except ValueError:
                     continue
 
-                won_this = (i == hand.winner_seat)
+                won_this = (hand.winner_seat is not None and i == hand.winner_seat)
                 payout = hand.pot if won_this else 0
 
                 # Debit net stakes contributed by this user
@@ -473,7 +469,7 @@ def _settle_hand(table_id: str, hand: TeenPattiHand) -> None:
             except ValueError:
                 continue
 
-            won_this = (i == hand.winner_seat)
+            won_this = (hand.winner_seat is not None and i == hand.winner_seat)
             payout = hand.pot if won_this else 0
 
             db.add(TeenPattiHandHistory(
@@ -482,7 +478,7 @@ def _settle_hand(table_id: str, hand: TeenPattiHand) -> None:
                 mode=table.mode.value,
                 boot=table.boot_amount,
                 pot=hand.pot,
-                winner_seat=hand.winner_seat,
+                winner_seat=hand.winner_seat if hand.winner_seat is not None else -1,
                 won=won_this,
                 payout=payout,
                 hand_json=json.dumps(hand.as_dict(for_user_id=s.id)),
@@ -608,6 +604,19 @@ async def teen_patti_socket(websocket: WebSocket, table_id: str) -> None:
         await manager.connect(table_id, user_id, websocket)
         await manager.send_to_user(table_id, user_id, {"type": "event", "event": "joined"})
         await _broadcast_state(table_id)
+
+        # BUG-038: Start only when both players have joined the table
+        if len(hand.seats) >= _MIN_PLAYERS_TO_START and hand.phase == Phase.WAITING:
+            async def _auto_start_delayed():
+                try:
+                    await asyncio.sleep(2.5)
+                    h = teen_patti_manager.get(table_id)
+                    if h and h.phase == Phase.WAITING and len(h.seats) >= _MIN_PLAYERS_TO_START:
+                        await _start_hand(table_id)
+                except asyncio.CancelledError:
+                    pass
+            _cancel(_start_timers, table_id)
+            _start_timers[table_id] = asyncio.create_task(_auto_start_delayed())
 
     try:
         while True:

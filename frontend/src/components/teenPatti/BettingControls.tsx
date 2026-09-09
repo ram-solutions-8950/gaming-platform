@@ -46,7 +46,7 @@ export const BettingControls: React.FC<BettingControlsProps> = ({
         {canStart ? (
           <button className="tp-btn tp-btn-chaal" onClick={onStart} style={{ minWidth: 160 }}>
             <span>Deal Hand</span>
-            <span className="tp-btn-sub">Start Round ({playerCount} Players)</span>
+            <span className="tp-btn-sub">Start Round ({playerCount}/2 Ready)</span>
           </button>
         ) : (
           <button
@@ -54,8 +54,8 @@ export const BettingControls: React.FC<BettingControlsProps> = ({
             disabled
             style={{ minWidth: 180, opacity: 0.65, cursor: 'not-allowed' }}
           >
-            <span>Waiting for Players</span>
-            <span className="tp-btn-sub">Need min 2 ({playerCount}/4)</span>
+            <span>Waiting for Opponent</span>
+            <span className="tp-btn-sub">Waiting for Player 2 ({playerCount}/2)</span>
           </button>
         )}
       </div>

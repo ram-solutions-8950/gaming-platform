@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import IntEnum
+from functools import total_ordering
 from typing import List, Tuple
 
 from .cards import Card
@@ -29,6 +30,7 @@ CATEGORY_NAMES = {
 }
 
 
+@total_ordering
 @dataclass(frozen=True)
 class HandRank:
     category: HandCategory

@@ -50,7 +50,8 @@ def decide_action(
     pot: int,
     rng: random.Random,
 ) -> Action:
-    if can_show:
+    # In a 2-player hand, only call SHOW after some action/pot build-up, not instantly on turn 1
+    if can_show and pot >= current_stake * 6 and rng.random() < 0.4:
         return Action.SHOW
 
     if not seen:

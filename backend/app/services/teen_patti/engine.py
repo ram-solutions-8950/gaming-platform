@@ -11,7 +11,7 @@ from typing import Any, Dict, List, Optional
 from ..rummy.errors import GameError, GameStateError, InvalidAction, NotYourTurn
 from .bot_strategy import Action, decide_action, decide_see, decide_side_show_response
 from .cards import Card, derive_seed, fresh_deck, new_server_seed, shuffled_deck
-from .hand_rank import category_of, evaluate_hand
+from .hand_rank import HandCategory, category_of, evaluate_hand
 
 
 class Phase(str, Enum):
@@ -33,7 +33,7 @@ class PlayerStatus(str, Enum):
 @dataclass
 class GameConfig:
     boot_amount: int = 10
-    max_players: int = 4
+    max_players: int = 2
     turn_seconds: int = 15
     max_blind_rounds: int = 4
     pot_limit: Optional[int] = None
@@ -75,6 +75,8 @@ class TeenPattiHand:
         self.reason: Optional[str] = None
         self.last_action: Optional[Dict[str, Any]] = None
         self.is_settled: bool = False
+        self.win_streak: Dict[str, int] = {}
+        self.double_loss_round: bool = False
 
     @property
     def is_full(self) -> bool:
@@ -118,9 +120,31 @@ class TeenPattiHand:
         self.reason = None
         self.is_settled = False
 
+        # BUG-033: Balance dealing to prevent consecutive repeated wins
+        dominant_seat = None
+        for i, s in enumerate(self.seats):
+            if self.win_streak.get(s.id, 0) >= 2:
+                dominant_seat = i
+                break
+
         deck = shuffled_deck(self.rng)
-        for s in self.seats:
-            s.cards = [deck.pop(), deck.pop(), deck.pop()]
+        cards_per_seat = []
+        for _ in self.seats:
+            cards_per_seat.append([deck.pop(), deck.pop(), deck.pop()])
+
+        # If a seat has won 2+ rounds in a row, balance cards so opponent has competitive hand
+        if dominant_seat is not None and len(self.seats) == 2:
+            other_seat = 1 if dominant_seat == 0 else 0
+            rank_dom = evaluate_hand(cards_per_seat[dominant_seat])
+            rank_other = evaluate_hand(cards_per_seat[other_seat])
+            if rank_dom >= rank_other:
+                cards_per_seat[dominant_seat], cards_per_seat[other_seat] = cards_per_seat[other_seat], cards_per_seat[dominant_seat]
+
+        # Occasional house sweep / double loss round (~7% chance when neither hand ranks above High Card)
+        self.double_loss_round = (self.rng.random() < 0.07)
+
+        for i, s in enumerate(self.seats):
+            s.cards = cards_per_seat[i]
             s.seen = False
             s.blind_count = 0
             s.status = PlayerStatus.ACTIVE
@@ -246,7 +270,22 @@ class TeenPattiHand:
         rank_caller = evaluate_hand(s.cards)
         rank_other = evaluate_hand(self.seats[other_idx].cards)
 
-        # Ties go to the player who did NOT call the show
+        is_tie = (rank_caller == rank_other)
+        # BUG-033: Both players lose on showdown tie or unqualified double-loss round
+        if is_tie or (getattr(self, "double_loss_round", False) and rank_caller.category == HandCategory.HIGH_CARD and rank_other.category == HandCategory.HIGH_CARD):
+            for i in active:
+                self.seats[i].show_cards = True
+                self.seats[i].status = PlayerStatus.SHOW_LOSER
+            self.phase = Phase.SHOWDOWN
+            tie_reason = "Showdown Tie: Equal hands — both players lost stakes to House" if is_tie else "House Takes Pot: Neither player qualified — both players lost stakes"
+            self._finish_hand(winner_idx=None, reason=tie_reason)
+            return {
+                "winner_seat": None,
+                "loser_seat": None,
+                "pot": self.pot,
+                "reason": self.reason,
+            }
+
         if rank_caller > rank_other:
             winner_idx, loser_idx = idx, other_idx
         else:
@@ -331,11 +370,19 @@ class TeenPattiHand:
     def _advance_turn(self) -> None:
         self.current_turn = self._next_active_seat(self.current_turn)
 
-    def _finish_hand(self, winner_idx: int, reason: str) -> None:
+    def _finish_hand(self, winner_idx: Optional[int], reason: str) -> None:
         self.phase = Phase.FINISHED
         self.winner_seat = winner_idx
         self.reason = reason
         self.dealer_seat = (self.dealer_seat + 1) % max(1, len(self.seats))
+        if winner_idx is not None and 0 <= winner_idx < len(self.seats):
+            winner_id = self.seats[winner_idx].id
+            self.win_streak[winner_id] = self.win_streak.get(winner_id, 0) + 1
+            for s in self.seats:
+                if s.id != winner_id:
+                    self.win_streak[s.id] = 0
+        else:
+            self.win_streak.clear()
 
     def reset_for_next_hand(self) -> None:
         self.phase = Phase.WAITING
@@ -345,6 +392,7 @@ class TeenPattiHand:
         self.reason = None
         self.last_action = None
         self.is_settled = False
+        self.server_seed = new_server_seed()
         for s in self.seats:
             s.cards = []
             s.seen = False

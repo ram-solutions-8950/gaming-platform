@@ -31,7 +31,7 @@ class PlayHandResponse(BaseModel):
 class TableCreate(BaseModel):
     name: str = Field(default="Teen Patti Table", min_length=1, max_length=80)
     mode: Literal["virtual", "real"] = "real"
-    max_players: int = Field(default=4, ge=2, le=6)
+    max_players: int = Field(default=2, ge=2, le=6)
     boot_amount: int = Field(default=1000, gt=0)  # in paise
     turn_seconds: int = Field(default=15, ge=5, le=60)
     is_private: bool = False

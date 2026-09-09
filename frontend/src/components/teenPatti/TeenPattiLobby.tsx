@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { teenPattiService, type TeenPattiTable } from '../../services/teenPatti';
 import { GameRulesModal } from '../common/GameRulesModal';
 import { TEEN_PATTI_RULES_DATA } from '../common/gameRulesData';
-import { HelpCircle } from 'lucide-react';
+import { HelpCircle, Crown } from 'lucide-react';
 
 interface TeenPattiLobbyProps {
   onJoinTable: (tableId: string) => void;
@@ -86,8 +86,9 @@ export const TeenPattiLobby: React.FC<TeenPattiLobbyProps> = ({ onJoinTable }) =
         >
           ← Exit to Dashboard
         </button>
-        <h1 className="text-xl sm:text-2xl font-black text-gold-400 uppercase tracking-wide text-center">
-          👑 Royal Teen Patti
+        <h1 className="text-xl sm:text-2xl font-black text-gold-400 uppercase tracking-wide text-center flex items-center justify-center gap-2">
+          <Crown size={22} className="text-amber-400 fill-amber-400 shrink-0" />
+          <span>Royal Teen Patti</span>
         </h1>
         <div className="flex items-center gap-2">
           <button
@@ -166,9 +167,12 @@ export const TeenPattiLobby: React.FC<TeenPattiLobbyProps> = ({ onJoinTable }) =
                 className="bg-dark-800 border border-dark-700 rounded-xl p-3 flex justify-between items-center shadow-sm"
               >
                 <div>
-                  <div className="font-bold text-white text-xs">{t.name}</div>
+                  <div className="font-bold text-white text-xs flex items-center gap-1.5">
+                    <Crown size={13} className="text-amber-400 fill-amber-400 shrink-0" />
+                    <span>{t.name}</span>
+                  </div>
                   <div className="text-[11px] text-slate-400">
-                    Boot: ₹{(t.boot_amount / 100).toFixed(0)} • Players: {t.player_count}/{t.max_players}
+                    Boot: ₹{(t.boot_amount / 100).toFixed(0)} • Players: {t.player_count}/{t.max_players || 2}
                   </div>
                 </div>
                 <button

@@ -1,6 +1,7 @@
 import React from 'react';
 import type { TeenPattiSeat } from '../../services/teenPatti';
 import { PlayingCard } from './PlayingCard';
+import { Crown } from 'lucide-react';
 
 interface PlayerSeatProps {
   seat: TeenPattiSeat;
@@ -60,7 +61,10 @@ export const PlayerSeat: React.FC<PlayerSeatProps> = ({
             {seat.seen ? 'Seen' : 'Blind'}
           </span>
         ) : isWinner ? (
-          <span className="tp-seat-status-badge tp-badge-won">Winner</span>
+          <span className="tp-seat-status-badge tp-badge-won flex items-center gap-1">
+            <Crown size={10} className="text-white fill-white shrink-0" />
+            <span>Winner</span>
+          </span>
         ) : (
           <span className="tp-seat-status-badge tp-badge-packed">Packed</span>
         )}

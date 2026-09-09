@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import type { TeenPattiSeat } from '../../services/teenPatti';
 import { PlayingCard } from './PlayingCard';
-import { LogOut, Play, X } from 'lucide-react';
+import { LogOut, Play, X, Crown } from 'lucide-react';
 
 interface ShowdownOverlayProps {
   winnerSeat: number | null;
@@ -27,7 +27,8 @@ export const ShowdownOverlay: React.FC<ShowdownOverlayProps> = ({
   const [countdown, setCountdown] = useState<number>(5);
   const winner = winnerSeat !== null ? seats[winnerSeat] : null;
   const mySeat = seats.find((s) => s.id === currentUserId);
-  const isMeWinner = winner && winner.id === currentUserId;
+  const isMeWinner = Boolean(winner && winner.id === currentUserId);
+  const isDoubleLoss = winnerSeat === null;
   const myBet = mySeat?.total_bet || 0;
 
   useEffect(() => {
@@ -60,43 +61,62 @@ export const ShowdownOverlay: React.FC<ShowdownOverlayProps> = ({
           </button>
         )}
 
-        {/* Winner Title */}
-        <h2 style={{ fontSize: '1.45rem', fontWeight: 900, color: isMeWinner ? '#4ade80' : '#ffd700', textTransform: 'uppercase', margin: '0 0 6px' }}>
-          {isMeWinner ? '🎉 YOU WON!' : `🏆 Winner: ${winner ? winner.name : 'Split'}`}
-        </h2>
+        {/* Clear Win / Loss Title (BUG-035) */}
+        {isDoubleLoss ? (
+          <h2 style={{ fontSize: '1.5rem', fontWeight: 900, color: '#ef4444', textTransform: 'uppercase', margin: '0 0 6px' }}>
+            ❌ BOTH PLAYERS LOST
+          </h2>
+        ) : isMeWinner ? (
+          <h2 style={{ fontSize: '1.5rem', fontWeight: 900, color: '#4ade80', textTransform: 'uppercase', margin: '0 0 6px' }}>
+            🎉 YOU WON!
+          </h2>
+        ) : (
+          <h2 style={{ fontSize: '1.5rem', fontWeight: 900, color: '#ef4444', textTransform: 'uppercase', margin: '0 0 6px' }}>
+            ❌ YOU LOST
+          </h2>
+        )}
 
-        {/* Total Pot */}
-        <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#22c55e', margin: '0 0 8px' }}>
-          +₹{(potAmount / 100).toFixed(0)}
+        {/* Net Amount Result: Positive for winner, Negative for loser (BUG-035) */}
+        <div style={{
+          fontSize: '1.6rem',
+          fontWeight: 900,
+          color: isMeWinner ? '#22c55e' : '#f87171',
+          margin: '0 0 8px'
+        }}>
+          {isMeWinner ? `+₹${(potAmount / 100).toFixed(0)}` : `-₹${(myBet / 100).toFixed(0)}`}
         </div>
 
-        {/* Explicit Bet & Win Display */}
-        {mySeat && (
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'center',
-              alignItems: 'center',
-              gap: 12,
-              background: 'rgba(15, 23, 42, 0.75)',
-              border: '1px solid rgba(255, 255, 255, 0.1)',
-              borderRadius: 12,
-              padding: '6px 14px',
-              margin: '0 auto 12px',
-              width: 'fit-content',
-              fontSize: '0.8rem',
-              fontWeight: 700,
-            }}
-          >
+        {/* Explicit Bet & Result Details */}
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            gap: 12,
+            background: 'rgba(15, 23, 42, 0.75)',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+            borderRadius: 12,
+            padding: '6px 14px',
+            margin: '0 auto 12px',
+            width: 'fit-content',
+            fontSize: '0.8rem',
+            fontWeight: 700,
+          }}
+        >
+          {mySeat && (
             <span style={{ color: '#94a3b8' }}>
               Your Bet: <span style={{ color: '#ffd700' }}>₹{(myBet / 100).toFixed(0)}</span>
             </span>
-            <span style={{ color: 'rgba(255, 255, 255, 0.2)' }}>•</span>
-            <span style={{ color: isMeWinner ? '#4ade80' : '#f87171' }}>
-              {isMeWinner ? `Win: +₹${(potAmount / 100).toFixed(0)}` : `Lost: -₹${(myBet / 100).toFixed(0)}`}
-            </span>
-          </div>
-        )}
+          )}
+          {winner && !isMeWinner && (
+            <>
+              <span style={{ color: 'rgba(255, 255, 255, 0.2)' }}>•</span>
+              <span style={{ color: '#cbd5e1', display: 'flex', alignItems: 'center', gap: 4 }}>
+                Winner: <Crown size={12} className="text-amber-400 fill-amber-400 shrink-0" /> {winner.name}
+              </span>
+            </>
+          )}
+        </div>
 
         {reason && (
           <p style={{ color: '#94a3b8', fontSize: '0.82rem', margin: '0 0 12px' }}>

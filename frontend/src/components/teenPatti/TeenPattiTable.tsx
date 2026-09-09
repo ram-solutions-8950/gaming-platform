@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useTeenPattiSocket } from '../../hooks/useTeenPattiSocket';
 import { PlayerSeat } from './PlayerSeat';
 import { BettingControls } from './BettingControls';
@@ -8,7 +9,7 @@ import { soundManager } from '../../services/soundManager';
 import { walletService } from '../../services/wallet';
 import { GameRulesModal } from '../common/GameRulesModal';
 import { TEEN_PATTI_RULES_DATA } from '../common/gameRulesData';
-import { HelpCircle } from 'lucide-react';
+import { HelpCircle, Crown, Plus } from 'lucide-react';
 import './TeenPattiTable.css';
 
 interface TeenPattiTableProps {
@@ -20,6 +21,7 @@ export const TeenPattiTable: React.FC<TeenPattiTableProps> = ({
   tableId,
   onLeaveTable,
 }) => {
+  const navigate = useNavigate();
   const [walletBalance, setWalletBalance] = useState<number | null>(null);
   const [showRules, setShowRules] = useState<boolean>(false);
   const [showdownDismissed, setShowdownDismissed] = useState<boolean>(false);
@@ -130,62 +132,67 @@ export const TeenPattiTable: React.FC<TeenPattiTableProps> = ({
 
   return (
     <div className="tp-arena-container">
-      {/* Main Oval Table */}
-      <div className="tp-table-oval">
-        {/* Top Header Bar — inside the table so it stays within bounds */}
-        <div style={{
-          position: 'absolute', top: 10, left: 14, right: 14, display: 'flex',
-          justifyContent: 'space-between', alignItems: 'center', zIndex: 50
-        }}>
+      {/* Top Navigation & Status Bar — placed outside oval felt to prevent overlapping player (BUG-036) */}
+      <div className="tp-top-header-bar">
+        {/* Left: Lobby Exit + Live Status */}
+        <div className="flex items-center gap-2 shrink-0">
           <button
             onClick={onLeaveTable}
             className="tp-header-btn"
-            style={{
-              background: 'rgba(15, 23, 42, 0.8)', border: '1px solid rgba(255,255,255,0.2)',
-              color: '#fff', padding: '4px 10px', borderRadius: 10, fontWeight: 700,
-              cursor: 'pointer', fontSize: '0.75rem'
-            }}
           >
             ← Lobby
           </button>
-
-          <div style={{
-            background: 'rgba(15, 23, 42, 0.85)', padding: '3px 12px', borderRadius: 16,
-            border: '1px solid rgba(212, 175, 55, 0.4)', display: 'flex', gap: '6px', alignItems: 'center'
-          }}>
-            <span style={{ fontSize: '0.65rem', color: '#94a3b8', fontWeight: 600 }}>TOTAL BALANCE:</span>
-            <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#fbbf24' }}>
-              ₹{walletBalance !== null ? (walletBalance / 100).toFixed(2) : '...'}
-            </span>
-          </div>
-
-          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-            <button
-              type="button"
-              onClick={() => setShowRules(true)}
-              className="tp-header-btn"
-              style={{
-                background: 'rgba(245, 158, 11, 0.2)', border: '1px solid rgba(245, 158, 11, 0.5)',
-                color: '#fcd34d', padding: '4px 10px', borderRadius: 10, fontWeight: 700,
-                cursor: 'pointer', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px'
-              }}
-              aria-label="Rules"
-            >
-              <HelpCircle size={13} />
-              <span>Rules</span>
-            </button>
-
-            <div style={{
-              background: 'rgba(15, 23, 42, 0.85)', padding: '3px 10px', borderRadius: 16,
-              border: '1px solid rgba(212, 175, 55, 0.3)', display: 'flex', gap: '6px', alignItems: 'center'
-            }}>
-              <span style={{ width: 6, height: 6, borderRadius: '50%', background: isConnected ? '#22c55e' : '#ef4444' }} />
-              <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#e2e8f0' }}>
-                {isConnected ? 'LIVE TABLE' : 'RECONNECTING'}
-              </span>
-            </div>
+          <div className="tp-status-pill">
+            <span className={`tp-status-dot ${isConnected ? 'live' : 'offline'}`} />
+            <span>{isConnected ? 'LIVE TABLE' : 'RECONNECTING'}</span>
           </div>
         </div>
+
+        {/* Center: Consistent Crown icon next to Royal (BUG-037) */}
+        <div className="tp-brand-pill">
+          <Crown size={15} className="text-amber-400 fill-amber-400 shrink-0" />
+          <span className="font-extrabold text-xs text-amber-300 uppercase tracking-wider">Royal Teen Patti</span>
+        </div>
+
+        {/* Right: Total Balance + Add Amount (+) button (BUG-032) + Rules Modal */}
+        <div className="flex items-center gap-2 shrink-0">
+          <div className="tp-balance-pill">
+            <span className="tp-balance-label">TOTAL BALANCE:</span>
+            <span className="tp-balance-val">
+              ₹{walletBalance !== null ? (walletBalance / 100).toFixed(2) : '...'}
+            </span>
+            <button
+              type="button"
+              onClick={() => navigate('/deposit')}
+              className="tp-add-amount-btn"
+              title="Add Amount / Top Up Balance"
+            >
+              <Plus size={11} strokeWidth={3} />
+              <span>Add Amount</span>
+            </button>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setShowRules(true)}
+            className="tp-header-btn tp-rules-btn"
+            aria-label="Rules"
+          >
+            <HelpCircle size={13} />
+            <span>Rules</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Main Oval Table */}
+      <div className="tp-table-oval">
+        {/* In-table waiting notice when 2nd player has not yet joined (BUG-038) */}
+        {gameState.phase === 'waiting' && gameState.seats.length < 2 && (
+          <div className="tp-waiting-badge">
+            <span className="animate-spin text-xs">⏳</span>
+            <span>Waiting for Opponent to Join (1/2)...</span>
+          </div>
+        )}
 
         {/* Pot in center */}
         <div className="tp-center-pot">

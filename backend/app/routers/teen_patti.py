@@ -167,7 +167,7 @@ def play_instant_hand(
     )
 
 
-VALID_BOOT_TIERS = {100, 500, 1000, 5000}
+VALID_BOOT_TIERS = {100, 500, 1000, 2500, 5000, 10000}
 
 
 @router.get("/tables", response_model=List[TableOut])
@@ -260,7 +260,7 @@ def quick_join_table(
     if payload.boot_amount not in VALID_BOOT_TIERS:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid boot tier: ₹{payload.boot_amount / 100:.2f}. Allowed stakes: ₹1, ₹5, ₹10, ₹50."
+            detail=f"Invalid boot tier: ₹{payload.boot_amount / 100:.2f}. Allowed stakes: ₹1, ₹5, ₹10, ₹25, ₹50, ₹100."
         )
 
     mode_enum = TeenPattiTableMode(payload.mode)
@@ -320,7 +320,7 @@ def quick_join_table(
             name=f"Royal Table {tier_label}",
             mode=mode_enum,
             status=TeenPattiTableStatus.OPEN,
-            max_players=4,
+            max_players=2,
             boot_amount=payload.boot_amount,
             turn_seconds=15,
             is_private=False,

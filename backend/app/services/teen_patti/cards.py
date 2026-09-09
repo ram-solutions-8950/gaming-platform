@@ -8,7 +8,7 @@ import hmac
 import random
 import secrets
 from dataclasses import dataclass
-from typing import List
+from typing import List, Optional
 
 
 SUITS = ("S", "H", "D", "C")
@@ -50,7 +50,10 @@ def derive_seed(server_seed: str, client_seed: str, nonce: int) -> int:
     return int.from_bytes(digest[:8], "big")
 
 
-def shuffled_deck(rng: random.Random) -> List[Card]:
+def shuffled_deck(rng: Optional[random.Random] = None) -> List[Card]:
     d = fresh_deck()
-    rng.shuffle(d)
+    if rng is not None:
+        rng.shuffle(d)
+    else:
+        secrets.SystemRandom().shuffle(d)
     return d
