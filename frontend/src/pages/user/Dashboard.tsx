@@ -11,6 +11,7 @@ import '../../styles/startup-promotions.css';
 import { FreeRewardPopup } from '../../components/modals/FreeRewardPopup';
 import { ReferWinPopup } from '../../components/modals/ReferWinPopup';
 import { useRewardStore } from '../../store/rewardStore';
+import { setNativeLandscape } from '../../utils/nativeOrientation';
 
 /* ─── Game card definitions ─── */
 interface GameCardDef {
@@ -84,6 +85,7 @@ export function DashboardPage() {
   const [activePopup, setActivePopup] = useState<'free' | 'refer' | null>(null);
 
   useEffect(() => {
+    setNativeLandscape().catch(() => {});
     try {
       const alreadyShown = sessionStorage.getItem(REFERRAL_POPUP_SESSION_KEY);
       if (!alreadyShown) {

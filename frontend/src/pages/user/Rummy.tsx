@@ -11,7 +11,7 @@ import { useRummyMatchmaking } from "../../hooks/useRummyMatchmaking";
 import { RummyApi, type RummyTableOut } from "../../services/rummy";
 import { authStorage } from "../../services/authStorage";
 import api from "../../services/api";
-import { setNativeLandscape, setNativePortrait } from "../../utils/nativeOrientation";
+import { setNativeLandscape } from "../../utils/nativeOrientation";
 import "../../styles/rummy.css";
 
 type Mode = "real_money" | "free" | "pool";
@@ -170,6 +170,7 @@ export function RummyPage() {
     matchmaking.reset();
     setActiveTableId(null);
     setSearchParams({}, { replace: true });
+    setNativeLandscape().catch(() => {});
     navigate("/games/rummy", { replace: true });
     fetchBalance();
     fetchTables();
@@ -179,7 +180,7 @@ export function RummyPage() {
     matchmaking.reset();
     setActiveTableId(null);
     setSearchParams({}, { replace: true });
-    setNativePortrait().catch(() => {});
+    setNativeLandscape().catch(() => {});
     navigate("/dashboard");
   };
 
