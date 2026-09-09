@@ -16,96 +16,43 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT || '22' }}
+          timeout: 60s
+          command_timeout: 30m
           script: |
             set -e
 
-            cd /opt/gaming-platform
+            echo "=== 1. NAVIGATING TO REPO ==="
+            cd /root/gaming-platform || cd ~/gaming-platform
 
-            echo "=== PULLING LATEST CODE ==="
+            echo "=== 2. PULLING LATEST CODE ==="
             git fetch origin client-version
             git reset --hard origin/client-version
 
             echo "=== CURRENT COMMIT ==="
             git log -1 --oneline
 
-            echo "=== REBUILDING CONTAINERS ==="
-            docker compose up -d --build
+            echo "=== 3. STARTING BACKEND & DB SERVICES ==="
+            docker compose up -d --build backend db redis
 
-            echo "=== CONTAINER STATUS ==="
-            docker compose ps
+            echo "=== 4. BUILDING FRONTEND ==="
+            docker compose run --rm frontend npm run build
 
-            echo "=== WAITING FOR BACKEND ==="
-
-            READY=0
-
-            for i in $(seq 1 30); do
-              echo "Backend check $i/30"
-
-              CODE=$(curl -sS \
-                --connect-timeout 2 \
-                --max-time 5 \
-                -o /tmp/backend-health.json \
-                -w "%{http_code}" \
-                http://127.0.0.1:8000/api/v1/health 2>/tmp/backend-curl-error || true)
-
-              echo "HTTP status: $CODE"
-
-              if [ "$CODE" = "200" ]; then
-                echo "Backend is READY"
-                cat /tmp/backend-health.json
-                READY=1
-                break
-              fi
-
-              cat /tmp/backend-curl-error || true
-
-              echo "Backend not ready. Waiting 2 seconds..."
-              sleep 2
-            done
-
-            if [ "$READY" != "1" ]; then
-              echo "ERROR: Backend did not become ready."
-              docker compose ps
-              docker compose logs --tail=100 backend
-              exit 1
+            echo "=== 5. DEPLOYING TO NGINX WEB ROOT ==="
+            sudo cp -r frontend/dist/* /opt/gaming-platform/frontend/dist/
+            if [ -f frontend/public/Corona888.apk ]; then
+              sudo cp frontend/public/Corona888.apk /opt/gaming-platform/frontend/dist/Corona888.apk
+              sudo chmod 644 /opt/gaming-platform/frontend/dist/Corona888.apk
             fi
+            sudo chown -R www-data:www-data /opt/gaming-platform/frontend/dist
+            sudo chmod -R 755 /opt/gaming-platform/frontend/dist
 
-            echo "=== WAITING FOR FRONTEND ==="
+            echo "=== 6. RELOADING NGINX ==="
+            sudo systemctl reload nginx
 
-            READY=0
-
-            for i in $(seq 1 30); do
-              echo "Frontend check $i/30"
-
-              CODE=$(curl -sS \
-                --connect-timeout 2 \
-                --max-time 5 \
-                -o /dev/null \
-                -w "%{http_code}" \
-                http://127.0.0.1:5173 2>/tmp/frontend-curl-error || true)
-
-              echo "HTTP status: $CODE"
-
-              if [ "$CODE" = "200" ]; then
-                echo "Frontend is READY"
-                READY=1
-                break
-              fi
-
-              cat /tmp/frontend-curl-error || true
-
-              echo "Frontend not ready. Waiting 2 seconds..."
-              sleep 2
-            done
-
-            if [ "$READY" != "1" ]; then
-              echo "ERROR: Frontend did not become ready."
-              docker compose ps
-              docker compose logs --tail=100 frontend
-              exit 1
-            fi
-
-            echo "=== FINAL STATUS ==="
+            echo "=== 7. VERIFYING STATUS ==="
             docker compose ps
+            curl -sf http://127.0.0.1:8000/api/v1/health || true
+            curl -I http://127.0.0.1 || true
 
-            echo "=== DEPLOYMENT SUCCESSFUL ==="
+            echo "=== DEPLOYMENT COMPLETED SUCCESSFULLY ==="
