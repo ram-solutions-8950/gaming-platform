@@ -137,9 +137,31 @@ export function ChickenRoadPage() {
     setNextMultiplier(DEFAULT_MULTIPLIERS[diff][0]);
   };
 
+  // Bet stepper helpers restricted to allowed values [10, 20, 50, 100]
+  const handleStepDown = () => {
+    if (gameState === 'ACTIVE') return;
+    setBetAmount((curr) => {
+      const idx = QUICK_BETS.findIndex((b) => b >= curr);
+      if (idx > 0) return QUICK_BETS[idx - 1];
+      return QUICK_BETS[0];
+    });
+  };
+
+  const handleStepUp = () => {
+    if (gameState === 'ACTIVE') return;
+    setBetAmount((curr) => {
+      const idx = QUICK_BETS.findIndex((b) => b > curr);
+      if (idx !== -1) return QUICK_BETS[idx];
+      return QUICK_BETS[QUICK_BETS.length - 1];
+    });
+  };
+
   // Start / Place Bet
   const handleStartGame = async () => {
-    if (betAmount <= 0) return;
+    if (betAmount < 10 || betAmount > 100) {
+      setErrorMessage('Bet amount must be between ₹10 and ₹100.');
+      return;
+    }
     if (betAmount > balance) {
       setErrorMessage('Insufficient balance. Please deposit to continue.');
       return;
@@ -265,11 +287,16 @@ export function ChickenRoadPage() {
         <div className="cr-header-left">
           <button
             type="button"
-            onClick={() => navigate('/dashboard')}
+            onClick={() => {
+              lockLandscape().catch(() => {});
+              navigate('/dashboard');
+            }}
             className="cr-header-back-btn"
+            title="Back to Home"
+            aria-label="Back to Home"
           >
             <ArrowLeft size={16} />
-            <span>Chicken Road</span>
+            <span>Home</span>
           </button>
         </div>
 
@@ -486,11 +513,11 @@ export function ChickenRoadPage() {
 
       {/* ── 4. Compact Bottom Betting Panel (Dark Charcoal) ── */}
       <footer className="cr-bottom-panel">
-        {/* Bet Stepper: MIN [ - | value | + ] MAX */}
+        {/* Bet Stepper: MIN [ - | value | + ] MAX strictly bounded to [10, 20, 50, 100] */}
         <div className="cr-bet-stepper-group">
           <button
             type="button"
-            disabled={gameState === 'ACTIVE'}
+            disabled={gameState === 'ACTIVE' || betAmount <= 10}
             onClick={() => setBetAmount(10)}
             className="cr-stepper-bound-btn"
           >
@@ -501,7 +528,7 @@ export function ChickenRoadPage() {
             <button
               type="button"
               disabled={gameState === 'ACTIVE' || betAmount <= 10}
-              onClick={() => setBetAmount((prev) => Math.max(10, prev - 10))}
+              onClick={handleStepDown}
               className="cr-stepper-adj-btn"
             >
               -
@@ -509,14 +536,14 @@ export function ChickenRoadPage() {
             <input
               type="number"
               disabled={gameState === 'ACTIVE'}
+              readOnly
               value={betAmount}
-              onChange={(e) => setBetAmount(Math.max(10, Number(e.target.value)))}
-              className="cr-stepper-input"
+              className="cr-stepper-input cursor-default"
             />
             <button
               type="button"
-              disabled={gameState === 'ACTIVE'}
-              onClick={() => setBetAmount((prev) => prev + 10)}
+              disabled={gameState === 'ACTIVE' || betAmount >= 100}
+              onClick={handleStepUp}
               className="cr-stepper-adj-btn"
             >
               +
@@ -525,15 +552,15 @@ export function ChickenRoadPage() {
 
           <button
             type="button"
-            disabled={gameState === 'ACTIVE'}
-            onClick={() => setBetAmount(Math.floor(balance) || 100)}
+            disabled={gameState === 'ACTIVE' || betAmount >= 100}
+            onClick={() => setBetAmount(100)}
             className="cr-stepper-bound-btn"
           >
             MAX
           </button>
         </div>
 
-        {/* Quick Bet Buttons */}
+        {/* Quick Bet Buttons: strictly 10, 20, 50, 100 */}
         <div className="cr-quick-chips">
           {QUICK_BETS.map((chip) => (
             <button
@@ -546,22 +573,6 @@ export function ChickenRoadPage() {
               ₹{chip}
             </button>
           ))}
-          <button
-            type="button"
-            disabled={gameState === 'ACTIVE'}
-            onClick={() => setBetAmount((prev) => Math.max(10, Math.floor(prev / 2)))}
-            className="cr-chip-btn"
-          >
-            1/2
-          </button>
-          <button
-            type="button"
-            disabled={gameState === 'ACTIVE'}
-            onClick={() => setBetAmount((prev) => prev * 2)}
-            className="cr-chip-btn"
-          >
-            2X
-          </button>
         </div>
 
         {/* Difficulty Pills */}

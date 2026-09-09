@@ -135,3 +135,101 @@
 .ludo-dice-pedestal {
   background: radial-gradient(circle at 50% 50%, rgba(15, 23, 42, 0.9) 0%, rgba(3, 7, 18, 0.95) 75%, transparent 100%);
 }
+
+/* ── 9. Movable Token Highlighting Animations (BUG-004) ── */
+@keyframes tokenHop {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-14px);
+  }
+}
+
+.ludo-movable-pawn {
+  animation: tokenHop 1s cubic-bezier(0.28, 0.84, 0.42, 1) infinite;
+  transform-box: fill-box;
+  transform-origin: center bottom;
+}
+
+@keyframes tokenArrowBounce {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+.ludo-token-bounce-arrow {
+  animation: tokenArrowBounce 0.75s ease-in-out infinite;
+  transform-box: fill-box;
+  transform-origin: center bottom;
+}
+
+@keyframes tokenPulseRing {
+  0% {
+    r: 42px;
+    opacity: 0.95;
+    stroke-width: 4px;
+  }
+  50% {
+    r: 56px;
+    opacity: 0.35;
+    stroke-width: 6px;
+  }
+  100% {
+    r: 42px;
+    opacity: 0.95;
+    stroke-width: 4px;
+  }
+}
+
+.ludo-token-pulse-ring {
+  animation: tokenPulseRing 1.2s ease-out infinite;
+}
+
+/* ── 10. Fun Interactive Floating Emojis & Celebration Banners (BUG-006) ── */
+@keyframes floatReactionUp {
+  0% {
+    transform: translateY(0) scale(0.5);
+    opacity: 0.9;
+  }
+  40% {
+    transform: translateY(-40px) scale(1.35) rotate(-6deg);
+    opacity: 1;
+  }
+  75% {
+    transform: translateY(-80px) scale(1.1) rotate(6deg);
+    opacity: 0.9;
+  }
+  100% {
+    transform: translateY(-130px) scale(0.9) rotate(0deg);
+    opacity: 0;
+  }
+}
+
+.animate-reaction-float {
+  animation: floatReactionUp 1.8s cubic-bezier(0.18, 0.89, 0.32, 1.28) forwards;
+  pointer-events: none;
+}
+
+@keyframes bannerPopIn {
+  0% {
+    transform: scale(0.7) translateY(16px);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.06) translateY(-3px);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
+}
+
+.animate-banner-pop {
+  animation: bannerPopIn 0.32s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+

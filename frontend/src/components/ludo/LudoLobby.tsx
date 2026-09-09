@@ -64,7 +64,7 @@ export const LudoLobby: React.FC<Props> = ({
           </div>
         </div>
         <div className="flex flex-col items-end shrink-0">
-          <span className="ludo-balance-lbl text-[10px] text-slate-400 font-medium">Your Balance</span>
+          <span className="ludo-balance-lbl text-[10px] text-slate-400 font-medium uppercase tracking-wider">Total Balance</span>
           <span className="ludo-balance-val text-sm sm:text-base font-black text-amber-400">
             ₹{(userBalance / 100).toFixed(2)}
           </span>

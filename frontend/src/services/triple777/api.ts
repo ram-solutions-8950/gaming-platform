@@ -3,6 +3,7 @@ import api from '../api';
 export interface Triple777Config {
   min_bet: number;
   max_bet: number;
+  bet_options?: number[];
   symbols: string[];
   paytable: Record<string, number>;
 }

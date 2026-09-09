@@ -24,7 +24,8 @@ router = APIRouter(prefix="/games/triple-777", tags=["Triple 777"])
 
 # Symbol definitions and weights
 SYMBOLS = ["7", "BAR", "CHERRY", "LEMON", "BELL", "STAR", "COIN"]
-SYMBOL_WEIGHTS = [4, 8, 12, 16, 20, 20, 20]  # Weighted for realistic slot RNG
+# Weighted for realistic challenging slot RNG; '7' weight is 1 for rare jackpot hits (BUG-007, BUG-009)
+SYMBOL_WEIGHTS = [1, 6, 11, 16, 22, 22, 22]
 
 PAYTABLE_3_MATCH = {
     "7": 100,
@@ -38,7 +39,8 @@ PAYTABLE_3_MATCH = {
 PAYTABLE_2_MATCH_MULTIPLIER = 2
 
 MIN_BET = 10
-MAX_BET = 10000
+MAX_BET = 100
+ALLOWED_BETS = [10, 20, 50, 100]
 
 # Thread-safe persistent jackpot pool
 JACKPOT_BASE_PAISE = 5000000  # ₹50,000.00 base jackpot pool
@@ -50,7 +52,7 @@ USER_SPIN_HISTORY: Dict[uuid.UUID, List[dict]] = {}
 
 
 class SpinIn(BaseModel):
-    stake: float = Field(..., ge=10, le=10000, description="Bet amount in INR")
+    stake: float = Field(..., ge=10, le=100, description="Bet amount in INR (10, 20, 50, 100)")
     client_seed: Optional[str] = None
     nonce: Optional[int] = None
 
@@ -61,6 +63,7 @@ def get_config():
     return success_response({
         "min_bet": MIN_BET,
         "max_bet": MAX_BET,
+        "bet_options": ALLOWED_BETS,
         "symbols": SYMBOLS,
         "paytable": {
             **PAYTABLE_3_MATCH,
@@ -161,9 +164,10 @@ def spin(
                 tier = "bigwin"
             else:
                 tier = "win"
-        elif reels[0] == reels[1] or reels[1] == reels[2] or reels[0] == reels[2]:
-            # 2 of a kind match
+        elif reels[0] == reels[1]:
+            # 2 of a kind payline match (left-to-right near-miss / consolation win) (BUG-009)
             won = True
+            win_symbol = reels[0]
             multiplier = float(PAYTABLE_2_MATCH_MULTIPLIER)
             tier = "win"
 

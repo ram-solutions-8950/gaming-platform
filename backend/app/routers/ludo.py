@@ -29,64 +29,7 @@ logger = get_logger("ludo_router")
 router = APIRouter(prefix="/ludo", tags=["Ludo"])
 
 def _format_match_state(match: LudoMatch, user_id: Optional[UUID] = None) -> Dict[str, Any]:
-    player_data = []
-    for p in match.players:
-        p_dict = {
-            "id": str(p.id),
-            "user_id": str(p.user_id),
-            "username": p.user.username if p.user else "Player",
-            "color": p.color.value,
-            "seat_index": p.seat_index,
-            "is_ready": p.is_ready,
-            "rank": p.rank,
-            "consecutive_timeouts": p.consecutive_timeouts,
-            "tokens": [
-                {
-                    "id": str(t.id),
-                    "token_index": t.token_index,
-                    "position": t.position,
-                    "is_home": t.is_home,
-                }
-                for t in p.tokens
-            ],
-        }
-        player_data.append(p_dict)
-
-    # Remaining timer seconds
-    remaining_timer = 0
-    if match.turn_started_at and match.status == LudoMatchStatus.IN_PROGRESS:
-        elapsed = (datetime.now(timezone.utc) - match.turn_started_at).total_seconds()
-        remaining_timer = max(0, int(match.turn_timeout_seconds - elapsed))
-
-    # Legal tokens for current player
-    legal_indices = []
-    if match.status == LudoMatchStatus.IN_PROGRESS and match.last_dice_roll is not None:
-        curr_p = next((p for p in match.players if p.color == match.current_turn_color), None)
-        if curr_p and (user_id is None or curr_p.user_id == user_id):
-            color_map = {str(p.id): p.color for p in match.players}
-            all_tokens = [t for p in match.players for t in p.tokens]
-            legal_indices = get_legal_token_indices(
-                curr_p.tokens,
-                match.last_dice_roll,
-                curr_p.color,
-                all_tokens,
-                color_map,
-            )
-
-    return {
-        "id": str(match.id),
-        "status": match.status.value,
-        "current_turn_color": match.current_turn_color.value if match.current_turn_color else None,
-        "last_dice_roll": match.last_dice_roll,
-        "turn_timeout_seconds": match.turn_timeout_seconds,
-        "remaining_timer_seconds": remaining_timer,
-        "entry_fee": match.entry_fee,
-        "prize_pool": match.prize_pool,
-        "is_settled": match.is_settled,
-        "created_at": match.created_at.isoformat() if match.created_at else None,
-        "players": player_data,
-        "legal_token_indices": legal_indices,
-    }
+    return LudoEngine.format_match_state(match, user_id)
 
 # ----------------- Matchmaking Endpoints -----------------
 
@@ -387,10 +330,21 @@ async def ludo_websocket_endpoint(
     try:
         while True:
             data = await websocket.receive_text()
-            # Client can ping or send messages
-            msg = json.loads(data)
-            if msg.get("type") == "PING":
-                await websocket.send_text(json.dumps({"type": "PONG"}))
+            # Client can ping, send reactions, etc.
+            try:
+                msg = json.loads(data)
+                if msg.get("type") == "PING":
+                    await websocket.send_text(json.dumps({"type": "PONG"}))
+                elif msg.get("type") == "REACTION":
+                    await ludo_ws_manager.broadcast(match_id, {
+                        "type": "REACTION",
+                        "data": {
+                            "emoji": msg.get("emoji"),
+                            "sender": msg.get("sender"),
+                        }
+                    })
+            except json.JSONDecodeError:
+                pass
     except WebSocketDisconnect:
         ludo_ws_manager.disconnect(match_id, websocket)
     except Exception as e:

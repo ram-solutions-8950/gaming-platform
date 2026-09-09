@@ -209,12 +209,15 @@
   text-shadow: 0 0 12px rgba(251, 191, 36, 0.6);
 }
 
-/* Slot Machine Cabinet */
+/* Slot Machine Cabinet (4-Sided Illumination BUG-012) */
 .t777-machine-cabinet {
   border-radius: 22px;
   border: 3.5px solid #F59E0B;
   background: linear-gradient(180deg, #2b1f3d 0%, #150f22 100%);
-  box-shadow: 0 10px 36px rgba(0, 0, 0, 0.85), inset 0 2px 4px rgba(255, 255, 255, 0.2);
+  box-shadow:
+    0 0 24px rgba(245, 158, 11, 0.45),
+    inset 0 0 14px rgba(251, 191, 36, 0.3),
+    0 10px 36px rgba(0, 0, 0, 0.85);
   width: 100%;
   max-width: 340px;
   box-sizing: border-box;

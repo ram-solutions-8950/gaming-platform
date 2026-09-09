@@ -372,52 +372,12 @@ export const RoadCrossingGame: React.FC<RoadCrossingGameProps> = ({
     generateTraffic();
   }, [generateTraffic]);
 
-  // ── Secure random helper (Web Crypto API – no predictable pattern) ──
-  const secureRandom = useCallback((): number => {
-    const buf = new Uint32Array(1);
-    crypto.getRandomValues(buf);
-    return buf[0] / 0x100000000; // [0, 1)
-  }, []);
 
-  // Generate static pothole obstacles per round using crypto randomness
+
+  // Static pothole generator - kept empty to prevent unfair invisible collisions on fixed horizontal track
   const generatePotholes = useCallback(() => {
-    const holes: Pothole[] = [];
-    const roadTop = 45;
-    const roadBottom = WORLD_HEIGHT - 45;
-
-    // Per-lane probability and max slot count by difficulty
-    // (eased back slightly from 0.65/5 and 0.88/7 — still a bit denser than
-    // the original 0.58/4 and 0.80/6, but "no obstacle" lanes are more common again)
-    const chancePerSlot: Record<Difficulty, number> = {
-      MEDIUM: 0.60,
-      HARD:   0.82,
-    };
-    const slotsPerLane: Record<Difficulty, number> = {
-      MEDIUM: 4,
-      HARD:   6,
-    };
-
-    const chance = chancePerSlot[stateRef.current.difficulty];
-    const slots  = slotsPerLane[stateRef.current.difficulty];
-
-    for (let lane = 1; lane <= stateRef.current.totalLanes; lane++) {
-      const laneLeftX = START_ZONE_WIDTH + (lane - 1) * LANE_WIDTH;
-
-      for (let slot = 0; slot < slots; slot++) {
-        if (secureRandom() < chance) {
-          // X: random within lane, 12 px margin from lane edges
-          const x = laneLeftX + 12 + secureRandom() * (LANE_WIDTH - 24);
-          // Y: fully random within road surface (unpredictable hit / no-hit)
-          const y = roadTop + 12 + secureRandom() * (roadBottom - roadTop - 24);
-          // Radius 9–17 px — larger potholes are more dangerous
-          const radius = 9 + secureRandom() * 8;
-          holes.push({ x, y, radius, lane });
-        }
-      }
-    }
-
-    stateRef.current.potholes = holes;
-  }, [secureRandom]);
+    stateRef.current.potholes = [];
+  }, []);
 
   // Regenerate potholes fresh every time a new game starts
   useEffect(() => {
@@ -666,9 +626,13 @@ export const RoadCrossingGame: React.FC<RoadCrossingGameProps> = ({
           }
         }
 
-        // Check if chicken reached the RIGHT Finish Safe Zone
+        // Check safe zones
         const finishStartX = START_ZONE_WIDTH + s.totalLanes * LANE_WIDTH;
-        if (s.chicken.x >= finishStartX + 30) {
+        const inStartSafeZone = s.chicken.x <= START_ZONE_WIDTH;
+        const inFinishSafeZone = s.chicken.x >= finishStartX;
+
+        // Check if chicken reached the RIGHT Finish Safe Zone (Green Point)
+        if (inFinishSafeZone && !s.chicken.isWon) {
           s.chicken.isWon = true;
           sounds.playWin();
           spawnStarBurst(s.chicken.x, s.chicken.y);
@@ -677,50 +641,36 @@ export const RoadCrossingGame: React.FC<RoadCrossingGameProps> = ({
 
         // ──────────────────────────────────────────
         // 2. FORGIVING COLLISION DETECTION
+        // Only active when chicken is on the road surface (NOT in start or finish safe zones)
         // ──────────────────────────────────────────
-        const chickenBox = {
-          left: s.chicken.x - 12,
-          right: s.chicken.x + 12,
-          top: s.chicken.y - 12,
-          bottom: s.chicken.y + 12,
-        };
-
-        for (const v of s.vehicles) {
-          const vBox = {
-            left: v.x - v.width / 2 + 6,
-            right: v.x + v.width / 2 - 6,
-            top: v.y - v.height / 2 + 10,
-            bottom: v.y + v.height / 2 - 10,
+        if (!inStartSafeZone && !inFinishSafeZone && !s.chicken.isWon && !s.chicken.isHit) {
+          const chickenBox = {
+            left: s.chicken.x - 10,
+            right: s.chicken.x + 10,
+            top: s.chicken.y - 10,
+            bottom: s.chicken.y + 10,
           };
 
-          // AABB Box intersection
-          if (
-            chickenBox.left < vBox.right &&
-            chickenBox.right > vBox.left &&
-            chickenBox.top < vBox.bottom &&
-            chickenBox.bottom > vBox.top
-          ) {
-            s.chicken.isHit = true;
-            s.screenShake = 16;
-            spawnFeathers(s.chicken.x, s.chicken.y);
-            sounds.playCollision();
-            onCollision(v.lane);
-            break;
-          }
-        }
+          for (const v of s.vehicles) {
+            const vBox = {
+              left: v.x - v.width / 2 + 6,
+              right: v.x + v.width / 2 - 6,
+              top: v.y - v.height / 2 + 10,
+              bottom: v.y + v.height / 2 - 10,
+            };
 
-        // ── Pothole collision (static circular obstacles) ──
-        if (!s.chicken.isHit) {
-          for (const ph of s.potholes) {
-            const dx = s.chicken.x - ph.x;
-            const dy = s.chicken.y - ph.y;
-            // chicken radius ~10, add pothole radius for combined hit zone
-            if (dx * dx + dy * dy < (ph.radius + 10) * (ph.radius + 10)) {
+            // AABB Box intersection
+            if (
+              chickenBox.left < vBox.right &&
+              chickenBox.right > vBox.left &&
+              chickenBox.top < vBox.bottom &&
+              chickenBox.bottom > vBox.top
+            ) {
               s.chicken.isHit = true;
-              s.screenShake = 14;
+              s.screenShake = 16;
               spawnFeathers(s.chicken.x, s.chicken.y);
               sounds.playCollision();
-              onCollision(ph.lane);
+              onCollision(v.lane);
               break;
             }
           }

@@ -86,9 +86,12 @@ class LudoConnectionManager:
                                 result = engine.handle_timeout(match_uuid)
                                 if result.get("status") == "TIMEOUT":
                                     logger.info(f"Turn timed out in match {match_id}: {result}")
+                                    match = engine.get_match(match_uuid)
+                                    state = engine.format_match_state(match) if match else None
                                     await self.broadcast(match_id, {
                                         "type": "TIMEOUT",
                                         "data": result,
+                                        "state": state,
                                     })
                                     if result.get("game_over"):
                                         break

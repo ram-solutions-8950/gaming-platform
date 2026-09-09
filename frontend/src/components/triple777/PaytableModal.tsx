@@ -40,7 +40,7 @@ export function PaytableModal({ config, onClose }: PaytableModalProps) {
         </div>
 
         <p className="mt-2 text-xs text-slate-400">
-          Match all 3 reels for top payouts, or any 2 symbols for a 2× consolation win. Payout = Stake × Multiplier.
+          Match all 3 reels for top payouts, or first 2 matching symbols on the central payline for a 2× consolation win. Payout = Stake × Multiplier.
         </p>
 
         <div className="mt-3 max-h-60 divide-y divide-neutral-800 overflow-y-auto rounded-xl border border-neutral-800 bg-neutral-950">
@@ -48,7 +48,7 @@ export function PaytableModal({ config, onClose }: PaytableModalProps) {
             <div key={symbol} className="flex items-center justify-between px-3 py-2">
               {symbol === "two_match" ? (
                 <span className="text-xs font-bold uppercase tracking-wider text-slate-300">
-                  Any 2 Matching Symbols
+                  2 Matching Symbols (Payline)
                 </span>
               ) : (
                 <div className="flex items-center gap-2">

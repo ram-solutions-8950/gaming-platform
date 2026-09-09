@@ -10,6 +10,7 @@ import android.view.WindowInsets;
 import android.view.WindowInsetsController;
 import android.view.WindowManager;
 import android.webkit.JavascriptInterface;
+import android.webkit.ValueCallback;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import com.getcapacitor.BridgeActivity;
@@ -102,6 +103,35 @@ public class MainActivity extends BridgeActivity {
     public void onDestroy() {
         notifyWebAudioPause();
         super.onDestroy();
+    }
+
+    @Override
+    public void onBackPressed() {
+        try {
+            if (getBridge() != null && getBridge().getWebView() != null) {
+                WebView webView = getBridge().getWebView();
+                webView.evaluateJavascript(
+                    "(function() { " +
+                    "  try { " +
+                    "    if (typeof window.__onAndroidBackPressed === 'function') { " +
+                    "      return window.__onAndroidBackPressed() ? 'HANDLED' : 'EXIT'; " +
+                    "    } " +
+                    "  } catch(e) {} " +
+                    "  return 'EXIT'; " +
+                    "})()",
+                    new ValueCallback<String>() {
+                        @Override
+                        public void onReceiveValue(String value) {
+                            if (value == null || !value.contains("HANDLED")) {
+                                runOnUiThread(() -> moveTaskToBack(true));
+                            }
+                        }
+                    }
+                );
+                return;
+            }
+        } catch (Exception ignored) {}
+        moveTaskToBack(true);
     }
 
     private void notifyWebAudioPause() {

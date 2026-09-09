@@ -310,9 +310,9 @@ def test_wallet_invariants_across_multiple_rounds(client, user_a, db: Session):
     assert wallet.balance == current_expected
 
     # Round 2: Loss
-    res2 = client.post("/api/v1/games/chicken-road/start", json={"bet_amount": 200, "difficulty": "MEDIUM"}, headers=headers)
+    res2 = client.post("/api/v1/games/chicken-road/start", json={"bet_amount": 100, "difficulty": "MEDIUM"}, headers=headers)
     r2_id = res2.json()["data"]["round_id"]
-    current_expected -= 20000
+    current_expected -= 10000
 
     client.post("/api/v1/games/chicken-road/collision", json={"round_id": r2_id, "lane_index": 1}, headers=headers)
     db.refresh(wallet)

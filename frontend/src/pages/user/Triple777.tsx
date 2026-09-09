@@ -16,7 +16,7 @@ import { TRIPLE_777_RULES_DATA } from '../../components/common/gameRulesData';
 import { setNativePortrait, setNativeLandscape } from '../../utils/nativeOrientation';
 import '../../styles/triple-777.css';
 
-const QUICK_MULTIPLIERS = [1, 2, 5, 10];
+const BET_OPTIONS = [10, 20, 50, 100];
 const AUTO_SPIN_COUNT = 10;
 
 function checkIsMobileLandscape(): boolean {
@@ -59,12 +59,40 @@ export function Triple777Page() {
   const [historyLoading, setHistoryLoading] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const minBet = config?.min_bet ?? 10;
-  const maxBet = config?.max_bet ?? 10000;
   const symbols = config?.symbols ?? ['7', 'BAR', 'CHERRY', 'LEMON', 'BELL', 'STAR', 'COIN'];
 
   const spinLockRef = useRef(false);
   const userDismissedBlockerRef = useRef(false);
+
+  // Auto spin & Turbo runtime refs (BUG-010)
+  const autoSpinActiveRef = useRef<boolean>(false);
+  const autoSpinsRemainingRef = useRef<number>(0);
+  const autoSpinTimerRef = useRef<any>(null);
+  const turboRef = useRef<boolean>(false);
+  const balanceRef = useRef<number>(balance);
+  balanceRef.current = balance;
+  const stakeRef = useRef<number>(stake);
+  stakeRef.current = stake;
+
+  const stopAutoSpin = useCallback(() => {
+    autoSpinActiveRef.current = false;
+    autoSpinsRemainingRef.current = 0;
+    if (autoSpinTimerRef.current) {
+      clearTimeout(autoSpinTimerRef.current);
+      autoSpinTimerRef.current = null;
+    }
+    setAutoSpinsLeft(null);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      autoSpinActiveRef.current = false;
+      if (autoSpinTimerRef.current) {
+        clearTimeout(autoSpinTimerRef.current);
+        autoSpinTimerRef.current = null;
+      }
+    };
+  }, []);
 
   // Orientation Lock Helpers (Scoped strictly to Triple 777 via Android Native Activity & Bridge)
   const requestPortraitLock = async (): Promise<boolean> => {
@@ -196,9 +224,9 @@ export function Triple777Page() {
   // 3. Handle spin execution
   const handleSpin = useCallback(async (currentStake: number, isTurbo: boolean) => {
     if (spinLockRef.current) return;
-    if (balance < currentStake) {
+    if (balanceRef.current < currentStake) {
       setErrorMessage('Insufficient balance. Please add cash to spin.');
-      setAutoSpinsLeft(null);
+      stopAutoSpin();
       return;
     }
 
@@ -225,6 +253,7 @@ export function Triple777Page() {
         setLastWinAmount(response.won ? response.payout : 0);
         setJackpot(response.jackpot_amount);
         setBalance(response.balance);
+        balanceRef.current = response.balance;
         setSpinning(false);
         spinLockRef.current = false;
 
@@ -239,43 +268,65 @@ export function Triple777Page() {
           soundManager.play('reel_stop');
         }
 
-        setShowResultPopup(true);
+        // Auto spin chaining (BUG-010)
+        if (autoSpinActiveRef.current) {
+          const remaining = autoSpinsRemainingRef.current - 1;
+          autoSpinsRemainingRef.current = remaining;
+          setAutoSpinsLeft(remaining > 0 ? remaining : null);
+
+          // On big win / jackpot in auto mode, celebrate with popup
+          if (response.tier === 'jackpot' || response.tier === 'bigwin') {
+            setShowResultPopup(true);
+          }
+
+          if (remaining <= 0 || response.balance < currentStake) {
+            stopAutoSpin();
+            if (response.balance < currentStake && remaining > 0) {
+              setErrorMessage('Auto spin stopped: Insufficient balance.');
+            }
+          } else {
+            // Snappy auto advance: 350ms in turbo, 700ms in normal
+            const nextSpinDelay = isTurbo ? 350 : 700;
+            autoSpinTimerRef.current = setTimeout(() => {
+              if (autoSpinActiveRef.current) {
+                handleSpin(stakeRef.current, turboRef.current);
+              }
+            }, nextSpinDelay);
+          }
+        } else {
+          // Manual spin: display clear win/loss result popup (BUG-008)
+          setShowResultPopup(true);
+        }
       }, revealDelay);
     } catch (err: any) {
       const msg = err?.response?.data?.detail || err?.message || 'Spin failed';
       setErrorMessage(msg);
       setSpinning(false);
       spinLockRef.current = false;
-      setAutoSpinsLeft(null);
+      stopAutoSpin();
     }
-  }, [balance]);
+  }, [stopAutoSpin]);
 
-  // 4. Handle result popup close & Auto Spin chaining
+  // 4. Handle result popup close
   const handleCloseResultPopup = useCallback(() => {
     setShowResultPopup(false);
-    if (autoSpinsLeft !== null) {
-      if (autoSpinsLeft <= 1 || errorMessage || balance < stake) {
-        setAutoSpinsLeft(null);
-      } else {
-        setAutoSpinsLeft((prev) => (prev ? prev - 1 : null));
-        handleSpin(stake, turbo);
-      }
-    }
-  }, [autoSpinsLeft, errorMessage, balance, stake, turbo, handleSpin]);
+  }, []);
 
   // 5. Auto spin toggle
-  const toggleAutoSpin = () => {
-    if (autoSpinsLeft !== null) {
-      setAutoSpinsLeft(null);
+  const toggleAutoSpin = useCallback(() => {
+    if (autoSpinActiveRef.current) {
+      stopAutoSpin();
     } else {
-      if (balance < stake) {
+      if (balanceRef.current < stakeRef.current) {
         setErrorMessage('Insufficient balance for auto spin.');
         return;
       }
+      autoSpinActiveRef.current = true;
+      autoSpinsRemainingRef.current = AUTO_SPIN_COUNT;
       setAutoSpinsLeft(AUTO_SPIN_COUNT);
-      handleSpin(stake, turbo);
+      handleSpin(stakeRef.current, turboRef.current);
     }
-  };
+  }, [stopAutoSpin, handleSpin]);
 
   // 6. Open history
   const openHistoryModal = async () => {
@@ -436,14 +487,19 @@ export function Triple777Page() {
 
         {/* ── 3. Bottom Betting & Spin Controls (Stacked Portrait) ── */}
         <footer className="t777-bottom-panel">
-          {/* Row 1: Bet Stepper + Quick Chips */}
+          {/* Row 1: Bet Stepper + Quick Chips strictly [10, 20, 50, 100] (BUG-011) */}
           <div className="t777-controls-row">
             {/* Bet Stepper: [- | Stake | +] */}
             <div className="t777-stepper-group">
               <button
                 type="button"
-                disabled={spinning || autoSpinsLeft !== null || stake <= minBet}
-                onClick={() => setStake((s) => Math.max(minBet, s - minBet))}
+                disabled={spinning || autoSpinsLeft !== null || stake <= 10}
+                onClick={() => {
+                  const idx = BET_OPTIONS.indexOf(stake);
+                  const newStake = idx > 0 ? BET_OPTIONS[idx - 1] : 10;
+                  setStake(newStake);
+                  stakeRef.current = newStake;
+                }}
                 className="t777-stepper-btn"
                 aria-label="Decrease Bet"
               >
@@ -455,8 +511,13 @@ export function Triple777Page() {
               </div>
               <button
                 type="button"
-                disabled={spinning || autoSpinsLeft !== null || stake >= maxBet}
-                onClick={() => setStake((s) => Math.min(maxBet, s + minBet))}
+                disabled={spinning || autoSpinsLeft !== null || stake >= 100}
+                onClick={() => {
+                  const idx = BET_OPTIONS.indexOf(stake);
+                  const newStake = idx !== -1 && idx < BET_OPTIONS.length - 1 ? BET_OPTIONS[idx + 1] : 100;
+                  setStake(newStake);
+                  stakeRef.current = newStake;
+                }}
                 className="t777-stepper-btn"
                 aria-label="Increase Bet"
               >
@@ -464,53 +525,72 @@ export function Triple777Page() {
               </button>
             </div>
 
-            {/* Quick Multiplier Chips */}
+            {/* Quick Bet Chips: 10, 20, 50, 100 (BUG-011) */}
             <div className="t777-quick-chips">
-              {QUICK_MULTIPLIERS.map((m) => {
-                const chipStake = Math.min(maxBet, minBet * m);
-                return (
-                  <button
-                    key={m}
-                    type="button"
-                    disabled={spinning || autoSpinsLeft !== null}
-                    onClick={() => setStake(chipStake)}
-                    className={`t777-chip-btn ${stake === chipStake ? 't777-chip-btn--active' : ''}`}
-                  >
-                    {m}x
-                  </button>
-                );
-              })}
+              {BET_OPTIONS.map((chipStake) => (
+                <button
+                  key={chipStake}
+                  type="button"
+                  disabled={spinning || autoSpinsLeft !== null}
+                  onClick={() => {
+                    setStake(chipStake);
+                    stakeRef.current = chipStake;
+                  }}
+                  className={`t777-chip-btn ${stake === chipStake ? 't777-chip-btn--active' : ''}`}
+                >
+                  ₹{chipStake}
+                </button>
+              ))}
             </div>
           </div>
 
-          {/* Row 2: Turbo + Auto + Large Spin Button */}
+          {/* Row 2: Turbo + Auto + Large Spin Button (BUG-010) */}
           <div className="t777-actions-row">
             {/* Turbo Toggle */}
             <button
               type="button"
-              disabled={spinning}
-              onClick={() => setTurbo((t) => !t)}
+              onClick={() => {
+                setTurbo((prev) => {
+                  const next = !prev;
+                  turboRef.current = next;
+                  return next;
+                });
+              }}
               className={`t777-toggle-btn t777-toggle-btn--turbo ${
                 turbo ? 't777-toggle-btn--active' : ''
               }`}
-              title="Turbo Mode"
+              title="Turbo Mode: Fast 2× Spin Speed"
             >
-              <Zap size={16} />
-              <span>TURBO</span>
+              <Zap size={15} className={turbo ? 'fill-amber-300 text-amber-200' : 'text-slate-400'} />
+              <div className="flex flex-col items-center leading-none">
+                <span className="text-[10px] font-black">TURBO</span>
+                <span className={`text-[8px] font-bold ${turbo ? 'text-amber-100' : 'text-slate-400'}`}>
+                  {turbo ? '2× FAST' : 'OFF'}
+                </span>
+              </div>
             </button>
 
             {/* Auto Spin Toggle */}
             <button
               type="button"
-              disabled={spinning && autoSpinsLeft === null}
               onClick={toggleAutoSpin}
               className={`t777-toggle-btn t777-toggle-btn--auto ${
                 autoSpinsLeft !== null ? 't777-toggle-btn--active' : ''
               }`}
-              title="Auto Spin"
+              title={autoSpinsLeft !== null ? 'Click to Stop Auto Spin' : 'Auto Spin: 10 Consecutive Rounds'}
             >
-              <RotateCcw size={16} />
-              <span>{autoSpinsLeft !== null ? `AUTO ${autoSpinsLeft}` : 'AUTO'}</span>
+              <RotateCcw
+                size={15}
+                className={autoSpinsLeft !== null ? 'animate-spin text-white' : 'text-slate-400'}
+              />
+              <div className="flex flex-col items-center leading-none">
+                <span className="text-[10px] font-black">
+                  {autoSpinsLeft !== null ? 'STOP' : 'AUTO'}
+                </span>
+                <span className={`text-[8px] font-bold ${autoSpinsLeft !== null ? 'text-red-100' : 'text-slate-400'}`}>
+                  {autoSpinsLeft !== null ? `${autoSpinsLeft} LEFT` : '10 SPINS'}
+                </span>
+              </div>
             </button>
 
             {/* Large Glossy Green SPIN Button */}
@@ -522,7 +602,7 @@ export function Triple777Page() {
               aria-label="Spin Slot Machine"
             >
               <Play size={20} fill="#052e16" />
-              <span>{spinning ? 'SPINNING...' : `SPIN ₹${stake}`}</span>
+              <span>{spinning ? (turbo ? 'FAST SPINNING...' : 'SPINNING...') : `SPIN ₹${stake}`}</span>
             </button>
           </div>
         </footer>

@@ -47,7 +47,7 @@ ROUND_LOCK = threading.Lock()
 
 
 class StartGameIn(BaseModel):
-    bet_amount: float = Field(..., ge=10, le=50000, description="Bet amount in INR")
+    bet_amount: float = Field(..., ge=10, le=100, description="Bet amount in INR (10 to 100)")
     difficulty: Optional[str] = Field("EASY", description="Game difficulty (EASY, MEDIUM, HARD)")
 
 

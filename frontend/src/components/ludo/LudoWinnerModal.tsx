@@ -1,5 +1,6 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
+import { ArrowLeft } from 'lucide-react';
 import type { LudoPlayer } from '../../types/ludo';
 
 interface Props {
@@ -7,6 +8,7 @@ interface Props {
   isMe: boolean;
   prizePool: number;
   entryFee?: number;
+  userBalance?: number;
   onReturnToLobby: () => void;
 }
 
@@ -15,6 +17,7 @@ export const LudoWinnerModal: React.FC<Props> = ({
   isMe,
   prizePool,
   entryFee,
+  userBalance,
   onReturnToLobby,
 }) => {
   return createPortal(
@@ -29,6 +32,19 @@ export const LudoWinnerModal: React.FC<Props> = ({
       }}
     >
       <div className="relative flex flex-col items-center gap-3 sm:gap-5 p-4 sm:p-8 bg-gradient-to-b from-slate-900 via-slate-950 to-amber-950/60 border border-amber-500/50 rounded-2xl sm:rounded-3xl shadow-[0_0_50px_rgba(245,158,11,0.3)] max-w-sm w-full text-center max-h-[calc(100dvh-24px)] overflow-y-auto scrollbar-hide my-auto">
+        {/* Back Button (BUG-002) */}
+        <div className="w-full flex justify-start">
+          <button
+            type="button"
+            onClick={onReturnToLobby}
+            className="flex items-center gap-1.5 px-3 py-1 bg-slate-800/90 hover:bg-slate-700 active:scale-95 border border-slate-700 rounded-lg text-slate-200 text-xs font-bold transition shadow-sm cursor-pointer"
+            aria-label="Back to Lobby"
+          >
+            <ArrowLeft size={14} />
+            <span>Back</span>
+          </button>
+        </div>
+
         {/* Trophy icon */}
         <div className="w-14 h-14 sm:w-20 sm:h-20 rounded-full bg-amber-500/20 border-2 border-amber-400/80 flex items-center justify-center text-3xl sm:text-4xl shadow-inner animate-bounce shrink-0">
           🏆
@@ -45,7 +61,7 @@ export const LudoWinnerModal: React.FC<Props> = ({
           </p>
         </div>
 
-        {/* Bet & Win Metrics Box */}
+        {/* Bet & Win & Balance Metrics Box (BUG-001) */}
         <div className="w-full py-3 px-4 bg-slate-900/80 rounded-2xl border border-amber-500/30 flex justify-around items-center">
           {entryFee !== undefined && entryFee > 0 && (
             <div className="flex flex-col items-center">
@@ -65,6 +81,16 @@ export const LudoWinnerModal: React.FC<Props> = ({
               ₹{(prizePool / 100).toFixed(2)}
             </span>
           </div>
+          {userBalance !== undefined && (
+            <div className="flex flex-col items-center">
+              <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">
+                Total Balance
+              </span>
+              <span className="text-base font-black text-amber-400">
+                ₹{(userBalance / 100).toFixed(2)}
+              </span>
+            </div>
+          )}
         </div>
 
         <button

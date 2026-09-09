@@ -1,6 +1,7 @@
-import { BrowserRouter, Navigate, Outlet, Route, Routes } from 'react-router-dom';
+import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import './index.css';
+import { setNativeLandscape } from './utils/nativeOrientation';
 import { AuthLayout } from './layouts/AuthLayout';
 import { PublicLayout } from './layouts/PublicLayout';
 import { UserLayout } from './layouts/UserLayout';
@@ -46,6 +47,59 @@ function ProtectedRoute({ adminOnly = false }: { adminOnly?: boolean }) {
   if (!user) return <Navigate to="/login" replace />;
   if (adminOnly && user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN') return <Navigate to="/dashboard" replace />;
   return <Outlet />;
+}
+
+function GlobalAndroidBackHandler() {
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    const handleBackPressed = (): boolean => {
+      // 1. If an active screen or game has its own handler (e.g. Ludo confirm modal), check it first
+      if (typeof (window as any).__gameSpecificBackPressed === 'function') {
+        try {
+          const handled = (window as any).__gameSpecificBackPressed();
+          if (handled) return true;
+        } catch {}
+      }
+
+      // 2. Check current route
+      const path = location.pathname.toLowerCase();
+      const isHome = path === '/dashboard' || path === '/' || path === '';
+      const isAuth = path === '/login' || path === '/signup';
+
+      // If user is inside any game, catalog, wallet, profile, etc., navigate safely to dashboard
+      if (!isHome && !isAuth) {
+        setNativeLandscape().catch(() => {});
+        navigate('/dashboard');
+        return true; // Handled within app, DO NOT exit to Android home screen
+      }
+
+      // 3. User is already on Dashboard or Login -> permit system to minimize/exit
+      return false;
+    };
+
+    (window as any).__onAndroidBackPressed = handleBackPressed;
+
+    const handlePopState = (e: PopStateEvent) => {
+      const path = window.location.pathname.toLowerCase();
+      const isHome = path === '/dashboard' || path === '/' || path === '';
+      const isAuth = path === '/login' || path === '/signup';
+      if (!isHome && !isAuth) {
+        e.preventDefault();
+        setNativeLandscape().catch(() => {});
+        navigate('/dashboard');
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+
+    return () => {
+      delete (window as any).__onAndroidBackPressed;
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, [navigate, location]);
+
+  return null;
 }
 
 function App() {
@@ -168,7 +222,8 @@ function App() {
         />
       )}
       <BrowserRouter>
-      <Routes>
+        <GlobalAndroidBackHandler />
+        <Routes>
         {/* Dedicated standalone APK download routes - completely separate from game/dashboard layouts */}
         <Route path="/download-apk" element={<DownloadPage />} />
         <Route path="/download" element={<DownloadPage />} />

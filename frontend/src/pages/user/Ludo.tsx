@@ -18,6 +18,20 @@ import { lockLandscape } from '../../utils/nativeOrientation';
 import { ArrowLeft, HelpCircle } from 'lucide-react';
 import '../../styles/ludo.css';
 
+interface FloatingReaction {
+  id: string;
+  emoji: string;
+  leftPercent: number;
+}
+
+interface CelebrationBanner {
+  id: string;
+  title: string;
+  subtitle: string;
+  badge: string;
+  type: 'SIX' | 'CAPTURE' | 'HOME';
+}
+
 export const Ludo: React.FC = () => {
   const { user } = useAuthStore();
   const navigate = useNavigate();
@@ -37,6 +51,52 @@ export const Ludo: React.FC = () => {
   const [rollingDice, setRollingDice] = useState<boolean>(false);
   const [diceDisplayValue, setDiceDisplayValue] = useState<number | null>(null);
   const [diceStatusNotice, setDiceStatusNotice] = useState<string | null>(null);
+
+  // Floating reactions & celebration banners (BUG-006)
+  const [reactions, setReactions] = useState<FloatingReaction[]>([]);
+  const [banner, setBanner] = useState<CelebrationBanner | null>(null);
+  const bannerTimerRef = useRef<any>(null);
+
+  const triggerBanner = useCallback(
+    (title: string, subtitle: string, badge: string, type: 'SIX' | 'CAPTURE' | 'HOME') => {
+      if (bannerTimerRef.current) clearTimeout(bannerTimerRef.current);
+      const newBanner: CelebrationBanner = { id: Math.random().toString(), title, subtitle, badge, type };
+      setBanner(newBanner);
+      bannerTimerRef.current = setTimeout(() => {
+        setBanner(null);
+        bannerTimerRef.current = null;
+      }, 2400);
+    },
+    []
+  );
+
+  const addReaction = useCallback((emoji: string) => {
+    const id = `${Date.now()}_${Math.random()}`;
+    const leftPercent = 25 + Math.random() * 50;
+    setReactions((prev) => [...prev.slice(-12), { id, emoji, leftPercent }]);
+    soundManager.play('reveal_tick');
+    setTimeout(() => {
+      setReactions((prev) => prev.filter((r) => r.id !== id));
+    }, 1800);
+  }, []);
+
+  const sendReaction = useCallback(
+    (emoji: string) => {
+      addReaction(emoji);
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+        try {
+          wsRef.current.send(
+            JSON.stringify({
+              type: 'REACTION',
+              emoji,
+              sender: user?.username || 'Player',
+            })
+          );
+        } catch {}
+      }
+    },
+    [addReaction, user?.username]
+  );
 
   const rollCycleTimerRef = useRef<any>(null);
   const transitionDelayTimerRef = useRef<any>(null);
@@ -132,13 +192,14 @@ export const Ludo: React.FC = () => {
   }, [searching, transitionToMatch]);
 
   // -----------------------------------------------------------------
-  // Animated Dice Roll Pipeline (600ms tumbling + 1.4s notice hold)
+  // -----------------------------------------------------------------
+  // Animated Dice Roll Pipeline (Snappy 300ms tumbling + fast notice)
   // -----------------------------------------------------------------
   const triggerDiceRollAnimation = useCallback(
-    (rollVal: number, turnEnded: boolean, reason: string | undefined, newState: LudoMatchState) => {
-      // 1. Play sound and start tumbling
+    (rollVal: number, turnEnded: boolean, reason: string | undefined, rolledState: LudoMatchState) => {
       soundManager.play('dice_roll');
       setRollingDice(true);
+      setDiceDisplayValue(rollVal);
 
       if (rollCycleTimerRef.current) clearInterval(rollCycleTimerRef.current);
       if (transitionDelayTimerRef.current) clearTimeout(transitionDelayTimerRef.current);
@@ -148,11 +209,34 @@ export const Ludo: React.FC = () => {
         cycles++;
         setDiceDisplayValue(Math.floor(Math.random() * 6) + 1);
 
-        if (cycles >= 10) {
+        if (cycles >= 6) {
           clearInterval(rollCycleTimerRef.current);
           rollCycleTimerRef.current = null;
           setRollingDice(false);
           setDiceDisplayValue(rollVal);
+
+          // Update matchState safely without overwriting newer state (BUG-005)
+          setMatchState((current) => {
+            if (!current) return rolledState;
+            // If already on a newer state (token moved or turn already passed), preserve latest
+            if (current.last_dice_roll === null && current.current_turn_color !== rolledState.current_turn_color) {
+              return current;
+            }
+            return rolledState;
+          });
+          setTimerSeconds(rolledState.remaining_timer_seconds ?? 10);
+
+          // Trigger Lucky 6 Celebration Banner (BUG-006)
+          if (rollVal === 6) {
+            soundManager.play('cashout');
+            const isMe = rolledState.players.some((p) => p.user_id === user?.id && p.color === rolledState.current_turn_color);
+            triggerBanner(
+              'LUCKY 6! BONUS ROLL! 🎲',
+              isMe ? 'You earned a bonus roll!' : `${rolledState.current_turn_color} earned a bonus roll!`,
+              '🎉',
+              'SIX'
+            );
+          }
 
           if (turnEnded) {
             let note = `Rolled ${rollVal} • No legal moves`;
@@ -163,22 +247,18 @@ export const Ludo: React.FC = () => {
             }
             setDiceStatusNotice(note);
 
-            // Hold rolled number & explanation for 1.4s before advancing turn
+            // Fast 400ms notice hold without blocking turn transition
             transitionDelayTimerRef.current = setTimeout(() => {
-              setMatchState(newState);
-              setTimerSeconds(newState.remaining_timer_seconds ?? 10);
               setDiceStatusNotice(null);
               transitionDelayTimerRef.current = null;
-            }, 1400);
+            }, 400);
           } else {
-            setMatchState(newState);
-            setTimerSeconds(newState.remaining_timer_seconds ?? 10);
             setDiceStatusNotice(`Rolled ${rollVal}! Tap a glowing token`);
           }
         }
-      }, 55);
+      }, 50);
     },
-    []
+    [triggerBanner, user?.id]
   );
 
   // -----------------------------------------------------------------
@@ -220,29 +300,71 @@ export const Ludo: React.FC = () => {
           const reason = msg.data?.reason;
           triggerDiceRollAnimation(rollVal, turnEnded, reason, msg.state);
         } else if (msg.type === 'TOKEN_MOVED' && msg.state) {
+          // Immediately cancel any pending roll timers to prevent state regression (BUG-005)
+          if (rollCycleTimerRef.current) {
+            clearInterval(rollCycleTimerRef.current);
+            rollCycleTimerRef.current = null;
+            setRollingDice(false);
+          }
+          if (transitionDelayTimerRef.current) {
+            clearTimeout(transitionDelayTimerRef.current);
+            transitionDelayTimerRef.current = null;
+          }
           setDiceStatusNotice(null);
           setMatchState(msg.state);
           setTimerSeconds(msg.state.remaining_timer_seconds ?? 10);
+          setDiceDisplayValue(msg.state.last_dice_roll);
           if (msg.data?.captured) {
             soundManager.play('loss');
+            triggerBanner(
+              'TOKEN CAPTURED! 💥',
+              'Opponent eliminated back to yard! Bonus roll granted!',
+              '⚔️',
+              'CAPTURE'
+            );
+          } else if (msg.data?.is_home) {
+            soundManager.play('cashout');
+            triggerBanner(
+              'HOME RUN! TOKEN SCORED! 🌟',
+              'Pawn safely arrived at Home Triangle!',
+              '🏆',
+              'HOME'
+            );
           }
           if (msg.data?.game_over) {
             soundManager.play('win_clap');
             refreshWallet();
           }
-        } else if (msg.type === 'TIMEOUT' && msg.state) {
+        } else if (msg.type === 'TIMEOUT') {
+          if (rollCycleTimerRef.current) {
+            clearInterval(rollCycleTimerRef.current);
+            rollCycleTimerRef.current = null;
+            setRollingDice(false);
+          }
+          if (transitionDelayTimerRef.current) {
+            clearTimeout(transitionDelayTimerRef.current);
+            transitionDelayTimerRef.current = null;
+          }
           setDiceStatusNotice(null);
-          setMatchState(msg.state);
-          setTimerSeconds(msg.state.remaining_timer_seconds ?? 10);
+          if (msg.state) {
+            setMatchState(msg.state);
+            setTimerSeconds(msg.state.remaining_timer_seconds ?? 10);
+            setDiceDisplayValue(msg.state.last_dice_roll);
+          }
           if (msg.data?.game_over) {
             soundManager.play('win_clap');
             refreshWallet();
           }
         } else if (msg.type === 'PLAYER_FORFEITED' && msg.state) {
           setMatchState(msg.state);
+          setTimerSeconds(msg.state.remaining_timer_seconds ?? 10);
           if (msg.data?.game_over) {
             soundManager.play('win_clap');
             refreshWallet();
+          }
+        } else if (msg.type === 'REACTION' && msg.data?.emoji) {
+          if (msg.data.sender !== user?.username) {
+            addReaction(msg.data.emoji);
           }
         }
       } catch (e) {
@@ -278,7 +400,7 @@ export const Ludo: React.FC = () => {
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [matchState, rollingDice]);
+  }, [matchState?.current_turn_color, matchState?.status, rollingDice]);
 
   // Fallback Polling (Sync every 3s)
   useEffect(() => {
@@ -287,6 +409,7 @@ export const Ludo: React.FC = () => {
         try {
           const fresh = await ludoService.getMatchState(matchState.id);
           setMatchState(fresh);
+          setTimerSeconds(fresh.remaining_timer_seconds ?? 10);
         } catch {}
       }, 3000);
     }
@@ -428,6 +551,9 @@ export const Ludo: React.FC = () => {
     }
     if (rollCycleTimerRef.current) clearInterval(rollCycleTimerRef.current);
     if (transitionDelayTimerRef.current) clearTimeout(transitionDelayTimerRef.current);
+    if (bannerTimerRef.current) clearTimeout(bannerTimerRef.current);
+    setBanner(null);
+    setReactions([]);
 
     setMatchState(null);
     matchTransitionRef.current = null;
@@ -438,6 +564,9 @@ export const Ludo: React.FC = () => {
   const handleReturnToLobby = () => {
     if (rollCycleTimerRef.current) clearInterval(rollCycleTimerRef.current);
     if (transitionDelayTimerRef.current) clearTimeout(transitionDelayTimerRef.current);
+    if (bannerTimerRef.current) clearTimeout(bannerTimerRef.current);
+    setBanner(null);
+    setReactions([]);
     setMatchState(null);
     matchTransitionRef.current = null;
     refreshWallet();
@@ -462,6 +591,78 @@ export const Ludo: React.FC = () => {
   const greenPlayer = matchState?.players.find((p) => p.color === 'GREEN');
   const bluePlayer = matchState?.players.find((p) => p.color === 'BLUE');
   const yellowPlayer = matchState?.players.find((p) => p.color === 'YELLOW');
+
+  // Movable tokens calculation with fallback (BUG-004)
+  const legalTokenIndices = React.useMemo(() => {
+    if (!matchState || !isMyTurn) return [];
+    if (matchState.legal_token_indices && matchState.legal_token_indices.length > 0) {
+      return matchState.legal_token_indices;
+    }
+    const roll = diceDisplayValue ?? matchState.last_dice_roll;
+    if (!roll || !myPlayer) return [];
+    return myPlayer.tokens
+      .filter((t) => {
+        if (t.is_home || t.position >= 56) return false;
+        if (t.position === -1) return roll === 6;
+        return t.position + roll <= 56;
+      })
+      .map((t) => t.token_index);
+  }, [matchState, isMyTurn, diceDisplayValue, myPlayer]);
+
+  // Determine dynamic dice side (BUG-003):
+  // If active turn or player is on the yellow/green side, display dice on the yellow side!
+  const activeColor = matchState?.current_turn_color || myPlayer?.color || 'RED';
+  const isYellowOrGreenActive = activeColor === 'YELLOW' || activeColor === 'GREEN';
+
+  // Hardware & popstate Back Button Handler (BUG-002)
+  useEffect(() => {
+    const handleAndroidBack = (): boolean => {
+      if (showExitConfirm) {
+        setShowExitConfirm(false);
+        return true;
+      }
+      if (showRulesModal) {
+        setShowRulesModal(false);
+        return true;
+      }
+      if (matchState) {
+        if (matchState.status === 'COMPLETED') {
+          handleReturnToLobby();
+          return true;
+        }
+        setShowExitConfirm(true);
+        return true;
+      }
+      handleExitLobby();
+      return true;
+    };
+
+    (window as any).__gameSpecificBackPressed = handleAndroidBack;
+
+    const handlePopState = (e: PopStateEvent) => {
+      e.preventDefault();
+      handleAndroidBack();
+    };
+    window.addEventListener('popstate', handlePopState);
+
+    return () => {
+      delete (window as any).__gameSpecificBackPressed;
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, [matchState, showExitConfirm, showRulesModal, handleReturnToLobby, handleExitLobby]);
+
+  const diceElement = matchState ? (
+    <LudoDice
+      value={diceDisplayValue ?? matchState.last_dice_roll}
+      rolling={rollingDice}
+      isMyTurn={isMyTurn}
+      canRoll={canRoll}
+      onRoll={handleRollDice}
+      timerSeconds={timerSeconds}
+      currentTurnColor={matchState.current_turn_color}
+      statusNotice={diceStatusNotice}
+    />
+  ) : null;
 
   return (
     <div
@@ -490,20 +691,20 @@ export const Ludo: React.FC = () => {
         </div>
       )}
 
-      {/* 2. ACTIVE MATCH VIEW (Centered Board + 4 Corners + Bottom Corner Dice) */}
+      {/* 2. ACTIVE MATCH VIEW (Centered Board + 4 Corners + Dynamic Dice Placement) */}
       {matchState && (
         <div className="ludo-active-match w-full max-w-7xl h-full flex flex-col gap-1 sm:gap-2 items-center justify-between overflow-hidden">
-          {/* Header Bar */}
+          {/* Header Bar with Total Balance (BUG-001) & Contextual Back Button (BUG-002) */}
           <div className="ludo-game-header w-full flex items-center justify-between px-3 py-1.5 bg-slate-900/90 backdrop-blur-md rounded-xl border border-slate-800 shadow-md shrink-0">
             <div className="flex items-center gap-3">
               <button
                 type="button"
-                onClick={() => setShowExitConfirm(true)}
+                onClick={matchState.status === 'COMPLETED' ? handleReturnToLobby : () => setShowExitConfirm(true)}
                 className="flex items-center gap-1.5 px-3 py-1 bg-slate-800 hover:bg-slate-700 active:scale-95 border border-slate-700 rounded-lg text-slate-200 text-xs font-bold transition shadow-sm cursor-pointer shrink-0"
-                aria-label="Exit Game"
+                aria-label={matchState.status === 'COMPLETED' ? 'Back to Lobby' : 'Exit Game'}
               >
                 <ArrowLeft size={14} />
-                <span>Exit</span>
+                <span>{matchState.status === 'COMPLETED' ? 'Back' : 'Exit'}</span>
               </button>
               <div>
                 <h1 className="text-xs sm:text-sm font-black text-amber-400 leading-tight">
@@ -513,6 +714,14 @@ export const Ludo: React.FC = () => {
                   Prize: ₹{(matchState.prize_pool / 100).toFixed(0)} • Entry: ₹{(matchState.entry_fee / 100).toFixed(0)}
                 </span>
               </div>
+            </div>
+
+            {/* Total Balance Pill (BUG-001) */}
+            <div className="flex items-center gap-1.5 px-2.5 sm:px-3.5 py-1 bg-slate-950/80 rounded-full border border-amber-500/40 shadow-inner">
+              <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Total Balance:</span>
+              <span className="text-xs sm:text-sm font-black text-amber-400">
+                ₹{(walletBalance / 100).toFixed(2)}
+              </span>
             </div>
 
             <div className="flex items-center gap-2">
@@ -526,19 +735,21 @@ export const Ludo: React.FC = () => {
                 <span>Rules</span>
               </button>
 
-              <button
-                type="button"
-                onClick={() => setShowExitConfirm(true)}
-                className="text-xs font-bold px-3 py-1 bg-red-950/80 hover:bg-red-900 border border-red-500/40 text-red-300 rounded-lg transition active:scale-95 cursor-pointer"
-              >
-                Forfeit
-              </button>
+              {matchState.status === 'IN_PROGRESS' && (
+                <button
+                  type="button"
+                  onClick={() => setShowExitConfirm(true)}
+                  className="text-xs font-bold px-3 py-1 bg-red-950/80 hover:bg-red-900 border border-red-500/40 text-red-300 rounded-lg transition active:scale-95 cursor-pointer"
+                >
+                  Forfeit
+                </button>
+              )}
             </div>
           </div>
 
-          {/* Arena Stage: Centered Board flanked by Corner Player Panels & Bottom-Left Corner Dice */}
+          {/* Arena Stage: Centered Board flanked by Corner Player Panels & Corner Dice (BUG-003) */}
           <div className="ludo-arena-stage w-full flex-1 flex flex-row items-center justify-between gap-2 sm:gap-4 overflow-hidden min-h-0 px-1 sm:px-3">
-            {/* Left Side: P1 Red (Top-Left) & P3 Blue / Bottom Corner Dice (Bottom-Left) */}
+            {/* Left Side: P1 Red (Top-Left) & P3 Blue / Left Dice */}
             <div className="ludo-side-col-left h-full flex flex-col justify-between items-start w-[170px] sm:w-[210px] shrink-0 py-0.5">
               {/* Top-Left Corner: Red Player */}
               <div className="w-full">
@@ -555,7 +766,7 @@ export const Ludo: React.FC = () => {
                 )}
               </div>
 
-              {/* Bottom-Left Corner: P3 Blue & Dice Roll Widget */}
+              {/* Bottom-Left Corner: P3 Blue & Dice Widget (when left side is active) */}
               <div className="w-full flex flex-col gap-1.5 items-start">
                 {bluePlayer && (
                   <div className="w-full">
@@ -566,33 +777,47 @@ export const Ludo: React.FC = () => {
                     />
                   </div>
                 )}
+                {!bluePlayer && (
+                  <div className="w-full p-2 bg-slate-900/40 border border-dashed border-slate-800 rounded-xl text-center text-[10px] text-slate-500">
+                    {matchState.players.length === 2 ? '2P Match' : 'Empty Seat'}
+                  </div>
+                )}
 
-                {/* Bottom Corner Dice Box (matches user sketch) */}
-                <LudoDice
-                  value={diceDisplayValue ?? matchState.last_dice_roll}
-                  rolling={rollingDice}
-                  isMyTurn={isMyTurn}
-                  canRoll={canRoll}
-                  onRoll={handleRollDice}
-                  timerSeconds={timerSeconds}
-                  currentTurnColor={matchState.current_turn_color}
-                  statusNotice={diceStatusNotice}
-                />
+                {!isYellowOrGreenActive && diceElement}
               </div>
             </div>
 
-            {/* Center Stage: Ludo Board (Centered Horizontally & Vertically) */}
-            <div className="ludo-board-center-stage flex-1 flex items-center justify-center h-full max-h-full overflow-hidden p-1">
+            {/* Center Stage: Ludo Board (Centered Horizontally & Vertically) + Quick Reactions (BUG-006) */}
+            <div className="ludo-board-center-stage flex-1 flex flex-col items-center justify-center h-full max-h-full overflow-hidden p-1 relative">
               <LudoBoard
                 players={matchState.players}
                 currentTurnColor={matchState.current_turn_color}
-                legalTokenIndices={matchState.legal_token_indices || []}
+                legalTokenIndices={legalTokenIndices}
                 onTokenClick={handleMoveToken}
                 isMyTurn={isMyTurn}
               />
+
+              {/* Interactive Quick Reaction Bar (BUG-006) */}
+              <div className="mt-1 sm:mt-1.5 flex items-center justify-center gap-1 sm:gap-2 px-2.5 sm:px-3 py-1 bg-slate-900/90 backdrop-blur-md rounded-full border border-slate-700/70 shadow-lg shrink-0 z-20">
+                <span className="text-[10px] text-amber-400 font-bold uppercase tracking-wider hidden sm:inline mr-1">
+                  React:
+                </span>
+                {['😂', '🔥', '👑', '🎲', '😎', '👏'].map((emoji) => (
+                  <button
+                    key={emoji}
+                    type="button"
+                    onClick={() => sendReaction(emoji)}
+                    className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center rounded-full bg-slate-800 hover:bg-slate-700 active:scale-125 hover:scale-110 text-base sm:text-lg transition-transform cursor-pointer select-none shadow-sm border border-slate-700/50"
+                    title={`Send ${emoji}`}
+                    aria-label={`Reaction ${emoji}`}
+                  >
+                    {emoji}
+                  </button>
+                ))}
+              </div>
             </div>
 
-            {/* Right Side: P2 Green (Top-Right) & P4 Yellow (Bottom-Right) */}
+            {/* Right Side: P2 Green (Top-Right) & P4 Yellow / Right Dice (BUG-003) */}
             <div className="ludo-side-col-right h-full flex flex-col justify-between items-end w-[170px] sm:w-[210px] shrink-0 py-0.5">
               {/* Top-Right Corner: Green Player */}
               <div className="w-full">
@@ -609,30 +834,36 @@ export const Ludo: React.FC = () => {
                 )}
               </div>
 
-              {/* Bottom-Right Corner: Yellow Player */}
-              <div className="w-full">
-                {yellowPlayer ? (
-                  <LudoPlayerPanel
-                    player={yellowPlayer}
-                    isCurrentTurn={matchState.current_turn_color === 'YELLOW'}
-                    isMe={yellowPlayer.user_id === user?.id}
-                  />
-                ) : (
-                  <div className="p-2 bg-slate-900/40 border border-dashed border-slate-800 rounded-xl text-center text-[10px] text-slate-500">
+              {/* Bottom-Right Corner: Yellow Player & Dice Widget (when yellow/right side is active) */}
+              <div className="w-full flex flex-col gap-1.5 items-end">
+                {yellowPlayer && (
+                  <div className="w-full">
+                    <LudoPlayerPanel
+                      player={yellowPlayer}
+                      isCurrentTurn={matchState.current_turn_color === 'YELLOW'}
+                      isMe={yellowPlayer.user_id === user?.id}
+                    />
+                  </div>
+                )}
+                {!yellowPlayer && (
+                  <div className="w-full p-2 bg-slate-900/40 border border-dashed border-slate-800 rounded-xl text-center text-[10px] text-slate-500">
                     Empty Seat
                   </div>
                 )}
+
+                {isYellowOrGreenActive && diceElement}
               </div>
             </div>
           </div>
 
-          {/* Winner Modal */}
+          {/* Winner Modal (BUG-001 & BUG-002) */}
           {matchState.status === 'COMPLETED' && (
             <LudoWinnerModal
               winnerPlayer={winnerPlayer}
               isMe={isWinnerMe}
               prizePool={matchState.prize_pool}
               entryFee={matchState.entry_fee}
+              userBalance={walletBalance}
               onReturnToLobby={handleReturnToLobby}
             />
           )}
@@ -695,6 +926,44 @@ export const Ludo: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Celebration Banner Overlay (BUG-006) */}
+      {banner && (
+        <div className="fixed top-12 sm:top-14 left-1/2 -translate-x-1/2 z-[70] pointer-events-none animate-banner-pop max-w-sm sm:max-w-md w-[92%]">
+          <div
+            className={`px-4 py-2.5 rounded-2xl border backdrop-blur-xl shadow-[0_10px_35px_rgba(0,0,0,0.85)] text-center flex items-center justify-center gap-3 ${
+              banner.type === 'SIX'
+                ? 'bg-gradient-to-r from-amber-600/95 via-yellow-500/95 to-amber-600/95 border-amber-300 text-amber-950 font-extrabold'
+                : banner.type === 'CAPTURE'
+                ? 'bg-gradient-to-r from-red-600/95 via-rose-500/95 to-red-600/95 border-red-300 text-white font-extrabold'
+                : 'bg-gradient-to-r from-emerald-600/95 via-teal-500/95 to-green-600/95 border-emerald-300 text-white font-extrabold'
+            }`}
+          >
+            <span className="text-2xl sm:text-3xl filter drop-shadow shrink-0">{banner.badge}</span>
+            <div className="flex flex-col text-left leading-tight">
+              <span className="text-xs sm:text-sm font-black tracking-wide uppercase drop-shadow-sm">
+                {banner.title}
+              </span>
+              <span className="text-[10px] sm:text-xs font-bold opacity-95">
+                {banner.subtitle}
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Floating Reactions Overlay (BUG-006) */}
+      <div className="fixed inset-0 pointer-events-none z-[60] overflow-hidden">
+        {reactions.map((r) => (
+          <div
+            key={r.id}
+            className="absolute bottom-24 text-3xl sm:text-5xl animate-reaction-float filter drop-shadow-[0_4px_8px_rgba(0,0,0,0.6)] select-none"
+            style={{ left: `${r.leftPercent}%` }}
+          >
+            {r.emoji}
+          </div>
+        ))}
+      </div>
     </div>
   );
 };

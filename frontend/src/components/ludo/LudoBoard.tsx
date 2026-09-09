@@ -84,8 +84,85 @@ export const LudoBoard: React.FC<Props> = ({
     return [gx * 100 + 50, gy * 100 + 50];
   };
 
+  // Multiple Tokens Clustering: Prevent overlapping when multiple tokens share a cell (BUG-006)
+  const cellOccupants = React.useMemo(() => {
+    const map = new Map<string, Array<{ playerId: string; tokenIndex: number }>>();
+    const startOffsets: Record<LudoColor, number> = {
+      RED: 0,
+      GREEN: 13,
+      YELLOW: 26,
+      BLUE: 39,
+    };
+
+    players.forEach((player) => {
+      player.tokens.forEach((token) => {
+        let cellKey = '';
+        if (token.position === -1) {
+          cellKey = `yard_${player.color}_${token.token_index}`;
+        } else if (token.position >= 56 || token.is_home) {
+          cellKey = `home_${player.color}_${token.token_index}`;
+        } else if (token.position > 50) {
+          cellKey = `stretch_${player.color}_${token.position - 51}`;
+        } else {
+          const trackIdx = (startOffsets[player.color] + token.position) % 52;
+          cellKey = `track_${trackIdx}`;
+        }
+        if (!map.has(cellKey)) {
+          map.set(cellKey, []);
+        }
+        map.get(cellKey)!.push({ playerId: player.id, tokenIndex: token.token_index });
+      });
+    });
+
+    return map;
+  }, [players]);
+
+  const getClusterOffset = (
+    cellKey: string,
+    playerId: string,
+    tokenIndex: number
+  ): { dx: number; dy: number; scale: number } => {
+    if (cellKey.startsWith('yard_')) {
+      return { dx: 0, dy: 0, scale: 1.0 };
+    }
+
+    const occupants = cellOccupants.get(cellKey) || [];
+    const count = occupants.length;
+    if (count <= 1) {
+      return { dx: 0, dy: 0, scale: 1.0 };
+    }
+
+    const idx = occupants.findIndex(
+      (item) => item.playerId === playerId && item.tokenIndex === tokenIndex
+    );
+    const safeIdx = idx >= 0 ? idx : 0;
+
+    if (count === 2) {
+      const offsets = [
+        { dx: -16, dy: -12 },
+        { dx: 16, dy: 12 },
+      ];
+      return { ...offsets[safeIdx % 2], scale: 0.88 };
+    }
+    if (count === 3) {
+      const offsets = [
+        { dx: -18, dy: -14 },
+        { dx: 18, dy: -14 },
+        { dx: 0, dy: 16 },
+      ];
+      return { ...offsets[safeIdx % 3], scale: 0.8 };
+    }
+    const offsets = [
+      { dx: -18, dy: -18 },
+      { dx: 18, dy: -18 },
+      { dx: -18, dy: 18 },
+      { dx: 18, dy: 18 },
+    ];
+    return { ...offsets[safeIdx % 4], scale: 0.74 };
+  };
+
   return (
-    <div className="ludo-board-wrapper relative w-full max-w-[min(90vw,calc(100dvh-var(--safe-top)-var(--safe-bottom)-72px),440px)] aspect-square rounded-2xl p-2 sm:p-2.5 bg-gradient-to-br from-slate-900 via-slate-950 to-amber-950/40 shadow-2xl border border-amber-500/30 overflow-hidden flex items-center justify-center shrink-0">
+    <div className="ludo-board-wrapper relative w-full max-w-[min(90vw,calc(100dvh-var(--safe-top)-var(--safe-bottom)-100px),430px)] aspect-square rounded-2xl p-2 sm:p-2.5 bg-gradient-to-br from-slate-900 via-slate-950 to-amber-950/40 shadow-2xl border border-amber-500/30 overflow-hidden flex items-center justify-center shrink-0">
       <svg
         viewBox="0 0 1500 1500"
         className="w-full h-full select-none rounded-xl drop-shadow-lg"
@@ -103,11 +180,13 @@ export const LudoBoard: React.FC<Props> = ({
             </feMerge>
           </filter>
 
-          {/* Active Legal Token Glow Filter */}
+          {/* Active Legal Token Glow Filter (BUG-004) */}
           <filter id="goldLegalGlow" x="-50%" y="-50%" width="200%" height="200%">
-            <feGaussianBlur stdDeviation="12" result="blur" />
+            <feGaussianBlur in="SourceAlpha" stdDeviation="10" result="blur" />
+            <feFlood floodColor="#f59e0b" floodOpacity="0.95" result="goldColor" />
+            <feComposite in="goldColor" in2="blur" operator="in" result="goldGlow" />
             <feMerge>
-              <feMergeNode in="blur" />
+              <feMergeNode in="goldGlow" />
               <feMergeNode in="SourceGraphic" />
             </feMerge>
           </filter>
@@ -360,7 +439,7 @@ export const LudoBoard: React.FC<Props> = ({
         <circle cx="750" cy="750" r="64" fill="#090d16" stroke="#fbbf24" strokeWidth="5" />
         <text x="750" y="766" fill="#fbbf24" fontSize="44" textAnchor="middle" fontWeight="bold">👑</text>
 
-        {/* Luxury 3D Pawns (Tokens) */}
+        {/* Luxury 3D Royal Pawns (Tokens) */}
         {players.map((player) => {
           const isTurn = currentTurnColor === player.color;
           const colorKey = player.color.toLowerCase();
@@ -373,11 +452,26 @@ export const LudoBoard: React.FC<Props> = ({
           const baseRim = baseRimColors[player.color] || '#334155';
 
           return player.tokens.map((token) => {
-            const [rawCx, rawCy] = getTokenCoords(token, player.color);
+            const [baseCx, baseCy] = getTokenCoords(token, player.color);
+            let cellKey = '';
+            if (token.position === -1) {
+              cellKey = `yard_${player.color}_${token.token_index}`;
+            } else if (token.position >= 56 || token.is_home) {
+              cellKey = `home_${player.color}_${token.token_index}`;
+            } else if (token.position > 50) {
+              cellKey = `stretch_${player.color}_${token.position - 51}`;
+            } else {
+              const startOffsets: Record<LudoColor, number> = { RED: 0, GREEN: 13, YELLOW: 26, BLUE: 39 };
+              const trackIdx = (startOffsets[player.color] + token.position) % 52;
+              cellKey = `track_${trackIdx}`;
+            }
+            const { dx, dy, scale } = getClusterOffset(cellKey, player.id, token.token_index);
+            const rawCx = baseCx + dx;
+            const rawCy = baseCy + dy;
             const isLegal = isTurn && isMyTurn && legalTokenIndices.includes(token.token_index);
             // Slight upward hover translation if active/legal
             const cx = rawCx;
-            const cy = isLegal ? rawCy - 10 : rawCy;
+            const cy = isLegal ? rawCy - 12 : rawCy;
 
             return (
               <g
@@ -386,34 +480,54 @@ export const LudoBoard: React.FC<Props> = ({
                   if (isLegal) onTokenClick(token.token_index);
                 }}
                 className={isLegal ? 'cursor-pointer' : ''}
+                style={{
+                  transformOrigin: `${cx}px ${cy}px`,
+                  transform: scale !== 1 ? `scale(${scale})` : undefined,
+                  transition: 'transform 0.25s ease',
+                }}
               >
-                {/* Active Turn Ground Halo & Ping */}
+                {/* Active Turn Ground Halo & Pulse Rings (BUG-004) */}
                 {isLegal && (
                   <g>
                     <ellipse
                       cx={rawCx}
                       cy={rawCy + 14}
-                      rx="42"
-                      ry="20"
-                      fill="none"
+                      rx="48"
+                      ry="22"
+                      fill="rgba(245, 158, 11, 0.35)"
                       stroke="#fbbf24"
-                      strokeWidth="5"
-                      strokeDasharray="8,6"
-                      className="animate-ping"
-                      opacity="0.85"
+                      strokeWidth="4"
+                      className="ludo-token-pulse-ring"
                     />
-                    {/* Golden Floating Pointer Arrow Above Pawn */}
-                    <polygon
-                      points={`${cx},${cy - 68} ${cx - 9},${cy - 82} ${cx + 9},${cy - 82}`}
-                      fill="#fbbf24"
-                      stroke="#78350f"
-                      strokeWidth="1.5"
+                    <ellipse
+                      cx={rawCx}
+                      cy={rawCy + 14}
+                      rx="36"
+                      ry="16"
+                      fill="none"
+                      stroke="#fef08a"
+                      strokeWidth="2.5"
+                      strokeDasharray="6,4"
                     />
+                    {/* Bouncing Golden Floating Pointer Arrow Above Pawn (BUG-004) */}
+                    <g className="ludo-token-bounce-arrow pointer-events-none">
+                      <polygon
+                        points={`${cx},${cy - 66} ${cx - 16},${cy - 92} ${cx + 16},${cy - 92}`}
+                        fill="#f59e0b"
+                        stroke="#ffffff"
+                        strokeWidth="2.5"
+                        filter="drop-shadow(0 4px 8px rgba(0,0,0,0.8))"
+                      />
+                      <polygon
+                        points={`${cx},${cy - 70} ${cx - 10},${cy - 88} ${cx + 10},${cy - 88}`}
+                        fill="#fef08a"
+                      />
+                    </g>
                   </g>
                 )}
 
-                {/* 3D Pawn Body with Drop Shadow */}
-                <g filter={isLegal ? 'url(#goldLegalGlow)' : 'url(#pawnDropShadow)'}>
+                {/* 3D Pawn Body with Drop Shadow & Hop Animation (BUG-004 & BUG-006) */}
+                <g className={isLegal ? 'ludo-movable-pawn' : ''} filter={isLegal ? 'url(#goldLegalGlow)' : 'url(#pawnDropShadow)'}>
                   {/* Ground Contact Shadow */}
                   <ellipse cx={cx} cy={cy + 18} rx="32" ry="12" fill="rgba(0,0,0,0.65)" />
 
@@ -426,15 +540,31 @@ export const LudoBoard: React.FC<Props> = ({
                     rx="28"
                     ry="9"
                     fill={`url(#${colorKey}BodyGrad)`}
-                    stroke="rgba(255,255,255,0.6)"
-                    strokeWidth="1.2"
+                    stroke={isLegal ? '#fef08a' : 'rgba(255,255,255,0.6)'}
+                    strokeWidth={isLegal ? 2.5 : 1.2}
                   />
 
                   {/* Conical Tapered Waist Body */}
                   <path
                     d={`M ${cx - 22},${cy + 9} C ${cx - 20},${cy - 6} ${cx - 10},${cy - 22} ${cx - 8},${cy - 30} L ${cx + 8},${cy - 30} C ${cx + 10},${cy - 22} ${cx + 20},${cy - 6} ${cx + 22},${cy + 9} Z`}
                     fill={`url(#${colorKey}BodyGrad)`}
+                    stroke={isLegal ? '#fef08a' : 'none'}
+                    strokeWidth={isLegal ? 2 : 0}
                   />
+
+                  {/* Token Number Medallion Badge on Body (BUG-006) */}
+                  <circle cx={cx} cy={cy - 8} r="8.5" fill="#090d16" stroke="url(#goldCollar)" strokeWidth="1.3" />
+                  <text
+                    x={cx}
+                    y={cy - 4}
+                    fontSize="10"
+                    fontWeight="900"
+                    textAnchor="middle"
+                    fill="#fbbf24"
+                    pointerEvents="none"
+                  >
+                    {token.token_index + 1}
+                  </text>
 
                   {/* Metallic Gold Collar Ring */}
                   <ellipse
@@ -453,9 +583,22 @@ export const LudoBoard: React.FC<Props> = ({
                     cy={cy - 48}
                     r="19"
                     fill={`url(#${colorKey}HeadGrad)`}
-                    stroke="rgba(255,255,255,0.4)"
-                    strokeWidth="1"
+                    stroke={isLegal ? '#fef08a' : 'rgba(255,255,255,0.4)'}
+                    strokeWidth={isLegal ? 3 : 1}
                   />
+
+                  {/* Royal Crown Crest on Head (BUG-006) */}
+                  <text
+                    x={cx}
+                    y={cy - 43}
+                    fontSize="13"
+                    textAnchor="middle"
+                    fill="#ffffff"
+                    filter="drop-shadow(0 1px 2px rgba(0,0,0,0.8))"
+                    pointerEvents="none"
+                  >
+                    👑
+                  </text>
 
                   {/* Specular Highlight Glints */}
                   <ellipse
@@ -469,6 +612,11 @@ export const LudoBoard: React.FC<Props> = ({
                   />
                   <circle cx={cx - 10} cy={cy - 48} r="2.2" fill="#ffffff" opacity="0.9" />
                 </g>
+
+                {/* Enlarged touch area for mobile click comfort */}
+                {isLegal && (
+                  <circle cx={cx} cy={cy - 24} r="48" fill="transparent" />
+                )}
               </g>
             );
           });

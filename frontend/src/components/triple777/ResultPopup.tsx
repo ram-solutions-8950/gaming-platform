@@ -131,17 +131,9 @@ export function ResultPopup({
           )}
         </div>
 
-        <button
-          type="button"
-          className={`mt-5 h-11 w-full rounded-xl font-bold cursor-pointer transition-transform active:scale-95 ${
-            isLoss
-              ? "border border-neutral-700 bg-neutral-800 text-slate-200"
-              : "bg-gradient-to-b from-emerald-400 to-emerald-600 text-slate-950 shadow-lg shadow-emerald-500/30"
-          }`}
-          onClick={onClose}
-        >
-          {isLoss ? "TRY AGAIN" : "CONTINUE"}
-        </button>
+        <p className="mt-4 text-[10px] text-slate-500 font-medium tracking-wide uppercase">
+          Tap anywhere to close
+        </p>
       </div>
     </div>
   );
