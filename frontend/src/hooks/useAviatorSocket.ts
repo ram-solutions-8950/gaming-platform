@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useAuthStore } from '../store/authStore';
 import { authStorage } from '../services/authStorage';
+import { authService } from '../services/auth';
 import { getWebSocketUrl } from '../utils/ws';
 
 export type AviatorPhase = 'BETTING' | 'FLYING' | 'CRASHED' | 'SETTLED' | 'COOLDOWN' | 'DISCONNECTED';
@@ -38,7 +39,6 @@ export interface UseAviatorSocketOptions {
 
 export function useAviatorSocket(options: UseAviatorSocketOptions = {}) {
   const user = useAuthStore((state) => state.user);
-  const token = authStorage.getAccessToken();
 
   const [isConnected, setIsConnected] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
@@ -61,15 +61,21 @@ export function useAviatorSocket(options: UseAviatorSocketOptions = {}) {
   const isMountedRef = useRef<boolean>(true);
   const reconnectAttemptsRef = useRef<number>(0);
   const socketIdRef = useRef<number>(0);
+  const isRefreshingRef = useRef<boolean>(false);
 
   // Local multiplier interpolation during FLYING phase
   const flightStartTimeRef = useRef<number | null>(null);
 
-  const connect = useCallback(() => {
-    console.log('[AVIATOR] Initializing socket connection...');
-    console.log('[AVIATOR] token exists:', Boolean(token));
+  const connect = useCallback(async () => {
+    let activeToken = authStorage.getAccessToken();
+    if (!activeToken) {
+      const refreshed = await authService.refreshSession().catch(() => false);
+      if (refreshed) {
+        activeToken = authStorage.getAccessToken();
+      }
+    }
 
-    if (!token) {
+    if (!activeToken) {
       console.warn('[AVIATOR] Connection aborted: No token found in localStorage');
       setConnectionError(true);
       return;
@@ -90,7 +96,7 @@ export function useAviatorSocket(options: UseAviatorSocketOptions = {}) {
 
     setIsConnecting(true);
 
-    const wsUrl = getWebSocketUrl('aviator/ws', token);
+    const wsUrl = getWebSocketUrl('aviator/ws', activeToken);
     const sanitizedUrl = wsUrl.replace(/token=([^&]+)/, 'token=***');
     console.log('[AVIATOR] WS URL generated (socket #' + currentSocketId + '):', sanitizedUrl);
 
@@ -264,6 +270,21 @@ export function useAviatorSocket(options: UseAviatorSocketOptions = {}) {
       setRoundState((prev) => ({ ...prev, phase: 'DISCONNECTED' }));
       flightStartTimeRef.current = null;
 
+      if (evt.code === 1008) {
+        if (!isRefreshingRef.current) {
+          isRefreshingRef.current = true;
+          authService.refreshSession().then((refreshed) => {
+            isRefreshingRef.current = false;
+            if (refreshed && isMountedRef.current) {
+              connect();
+            }
+          }).catch(() => {
+            isRefreshingRef.current = false;
+          });
+          return;
+        }
+      }
+
       // Only flag connection error after multiple failed reconnect attempts
       if (reconnectAttemptsRef.current >= 3) {
         setConnectionError(true);
@@ -279,7 +300,7 @@ export function useAviatorSocket(options: UseAviatorSocketOptions = {}) {
         }
       }, delay);
     };
-  }, [token]);
+  }, []);
 
   useEffect(() => {
     isMountedRef.current = true;

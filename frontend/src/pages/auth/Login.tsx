@@ -14,7 +14,14 @@ interface FormData {
 }
 
 export function LoginPage() {
-  const { register, handleSubmit, formState: { errors } } = useForm<FormData>();
+  const savedEmail = typeof window !== 'undefined' ? localStorage.getItem('saved_email') || '' : '';
+  const [rememberMe, setRememberMe] = useState<boolean>(true);
+  const { register, handleSubmit, formState: { errors } } = useForm<FormData>({
+    defaultValues: {
+      email: savedEmail,
+      password: '',
+    },
+  });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -25,6 +32,12 @@ export function LoginPage() {
     setLoading(true);
     setError('');
     try {
+      if (rememberMe && typeof window !== 'undefined') {
+        localStorage.setItem('saved_email', data.email);
+      } else if (typeof window !== 'undefined') {
+        localStorage.removeItem('saved_email');
+      }
+
       const res = await authService.login(data.email, data.password);
       if (res.success) {
         try {
@@ -121,6 +134,19 @@ export function LoginPage() {
             {errors.password && (
               <span className="casino-field-error">{errors.password.message}</span>
             )}
+          </div>
+
+          {/* Remember Me Checkbox */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: '4px 0 12px' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.85rem', color: '#cbd5e1' }}>
+              <input
+                type="checkbox"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+                style={{ accentColor: '#eab308', width: '16px', height: '16px', cursor: 'pointer' }}
+              />
+              <span>Remember ID & Password</span>
+            </label>
           </div>
 
           {/* Casino Gold Submit Button */}

@@ -166,6 +166,14 @@ async def _game_loop() -> None:
                 "timestamp": now.isoformat(),
             })
 
+        # Send final snapshot at exact crash point
+        await _broadcast({
+            "type": "multiplier_update",
+            "round_id": str(rnd.round_id),
+            "multiplier": round(rnd.crash_point, 2),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        })
+
         # ── 5. Crash ──
         db = SessionLocal()
         try:
@@ -305,7 +313,7 @@ async def _handle_place_bet(
             "slot": slot,
             "amount": amount,
         })
-    except ValueError as e:
+    except Exception as e:
         await _send(ws, {"type": "error", "message": str(e), "action_id": action_id})
     finally:
         db.close()
@@ -344,7 +352,7 @@ async def _handle_cashout(
             "payout": bet.payout,
             "auto": False,
         })
-    except ValueError as e:
+    except Exception as e:
         await _send(ws, {"type": "error", "message": str(e), "action_id": action_id})
     finally:
         db.close()

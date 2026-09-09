@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useAuthStore } from '../store/authStore';
 import { authStorage } from '../services/authStorage';
+import { authService } from '../services/auth';
 import { getWebSocketUrl } from '../utils/ws';
 
 export interface PokerPlayerInfo {
@@ -51,7 +52,6 @@ function getPokerWsUrl(tableId: string, token: string): string {
 
 export function usePokerSocket(options: UsePokerSocketOptions) {
   const user = useAuthStore((state) => state.user);
-  const token = authStorage.getAccessToken();
 
   const [isConnected, setIsConnected] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
@@ -78,9 +78,11 @@ export function usePokerSocket(options: UsePokerSocketOptions) {
   const isMountedRef = useRef<boolean>(true);
   const reconnectAttemptsRef = useRef<number>(0);
   const socketIdRef = useRef<number>(0);
+  const isRefreshingRef = useRef<boolean>(false);
 
   const connect = useCallback(() => {
-    if (!token || !options.tableId) {
+    const currentToken = authStorage.getAccessToken();
+    if (!currentToken || !options.tableId) {
       setConnectionError(true);
       return;
     }
@@ -98,7 +100,7 @@ export function usePokerSocket(options: UsePokerSocketOptions) {
     }
 
     setIsConnecting(true);
-    const wsUrl = getPokerWsUrl(options.tableId, token);
+    const wsUrl = getPokerWsUrl(options.tableId, currentToken);
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
 
@@ -110,7 +112,7 @@ export function usePokerSocket(options: UsePokerSocketOptions) {
       reconnectAttemptsRef.current = 0;
     };
 
-    ws.onmessage = (evt) => {
+    ws.onmessage = async (evt) => {
       if (!isMountedRef.current || socketIdRef.current !== currentSocketId) return;
       setConnectionError(false);
       try {
@@ -135,6 +137,21 @@ export function usePokerSocket(options: UsePokerSocketOptions) {
           setMyHoleCards(msg.hole_cards || []);
           options.onHandStart?.();
         } else if (type === 'error') {
+          if (
+            msg.message?.toLowerCase().includes('authentication') ||
+            msg.message?.toLowerCase().includes('token') ||
+            msg.message?.toLowerCase().includes('log in again')
+          ) {
+            if (!isRefreshingRef.current) {
+              isRefreshingRef.current = true;
+              const refreshed = await authService.refreshSession().catch(() => false);
+              isRefreshingRef.current = false;
+              if (refreshed) {
+                connect();
+                return;
+              }
+            }
+          }
           options.onError?.(msg.message);
         }
       } catch (e) {
@@ -147,10 +164,24 @@ export function usePokerSocket(options: UsePokerSocketOptions) {
       console.error('[POKER WS ERROR]', evt);
     };
 
-    ws.onclose = () => {
+    ws.onclose = async (event: CloseEvent) => {
       if (!isMountedRef.current || socketIdRef.current !== currentSocketId) return;
       setIsConnected(false);
       setIsConnecting(false);
+
+      if (event?.code === 1008) {
+        // Attempt silent refresh on policy violation / token expiry
+        if (!isRefreshingRef.current) {
+          isRefreshingRef.current = true;
+          const refreshed = await authService.refreshSession().catch(() => false);
+          isRefreshingRef.current = false;
+          if (refreshed) {
+            connect();
+            return;
+          }
+        }
+      }
+
       if (reconnectAttemptsRef.current >= 3) {
         setConnectionError(true);
       }
@@ -164,7 +195,7 @@ export function usePokerSocket(options: UsePokerSocketOptions) {
         }
       }, delay);
     };
-  }, [token, options.tableId]);
+  }, [options.tableId, user]);
 
   useEffect(() => {
     isMountedRef.current = true;

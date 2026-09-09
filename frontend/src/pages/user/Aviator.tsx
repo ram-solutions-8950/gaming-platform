@@ -9,6 +9,9 @@ import { AviatorHistory } from '../../components/aviator/AviatorHistory';
 import { AviatorPlayers } from '../../components/aviator/AviatorPlayers';
 import { soundManager } from '../../services/soundManager';
 import { setNativeLandscape } from '../../utils/nativeOrientation';
+import { GameRulesModal } from '../../components/common/GameRulesModal';
+import { AVIATOR_RULES_DATA } from '../../components/common/gameRulesData';
+import { HelpCircle } from 'lucide-react';
 import '../../styles/aviator.css';
 
 export function AviatorPage() {
@@ -16,6 +19,7 @@ export function AviatorPage() {
   const [walletBalancePaise, setWalletBalancePaise] = useState<number>(0);
   const [myPastBets, setMyPastBets] = useState<AviatorBetHistoryItem[]>([]);
   const [recentCrashesList, setRecentCrashesList] = useState<number[]>([]);
+  const [showRules, setShowRules] = useState<boolean>(false);
 
   // Fetch current wallet balance
   const refreshWallet = useCallback(async () => {
@@ -151,7 +155,16 @@ export function AviatorPage() {
           </div>
         </div>
 
-        <div className="aviator-nav-right">
+        <div className="aviator-nav-right flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setShowRules(true)}
+            className="flex items-center gap-1 px-2.5 py-1 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 rounded-full text-xs font-bold transition active:scale-95 cursor-pointer shadow-sm"
+            aria-label="Aviator Rules"
+          >
+            <HelpCircle size={14} />
+            <span>Rules</span>
+          </button>
           <div className="aviator-wallet-pill">
             <span className="text-xs text-gray-400">₹</span>
             <span className="wallet-amount">
@@ -220,6 +233,16 @@ export function AviatorPage() {
           </div>
         </section>
       </main>
+      {showRules && (
+        <GameRulesModal
+          title={AVIATOR_RULES_DATA.title}
+          subtitle={AVIATOR_RULES_DATA.subtitle}
+          sections={AVIATOR_RULES_DATA.sections}
+          payouts={AVIATOR_RULES_DATA.payouts}
+          tips={AVIATOR_RULES_DATA.tips}
+          onClose={() => setShowRules(false)}
+        />
+      )}
     </div>
   );
 }

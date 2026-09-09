@@ -19,37 +19,14 @@ import type { GameRound } from "../../types";
 import { soundManager } from "../../services/soundManager";
 import { getWebSocketUrl } from "../../utils/ws";
 import { setNativeLandscape } from "../../utils/nativeOrientation";
+import { GameRulesModal } from "../../components/common/GameRulesModal";
+import { ANDAR_BAHAR_RULES_DATA } from "../../components/common/gameRulesData";
 import "../../styles/andar-bahar.css";
 
 type Phase = "betting" | "closed" | "dealing" | "result";
 
 const CHIPS = [10, 50, 100, 500, 1000, 5000];
 const STAKE_STEP = 10;
-
-const RULES_COPY = {
-  how: {
-    title: "How to Play Andar Bahar",
-    items: [
-      "1. Choose your bet amount using the chip selector or stepper.",
-      "2. Select ANDAR (blue) or BAHAR (red) to place your bet immediately before the timer runs out.",
-      "3. The server reveals the Open Card (the target) once betting closes.",
-      "4. Cards are dealt alternately to Andar and Bahar by the server.",
-      "5. The first side to receive a card matching the rank of the Open Card wins!",
-    ],
-  },
-  rules: {
-    title: "Game Rules & Payouts",
-    items: [
-      "Deck: One standard 52-card deck, shuffled server-side each round.",
-      "Target rank: Determined by the Open Card revealed at the start.",
-      "Dealing order: A black Open Card (♠/♣) deals to Andar first; a red Open Card (♥/♦) deals to Bahar first.",
-      "First match wins: The round ends immediately on the first matching card.",
-      "Payouts: Both Andar and Bahar pay 1.8× total return (0.8× net win).",
-      "No tie: Every round produces exactly one winning side.",
-      "Server-Authoritative: Every deal, winner calculation, and wallet settlement is executed securely on the server.",
-    ],
-  },
-};
 
 export function AndarBaharPage() {
   const navigate = useNavigate();
@@ -259,13 +236,13 @@ export function AndarBaharPage() {
         const totalReturn = bet.amount + netProfit;
         setResult({
           won: true,
-          text: `YOU WON! ${winner.toUpperCase()} WINS (+₹${totalReturn})`,
+          text: `YOU WON! Bet: ₹${bet.amount} • Won: +₹${totalReturn} (${winner.toUpperCase()})`,
         });
         soundManager.play("win_clap");
       } else if (didLose) {
         setResult({
           won: false,
-          text: `${winner.toUpperCase()} WINS (-₹${bet.amount})`,
+          text: `BET LOST: Bet: ₹${bet.amount} • ${winner.toUpperCase()} Wins`,
         });
         soundManager.play("loss");
       } else {
@@ -617,6 +594,14 @@ export function AndarBaharPage() {
             <button className="iconbtn !px-2.5 !py-1 flex items-center gap-1 font-bold text-xs" title="Leave Game" onClick={() => setConfirmLeave(true)}>
               ← Exit
             </button>
+            <button
+              type="button"
+              className="iconbtn !px-2.5 !py-1 flex items-center gap-1 font-bold text-xs !bg-amber-500/20 !border-amber-500/40 text-amber-300 cursor-pointer"
+              title="Rules & Guide"
+              onClick={() => setRulesPopup("rules")}
+            >
+              ❓ Rules
+            </button>
             <span className="brand">
               <small>♠♣</small> ANDAR BAHAR <small>♣♠</small>
             </span>
@@ -826,21 +811,14 @@ export function AndarBaharPage() {
         </footer>
 
         {rulesPopup && (
-          <div className="popup-overlay" onClick={() => setRulesPopup(null)}>
-            <div className="popup-card" onClick={(e) => e.stopPropagation()}>
-              <div className="popup-head">
-                <span>{RULES_COPY[rulesPopup].title}</span>
-                <button className="iconbtn" onClick={() => setRulesPopup(null)}>
-                  ✕
-                </button>
-              </div>
-              <ul className="rules-list">
-                {RULES_COPY[rulesPopup].items.map((line, idx) => (
-                  <li key={idx}>{line}</li>
-                ))}
-              </ul>
-            </div>
-          </div>
+          <GameRulesModal
+            title={ANDAR_BAHAR_RULES_DATA.title}
+            subtitle={ANDAR_BAHAR_RULES_DATA.subtitle}
+            sections={ANDAR_BAHAR_RULES_DATA.sections}
+            payouts={ANDAR_BAHAR_RULES_DATA.payouts}
+            tips={ANDAR_BAHAR_RULES_DATA.tips}
+            onClose={() => setRulesPopup(null)}
+          />
         )}
 
         {confirmLeave && (

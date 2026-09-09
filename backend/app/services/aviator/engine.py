@@ -26,11 +26,11 @@ from .models import LiveRound, LiveBet, RoundPhase, BetStatus
 
 logger = get_logger("aviator_engine")
 
-HOUSE_EDGE = 0.03          # 3% house edge
+HOUSE_EDGE = 0.08          # 8% house edge
 BETTING_DURATION = 10.0    # seconds
 COOLDOWN_DURATION = 3.0    # seconds
 MULTIPLIER_TICK_INTERVAL = 0.25   # server snapshot interval (4 per second)
-GROWTH_RATE = 0.1          # exponential growth rate
+GROWTH_RATE = 0.20         # dynamic fast exponential growth rate
 
 
 # ──────────────────────────────────────────────────────────────
@@ -49,11 +49,10 @@ def hash_server_seed(server_seed: str) -> str:
 
 def compute_crash_point(server_seed: str, nonce: int) -> float:
     """
-    Deterministic, provably fair crash point.
+    Deterministic, provably fair crash point with healthy house edge.
     hash = HMAC-SHA256(server_seed, str(nonce))
     h = int(hash[:13], 16)    # first 52 bits
     e = 2**52
-    crash = max(1.0, (e / (e - h)) * (1 - HOUSE_EDGE))
     """
     h_bytes = hmac.new(
         server_seed.encode(),
@@ -64,28 +63,30 @@ def compute_crash_point(server_seed: str, nonce: int) -> float:
     e = 2 ** 52
     if h == e:
         # Avoid division by zero — instant crash
-        return 1.0
+        return 1.00
+
+    # Approx 8% instant/early crashes below 1.15x to balance RTP and avoid guaranteed wins
+    if (h % 13) == 0:
+        early_mult = 1.00 + ((h % 15) / 100.0)
+        return round(early_mult, 2)
+
     raw = (e / (e - h)) * (1 - HOUSE_EDGE)
-    # Round to 2 decimal places, starting at 0.1x minimum
-    return max(0.1, math.floor(raw * 100) / 100)
+    # Round to 2 decimal places, starting at 1.00x minimum
+    return max(1.00, math.floor(raw * 100) / 100)
 
 
 def time_for_multiplier(multiplier: float) -> float:
-    """Seconds from flight start to reach a given multiplier (starting from 0.1x)."""
-    if multiplier <= 0.1:
+    """Seconds from flight start to reach a given multiplier (starting from 1.00x)."""
+    if multiplier <= 1.00:
         return 0.0
-    if multiplier < 1.0:
-        return (multiplier - 0.1) / 0.9
-    return 1.0 + (math.log(multiplier) / GROWTH_RATE)
+    return math.log(multiplier) / GROWTH_RATE
 
 
 def multiplier_at_time(elapsed: float) -> float:
-    """Multiplier at a given elapsed time (seconds) from flight start. Starts from 0.1x."""
+    """Multiplier at a given elapsed time (seconds) from flight start. Starts from 1.00x."""
     if elapsed <= 0:
-        return 0.1
-    if elapsed < 1.0:
-        return round(0.1 + 0.9 * elapsed, 2)
-    return round(math.exp((elapsed - 1.0) * GROWTH_RATE), 2)
+        return 1.00
+    return round(math.exp(elapsed * GROWTH_RATE), 2)
 
 
 # ──────────────────────────────────────────────────────────────
@@ -226,8 +227,8 @@ class AviatorEngine:
             raise ValueError("Betting is closed")
         if slot not in (1, 2):
             raise ValueError("Invalid slot (must be 1 or 2)")
-        if amount <= 0:
-            raise ValueError("Bet amount must be positive")
+        if amount < 1000:
+            raise ValueError("Minimum bet amount is ₹10")
         if auto_cashout is not None and auto_cashout < 1.01:
             raise ValueError("Auto cashout must be >= 1.01")
 

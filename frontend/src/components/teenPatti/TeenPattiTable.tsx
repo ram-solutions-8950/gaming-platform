@@ -6,6 +6,9 @@ import { SideShowDialog } from './SideShowDialog';
 import { ShowdownOverlay } from './ShowdownOverlay';
 import { soundManager } from '../../services/soundManager';
 import { walletService } from '../../services/wallet';
+import { GameRulesModal } from '../common/GameRulesModal';
+import { TEEN_PATTI_RULES_DATA } from '../common/gameRulesData';
+import { HelpCircle } from 'lucide-react';
 import './TeenPattiTable.css';
 
 interface TeenPattiTableProps {
@@ -18,6 +21,8 @@ export const TeenPattiTable: React.FC<TeenPattiTableProps> = ({
   onLeaveTable,
 }) => {
   const [walletBalance, setWalletBalance] = useState<number | null>(null);
+  const [showRules, setShowRules] = useState<boolean>(false);
+  const [showdownDismissed, setShowdownDismissed] = useState<boolean>(false);
 
   const refreshWallet = useCallback(() => {
     walletService.getWallet().then((w) => setWalletBalance(w.balance || 0)).catch(() => {});
@@ -42,7 +47,8 @@ export const TeenPattiTable: React.FC<TeenPattiTableProps> = ({
     errorMessage,
   } = useTeenPattiSocket({ tableId });
 
-  const lastPhaseRef = useRef<string | null>(null);
+  // Audio effects & phase change reactions
+  const lastPhaseRef = useRef<string>('');
   const lastBetRef = useRef<number>(0);
   const lastSeenRef = useRef<boolean>(false);
   const lastWinnerSeatRef = useRef<number | null>(null);
@@ -53,11 +59,13 @@ export const TeenPattiTable: React.FC<TeenPattiTableProps> = ({
     // Betting start / stop & initial card deal
     if (gameState.phase !== lastPhaseRef.current) {
       const p = gameState.phase;
-      if (p === 'boot' || p === 'playing') {
+      if (p === 'boot' || p === 'playing' || p === 'waiting') {
+        setShowdownDismissed(false);
         soundManager.play('betting_start');
         soundManager.play('card_deal');
       } else if (p === 'showdown' || p === 'finished') {
         soundManager.play('betting_stop');
+        refreshWallet();
       }
       lastPhaseRef.current = p;
     }
@@ -151,14 +159,31 @@ export const TeenPattiTable: React.FC<TeenPattiTableProps> = ({
             </span>
           </div>
 
-          <div style={{
-            background: 'rgba(15, 23, 42, 0.85)', padding: '3px 10px', borderRadius: 16,
-            border: '1px solid rgba(212, 175, 55, 0.3)', display: 'flex', gap: '6px', alignItems: 'center'
-          }}>
-            <span style={{ width: 6, height: 6, borderRadius: '50%', background: isConnected ? '#22c55e' : '#ef4444' }} />
-            <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#e2e8f0' }}>
-              {isConnected ? 'LIVE TABLE' : 'RECONNECTING'}
-            </span>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <button
+              type="button"
+              onClick={() => setShowRules(true)}
+              className="tp-header-btn"
+              style={{
+                background: 'rgba(245, 158, 11, 0.2)', border: '1px solid rgba(245, 158, 11, 0.5)',
+                color: '#fcd34d', padding: '4px 10px', borderRadius: 10, fontWeight: 700,
+                cursor: 'pointer', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px'
+              }}
+              aria-label="Rules"
+            >
+              <HelpCircle size={13} />
+              <span>Rules</span>
+            </button>
+
+            <div style={{
+              background: 'rgba(15, 23, 42, 0.85)', padding: '3px 10px', borderRadius: 16,
+              border: '1px solid rgba(212, 175, 55, 0.3)', display: 'flex', gap: '6px', alignItems: 'center'
+            }}>
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: isConnected ? '#22c55e' : '#ef4444' }} />
+              <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#e2e8f0' }}>
+                {isConnected ? 'LIVE TABLE' : 'RECONNECTING'}
+              </span>
+            </div>
           </div>
         </div>
 
@@ -206,12 +231,28 @@ export const TeenPattiTable: React.FC<TeenPattiTableProps> = ({
       )}
 
       {/* Showdown Winner Overlay */}
-      {isShowdown && gameState.winner_seat !== null && (
+      {isShowdown && !showdownDismissed && gameState.winner_seat !== null && (
         <ShowdownOverlay
           winnerSeat={gameState.winner_seat}
           reason={gameState.reason}
           seats={gameState.seats}
           potAmount={gameState.pot}
+          currentUserId={currentUserId}
+          onLeaveTable={onLeaveTable}
+          onNextHand={startHand}
+          onDismiss={() => setShowdownDismissed(true)}
+        />
+      )}
+
+      {/* Rules Modal */}
+      {showRules && (
+        <GameRulesModal
+          title={TEEN_PATTI_RULES_DATA.title}
+          subtitle={TEEN_PATTI_RULES_DATA.subtitle}
+          sections={TEEN_PATTI_RULES_DATA.sections}
+          payouts={TEEN_PATTI_RULES_DATA.payouts}
+          tips={TEEN_PATTI_RULES_DATA.tips}
+          onClose={() => setShowRules(false)}
         />
       )}
     </div>

@@ -560,3 +560,32 @@
     min-width: 3.8rem !important;
   }
 }
+
+.card-surface {
+  background: linear-gradient(180deg, #1c0b36 0%, #120524 50%, #0a0218 100%);
+  border: 1.5px solid rgba(245, 197, 66, 0.4);
+  border-radius: 1.25rem;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.8);
+  color: #f1f5f9;
+}
+
+.btn-ghost {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #e2e8f0;
+  transition: all 0.2s;
+}
+.btn-ghost:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.btn-danger {
+  background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+  border: 1px solid rgba(239, 68, 68, 0.5);
+  color: #ffffff;
+  font-weight: 700;
+  transition: all 0.2s;
+}
+.btn-danger:hover {
+  filter: brightness(1.1);
+}

@@ -4,6 +4,8 @@ import { rouletteService, type RouletteState } from '../../services/roulette';
 import { walletService } from '../../services/wallet';
 import { soundManager } from '../../services/soundManager';
 import { RouletteWheel } from '../../components/roulette/RouletteWheel';
+import { GameRulesModal } from '../../components/common/GameRulesModal';
+import { ROULETTE_RULES_DATA } from '../../components/common/gameRulesData';
 import { setNativeLandscape } from '../../utils/nativeOrientation';
 import '../../styles/roulette.css';
 
@@ -54,6 +56,7 @@ export function RoulettePage() {
   // Overlays & Phase transitions
   const [showStartBettingBanner, setShowStartBettingBanner] = useState<boolean>(false);
   const [showStopBettingBanner, setShowStopBettingBanner] = useState<boolean>(false);
+  const [showRules, setShowRules] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // Sound & round tracking
@@ -104,10 +107,14 @@ export function RoulettePage() {
             prevWinningNumRef.current = state.winning_number;
             // Check if user won
             const totalWin = state.my_bets.reduce((sum, b) => sum + (b.win_inr || 0), 0);
+            const totalBet = state.my_bets.reduce((sum, b) => sum + (b.amount_inr || 0), 0);
             if (totalWin > 0) {
               soundManager.play('win_clap');
-              setToastMessage(`Congratulations! You won ₹${totalWin.toFixed(2)}`);
-              setTimeout(() => setToastMessage(null), 4000);
+              setToastMessage(`🎉 Won: ₹${totalWin.toFixed(2)} (Bet: ₹${totalBet.toFixed(0)})`);
+              setTimeout(() => setToastMessage(null), 4500);
+            } else if (totalBet > 0) {
+              setToastMessage(`Round Lost: Bet ₹${totalBet.toFixed(0)}`);
+              setTimeout(() => setToastMessage(null), 4500);
             }
             refreshBalance();
           }
@@ -153,6 +160,10 @@ export function RoulettePage() {
   const totalMyBet = useMemo(() => {
     return Object.values(betsByTarget).reduce((sum, v) => sum + v, 0);
   }, [betsByTarget]);
+
+  const myRoundWin = useMemo(() => {
+    return serverState?.my_bets?.reduce((sum, b) => sum + (b.win_inr || 0), 0) || 0;
+  }, [serverState?.my_bets]);
 
   // Handle placing bet on table
   const handlePlaceBet = async (bet_type: string, target: string) => {
@@ -352,6 +363,17 @@ export function RoulettePage() {
             <span className="roulette-ranking-trophy">🏆</span>
             <span className="roulette-ranking-text">Ranking</span>
           </div>
+
+          {/* Rules Button */}
+          <button
+            type="button"
+            onClick={() => setShowRules(true)}
+            className="roulette-ranking-pill !bg-amber-500/20 !border-amber-500/40 hover:!bg-amber-500/30 cursor-pointer"
+            aria-label="Roulette Rules"
+          >
+            <span className="text-amber-300">❓</span>
+            <span className="roulette-ranking-text !text-amber-300 font-bold">Rules</span>
+          </button>
         </div>
 
         {/* Center Live Marquee & Winning History Pill Track */}
@@ -656,6 +678,27 @@ export function RoulettePage() {
                 <div className="winning-num-3d-display">
                   {winNum}
                 </div>
+                {totalMyBet > 0 && (
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    background: 'rgba(15, 23, 42, 0.85)',
+                    border: '1px solid rgba(234, 179, 8, 0.4)',
+                    padding: '4px 12px',
+                    borderRadius: '16px',
+                    margin: '6px 0',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
+                  }}>
+                    <span style={{ fontSize: '0.75rem', color: '#cbd5e1', fontWeight: 700 }}>
+                      Bet: <span style={{ color: '#fde047' }}>₹{totalMyBet.toFixed(0)}</span>
+                    </span>
+                    <span style={{ color: 'rgba(255,255,255,0.3)' }}>•</span>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 800, color: myRoundWin > 0 ? '#4ade80' : '#f87171' }}>
+                      {myRoundWin > 0 ? `Won: +₹${myRoundWin.toFixed(2)}` : 'Lost'}
+                    </span>
+                  </div>
+                )}
                 <div className="waiting-game-text">Waiting for the game to start</div>
               </div>
             )}
@@ -772,6 +815,18 @@ export function RoulettePage() {
         <div className="roulette-floating-toast">
           {toastMessage}
         </div>
+      )}
+
+      {/* Rules Modal */}
+      {showRules && (
+        <GameRulesModal
+          title={ROULETTE_RULES_DATA.title}
+          subtitle={ROULETTE_RULES_DATA.subtitle}
+          sections={ROULETTE_RULES_DATA.sections}
+          payouts={ROULETTE_RULES_DATA.payouts}
+          tips={ROULETTE_RULES_DATA.tips}
+          onClose={() => setShowRules(false)}
+        />
       )}
     </div>
   );

@@ -11,6 +11,8 @@ import { soundManager } from '../../services/triple777/soundManager';
 import { haptics } from '../../services/triple777/haptics';
 import { REEL_STOPS_MS, REVEAL_BUFFER_MS, spinPace } from '../../services/triple777/spinTiming';
 import triple777Logo from '../../assets/triple-777-logo.webp';
+import { GameRulesModal } from '../../components/common/GameRulesModal';
+import { TRIPLE_777_RULES_DATA } from '../../components/common/gameRulesData';
 import { setNativePortrait, setNativeLandscape } from '../../utils/nativeOrientation';
 import '../../styles/triple-777.css';
 
@@ -52,6 +54,7 @@ export function Triple777Page() {
   const [showResultPopup, setShowResultPopup] = useState<boolean>(false);
   const [showPaytable, setShowPaytable] = useState<boolean>(false);
   const [showHistory, setShowHistory] = useState<boolean>(false);
+  const [showRules, setShowRules] = useState<boolean>(false);
   const [historyItems, setHistoryItems] = useState<api.HistoryItem[]>([]);
   const [historyLoading, setHistoryLoading] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -373,6 +376,16 @@ export function Triple777Page() {
               <span className="hidden xs:inline">History</span>
             </button>
 
+            <button
+              type="button"
+              onClick={() => setShowRules(true)}
+              className="t777-header-btn !border-amber-500/40 text-amber-300"
+              title="Rules"
+            >
+              <span>❓</span>
+              <span className="hidden xs:inline">Rules</span>
+            </button>
+
             <div className="t777-balance-pill">
               <span className="text-[10px] text-gray-400 uppercase font-bold">₹</span>
               <span className="t777-balance-text">{balance.toFixed(2)}</span>
@@ -538,6 +551,17 @@ export function Triple777Page() {
             items={historyItems}
             loading={historyLoading}
             onClose={() => setShowHistory(false)}
+          />
+        )}
+
+        {showRules && (
+          <GameRulesModal
+            title={TRIPLE_777_RULES_DATA.title}
+            subtitle={TRIPLE_777_RULES_DATA.subtitle}
+            sections={TRIPLE_777_RULES_DATA.sections}
+            payouts={TRIPLE_777_RULES_DATA.payouts}
+            tips={TRIPLE_777_RULES_DATA.tips}
+            onClose={() => setShowRules(false)}
           />
         )}
       </div>

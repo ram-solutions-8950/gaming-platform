@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   ArrowLeft, Users, History, BarChart3, Volume2, VolumeX, Settings, Flag,
@@ -14,6 +14,7 @@ import type { TableState } from "../../types/rummy";
 import { useAuthStore } from "../../store/authStore";
 import { soundManager } from "../../services/soundManager";
 import { authStorage } from "../../services/authStorage";
+import { walletService } from "../../services/wallet";
 
 const FIRST_DROP_POINTS = 20;
 const MIDDLE_DROP_POINTS = 40;
@@ -71,10 +72,11 @@ function TurnRing({ seconds, total, size }: { seconds: number; total: number; si
 }
 
 function ResultOverlay({
-  state, meId, onContinue, onBackToLobby, onPlayAgain, playAgainBusy,
+  state, meId, table, onContinue, onBackToLobby, onPlayAgain, playAgainBusy,
 }: {
   state: TableState;
   meId: string | null;
+  table: RummyTableOut | null;
   onContinue: () => void;
   onBackToLobby: () => void;
   onPlayAgain: () => void;
@@ -90,9 +92,17 @@ function ResultOverlay({
     .filter((p) => p.id !== state.winner_id)
     .reduce((sum, p) => sum + p.deal_points, 0);
 
+  const entryFeePaise = table?.entry_fee_paise || 0;
+  const pointValuePaise = entryFeePaise >= 80 ? Math.max(1, Math.round(entryFeePaise / 80)) : Math.max(1, entryFeePaise);
+  const entryFeeRupees = entryFeePaise / 100;
+  const totalPoolPaise = pool * pointValuePaise;
+  const totalPoolRupees = (totalPoolPaise / 100).toFixed(2);
+  const myLossPaise = Math.min((me?.deal_points || 0) * pointValuePaise, entryFeePaise);
+  const myLossRupees = (myLossPaise / 100).toFixed(2);
+
   return (
-    <div className="absolute inset-0 rounded-[50%] bg-black/80 flex flex-col items-center justify-center gap-1.5 z-30 px-6 text-center overflow-hidden">
-      <p className="font-display text-base sm:text-lg text-gold-400">
+    <div className="absolute inset-0 rounded-[50%] bg-black/85 flex flex-col items-center justify-center gap-1.5 z-30 px-6 text-center overflow-hidden">
+      <p className="font-display text-base sm:text-lg text-gold-400 font-extrabold">
         {isGameOver
           ? isPool
             ? iWon ? "🏆 POOL WINNER" : "🏁 POOL OVER"
@@ -105,29 +115,51 @@ function ResultOverlay({
                 ? `🏆 ${winner.name} wins the deal`
                 : "Deal over"}
       </p>
-      <div className="w-full max-w-[15rem] space-y-0.5">
-        {state.players.map((p) => (
-          <div key={p.id} className="flex justify-between text-[11px] bg-ink-900/60 rounded px-2 py-0.5">
-            <span className={p.id === meId ? "text-gold-300 font-semibold" : "text-slate-200"}>
-              {p.name}
-              {isPool && p.eliminated && <span className="ml-1 text-[8px] text-red-400 uppercase">out</span>}
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className={p.id === state.winner_id ? "text-green-400" : "text-red-400"}>
-                {p.id === state.winner_id ? `+${pool}` : `-${p.deal_points}`}
+
+      {/* Explicit Bet & Win Display */}
+      {entryFeePaise > 0 && (
+        <div className="flex items-center justify-center gap-2.5 bg-black/80 border border-amber-500/40 rounded-xl px-3.5 py-1 text-xs font-bold my-0.5">
+          <span className="text-slate-300">
+            Bet: <span className="text-amber-300">₹{entryFeeRupees.toFixed(2)}</span>
+          </span>
+          <span className="text-slate-600">•</span>
+          <span className={iWon ? "text-emerald-400 font-black" : "text-rose-400 font-black"}>
+            {iWon ? `Won: +₹${totalPoolRupees}` : `Lost: -₹${myLossRupees}`}
+          </span>
+        </div>
+      )}
+
+      <div className="w-full max-w-[17rem] space-y-1 my-1">
+        {state.players.map((p) => {
+          const pLossRupees = ((Math.min(p.deal_points * pointValuePaise, entryFeePaise)) / 100).toFixed(2);
+          return (
+            <div key={p.id} className="flex justify-between items-center text-[11px] bg-ink-900/80 rounded px-2.5 py-1">
+              <span className={p.id === meId ? "text-gold-300 font-bold" : "text-slate-200 font-medium"}>
+                {p.name}
+                {isPool && p.eliminated && <span className="ml-1 text-[8px] text-red-400 uppercase">out</span>}
               </span>
-              {isPool && (
-                <span className="text-[9px] text-slate-500 font-mono">
-                  {p.total_score}/{state.pool_limit}
+              <span className="flex items-center gap-1.5 font-mono">
+                <span className={p.id === state.winner_id ? "text-emerald-400 font-bold" : "text-rose-400 font-bold"}>
+                  {p.id === state.winner_id
+                    ? (entryFeePaise > 0 ? `+₹${totalPoolRupees}` : `+${pool}`)
+                    : (entryFeePaise > 0 ? `-₹${pLossRupees}` : `-${p.deal_points}`)}
                 </span>
-              )}
-            </span>
-          </div>
-        ))}
+                <span className="text-[9px] text-slate-400">
+                  ({p.deal_points} pts)
+                </span>
+                {isPool && (
+                  <span className="text-[9px] text-slate-500 font-mono">
+                    {p.total_score}/{state.pool_limit}
+                  </span>
+                )}
+              </span>
+            </div>
+          );
+        })}
       </div>
-      <p className="text-[8px] text-slate-500 font-mono hidden sm:block">Game ID: {state.table_id}</p>
+      <p className="text-[8px] text-slate-500 font-mono hidden sm:block">Table: {state.table_id.slice(0, 8)}</p>
       {isGameOver ? (
-        <div className="flex gap-1.5">
+        <div className="flex gap-1.5 mt-1">
           <button className="btn-gold rounded-full px-3 py-1 text-xs" disabled={playAgainBusy} onClick={onPlayAgain}>
             {playAgainBusy ? "Creating…" : "🔁 Play Again"}
           </button>
@@ -144,7 +176,7 @@ function ResultOverlay({
   );
 }
 
-export default function GameTable({ onBack, customTableId }: { onBack?: () => void; customTableId?: string } = {}) {
+export default function GameTable({ onBack, onExit, customTableId }: { onBack?: () => void; onExit?: () => void; customTableId?: string } = {}) {
   const { tableId: paramTableId } = useParams();
   const tableId = customTableId || paramTableId || "";
   const token = authStorage.getAccessToken() || "";
@@ -154,6 +186,7 @@ export default function GameTable({ onBack, customTableId }: { onBack?: () => vo
   const { state, hand, connected, lastError, send } = useRummySocket(tableId, token);
 
   const [table, setTable] = useState<RummyTableOut | null>(null);
+  const [walletBalance, setWalletBalance] = useState<number | null>(null);
   const [leaveConfirmOpen, setLeaveConfirmOpen] = useState(false);
   const [groups, setGroups] = useState<string[][]>([]);
   const [finishCard, setFinishCard] = useState<string | null>(null);
@@ -163,11 +196,29 @@ export default function GameTable({ onBack, customTableId }: { onBack?: () => vo
   const [resultDismissed, setResultDismissed] = useState(false);
   const [playAgainBusy, setPlayAgainBusy] = useState(false);
 
+  const refreshWallet = useCallback(() => {
+    walletService.getWallet().then((w) => setWalletBalance(w.balance || 0)).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    refreshWallet();
+    const timer = setInterval(refreshWallet, 5000);
+    return () => clearInterval(timer);
+  }, [refreshWallet]);
+
   function handleBackToLobby() {
     if (onBack) {
       onBack();
     } else {
       navigate("/games/rummy");
+    }
+  }
+
+  function handleExitToDashboard() {
+    if (onExit) {
+      onExit();
+    } else {
+      navigate("/dashboard");
     }
   }
 
@@ -208,12 +259,14 @@ export default function GameTable({ onBack, customTableId }: { onBack?: () => vo
       if (p === 'dealing' || p === 'await_draw' || p === 'await_discard') {
         soundManager.play('betting_start');
         soundManager.play('card_deal');
-      } else if (p === 'declare' || p === 'showdown' || p === 'game_over') {
+        setResultDismissed(false);
+      } else if (p === 'declare' || p === 'showdown' || p === 'game_over' || p === 'deal_over') {
         soundManager.play('betting_stop');
+        refreshWallet();
       }
       lastPhaseRef.current = p;
     }
-  }, [state?.phase]);
+  }, [state?.phase, refreshWallet]);
 
   const lastWinnerIdRef = useRef<string | null>(null);
   useEffect(() => {
@@ -556,10 +609,15 @@ export default function GameTable({ onBack, customTableId }: { onBack?: () => vo
     <div className="gt-shell">
       <header className="gt-header">
         <div className="gt-header-cluster">
-          <button className="gt-chip" onClick={() => setLeaveConfirmOpen(true)}>
-            <ArrowLeft size={14} /><span>Lobby</span>
+          <button
+            type="button"
+            className="gt-chip !bg-red-950/90 hover:!bg-red-900 !border-red-500/50 text-red-200 font-bold transition active:scale-95 cursor-pointer flex items-center gap-1"
+            onClick={() => setLeaveConfirmOpen(true)}
+            aria-label="Exit Table"
+          >
+            <ArrowLeft size={14} /><span>Exit</span>
           </button>
-          <span className="gt-title">Deals Rummy</span>
+          <span className="gt-title">{modeName || "Indian Rummy"}</span>
         </div>
         <div className="gt-header-cluster">
           {table && (
@@ -571,6 +629,16 @@ export default function GameTable({ onBack, customTableId }: { onBack?: () => vo
           {table && <span className="gt-chip gt-hide-narrow">{modeName}</span>}
         </div>
         <div className="gt-header-cluster">
+          <span className="gt-chip !border-amber-500/40 !bg-slate-900/90 text-amber-300 font-extrabold flex items-center gap-1.5 shadow-sm">
+            <span className="text-[10px] text-slate-400 font-bold uppercase hidden sm:inline">BALANCE:</span>
+            <span>₹{walletBalance !== null ? (walletBalance / 100).toFixed(2) : "..."}</span>
+          </span>
+          {table && table.entry_fee_paise > 0 && (
+            <span className="gt-chip !border-emerald-500/40 !bg-slate-900/90 text-emerald-400 font-bold flex items-center gap-1 shadow-sm">
+              <span className="text-[10px] text-slate-400 uppercase">BET:</span>
+              <span>₹{(table.entry_fee_paise / 100).toFixed(2)}</span>
+            </span>
+          )}
           <span className={`gt-chip ${connected ? "text-green-400" : "text-red-400"}`}>
             <span className={`w-1.5 h-1.5 rounded-full ${connected ? "bg-green-400 animate-pulse" : "bg-red-400"}`} />
             {connected ? "LIVE" : "OFFLINE"}
@@ -702,7 +770,7 @@ export default function GameTable({ onBack, customTableId }: { onBack?: () => vo
           )}
 
           {state && (state.phase === "deal_over" || state.phase === "game_over") && !resultDismissed && (
-            <ResultOverlay state={state} meId={me?.id ?? null} onContinue={() => setResultDismissed(true)} onBackToLobby={handleBackToLobby} onPlayAgain={handlePlayAgain} playAgainBusy={playAgainBusy} />
+            <ResultOverlay state={state} meId={me?.id ?? null} table={table} onContinue={() => setResultDismissed(true)} onBackToLobby={handleBackToLobby} onPlayAgain={handlePlayAgain} playAgainBusy={playAgainBusy} />
           )}
         </div>
       </main>
@@ -785,13 +853,47 @@ export default function GameTable({ onBack, customTableId }: { onBack?: () => vo
 
       {rulesOpen && <RulesModal onClose={() => setRulesOpen(false)} />}
       {leaveConfirmOpen && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-          <div className="card-surface w-full max-w-sm p-6 text-center">
-            <h2 className="font-display text-lg font-bold text-gold-400 mb-3">Leave Table</h2>
-            <p className="text-sm text-slate-300 mb-6">Are you sure you want to leave the table?</p>
-            <div className="flex gap-3">
-              <button className="btn-ghost rounded-full px-4 py-2 flex-1" onClick={() => setLeaveConfirmOpen(false)}>No</button>
-              <button className="btn-danger rounded-full px-4 py-2 flex-1" onClick={() => { setLeaveConfirmOpen(false); handleBackToLobby(); }}>Yes</button>
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/85 backdrop-blur-md p-4 animate-fade-in select-none"
+          onClick={() => setLeaveConfirmOpen(false)}
+        >
+          <div
+            className="w-full max-w-sm bg-gradient-to-b from-[#1c0836] via-[#120324] to-[#0a0117] border-2 border-amber-500/60 rounded-3xl p-6 text-center shadow-[0_0_40px_rgba(0,0,0,0.9)] text-white"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-14 h-14 mx-auto mb-3 rounded-full bg-gradient-to-br from-amber-600/30 via-red-950/40 to-slate-900 border-2 border-amber-500/50 flex items-center justify-center text-3xl shadow-inner">
+              🚪
+            </div>
+            <h2 className="font-display text-lg font-black text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-yellow-200 to-amber-500 uppercase tracking-wide mb-1.5">
+              Leave Table?
+            </h2>
+            <p className="text-xs text-slate-300 mb-5 leading-relaxed">
+              Are you sure you want to leave? You can return to the Rummy lobby or exit directly to the dashboard.
+            </p>
+            <div className="flex flex-col gap-2.5">
+              <div className="grid grid-cols-2 gap-2.5">
+                <button
+                  type="button"
+                  className="py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-200 border border-slate-700 transition active:scale-95 cursor-pointer"
+                  onClick={() => setLeaveConfirmOpen(false)}
+                >
+                  Stay in Game
+                </button>
+                <button
+                  type="button"
+                  className="py-2.5 px-3 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-600 hover:from-amber-400 hover:to-yellow-500 text-slate-950 text-xs font-black shadow-md transition active:scale-95 cursor-pointer uppercase tracking-wider"
+                  onClick={() => { setLeaveConfirmOpen(false); handleBackToLobby(); }}
+                >
+                  To Lobby
+                </button>
+              </div>
+              <button
+                type="button"
+                className="py-2.5 px-3 rounded-xl bg-gradient-to-r from-red-600 via-rose-600 to-red-700 hover:brightness-110 text-xs font-black text-white shadow-lg shadow-red-900/40 border border-red-400/50 transition active:scale-95 cursor-pointer uppercase tracking-wider"
+                onClick={() => { setLeaveConfirmOpen(false); handleExitToDashboard(); }}
+              >
+                Exit to Dashboard
+              </button>
             </div>
           </div>
         </div>

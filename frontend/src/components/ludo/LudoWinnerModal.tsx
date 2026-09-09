@@ -6,6 +6,7 @@ interface Props {
   winnerPlayer: LudoPlayer | null;
   isMe: boolean;
   prizePool: number;
+  entryFee?: number;
   onReturnToLobby: () => void;
 }
 
@@ -13,6 +14,7 @@ export const LudoWinnerModal: React.FC<Props> = ({
   winnerPlayer,
   isMe,
   prizePool,
+  entryFee,
   onReturnToLobby,
 }) => {
   return createPortal(
@@ -43,14 +45,26 @@ export const LudoWinnerModal: React.FC<Props> = ({
           </p>
         </div>
 
-        {/* Prize Pool Box */}
-        <div className="w-full py-3 px-4 bg-slate-900/80 rounded-2xl border border-amber-500/30 flex flex-col items-center">
-          <span className="text-[11px] text-slate-400 font-semibold uppercase tracking-wider">
-            Prize Pool
-          </span>
-          <span className="text-2xl font-black text-amber-400">
-            ₹{(prizePool / 100).toFixed(2)}
-          </span>
+        {/* Bet & Win Metrics Box */}
+        <div className="w-full py-3 px-4 bg-slate-900/80 rounded-2xl border border-amber-500/30 flex justify-around items-center">
+          {entryFee !== undefined && entryFee > 0 && (
+            <div className="flex flex-col items-center">
+              <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">
+                Entry Bet
+              </span>
+              <span className="text-base font-bold text-amber-300">
+                ₹{(entryFee / 100).toFixed(2)}
+              </span>
+            </div>
+          )}
+          <div className="flex flex-col items-center">
+            <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">
+              {isMe ? 'You Won' : 'Prize Pool'}
+            </span>
+            <span className={`text-xl font-black ${isMe ? 'text-emerald-400' : 'text-amber-400'}`}>
+              ₹{(prizePool / 100).toFixed(2)}
+            </span>
+          </div>
         </div>
 
         <button

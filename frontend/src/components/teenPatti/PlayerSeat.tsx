@@ -68,7 +68,7 @@ export const PlayerSeat: React.FC<PlayerSeatProps> = ({
 
       {seat.total_bet > 0 && (
         <span style={{ fontSize: '0.75rem', color: '#ffd700', fontWeight: 700 }}>
-          ₹{(seat.total_bet / 100).toFixed(0)}
+          Bet: ₹{(seat.total_bet / 100).toFixed(0)}
         </span>
       )}
 

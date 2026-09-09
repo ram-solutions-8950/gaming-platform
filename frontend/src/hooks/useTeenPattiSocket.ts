@@ -1,9 +1,7 @@
-/**
- * WebSocket Hook for Live Teen Patti Game Table.
- */
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useAuthStore } from '../store/authStore';
 import { authStorage } from '../services/authStorage';
+import { authService } from '../services/auth';
 import type { TeenPattiGameState } from '../services/teenPatti';
 import { getWebSocketUrl } from '../utils/ws';
 
@@ -15,7 +13,6 @@ export interface UseTeenPattiSocketOptions {
 
 export function useTeenPattiSocket({ tableId, onEvent, onError }: UseTeenPattiSocketOptions) {
   const user = useAuthStore((state) => state.user);
-  const token = authStorage.getAccessToken();
   const [gameState, setGameState] = useState<TeenPattiGameState | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
@@ -23,9 +20,19 @@ export function useTeenPattiSocket({ tableId, onEvent, onError }: UseTeenPattiSo
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<any>(null);
+  const isRefreshingRef = useRef(false);
 
-  const connect = useCallback(() => {
-    if (!tableId || !token) return;
+  const connect = useCallback(async () => {
+    if (!tableId) return;
+
+    let activeToken = authStorage.getAccessToken();
+    if (!activeToken) {
+      const refreshed = await authService.refreshSession().catch(() => false);
+      if (refreshed) {
+        activeToken = authStorage.getAccessToken();
+      }
+    }
+    if (!activeToken) return;
 
     if (wsRef.current) {
       try {
@@ -37,7 +44,7 @@ export function useTeenPattiSocket({ tableId, onEvent, onError }: UseTeenPattiSo
     setIsConnecting(true);
     setErrorMessage(null);
 
-    const wsUrl = getWebSocketUrl(`ws/teen-patti/${tableId}`, token);
+    const wsUrl = getWebSocketUrl(`ws/teen-patti/${tableId}`, activeToken);
 
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
@@ -47,7 +54,7 @@ export function useTeenPattiSocket({ tableId, onEvent, onError }: UseTeenPattiSo
       setIsConnecting(false);
     };
 
-    ws.onmessage = (evt) => {
+    ws.onmessage = async (evt) => {
       try {
         const msg = JSON.parse(evt.data);
         if (msg.type === 'state') {
@@ -62,6 +69,21 @@ export function useTeenPattiSocket({ tableId, onEvent, onError }: UseTeenPattiSo
           }
           onEvent?.(msg);
         } else if (msg.type === 'error') {
+          if (
+            msg.message?.toLowerCase().includes('authentication') ||
+            msg.message?.toLowerCase().includes('log in again')
+          ) {
+            if (!isRefreshingRef.current) {
+              isRefreshingRef.current = true;
+              const refreshed = await authService.refreshSession().catch(() => false);
+              isRefreshingRef.current = false;
+              if (refreshed) {
+                setErrorMessage(null);
+                connect();
+                return;
+              }
+            }
+          }
           setErrorMessage(msg.message);
           onError?.(msg.message);
         }
@@ -74,11 +96,20 @@ export function useTeenPattiSocket({ tableId, onEvent, onError }: UseTeenPattiSo
       onError?.('WebSocket connection encountered an error');
     };
 
-    ws.onclose = (event: CloseEvent) => {
+    ws.onclose = async (event: CloseEvent) => {
       setIsConnected(false);
       setIsConnecting(false);
-      // Policy violation (e.g. table full or game in progress) - do not loop reconnect
       if (event.code === 1008) {
+        // Attempt one silent refresh if closed due to policy / auth
+        if (!isRefreshingRef.current) {
+          isRefreshingRef.current = true;
+          const refreshed = await authService.refreshSession().catch(() => false);
+          isRefreshingRef.current = false;
+          if (refreshed) {
+            connect();
+            return;
+          }
+        }
         return;
       }
       // Auto-reconnect after 3s if still mounted
@@ -89,7 +120,7 @@ export function useTeenPattiSocket({ tableId, onEvent, onError }: UseTeenPattiSo
         }
       }, 3000);
     };
-  }, [tableId, token, onEvent, onError]);
+  }, [tableId, onEvent, onError]);
 
   useEffect(() => {
     connect();

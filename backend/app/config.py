@@ -15,8 +15,8 @@ class Settings(BaseSettings):
     JWT_SECRET: str = "change-me-in-production"
     JWT_REFRESH_SECRET: str = "refresh-change-me-in-production"
     JWT_ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
-    REFRESH_TOKEN_EXPIRE_DAYS: int = 30
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 10080  # 7 days for seamless gaming sessions
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 90
 
     PAYMENT_PROVIDER: str = ""
     PAYMENT_API_KEY: str = ""

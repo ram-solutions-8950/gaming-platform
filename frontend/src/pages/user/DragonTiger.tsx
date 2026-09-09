@@ -50,6 +50,8 @@ function paiseToRupees(p: number): string {
 }
 
 import { setNativeLandscape } from '../../utils/nativeOrientation';
+import { GameRulesModal } from '../../components/common/GameRulesModal';
+import { DRAGON_TIGER_RULES_DATA } from '../../components/common/gameRulesData';
 
 export function DragonTigerPage() {
   const navigate = useNavigate();
@@ -57,6 +59,7 @@ export function DragonTigerPage() {
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [wallet, setWallet] = useState<Wallet | null>(null);
   const [history, setHistory] = useState<GameRound[]>([]);
+  const [showRules, setShowRules] = useState(false);
   const [myBets, setMyBets] = useState<GameBet[]>([]);
   const [catalogGame, setCatalogGame] = useState<CatalogGame | null>(null);
   const [publicBets, setPublicBets] = useState<PublicBet[]>([]);
@@ -674,6 +677,10 @@ export function DragonTigerPage() {
     }, 0);
   }, [roundBets, activeWinnerSide]);
 
+  const userTotalBetPaise = useMemo(() => {
+    return roundBets.reduce((sum, b) => sum + (b.amount || 0), 0);
+  }, [roundBets]);
+
   /* ── place bet ── */
   const handleBet = async (predictionKey?: string) => {
     const prediction = predictionKey || selected;
@@ -760,13 +767,21 @@ export function DragonTigerPage() {
         {/* ═══════════ TOP: HUD + ARENA (cards + artwork) ═══════════ */}
         <div className="relative shrink-0 w-full flex-none" style={{ height: 'clamp(110px, 42dvh, 300px)' }}>
 
-          {/* HUD top-left: Back + Ranking */}
+          {/* HUD top-left: Back + Ranking + Rules */}
           <div className="absolute top-1.5 left-2 z-30 flex items-center gap-1.5">
             <button onClick={() => navigate('/dashboard')} className="px-3 py-1 rounded-full bg-black/60 hover:bg-black/80 border border-white/20 text-xs font-bold text-white transition-colors flex items-center gap-1 shadow-md">← Exit</button>
             <div className="flex items-center gap-1 bg-black/50 pl-1 pr-2.5 py-1 rounded-full border border-yellow-500/40">
               <span className="text-yellow-400 text-base">🏆</span>
               <span className="text-[9px] text-yellow-300 font-bold tracking-wider">Ranking</span>
             </div>
+            <button
+              type="button"
+              onClick={() => setShowRules(true)}
+              className="px-2.5 py-1 rounded-full bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-xs font-bold text-amber-300 transition-colors flex items-center gap-1 shadow-md cursor-pointer"
+              aria-label="Rules"
+            >
+              ❓ Rules
+            </button>
           </div>
 
           {/* HUD top-center: Live Public Bets Indicator */}
@@ -920,6 +935,7 @@ export function DragonTigerPage() {
               showPlayer={showPlayer && (wonThisRound || lostThisRound)}
               playerWon={wonThisRound ? true : lostThisRound ? false : null}
               playerAmountLabel={wonThisRound ? `+₹${paiseToRupees(userWinningAmountPaise)}` : undefined}
+              playerBetLabel={userTotalBetPaise > 0 ? `₹${paiseToRupees(userTotalBetPaise)}` : undefined}
               winnerResult={winnerResult}
             />
           </div>
@@ -1110,6 +1126,17 @@ export function DragonTigerPage() {
             <p className="text-sm sm:text-lg font-black tracking-widest text-yellow-400 animate-pulse uppercase">Revealing...</p>
           </div>
         </div>
+      )}
+
+      {showRules && (
+        <GameRulesModal
+          title={DRAGON_TIGER_RULES_DATA.title}
+          subtitle={DRAGON_TIGER_RULES_DATA.subtitle}
+          sections={DRAGON_TIGER_RULES_DATA.sections}
+          payouts={DRAGON_TIGER_RULES_DATA.payouts}
+          tips={DRAGON_TIGER_RULES_DATA.tips}
+          onClose={() => setShowRules(false)}
+        />
       )}
     </div>
   );

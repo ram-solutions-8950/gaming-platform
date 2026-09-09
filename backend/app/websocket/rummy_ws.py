@@ -16,7 +16,7 @@ from contextlib import contextmanager
 from ..database import SessionLocal
 from ..dependencies.database import get_db
 from ..models.rummy import RummyRound, RummyTable, RummyTableMode, RummyTableStatus
-from ..models.transaction import WalletTransactionType
+from ..models.transaction import WalletTransaction, WalletTransactionType
 from ..models.user import User, UserStatus
 from ..schemas.rummy import TableCreate
 from ..security.jwt import decode_access_token
@@ -26,6 +26,8 @@ from ..services.rummy.errors import GameError
 from ..services.rummy.game_manager import game_manager
 from ..services.wallet_service import credit_wallet, debit_wallet, get_balance
 from ..services.settlement_service import settle_winning_bet
+
+_settled_deals: set[str] = set()
 
 logger = logging.getLogger(__name__)
 
@@ -334,6 +336,17 @@ def _settle_real_money(table_id: str, game: DealsRummyGame) -> None:
             point_value_paise = max(1, table.entry_fee_paise)
 
         deal_key = f"{table_id}:{game.deal_number}"
+        if deal_key in _settled_deals:
+            return
+
+        # Check if transaction with this deal key already exists in DB ledger
+        existing_tx = db.query(WalletTransaction).filter(
+            WalletTransaction.reference_id.like(f"%{deal_key}%")
+        ).first()
+        if existing_tx is not None:
+            _settled_deals.add(deal_key)
+            return
+
         total_credit = 0
 
         # Enforce atomic savepoint transaction for all wallet entries in this deal
@@ -369,10 +382,16 @@ def _settle_real_money(table_id: str, game: DealsRummyGame) -> None:
                     metadata={"table_id": table_id, "deal_number": game.deal_number, "prize_pool": total_credit},
                 )
             sp.commit()
+            _settled_deals.add(deal_key)
         except Exception as e:
             sp.rollback()
-            logger.error("RUMMY_SETTLEMENT_FAILED: table_id=%s deal=%d error=%s. Rollback wallet changes.", table_id, game.deal_number, str(e))
-            raise
+            err_msg = str(e)
+            if "Duplicate transaction reference" in err_msg or "already exists" in err_msg:
+                logger.warning("RUMMY_SETTLEMENT_ALREADY_SETTLED: table_id=%s deal=%d: %s", table_id, game.deal_number, err_msg)
+                _settled_deals.add(deal_key)
+                return
+            logger.error("RUMMY_SETTLEMENT_FAILED: table_id=%s deal=%d error=%s. Rollback wallet changes.", table_id, game.deal_number, err_msg)
+            return
 
         # Record finished round
         try:

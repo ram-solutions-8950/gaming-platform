@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import type { AviatorPhase } from '../../hooks/useAviatorSocket';
 import { soundManager } from '../../services/soundManager';
 
@@ -17,25 +17,35 @@ export const AviatorArena: React.FC<AviatorArenaProps> = ({
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const animFrameRef = useRef<number | null>(null);
-  const bettingTimerRef = useRef<number>(bettingDuration);
-
+  const [bettingSeconds, setBettingSeconds] = useState<number>(bettingDuration);
   const prevIntRef = useRef<number>(-1);
 
-  // Countdown timer for BETTING phase
+  // Smooth continuous animation multiplier and flight state
+  const smoothMultRef = useRef<number>(1.0);
+  const lastTimeRef = useRef<number>(performance.now());
+  const crashFlyAwayRef = useRef<{ active: boolean; startTime: number; startX: number; startY: number }>({
+    active: false,
+    startTime: 0,
+    startX: 0,
+    startY: 0,
+  });
+
+  // Countdown timer for BETTING phase with reactive state
   useEffect(() => {
     if (phase !== 'BETTING') {
-      bettingTimerRef.current = bettingDuration;
+      setBettingSeconds(bettingDuration);
       prevIntRef.current = -1;
       return;
     }
-    const start = Date.now();
+    setBettingSeconds(bettingDuration);
+    const start = performance.now();
     const interval = setInterval(() => {
-      const elapsed = (Date.now() - start) / 1000;
+      const elapsed = (performance.now() - start) / 1000;
       const current = Math.max(0, bettingDuration - elapsed);
-      bettingTimerRef.current = current;
+      setBettingSeconds(current);
 
       const currentInt = Math.ceil(current);
-      if (currentInt !== prevIntRef.current && currentInt >= 5 && currentInt <= 9) {
+      if (currentInt !== prevIntRef.current && currentInt >= 1 && currentInt <= 5) {
         soundManager.play('countdown_tick');
       }
       prevIntRef.current = currentInt;
@@ -44,7 +54,21 @@ export const AviatorArena: React.FC<AviatorArenaProps> = ({
     return () => clearInterval(interval);
   }, [phase, bettingDuration]);
 
-  // Canvas render loop
+  // Track crash event to trigger fly-away burst
+  useEffect(() => {
+    if (phase === 'CRASHED' || phase === 'SETTLED') {
+      crashFlyAwayRef.current.active = true;
+      crashFlyAwayRef.current.startTime = performance.now();
+    } else if (phase === 'FLYING') {
+      crashFlyAwayRef.current.active = false;
+      smoothMultRef.current = Math.max(1.0, multiplier);
+    } else {
+      crashFlyAwayRef.current.active = false;
+      smoothMultRef.current = 1.0;
+    }
+  }, [phase]);
+
+  // Canvas render loop with smooth 60fps interpolation
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -62,17 +86,20 @@ export const AviatorArena: React.FC<AviatorArenaProps> = ({
     window.addEventListener('resize', handleResize);
 
     // Stars / background dots
-    const stars = Array.from({ length: 40 }).map(() => ({
+    const stars = Array.from({ length: 50 }).map(() => ({
       x: Math.random() * width,
       y: Math.random() * height,
       r: Math.random() * 1.5 + 0.5,
-      speed: Math.random() * 0.8 + 0.2,
+      speed: Math.random() * 1.2 + 0.4,
       opacity: Math.random() * 0.7 + 0.3,
     }));
 
-    let progress = 0;
+    lastTimeRef.current = performance.now();
 
-    const render = () => {
+    const render = (now: number) => {
+      const dt = Math.min((now - lastTimeRef.current) / 1000, 0.1);
+      lastTimeRef.current = now;
+
       ctx.clearRect(0, 0, width, height);
 
       // 1. Background grid
@@ -92,10 +119,28 @@ export const AviatorArena: React.FC<AviatorArenaProps> = ({
         ctx.stroke();
       }
 
-      // 2. Background stars moving during flight
+      // Smoothly advance multiplier continuously on every frame (no freezing!)
       if (phase === 'FLYING') {
+        const target = Math.max(1.0, multiplier);
+        if (target > smoothMultRef.current) {
+          // Catch up smoothly to server target while never stopping
+          const diff = target - smoothMultRef.current;
+          smoothMultRef.current += Math.max(diff * 0.15, dt * 0.20 * smoothMultRef.current);
+        } else {
+          // Extrapolate at growth rate so plane never sits still between ticks
+          smoothMultRef.current += dt * 0.20 * smoothMultRef.current;
+        }
+      }
+
+      const activeMult = phase === 'FLYING'
+        ? smoothMultRef.current
+        : (crashPoint || multiplier || 1.0);
+
+      // 2. Background stars moving faster during flight
+      if (phase === 'FLYING' || crashFlyAwayRef.current.active) {
+        const starSpeedMult = Math.min(activeMult * 1.2, 8);
         stars.forEach((s) => {
-          s.x -= s.speed * Math.min(multiplier, 5);
+          s.x -= s.speed * starSpeedMult;
           if (s.x < 0) s.x = width;
           ctx.fillStyle = `rgba(255, 255, 255, ${s.opacity})`;
           ctx.beginPath();
@@ -104,20 +149,31 @@ export const AviatorArena: React.FC<AviatorArenaProps> = ({
         });
       }
 
-      // 3. Draw flight curve
+      // 3. Draw flight curve & plane
       if (phase === 'FLYING' || phase === 'CRASHED' || phase === 'SETTLED') {
-        const flightTime = multiplier < 1.0
-          ? Math.max(0, (multiplier - 0.1) / 0.9)
-          : 1.0 + Math.max(0, Math.log(multiplier) / 0.1);
-        progress = Math.min(1, flightTime / 15); // Normalize progress across arena
+        // Dynamic, responsive exponential curve
+        const logVal = Math.log(Math.max(1.0, activeMult));
+        const progress = Math.min(1.0, logVal / 2.3); // Reaches upper arena at ~10x
 
-        const startX = width * 0.08;
+        const startX = width * 0.06;
         const startY = height * 0.88;
-        const endX = startX + (width * 0.72) * Math.min(1, progress * 1.2);
-        const endY = startY - (height * 0.65) * Math.pow(progress, 0.75);
+        let endX = startX + (width * 0.76) * Math.min(1.0, progress * 1.15);
+        let endY = startY - (height * 0.68) * Math.pow(progress, 0.72);
 
-        // Control point for smooth exponential curve
-        const cpX = startX + (endX - startX) * 0.65;
+        // Fly-away animation on crash: plane zooms off top-right!
+        let planeAlpha = 1.0;
+        if (crashFlyAwayRef.current.active) {
+          const flyElapsed = (now - crashFlyAwayRef.current.startTime) / 1000;
+          if (flyElapsed < 0.6) {
+            endX += flyElapsed * width * 1.2;
+            endY -= flyElapsed * height * 1.0;
+            planeAlpha = Math.max(0, 1.0 - flyElapsed / 0.6);
+          } else {
+            planeAlpha = 0;
+          }
+        }
+
+        const cpX = startX + (endX - startX) * 0.55;
         const cpY = startY;
 
         // Gradient under curve
@@ -126,8 +182,8 @@ export const AviatorArena: React.FC<AviatorArenaProps> = ({
           gradient.addColorStop(0, 'rgba(239, 68, 68, 0.35)');
           gradient.addColorStop(1, 'rgba(239, 68, 68, 0.0)');
         } else {
-          gradient.addColorStop(0, 'rgba(150, 20, 20, 0.2)');
-          gradient.addColorStop(1, 'rgba(150, 20, 20, 0.0)');
+          gradient.addColorStop(0, 'rgba(185, 28, 28, 0.18)');
+          gradient.addColorStop(1, 'rgba(185, 28, 28, 0.0)');
         }
 
         ctx.beginPath();
@@ -150,10 +206,10 @@ export const AviatorArena: React.FC<AviatorArenaProps> = ({
         ctx.shadowBlur = 0;
 
         // 4. Draw Airplane
-        if (phase === 'FLYING') {
+        if ((phase === 'FLYING' || crashFlyAwayRef.current.active) && planeAlpha > 0) {
           ctx.save();
+          ctx.globalAlpha = planeAlpha;
           ctx.translate(endX, endY);
-          // Angle of plane following curve tangent
           const angle = Math.atan2(endY - startY, endX - cpX) * 0.45;
           ctx.rotate(angle);
 
@@ -161,7 +217,7 @@ export const AviatorArena: React.FC<AviatorArenaProps> = ({
           ctx.fillStyle = '#f43f5e';
           ctx.beginPath();
           // Nose
-          ctx.moveTo(25, 0);
+          ctx.moveTo(26, 0);
           ctx.lineTo(-20, -9);
           ctx.lineTo(-14, 0);
           ctx.lineTo(-20, 9);
@@ -185,7 +241,7 @@ export const AviatorArena: React.FC<AviatorArenaProps> = ({
           ctx.fill();
 
           // Afterburner / Thrust Flame
-          const flameLength = 12 + Math.random() * 10;
+          const flameLength = (14 + Math.random() * 12) * (phase === 'FLYING' ? 1 : 1.8);
           const flameGrad = ctx.createLinearGradient(-14, 0, -14 - flameLength, 0);
           flameGrad.addColorStop(0, '#fde047');
           flameGrad.addColorStop(0.5, '#f97316');
@@ -205,13 +261,13 @@ export const AviatorArena: React.FC<AviatorArenaProps> = ({
       animFrameRef.current = requestAnimationFrame(render);
     };
 
-    render();
+    animFrameRef.current = requestAnimationFrame(render);
 
     return () => {
       window.removeEventListener('resize', handleResize);
       if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
     };
-  }, [phase, multiplier]);
+  }, [phase, multiplier, crashPoint]);
 
   return (
     <div className="aviator-arena">
@@ -227,19 +283,19 @@ export const AviatorArena: React.FC<AviatorArenaProps> = ({
               <div
                 className="aviator-betting-bar-fill"
                 style={{
-                  width: `${Math.max(0, Math.min(100, (bettingTimerRef.current / bettingDuration) * 100))}%`,
+                  width: `${Math.max(0, Math.min(100, (bettingSeconds / bettingDuration) * 100))}%`,
                 }}
               />
             </div>
             <div className="aviator-betting-seconds">
-              {bettingTimerRef.current.toFixed(1)}s
+              {bettingSeconds.toFixed(1)}s
             </div>
           </div>
         )}
 
         {phase === 'FLYING' && (
           <div className="aviator-multiplier-display flying">
-            <span className="mult-value">{multiplier.toFixed(2)}</span>
+            <span className="mult-value">{Math.max(1.0, multiplier).toFixed(2)}</span>
             <span className="mult-x">x</span>
           </div>
         )}

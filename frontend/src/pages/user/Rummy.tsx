@@ -11,7 +11,7 @@ import { useRummyMatchmaking } from "../../hooks/useRummyMatchmaking";
 import { RummyApi, type RummyTableOut } from "../../services/rummy";
 import { authStorage } from "../../services/authStorage";
 import api from "../../services/api";
-import { setNativeLandscape } from "../../utils/nativeOrientation";
+import { setNativeLandscape, setNativePortrait } from "../../utils/nativeOrientation";
 import "../../styles/rummy.css";
 
 type Mode = "real_money" | "free" | "pool";
@@ -29,7 +29,7 @@ interface Tier {
 }
 
 const POINT_TIERS: { pointValue: number; entryFeePaise: number }[] = [
-  { pointValue: 0.1, entryFeePaise: 800 },    // ₹8 entry (80 pts * ₹0.1)
+  { pointValue: 0.25, entryFeePaise: 2000 },  // ₹20 entry (80 pts * ₹0.25)
   { pointValue: 0.5, entryFeePaise: 4000 },   // ₹40 entry
   { pointValue: 1.0, entryFeePaise: 8000 },   // ₹80 entry
   { pointValue: 5.0, entryFeePaise: 40000 },  // ₹400 entry
@@ -167,18 +167,25 @@ export function RummyPage() {
   };
 
   const handleLeaveTable = () => {
+    matchmaking.reset();
     setActiveTableId(null);
-    setSearchParams({});
-    if (routeTableId) {
-      navigate("/games/rummy");
-    }
+    setSearchParams({}, { replace: true });
+    navigate("/games/rummy", { replace: true });
     fetchBalance();
     fetchTables();
   };
 
+  const handleExitDashboard = () => {
+    matchmaking.reset();
+    setActiveTableId(null);
+    setSearchParams({}, { replace: true });
+    setNativePortrait().catch(() => {});
+    navigate("/dashboard");
+  };
+
   // If inside a game table, render GameTable
   if (activeTableId) {
-    return <GameTable customTableId={activeTableId} onBack={handleLeaveTable} />;
+    return <GameTable customTableId={activeTableId} onBack={handleLeaveTable} onExit={handleExitDashboard} />;
   }
 
   return (
@@ -188,7 +195,7 @@ export function RummyPage() {
         <div className="rummy-header-inner max-w-7xl mx-auto flex items-center justify-between flex-wrap gap-2">
           <div className="flex items-center gap-2.5">
             <button
-              onClick={() => navigate("/dashboard")}
+              onClick={handleExitDashboard}
               className="rummy-exit-btn px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs border border-slate-700 transition flex items-center gap-1 active:scale-95"
               title="Back to Dashboard"
             >

@@ -9,11 +9,14 @@ import { LudoDice } from '../../components/ludo/LudoDice';
 import { LudoPlayerPanel } from '../../components/ludo/LudoPlayerPanel';
 import { LudoLobby } from '../../components/ludo/LudoLobby';
 import { LudoWinnerModal } from '../../components/ludo/LudoWinnerModal';
+import { GameRulesModal } from '../../components/common/GameRulesModal';
+import { LUDO_RULES_DATA } from '../../components/common/gameRulesData';
 import { soundManager } from '../../services/soundManager';
 import { authStorage } from '../../services/authStorage';
 import { getWebSocketUrl } from '../../utils/ws';
 import { lockLandscape } from '../../utils/nativeOrientation';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, HelpCircle } from 'lucide-react';
+import '../../styles/ludo.css';
 
 export const Ludo: React.FC = () => {
   const { user } = useAuthStore();
@@ -22,14 +25,22 @@ export const Ludo: React.FC = () => {
   const [walletBalance, setWalletBalance] = useState<number>(0);
   const [matchState, setMatchState] = useState<LudoMatchState | null>(null);
   const [showExitConfirm, setShowExitConfirm] = useState<boolean>(false);
+  const [showRulesModal, setShowRulesModal] = useState<boolean>(false);
 
   // Matchmaking State
   const [searching, setSearching] = useState<boolean>(false);
   const [searchRemainingSeconds, setSearchRemainingSeconds] = useState<number>(30);
   const [searchElapsedSeconds, setSearchElapsedSeconds] = useState<number>(0);
 
-  // In-Game State
+  // In-Game State & Dice Animation
   const [timerSeconds, setTimerSeconds] = useState<number>(10);
+  const [rollingDice, setRollingDice] = useState<boolean>(false);
+  const [diceDisplayValue, setDiceDisplayValue] = useState<number | null>(null);
+  const [diceStatusNotice, setDiceStatusNotice] = useState<string | null>(null);
+
+  const rollCycleTimerRef = useRef<any>(null);
+  const transitionDelayTimerRef = useRef<any>(null);
+
   const wsRef = useRef<WebSocket | null>(null);
   const pollIntervalRef = useRef<any>(null);
 
@@ -56,7 +67,6 @@ export const Ludo: React.FC = () => {
 
   useEffect(() => {
     refreshWallet();
-    // Check if user already has an active matchmaking search or in-progress match
     ludoService.getMatchmakingStatus().then((res) => {
       if (res.status === 'MATCHED' && res.match_id) {
         transitionToMatch(res.match_id);
@@ -71,19 +81,14 @@ export const Ludo: React.FC = () => {
   // Guarded Match Transition (prevents duplicate loadMatch calls)
   // -----------------------------------------------------------------
   const transitionToMatch = useCallback((matchId: string) => {
-    // Prevent duplicate transitions
     if (matchTransitionRef.current === matchId) {
       return;
     }
     matchTransitionRef.current = matchId;
 
-    console.log('[LUDO] transitionToMatch matchId=', matchId);
-
-    // Stop searching UI
     setSearching(false);
     setSearchElapsedSeconds(0);
 
-    // Close matchmaking WebSocket
     if (mmWsRef.current) {
       try {
         mmWsRef.current.close();
@@ -91,7 +96,6 @@ export const Ludo: React.FC = () => {
       mmWsRef.current = null;
     }
 
-    // Load match and connect game WebSocket
     loadMatch(matchId);
     refreshWallet();
   }, [refreshWallet]);
@@ -106,7 +110,6 @@ export const Ludo: React.FC = () => {
         try {
           const status = await ludoService.getMatchmakingStatus();
           if (status.status === 'MATCHED' && status.match_id) {
-            // REST detected match — transition (guard prevents duplicate)
             clearInterval(interval);
             transitionToMatch(status.match_id);
           } else if (status.status === 'CANCELLED' || status.status === 'TIMEOUT') {
@@ -129,6 +132,56 @@ export const Ludo: React.FC = () => {
   }, [searching, transitionToMatch]);
 
   // -----------------------------------------------------------------
+  // Animated Dice Roll Pipeline (600ms tumbling + 1.4s notice hold)
+  // -----------------------------------------------------------------
+  const triggerDiceRollAnimation = useCallback(
+    (rollVal: number, turnEnded: boolean, reason: string | undefined, newState: LudoMatchState) => {
+      // 1. Play sound and start tumbling
+      soundManager.play('dice_roll');
+      setRollingDice(true);
+
+      if (rollCycleTimerRef.current) clearInterval(rollCycleTimerRef.current);
+      if (transitionDelayTimerRef.current) clearTimeout(transitionDelayTimerRef.current);
+
+      let cycles = 0;
+      rollCycleTimerRef.current = setInterval(() => {
+        cycles++;
+        setDiceDisplayValue(Math.floor(Math.random() * 6) + 1);
+
+        if (cycles >= 10) {
+          clearInterval(rollCycleTimerRef.current);
+          rollCycleTimerRef.current = null;
+          setRollingDice(false);
+          setDiceDisplayValue(rollVal);
+
+          if (turnEnded) {
+            let note = `Rolled ${rollVal} • No legal moves`;
+            if (reason === 'THREE_CONSECUTIVE_SIXES') {
+              note = '3 Consecutive 6s! Turn forfeited';
+            } else if (rollVal !== 6) {
+              note = `Rolled ${rollVal} • Need 6 to open token`;
+            }
+            setDiceStatusNotice(note);
+
+            // Hold rolled number & explanation for 1.4s before advancing turn
+            transitionDelayTimerRef.current = setTimeout(() => {
+              setMatchState(newState);
+              setTimerSeconds(newState.remaining_timer_seconds ?? 10);
+              setDiceStatusNotice(null);
+              transitionDelayTimerRef.current = null;
+            }, 1400);
+          } else {
+            setMatchState(newState);
+            setTimerSeconds(newState.remaining_timer_seconds ?? 10);
+            setDiceStatusNotice(`Rolled ${rollVal}! Tap a glowing token`);
+          }
+        }
+      }, 55);
+    },
+    []
+  );
+
+  // -----------------------------------------------------------------
   // Load Match State & Connect Game WebSocket
   // -----------------------------------------------------------------
   const loadMatch = async (matchId: string) => {
@@ -136,10 +189,10 @@ export const Ludo: React.FC = () => {
       const state = await ludoService.getMatchState(matchId);
       setMatchState(state);
       setTimerSeconds(state.remaining_timer_seconds ?? 10);
+      setDiceDisplayValue(state.last_dice_roll);
       connectWebSocket(matchId);
     } catch (e) {
       console.error('Failed to load match state', e);
-      // Reset transition guard so user can retry
       matchTransitionRef.current = null;
     }
   };
@@ -160,11 +213,14 @@ export const Ludo: React.FC = () => {
         if (msg.type === 'MATCH_STATE' && msg.state) {
           setMatchState(msg.state);
           setTimerSeconds(msg.state.remaining_timer_seconds ?? 10);
+          setDiceDisplayValue(msg.state.last_dice_roll);
         } else if (msg.type === 'DICE_ROLLED' && msg.state) {
-          setMatchState(msg.state);
-          setTimerSeconds(msg.state.remaining_timer_seconds ?? 10);
-          soundManager.play('dice_roll');
+          const rollVal = msg.data?.roll ?? msg.state.last_dice_roll ?? 1;
+          const turnEnded = Boolean(msg.data?.turn_ended);
+          const reason = msg.data?.reason;
+          triggerDiceRollAnimation(rollVal, turnEnded, reason, msg.state);
         } else if (msg.type === 'TOKEN_MOVED' && msg.state) {
+          setDiceStatusNotice(null);
           setMatchState(msg.state);
           setTimerSeconds(msg.state.remaining_timer_seconds ?? 10);
           if (msg.data?.captured) {
@@ -175,6 +231,7 @@ export const Ludo: React.FC = () => {
             refreshWallet();
           }
         } else if (msg.type === 'TIMEOUT' && msg.state) {
+          setDiceStatusNotice(null);
           setMatchState(msg.state);
           setTimerSeconds(msg.state.remaining_timer_seconds ?? 10);
           if (msg.data?.game_over) {
@@ -194,7 +251,6 @@ export const Ludo: React.FC = () => {
     };
 
     ws.onclose = () => {
-      // Reconnect after brief pause if match in progress
       setTimeout(() => {
         if (matchState && matchState.status === 'IN_PROGRESS') {
           connectWebSocket(matchId);
@@ -208,7 +264,7 @@ export const Ludo: React.FC = () => {
   // -----------------------------------------------------------------
   useEffect(() => {
     let interval: any = null;
-    if (matchState && matchState.status === 'IN_PROGRESS') {
+    if (matchState && matchState.status === 'IN_PROGRESS' && !rollingDice) {
       interval = setInterval(() => {
         setTimerSeconds((prev) => {
           if (prev <= 1) {
@@ -222,11 +278,11 @@ export const Ludo: React.FC = () => {
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [matchState]);
+  }, [matchState, rollingDice]);
 
   // Fallback Polling (Sync every 3s)
   useEffect(() => {
-    if (matchState && matchState.status === 'IN_PROGRESS') {
+    if (matchState && matchState.status === 'IN_PROGRESS' && !rollingDice) {
       pollIntervalRef.current = setInterval(async () => {
         try {
           const fresh = await ludoService.getMatchState(matchState.id);
@@ -237,18 +293,14 @@ export const Ludo: React.FC = () => {
     return () => {
       if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
     };
-  }, [matchState?.id, matchState?.status]);
+  }, [matchState?.id, matchState?.status, rollingDice]);
 
   // -----------------------------------------------------------------
-  // FIND MATCH handler — WS-first, then POST
+  // Matchmaking handlers
   // -----------------------------------------------------------------
   const handleStartMatchmaking = async (playerCount: number, entryFee: number) => {
-    // Reset transition guard
     matchTransitionRef.current = null;
-
     const token = authStorage.getAccessToken();
-
-    // 1. Connect matchmaking WebSocket FIRST
     const mmWsUrl = getWebSocketUrl('ludo/ws/matchmaking', token || undefined);
 
     try {
@@ -271,13 +323,10 @@ export const Ludo: React.FC = () => {
 
       mmWsRef.current = mmWs;
 
-      // Listen for MATCH_FOUND on the matchmaking WebSocket
       mmWs.onmessage = (event) => {
         try {
           const msg = JSON.parse(event.data);
-          console.log('[LUDO-MM-WS] Received:', msg.type);
           if (msg.type === 'MATCH_FOUND' && msg.match_id) {
-            console.log('[LUDO-MM-WS] MATCH_FOUND match_id=', msg.match_id);
             transitionToMatch(msg.match_id);
           }
         } catch (e) {
@@ -286,32 +335,25 @@ export const Ludo: React.FC = () => {
       };
 
       mmWs.onclose = () => {
-        console.log('[LUDO-MM-WS] Matchmaking WS closed');
         mmWsRef.current = null;
       };
-
     } catch (wsError) {
-      // WS failed to connect — fall back to REST-only mode
       console.warn('[LUDO-MM-WS] WS connection failed, using REST fallback only', wsError);
     }
 
-    // 2. ONLY AFTER WS is connected (or failed), call POST /matchmaking/join
     try {
       const res = await ludoService.joinMatchmaking(playerCount, entryFee);
       if (res.status === 'MATCHED' && res.match_id) {
-        // Immediate match — transition directly
         transitionToMatch(res.match_id);
       } else if (res.status === 'ALREADY_IN_MATCH' && res.match_id) {
         transitionToMatch(res.match_id);
       } else {
-        // SEARCHING — show modal, REST polling starts via useEffect
         setSearching(true);
         setSearchRemainingSeconds(30);
         setSearchElapsedSeconds(0);
       }
     } catch (e: any) {
       alert(e.response?.data?.detail || 'Failed to start matchmaking');
-      // Close matchmaking WS on error
       if (mmWsRef.current) {
         mmWsRef.current.close();
         mmWsRef.current = null;
@@ -319,12 +361,8 @@ export const Ludo: React.FC = () => {
     }
   };
 
-  // -----------------------------------------------------------------
-  // Cancel Matchmaking
-  // -----------------------------------------------------------------
   const handleCancelMatchmaking = async () => {
     try {
-      // Close matchmaking WebSocket
       if (mmWsRef.current) {
         mmWsRef.current.close();
         mmWsRef.current = null;
@@ -340,7 +378,7 @@ export const Ludo: React.FC = () => {
   // Game Actions
   // -----------------------------------------------------------------
   const handleRollDice = async () => {
-    if (!matchState) return;
+    if (!matchState || rollingDice) return;
     try {
       await ludoService.rollDice(matchState.id);
     } catch (e: any) {
@@ -352,6 +390,7 @@ export const Ludo: React.FC = () => {
     if (!matchState) return;
     try {
       await ludoService.moveToken(matchState.id, tokenIndex);
+      setDiceStatusNotice(null);
     } catch (e: any) {
       console.error('Move error', e);
     }
@@ -387,6 +426,9 @@ export const Ludo: React.FC = () => {
       clearInterval(pollIntervalRef.current);
       pollIntervalRef.current = null;
     }
+    if (rollCycleTimerRef.current) clearInterval(rollCycleTimerRef.current);
+    if (transitionDelayTimerRef.current) clearTimeout(transitionDelayTimerRef.current);
+
     setMatchState(null);
     matchTransitionRef.current = null;
     refreshWallet();
@@ -394,34 +436,43 @@ export const Ludo: React.FC = () => {
   };
 
   const handleReturnToLobby = () => {
+    if (rollCycleTimerRef.current) clearInterval(rollCycleTimerRef.current);
+    if (transitionDelayTimerRef.current) clearTimeout(transitionDelayTimerRef.current);
     setMatchState(null);
     matchTransitionRef.current = null;
     refreshWallet();
   };
 
-  // Identify Current Player & My Player
+  // Identify Player Info
   const myPlayer = matchState?.players.find((p) => p.user_id === user?.id);
   const isMyTurn = Boolean(
     myPlayer &&
-    matchState?.status === 'IN_PROGRESS' &&
-    matchState.current_turn_color === myPlayer.color
+      matchState?.status === 'IN_PROGRESS' &&
+      matchState.current_turn_color === myPlayer.color
   );
 
-  const canRoll = isMyTurn && matchState?.last_dice_roll === null;
+  const canRoll = isMyTurn && matchState?.last_dice_roll === null && !rollingDice;
 
   const winnerPlayer = matchState?.players.find((p) => p.rank === 1) || null;
   const isWinnerMe = Boolean(winnerPlayer && myPlayer && winnerPlayer.user_id === myPlayer.user_id);
 
+  // Position Players at the 4 Corners matching Board Yards
+  // Top-Left: Red, Top-Right: Green, Bottom-Left: Blue, Bottom-Right: Yellow
+  const redPlayer = matchState?.players.find((p) => p.color === 'RED');
+  const greenPlayer = matchState?.players.find((p) => p.color === 'GREEN');
+  const bluePlayer = matchState?.players.find((p) => p.color === 'BLUE');
+  const yellowPlayer = matchState?.players.find((p) => p.color === 'YELLOW');
+
   return (
     <div
-      className="ludo-page-container w-full h-full flex-1 flex flex-col items-center justify-center bg-[#040713] text-white"
+      className="ludo-page-container w-full h-full flex-1 flex flex-col items-center justify-center bg-[#040713] text-white select-none"
       style={{
         WebkitOverflowScrolling: 'touch',
         touchAction: 'pan-y',
         paddingLeft: 'max(var(--safe-left), 8px)',
         paddingRight: 'max(var(--safe-right), 8px)',
         paddingTop: 'max(var(--safe-top), 4px)',
-        paddingBottom: 'max(var(--safe-bottom), 8px)',
+        paddingBottom: 'max(var(--safe-bottom), 6px)',
       }}
     >
       {/* 1. LOBBY VIEW */}
@@ -439,23 +490,23 @@ export const Ludo: React.FC = () => {
         </div>
       )}
 
-      {/* 2. ACTIVE MATCH VIEW */}
+      {/* 2. ACTIVE MATCH VIEW (Centered Board + 4 Corners + Bottom Corner Dice) */}
       {matchState && (
-        <div className="ludo-active-match w-full max-w-5xl h-full flex flex-col gap-2 items-center justify-between overflow-hidden">
+        <div className="ludo-active-match w-full max-w-7xl h-full flex flex-col gap-1 sm:gap-2 items-center justify-between overflow-hidden">
           {/* Header Bar */}
-          <div className="ludo-game-header w-full flex items-center justify-between px-3 py-1.5 bg-slate-900/80 backdrop-blur-md rounded-xl border border-slate-800 shadow-md shrink-0">
+          <div className="ludo-game-header w-full flex items-center justify-between px-3 py-1.5 bg-slate-900/90 backdrop-blur-md rounded-xl border border-slate-800 shadow-md shrink-0">
             <div className="flex items-center gap-3">
               <button
                 type="button"
                 onClick={() => setShowExitConfirm(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800/90 hover:bg-slate-700 active:scale-95 border border-slate-700 rounded-xl text-slate-200 text-xs font-bold transition shadow-sm cursor-pointer shrink-0"
+                className="flex items-center gap-1.5 px-3 py-1 bg-slate-800 hover:bg-slate-700 active:scale-95 border border-slate-700 rounded-lg text-slate-200 text-xs font-bold transition shadow-sm cursor-pointer shrink-0"
                 aria-label="Exit Game"
               >
-                <ArrowLeft size={16} />
+                <ArrowLeft size={14} />
                 <span>Exit</span>
               </button>
               <div>
-                <h1 className="text-sm sm:text-base font-black text-amber-400 leading-tight">
+                <h1 className="text-xs sm:text-sm font-black text-amber-400 leading-tight">
                   LUDO {matchState.players.length}P
                 </h1>
                 <span className="text-[10px] text-slate-400">
@@ -467,6 +518,16 @@ export const Ludo: React.FC = () => {
             <div className="flex items-center gap-2">
               <button
                 type="button"
+                onClick={() => setShowRulesModal(true)}
+                className="flex items-center gap-1 px-2.5 py-1 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-300 rounded-lg text-xs font-bold transition active:scale-95 cursor-pointer"
+                aria-label="View Rules"
+              >
+                <HelpCircle size={14} />
+                <span>Rules</span>
+              </button>
+
+              <button
+                type="button"
                 onClick={() => setShowExitConfirm(true)}
                 className="text-xs font-bold px-3 py-1 bg-red-950/80 hover:bg-red-900 border border-red-500/40 text-red-300 rounded-lg transition active:scale-95 cursor-pointer"
               >
@@ -475,40 +536,93 @@ export const Ludo: React.FC = () => {
             </div>
           </div>
 
-          {/* Center Stage: Board & Controls Side Panel */}
-          <div className="ludo-board-control-row w-full flex-1 flex flex-row items-center justify-center gap-3 sm:gap-6 overflow-hidden min-h-0">
-            {/* Ludo Board */}
-            <LudoBoard
-              players={matchState.players}
-              currentTurnColor={matchState.current_turn_color}
-              legalTokenIndices={matchState.legal_token_indices || []}
-              onTokenClick={handleMoveToken}
-              isMyTurn={isMyTurn}
-            />
-
-            {/* Controls Side Panel */}
-            <div className="ludo-controls-side-panel flex flex-col items-center justify-center gap-1.5 w-full max-w-[280px] shrink-0 h-full max-h-full overflow-y-auto">
-              {/* All Players List */}
-              <div className="w-full flex flex-col gap-1">
-                {matchState.players.map((p) => (
+          {/* Arena Stage: Centered Board flanked by Corner Player Panels & Bottom-Left Corner Dice */}
+          <div className="ludo-arena-stage w-full flex-1 flex flex-row items-center justify-between gap-2 sm:gap-4 overflow-hidden min-h-0 px-1 sm:px-3">
+            {/* Left Side: P1 Red (Top-Left) & P3 Blue / Bottom Corner Dice (Bottom-Left) */}
+            <div className="ludo-side-col-left h-full flex flex-col justify-between items-start w-[170px] sm:w-[210px] shrink-0 py-0.5">
+              {/* Top-Left Corner: Red Player */}
+              <div className="w-full">
+                {redPlayer ? (
                   <LudoPlayerPanel
-                    key={p.id}
-                    player={p}
-                    isCurrentTurn={matchState.current_turn_color === p.color}
-                    isMe={p.user_id === user?.id}
+                    player={redPlayer}
+                    isCurrentTurn={matchState.current_turn_color === 'RED'}
+                    isMe={redPlayer.user_id === user?.id}
                   />
-                ))}
+                ) : (
+                  <div className="p-2 bg-slate-900/40 border border-dashed border-slate-800 rounded-xl text-center text-[10px] text-slate-500">
+                    Empty Seat
+                  </div>
+                )}
               </div>
 
-              {/* Dice & Timer Box */}
-              <LudoDice
-                value={matchState.last_dice_roll}
-                isMyTurn={isMyTurn}
-                canRoll={canRoll}
-                onRoll={handleRollDice}
-                timerSeconds={timerSeconds}
+              {/* Bottom-Left Corner: P3 Blue & Dice Roll Widget */}
+              <div className="w-full flex flex-col gap-1.5 items-start">
+                {bluePlayer && (
+                  <div className="w-full">
+                    <LudoPlayerPanel
+                      player={bluePlayer}
+                      isCurrentTurn={matchState.current_turn_color === 'BLUE'}
+                      isMe={bluePlayer.user_id === user?.id}
+                    />
+                  </div>
+                )}
+
+                {/* Bottom Corner Dice Box (matches user sketch) */}
+                <LudoDice
+                  value={diceDisplayValue ?? matchState.last_dice_roll}
+                  rolling={rollingDice}
+                  isMyTurn={isMyTurn}
+                  canRoll={canRoll}
+                  onRoll={handleRollDice}
+                  timerSeconds={timerSeconds}
+                  currentTurnColor={matchState.current_turn_color}
+                  statusNotice={diceStatusNotice}
+                />
+              </div>
+            </div>
+
+            {/* Center Stage: Ludo Board (Centered Horizontally & Vertically) */}
+            <div className="ludo-board-center-stage flex-1 flex items-center justify-center h-full max-h-full overflow-hidden p-1">
+              <LudoBoard
+                players={matchState.players}
                 currentTurnColor={matchState.current_turn_color}
+                legalTokenIndices={matchState.legal_token_indices || []}
+                onTokenClick={handleMoveToken}
+                isMyTurn={isMyTurn}
               />
+            </div>
+
+            {/* Right Side: P2 Green (Top-Right) & P4 Yellow (Bottom-Right) */}
+            <div className="ludo-side-col-right h-full flex flex-col justify-between items-end w-[170px] sm:w-[210px] shrink-0 py-0.5">
+              {/* Top-Right Corner: Green Player */}
+              <div className="w-full">
+                {greenPlayer ? (
+                  <LudoPlayerPanel
+                    player={greenPlayer}
+                    isCurrentTurn={matchState.current_turn_color === 'GREEN'}
+                    isMe={greenPlayer.user_id === user?.id}
+                  />
+                ) : (
+                  <div className="p-2 bg-slate-900/40 border border-dashed border-slate-800 rounded-xl text-center text-[10px] text-slate-500">
+                    {matchState.players.length === 2 ? '2P Match' : 'Empty Seat'}
+                  </div>
+                )}
+              </div>
+
+              {/* Bottom-Right Corner: Yellow Player */}
+              <div className="w-full">
+                {yellowPlayer ? (
+                  <LudoPlayerPanel
+                    player={yellowPlayer}
+                    isCurrentTurn={matchState.current_turn_color === 'YELLOW'}
+                    isMe={yellowPlayer.user_id === user?.id}
+                  />
+                ) : (
+                  <div className="p-2 bg-slate-900/40 border border-dashed border-slate-800 rounded-xl text-center text-[10px] text-slate-500">
+                    Empty Seat
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
@@ -518,13 +632,25 @@ export const Ludo: React.FC = () => {
               winnerPlayer={winnerPlayer}
               isMe={isWinnerMe}
               prizePool={matchState.prize_pool}
+              entryFee={matchState.entry_fee}
               onReturnToLobby={handleReturnToLobby}
             />
           )}
         </div>
       )}
 
-      {/* 3. EXIT CONFIRMATION MODAL */}
+      {/* Rules Modal */}
+      {showRulesModal && (
+        <GameRulesModal
+          title={LUDO_RULES_DATA.title}
+          subtitle={LUDO_RULES_DATA.subtitle}
+          sections={LUDO_RULES_DATA.sections}
+          tips={LUDO_RULES_DATA.tips}
+          onClose={() => setShowRulesModal(false)}
+        />
+      )}
+
+      {/* Exit Confirmation Modal */}
       {showExitConfirm && (
         <div
           className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/85 backdrop-blur-md p-4 animate-fade-in select-none"
@@ -534,12 +660,10 @@ export const Ludo: React.FC = () => {
             className="relative w-full max-w-sm bg-gradient-to-b from-[#1c0836] via-[#120324] to-[#0a0117] border-2 border-amber-500/60 rounded-3xl p-5 sm:p-6 shadow-[0_0_40px_rgba(0,0,0,0.85)] text-white text-center flex flex-col items-center gap-3.5 my-auto"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Warning Icon Badge */}
             <div className="w-14 h-14 rounded-full bg-gradient-to-br from-red-600/30 via-red-900/40 to-slate-900 border-2 border-red-500/50 flex items-center justify-center text-3xl shadow-inner">
               ⚠️
             </div>
 
-            {/* Title & Copy */}
             <div className="space-y-1">
               <h3 className="text-lg font-black text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-yellow-200 to-amber-500 uppercase tracking-wide">
                 Exit Game?
@@ -552,7 +676,6 @@ export const Ludo: React.FC = () => {
               </span>
             </div>
 
-            {/* Action Buttons */}
             <div className="grid grid-cols-2 gap-3 w-full pt-1">
               <button
                 type="button"
@@ -575,3 +698,5 @@ export const Ludo: React.FC = () => {
     </div>
   );
 };
+
+export default Ludo;

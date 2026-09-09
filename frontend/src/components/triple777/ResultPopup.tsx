@@ -116,18 +116,20 @@ export function ResultPopup({
           {isLoss ? "−" : "+"}₹{countedAmount.toFixed(2)}
         </p>
 
-        {isLoss ? (
-          <p className="mt-3 text-sm text-slate-400">Better luck next spin</p>
-        ) : (
-          <div className="mt-3 flex justify-center gap-6 text-xs">
-            <span className="text-slate-400">
-              Bet <span className="font-semibold text-slate-200">₹{bet}</span>
+        <div className="mt-3 flex justify-center items-center gap-4 text-xs font-semibold">
+          <span className="text-slate-400">
+            Bet: <span className="text-slate-200">₹{bet}</span>
+          </span>
+          {isLoss ? (
+            <span className="text-red-400">
+              Lost: <span className="font-bold">₹{bet}</span>
             </span>
+          ) : (
             <span className="text-slate-400">
-              Multiplier <span className="font-semibold text-emerald-400">{multiplier}×</span>
+              Won: <span className="text-emerald-400 font-bold">+₹{amount.toFixed(2)}</span> ({multiplier}×)
             </span>
-          </div>
-        )}
+          )}
+        </div>
 
         <button
           type="button"

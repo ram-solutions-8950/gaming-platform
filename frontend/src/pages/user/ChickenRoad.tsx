@@ -6,7 +6,6 @@ import {
   Play,
   RotateCcw,
   HelpCircle,
-  X,
   ChevronLeft,
   ChevronRight,
   Sparkles,
@@ -21,6 +20,8 @@ import { walletService } from '../../services/wallet';
 import { RoadCrossingGame } from '../../components/chickenRoad/RoadCrossingGame';
 import { soundManager } from '../../services/soundManager';
 import { lockLandscape } from '../../utils/nativeOrientation';
+import { GameRulesModal } from '../../components/common/GameRulesModal';
+import { CHICKEN_ROAD_RULES_DATA } from '../../components/common/gameRulesData';
 import '../../styles/chicken-road.css';
 
 const DEFAULT_MULTIPLIERS: Record<Difficulty, number[]> = {
@@ -28,7 +29,7 @@ const DEFAULT_MULTIPLIERS: Record<Difficulty, number[]> = {
   HARD: [1.05, 1.15, 1.30, 1.55, 1.90, 2.40, 3.10, 4.20, 6.00, 10.00],
 };
 
-const QUICK_BETS = [5, 10, 20, 30];
+const QUICK_BETS = [10, 20, 50, 100];
 
 export function ChickenRoadPage() {
   const navigate = useNavigate();
@@ -222,6 +223,28 @@ export function ChickenRoadPage() {
     }
   };
 
+  // Cashout mid-game callback
+  const handleCashout = async () => {
+    if (!activeRoundId || gameState !== 'ACTIVE' || isActionLoading) return;
+    setIsActionLoading(true);
+    try {
+      const res = await chickenRoadService.cashout(activeRoundId);
+      soundManager.play('win_clap');
+      setGameState('WON');
+      setWinAmount(res.won_amount);
+      setCurrentMultiplier(res.multiplier);
+      if (res.wallet_balance !== undefined) {
+        setBalance(res.wallet_balance);
+      }
+      setActiveRoundId(null);
+    } catch (err: any) {
+      const msg = err.response?.data?.detail || err.message || 'Failed to cash out';
+      setErrorMessage(msg);
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
+
   // Play again
   const handlePlayAgain = () => {
     setGameState('READY');
@@ -373,7 +396,7 @@ export function ChickenRoadPage() {
           </div>
 
           {/* Win Modal */}
-          {gameState === 'WON' && (
+          {(gameState === 'WON' || (gameState as any) === 'CASHED_OUT') && (
             <div className="cr-overlay-backdrop">
               <div className="cr-arcade-modal cr-arcade-modal--win">
                 <div className="cr-modal-badge">🏆</div>
@@ -445,54 +468,14 @@ export function ChickenRoadPage() {
 
           {/* How to Play Modal */}
           {showHowToPlay && (
-            <div className="cr-overlay-backdrop" onClick={() => setShowHowToPlay(false)}>
-              <div className="cr-arcade-modal cr-arcade-modal--help" onClick={(e) => e.stopPropagation()}>
-                <div className="flex items-center justify-between w-full border-b border-white/10 pb-2">
-                  <div className="flex items-center gap-2 font-black text-sm text-yellow-400">
-                    <HelpCircle size={16} />
-                    <span>HOW TO PLAY</span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setShowHowToPlay(false)}
-                    className="text-gray-400 hover:text-white"
-                  >
-                    <X size={18} />
-                  </button>
-                </div>
-
-                <div className="cr-rules-list">
-                  <div className="cr-rule-item">
-                    <span className="cr-rule-num">1</span>
-                    <span>Choose your bet amount and difficulty.</span>
-                  </div>
-                  <div className="cr-rule-item">
-                    <span className="cr-rule-num">2</span>
-                    <span>Press <strong>PLAY</strong> to start the crossing run.</span>
-                  </div>
-                  <div className="cr-rule-item">
-                    <span className="cr-rule-num">3</span>
-                    <span>Use <strong>Arrow Keys / A & D</strong> or swipe to steer through traffic gaps.</span>
-                  </div>
-                  <div className="cr-rule-item">
-                    <span className="cr-rule-num">4</span>
-                    <span>Each crossed lane increases your reward multiplier.</span>
-                  </div>
-                  <div className="cr-rule-item">
-                    <span className="cr-rule-num">5</span>
-                    <span>Reach the finish line safe zone!</span>
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => setShowHowToPlay(false)}
-                  className="cr-modal-action-btn cr-modal-action-btn--green mt-2"
-                >
-                  <span>GOT IT</span>
-                </button>
-              </div>
-            </div>
+            <GameRulesModal
+              title={CHICKEN_ROAD_RULES_DATA.title}
+              subtitle={CHICKEN_ROAD_RULES_DATA.subtitle}
+              sections={CHICKEN_ROAD_RULES_DATA.sections}
+              payouts={CHICKEN_ROAD_RULES_DATA.payouts}
+              tips={CHICKEN_ROAD_RULES_DATA.tips}
+              onClose={() => setShowHowToPlay(false)}
+            />
           )}
         </div>
 
@@ -508,7 +491,7 @@ export function ChickenRoadPage() {
           <button
             type="button"
             disabled={gameState === 'ACTIVE'}
-            onClick={() => setBetAmount(1)}
+            onClick={() => setBetAmount(10)}
             className="cr-stepper-bound-btn"
           >
             MIN
@@ -517,8 +500,8 @@ export function ChickenRoadPage() {
           <div className="cr-stepper-input-box">
             <button
               type="button"
-              disabled={gameState === 'ACTIVE' || betAmount <= 1}
-              onClick={() => setBetAmount((prev) => Math.max(1, prev - 5))}
+              disabled={gameState === 'ACTIVE' || betAmount <= 10}
+              onClick={() => setBetAmount((prev) => Math.max(10, prev - 10))}
               className="cr-stepper-adj-btn"
             >
               -
@@ -527,13 +510,13 @@ export function ChickenRoadPage() {
               type="number"
               disabled={gameState === 'ACTIVE'}
               value={betAmount}
-              onChange={(e) => setBetAmount(Math.max(1, Number(e.target.value)))}
+              onChange={(e) => setBetAmount(Math.max(10, Number(e.target.value)))}
               className="cr-stepper-input"
             />
             <button
               type="button"
               disabled={gameState === 'ACTIVE'}
-              onClick={() => setBetAmount((prev) => prev + 5)}
+              onClick={() => setBetAmount((prev) => prev + 10)}
               className="cr-stepper-adj-btn"
             >
               +
@@ -566,7 +549,7 @@ export function ChickenRoadPage() {
           <button
             type="button"
             disabled={gameState === 'ACTIVE'}
-            onClick={() => setBetAmount((prev) => Math.max(1, Math.floor(prev / 2)))}
+            onClick={() => setBetAmount((prev) => Math.max(10, Math.floor(prev / 2)))}
             className="cr-chip-btn"
           >
             1/2
@@ -602,27 +585,47 @@ export function ChickenRoadPage() {
 
         {/* Large Action Button: Strictly invariant position, size & structure */}
         <div className="cr-play-action-wrap">
-          <button
-            type="button"
-            disabled={gameState === 'ACTIVE' || (gameState === 'READY' && (isActionLoading || betAmount <= 0))}
-            onClick={gameState === 'READY' ? handleStartGame : handlePlayAgain}
-            className="cr-play-btn"
-          >
-            <span className="cr-btn-icon-slot">
-              {gameState === 'READY' && <Play size={15} fill="#FFFFFF" />}
-              {gameState === 'ACTIVE' && <span className="cr-btn-pulse-dot" />}
-              {(gameState === 'WON' || gameState === 'LOST') && <RotateCcw size={15} />}
-            </span>
-            <span className="cr-btn-label">
-              {gameState === 'READY'
-                ? isActionLoading
-                  ? 'STARTING...'
-                  : `PLAY ₹${betAmount}`
-                : gameState === 'ACTIVE'
-                ? 'CROSSING...'
-                : 'PLAY AGAIN'}
-            </span>
-          </button>
+          {gameState === 'ACTIVE' ? (
+            <button
+              type="button"
+              disabled={isActionLoading}
+              onClick={handleCashout}
+              className="cr-play-btn"
+              style={{
+                background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
+                borderColor: '#34D399',
+                boxShadow: '0 0 15px rgba(16, 185, 129, 0.4)',
+              }}
+            >
+              <span className="cr-btn-icon-slot">
+                <Coins size={16} className="text-yellow-300 animate-bounce" />
+              </span>
+              <span className="cr-btn-label">
+                {isActionLoading
+                  ? 'CASHING OUT...'
+                  : `CASH OUT ₹${(betAmount * (currentLane > 0 ? currentMultiplier : 1.0)).toFixed(2)} (${(currentLane > 0 ? currentMultiplier : 1.0).toFixed(2)}x)`}
+              </span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              disabled={gameState === 'READY' && (isActionLoading || betAmount <= 0)}
+              onClick={gameState === 'READY' ? handleStartGame : handlePlayAgain}
+              className="cr-play-btn"
+            >
+              <span className="cr-btn-icon-slot">
+                {gameState === 'READY' && <Play size={15} fill="#FFFFFF" />}
+                {(gameState === 'WON' || (gameState as any) === 'CASHED_OUT' || gameState === 'LOST') && <RotateCcw size={15} />}
+              </span>
+              <span className="cr-btn-label">
+                {gameState === 'READY'
+                  ? isActionLoading
+                    ? 'STARTING...'
+                    : `PLAY ₹${betAmount}`
+                  : 'PLAY AGAIN'}
+              </span>
+            </button>
+          )}
         </div>
       </footer>
     </div>

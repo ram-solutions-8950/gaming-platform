@@ -47,7 +47,7 @@ ROUND_LOCK = threading.Lock()
 
 
 class StartGameIn(BaseModel):
-    bet_amount: float = Field(..., ge=1, le=50000, description="Bet amount in INR")
+    bet_amount: float = Field(..., ge=10, le=50000, description="Bet amount in INR")
     difficulty: Optional[str] = Field("EASY", description="Game difficulty (EASY, MEDIUM, HARD)")
 
 
@@ -113,10 +113,10 @@ def start_game(
 ):
     """Place bet, debit wallet, and start a new Chicken Road round."""
     bet_paisa = int(round(data.bet_amount * 100))
-    if bet_paisa < 100:  # Minimum ₹1
+    if bet_paisa < 1000:  # Minimum ₹10
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Minimum bet is ₹1.00",
+            detail="Minimum bet is ₹10.00",
         )
 
     with ROUND_LOCK:

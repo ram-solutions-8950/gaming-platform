@@ -1,16 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { teenPattiService, type TeenPattiTable } from '../../services/teenPatti';
+import { GameRulesModal } from '../common/GameRulesModal';
+import { TEEN_PATTI_RULES_DATA } from '../common/gameRulesData';
+import { HelpCircle } from 'lucide-react';
 
 interface TeenPattiLobbyProps {
   onJoinTable: (tableId: string) => void;
 }
 
 const BOOT_TIERS = [
-  { name: 'Bronze Club', boot: 100, label: '₹1 Boot', minBuyIn: '₹50' },
-  { name: 'Silver Suite', boot: 500, label: '₹5 Boot', minBuyIn: '₹250' },
   { name: 'Gold Royale', boot: 1000, label: '₹10 Boot', minBuyIn: '₹500' },
+  { name: 'Diamond Lounge', boot: 2500, label: '₹25 Boot', minBuyIn: '₹1,250' },
   { name: 'Platinum Arena', boot: 5000, label: '₹50 Boot', minBuyIn: '₹2,500' },
+  { name: 'High Roller VIP', boot: 10000, label: '₹100 Boot', minBuyIn: '₹5,000' },
 ];
 
 export const TeenPattiLobby: React.FC<TeenPattiLobbyProps> = ({ onJoinTable }) => {
@@ -19,6 +22,7 @@ export const TeenPattiLobby: React.FC<TeenPattiLobbyProps> = ({ onJoinTable }) =
   const [loading, setLoading] = useState(true);
   const [joinError, setJoinError] = useState('');
   const [creatingTable, setCreatingTable] = useState(false);
+  const [showRules, setShowRules] = useState(false);
 
   const fetchTables = async () => {
     try {
@@ -85,7 +89,17 @@ export const TeenPattiLobby: React.FC<TeenPattiLobbyProps> = ({ onJoinTable }) =
         <h1 className="text-xl sm:text-2xl font-black text-gold-400 uppercase tracking-wide text-center">
           👑 Royal Teen Patti
         </h1>
-        <div className="w-20 hidden sm:block" />
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setShowRules(true)}
+            className="px-3 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 font-bold text-xs rounded-xl border border-amber-500/40 transition shadow-sm flex items-center gap-1.5 active:scale-95 cursor-pointer shrink-0"
+            aria-label="Rules"
+          >
+            <HelpCircle size={15} />
+            <span>Rules</span>
+          </button>
+        </div>
       </div>
 
       {/* Prominent Error Banner */}
@@ -168,6 +182,17 @@ export const TeenPattiLobby: React.FC<TeenPattiLobbyProps> = ({ onJoinTable }) =
           </div>
         )}
       </div>
+
+      {showRules && (
+        <GameRulesModal
+          title={TEEN_PATTI_RULES_DATA.title}
+          subtitle={TEEN_PATTI_RULES_DATA.subtitle}
+          sections={TEEN_PATTI_RULES_DATA.sections}
+          payouts={TEEN_PATTI_RULES_DATA.payouts}
+          tips={TEEN_PATTI_RULES_DATA.tips}
+          onClose={() => setShowRules(false)}
+        />
+      )}
     </div>
   );
 };

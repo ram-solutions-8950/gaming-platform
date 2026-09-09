@@ -41,26 +41,26 @@ export const AviatorBetPanel: React.FC<AviatorBetPanelProps> = ({
   const handlePresetClick = (val: number) => {
     if (hasActiveBet) return;
     const current = parseInt(amountInput, 10) || 0;
-    setAmountInput(String(Math.max(1, current + val)));
+    setAmountInput(String(Math.max(10, current + val)));
   };
 
   const handleDouble = () => {
     if (hasActiveBet) return;
     const current = parseInt(amountInput, 10) || 0;
-    setAmountInput(String(Math.max(1, current * 2)));
+    setAmountInput(String(Math.max(10, current * 2)));
   };
 
   const handleHalf = () => {
     if (hasActiveBet) return;
     const current = parseInt(amountInput, 10) || 0;
-    setAmountInput(String(Math.max(1, Math.floor(current / 2))));
+    setAmountInput(String(Math.max(10, Math.floor(current / 2))));
   };
 
   const handleActionClick = () => {
     if (isBettingPhase) {
       if (!myBet) {
         // Place bet
-        const effectiveAmountRupees = Math.max(1, parseInt(amountInput, 10) || 10);
+        const effectiveAmountRupees = Math.max(10, parseInt(amountInput, 10) || 10);
         const effectiveAmountPaise = Math.round(effectiveAmountRupees * 100);
         const effectiveAutoMult = autoCashoutEnabled ? (parseFloat(autoCashoutInput) || 2.0) : null;
         onPlaceBet(
@@ -130,7 +130,7 @@ export const AviatorBetPanel: React.FC<AviatorBetPanelProps> = ({
               }}
               onBlur={() => {
                 const val = parseInt(amountInput, 10);
-                if (!val || val < 1) {
+                if (!val || val < 10) {
                   setAmountInput('10');
                 }
               }}
@@ -211,13 +211,15 @@ export const AviatorBetPanel: React.FC<AviatorBetPanelProps> = ({
             /* CRASHED or SETTLED */
             <div className="round-ended-state">
               {isCashedOut ? (
-                <div className="cashed-out-badge">
-                  <span className="text-xs font-bold text-emerald-400">WON ₹{((myBet?.payout || 0) / 100).toFixed(2)}</span>
-                  <span className="text-[11px] text-emerald-300">@{myBet?.cashout_multiplier?.toFixed(2)}x</span>
+                <div className="cashed-out-badge" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
+                  <span className="text-[10px] text-emerald-200 font-bold uppercase tracking-wider">Bet: ₹{((myBet?.amount || 0) / 100).toFixed(0)}</span>
+                  <span className="text-sm font-black text-emerald-400">WON: ₹{((myBet?.payout || 0) / 100).toFixed(2)}</span>
+                  <span className="text-[10px] text-emerald-300 font-mono font-bold">@{myBet?.cashout_multiplier?.toFixed(2)}x</span>
                 </div>
               ) : isLost ? (
-                <div className="lost-badge">
-                  <span className="text-xs font-bold text-rose-400">CRASHED</span>
+                <div className="lost-badge" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
+                  <span className="text-[10px] text-rose-300 font-bold uppercase tracking-wider">Bet: ₹{((myBet?.amount || 0) / 100).toFixed(0)}</span>
+                  <span className="text-xs font-black text-rose-400">CRASHED (LOST)</span>
                 </div>
               ) : (
                 <div className="waiting-next-round">

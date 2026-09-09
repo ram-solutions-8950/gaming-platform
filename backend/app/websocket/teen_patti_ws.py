@@ -283,8 +283,17 @@ async def _bot_fill_task(table_id: str) -> None:
                     hand.add_seat(bot_id, _BOT_NAMES[idx], is_bot=True)
                 except GameError:
                     break
-            idx += 1
         await _broadcast_state(table_id)
+        if len(hand.seats) >= _MIN_PLAYERS_TO_START:
+            async def _auto_start_delayed():
+                try:
+                    await asyncio.sleep(2.0)
+                    h = teen_patti_manager.get(table_id)
+                    if h and h.phase == Phase.WAITING and len(h.seats) >= _MIN_PLAYERS_TO_START:
+                        await _start_hand(table_id)
+                except asyncio.CancelledError:
+                    pass
+            _start_timers[table_id] = asyncio.create_task(_auto_start_delayed())
 
 
 def _maybe_trigger_bot_turn(table_id: str) -> None:
@@ -448,7 +457,12 @@ def _settle_hand(table_id: str, hand: TeenPattiHand) -> None:
             sp.commit()
         except Exception as e:
             sp.rollback()
-            raise
+            err_msg = str(e)
+            if "Duplicate transaction reference" in err_msg or "already exists" in err_msg:
+                logging.getLogger(__name__).warning("TEEN_PATTI_SETTLEMENT_ALREADY_DONE: table_id=%s %s", table_id, err_msg)
+            else:
+                logging.getLogger(__name__).error("TEEN_PATTI_SETTLEMENT_FAILED: table_id=%s error=%s", table_id, err_msg)
+                raise
 
         # Store hand records
         for i, s in enumerate(hand.seats):
@@ -491,12 +505,16 @@ async def _schedule_next_hand(table_id: str) -> None:
         hand = teen_patti_manager.get(table_id)
         if hand is not None and hand.phase == Phase.FINISHED:
             hand.reset_for_next_hand()
-            await manager.broadcast(table_id, {
-                "type": "event",
-                "event": "next_hand_ready",
-                "hand_number": _hand_number[table_id],
-            })
-            await _broadcast_state(table_id)
+            seated_players = [s for s in hand.seats if s.id is not None]
+            if len(seated_players) >= 2:
+                await _start_hand(table_id)
+            else:
+                await manager.broadcast(table_id, {
+                    "type": "event",
+                    "event": "next_hand_ready",
+                    "hand_number": _hand_number[table_id],
+                })
+                await _broadcast_state(table_id)
 
 
 async def _after_action(table_id: str) -> None:
@@ -626,8 +644,12 @@ async def _handle_action(table_id: str, user_id: str, msg: dict) -> None:
 
     try:
         if action == "start":
+            if hand.phase == Phase.FINISHED:
+                _cancel(_start_timers, table_id)
+                hand.reset_for_next_hand()
             if hand.phase == Phase.WAITING:
-                if len(hand.seats) < 2:
+                seated_players = [s for s in hand.seats if s.id is not None]
+                if len(seated_players) < 2:
                     await manager.send_to_user(table_id, user_id, {
                         "type": "error",
                         "message": "Need at least 2 players to start"
@@ -636,7 +658,7 @@ async def _handle_action(table_id: str, user_id: str, msg: dict) -> None:
                 await _start_hand(table_id)
             return
         elif action == "leave":
-            if hand.phase == Phase.WAITING:
+            if hand.phase in (Phase.WAITING, Phase.FINISHED):
                 hand.remove_seat(user_id)
                 await manager.disconnect(table_id, user_id)
                 await manager.broadcast(table_id, {"type": "event", "event": "left", "seat": user_id})

@@ -66,8 +66,7 @@ class LiveRound:
         if elapsed < 0:
             return 1.0
         import math
-        # Growth rate: ln(10) / 23 ≈ 0.1  → reaches 10× at ~23s
-        mult = math.exp(elapsed * 0.1)
+        mult = math.exp(elapsed * 0.20)
         return min(mult, self.crash_point)
 
     def get_user_bets(self, user_id: UUID) -> list[LiveBet]:

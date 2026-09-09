@@ -1,4 +1,5 @@
 import json
+import uuid
 import asyncio
 import random
 from typing import Dict, Set, Optional, Tuple
@@ -11,7 +12,7 @@ from ..services.poker.engine import PokerEngine
 from ..services.wallet_service import credit_wallet, debit_wallet
 from ..models.transaction import WalletTransactionType
 from ..models.user import User
-from ..models.poker import PokerTable, PokerHand, PokerAction
+from ..models.poker import PokerTable, PokerHand, PokerAction, PokerPlayer
 
 router = APIRouter(prefix="/poker", tags=["Poker WebSocket"])
 
@@ -188,7 +189,36 @@ async def poker_websocket_endpoint(
         # Auto-seat user if not already seated
         if not engine.get_player_by_id(user_id):
             buy_in = table.min_buy_in if table.min_buy_in else 2000
-            engine.add_player(user_id=user_id, username=username, buy_in_amount=buy_in)
+            if table.is_practice:
+                engine.add_player(user_id=user_id, username=username, buy_in_amount=buy_in)
+            else:
+                db_player = db.query(PokerPlayer).filter(
+                    PokerPlayer.table_id == table_id,
+                    PokerPlayer.user_id == user.id
+                ).first()
+                if db_player:
+                    engine.add_player(user_id=user_id, username=username, buy_in_amount=db_player.stack)
+                else:
+                    try:
+                        debit_wallet(
+                            db=db,
+                            user_id=user.id,
+                            amount=buy_in,
+                            tx_type=WalletTransactionType.GAME_ENTRY,
+                            reference_type="poker_buyin",
+                            reference_id=f"poker_buyin_{uuid.uuid4()}"
+                        )
+                        db_player = PokerPlayer(
+                            table_id=table.id,
+                            user_id=user.id,
+                            seat_index=0,
+                            stack=buy_in
+                        )
+                        db.add(db_player)
+                        db.commit()
+                        engine.add_player(user_id=user_id, username=username, buy_in_amount=buy_in)
+                    except Exception as e:
+                        print(f"[POKER WS] User {user_id} could not be seated on cash table: {e}")
 
         # Fill remaining seats with bots on practice tables
         _seat_practice_bots(engine, table)
