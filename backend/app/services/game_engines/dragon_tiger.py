@@ -22,9 +22,9 @@ from ...models.transaction import WalletTransactionType
 from ...services.wallet_service import debit_wallet, credit_wallet
 from ...services.settlement_service import settle_winning_bet
 
-# Authoritative defaults: 15-second betting window + 10-second calculation/animation = 25s total round
+# Authoritative defaults: 15-second betting window + 3-second calculation/reveal = 18s total round
 DEFAULT_CONFIG = {
-    "round_duration_seconds": 25,
+    "round_duration_seconds": 18,
     "betting_duration_seconds": 15,
     "allowed_bets": {"dragon": True, "tiger": True, "tie": True},
     "payouts": {"dragon": 1.0, "tiger": 1.0, "tie": 11.0},
@@ -44,6 +44,9 @@ def merge_dragon_tiger_config(game: Game) -> dict:
     for key in ("round_duration_seconds", "betting_duration_seconds"):
         if key in incoming and incoming[key] is not None:
             cfg[key] = incoming[key]
+    # Enforce synchronized 15s betting + 3s calculation = 18s total round lifecycle
+    cfg["round_duration_seconds"] = 18
+    cfg["betting_duration_seconds"] = 15
     if incoming.get("deck"):
         cfg["deck"] = {**cfg["deck"], **incoming["deck"]}
     cfg["allowed_bets"] = {**cfg["allowed_bets"], **(incoming.get("allowed_bets") or {})}
@@ -111,10 +114,10 @@ class DragonTigerEngine(GameEngine):
                 game.config = copy.deepcopy(DEFAULT_CONFIG)
                 flag_modified(game, "config")
                 changed = True
-            elif game.config.get("betting_duration_seconds") != 15 or game.config.get("round_duration_seconds") != 25:
+            elif game.config.get("betting_duration_seconds") != 15 or game.config.get("round_duration_seconds") != 18:
                 cfg = copy.deepcopy(game.config)
                 cfg["betting_duration_seconds"] = 15
-                cfg["round_duration_seconds"] = 25
+                cfg["round_duration_seconds"] = 18
                 game.config = cfg
                 flag_modified(game, "config")
                 changed = True

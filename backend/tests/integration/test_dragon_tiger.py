@@ -359,7 +359,7 @@ def test_public_bets_endpoint(client, db: Session, auth_user, fee_config, dt_gam
 def test_dragon_tiger_15_second_betting_timer_config(db: Session, dt_game):
     """Verify backend authoritative betting timer is exactly 15 seconds."""
     assert engine.get_betting_duration_seconds(db) == 15
-    assert engine.get_round_duration_seconds(db) == 25
+    assert engine.get_round_duration_seconds(db) == 18
 
     rd = engine.create_round(db)
     duration = (rd.betting_closes_at - rd.started_at).total_seconds()

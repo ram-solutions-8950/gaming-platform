@@ -58,3 +58,25 @@ def test_draw_cards_returns_two_unique_from_standard_deck():
         rank, suit = card.split("-")
         assert rank in RANK_ORDER
         assert suit in ("S", "H", "D", "C")
+
+
+def test_dragon_tiger_round_duration_defaults():
+    from app.services.game_engines.dragon_tiger import merge_dragon_tiger_config
+    from app.models.game_catalog import Game
+
+    assert DEFAULT_CONFIG["round_duration_seconds"] == 18
+    assert DEFAULT_CONFIG["betting_duration_seconds"] == 15
+
+    dummy_game = Game(
+        name="Dragon Tiger",
+        slug="dragon-tiger",
+        game_type="DRAGON_TIGER",
+        min_bet=1000,
+        max_bet=200000,
+        config={"round_duration_seconds": 60, "betting_duration_seconds": 30},
+    )
+    cfg = merge_dragon_tiger_config(dummy_game)
+    # Must be clamped to 18s total and 15s betting for prompt result delivery
+    assert cfg["round_duration_seconds"] == 18
+    assert cfg["betting_duration_seconds"] == 15
+

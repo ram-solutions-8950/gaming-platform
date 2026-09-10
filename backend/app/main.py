@@ -35,6 +35,14 @@ async def lifespan(app: FastAPI):
                     cfg["betting_duration_seconds"] = 15
                     ab.config = cfg
                     db.commit()
+            dt = db.query(Game).filter(Game.slug == "dragon-tiger").first()
+            if dt:
+                cfg = dict(dt.config or {})
+                if cfg.get("round_duration_seconds") != 18 or cfg.get("betting_duration_seconds") != 15:
+                    cfg["round_duration_seconds"] = 18
+                    cfg["betting_duration_seconds"] = 15
+                    dt.config = cfg
+                    db.commit()
     except Exception as e:
         pass
     start_engine(broadcast_fn=game_ws_manager.broadcast)

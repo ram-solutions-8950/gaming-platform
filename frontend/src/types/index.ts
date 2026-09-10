@@ -105,6 +105,7 @@ export interface GameBet {
 
 export interface PublicBet {
   id: string;
+  player_token?: string;
   prediction: string;
   amount: number;
   created_at: string;
@@ -116,6 +117,7 @@ export interface GameState {
   seconds_remaining: number;
   game?: CatalogGame | null;
   public_bets?: PublicBet[];
+  unique_players?: number;
 }
 
 export interface GameRoundAdmin extends GameRound {

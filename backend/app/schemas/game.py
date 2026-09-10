@@ -53,6 +53,7 @@ class GameRoundDetailOut(GameRoundOut):
 
 class PublicBetOut(BaseModel):
     id: str
+    player_token: Optional[str] = None
     prediction: str
     amount: int
     created_at: datetime
@@ -66,3 +67,4 @@ class GameStateOut(BaseModel):
     seconds_remaining: float = 0.0
     game: Optional[GameOut] = None
     public_bets: Optional[list[PublicBetOut]] = None
+    unique_players: Optional[int] = None

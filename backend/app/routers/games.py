@@ -70,9 +70,11 @@ def get_current_round(
             remaining = max(0, (round_end - now).total_seconds())
 
         raw_bets = db.query(GameBet).filter(GameBet.round_id == game_round.id).order_by(GameBet.created_at.asc()).all()
+        unique_players = len({b.user_id for b in raw_bets}) if raw_bets else 0
         public_bets = [
             PublicBetOut(
                 id=_obfuscate_bet_id(b.id),
+                player_token=_obfuscate_bet_id(b.user_id),
                 prediction=b.prediction.value,
                 amount=b.amount,
                 created_at=b.created_at,
@@ -86,9 +88,10 @@ def get_current_round(
             seconds_remaining=round(remaining, 1),
             game=game_out,
             public_bets=public_bets,
+            unique_players=unique_players,
         )
     else:
-        state = GameStateOut(round=None, server_time=now, seconds_remaining=0, game=game_out, public_bets=[])
+        state = GameStateOut(round=None, server_time=now, seconds_remaining=0, game=game_out, public_bets=[], unique_players=0)
     return success_response(state.model_dump())
 
 
@@ -152,6 +155,7 @@ async def place_bet(
                 "round_id": str(data.round_id),
                 "bet": {
                     "id": _obfuscate_bet_id(bet.id),
+                    "player_token": _obfuscate_bet_id(bet.user_id),
                     "prediction": bet.prediction.value,
                     "amount": bet.amount,
                     "created_at": bet.created_at.isoformat() if hasattr(bet, "created_at") and bet.created_at else datetime.now(timezone.utc).isoformat(),

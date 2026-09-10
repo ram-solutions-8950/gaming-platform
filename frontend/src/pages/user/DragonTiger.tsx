@@ -52,6 +52,7 @@ function paiseToRupees(p: number): string {
 import { setNativeLandscape } from '../../utils/nativeOrientation';
 import { GameRulesModal } from '../../components/common/GameRulesModal';
 import { DRAGON_TIGER_RULES_DATA } from '../../components/common/gameRulesData';
+import { DragonTigerRankingModal } from '../../components/dragonTiger/DragonTigerRankingModal';
 
 export function DragonTigerPage() {
   const navigate = useNavigate();
@@ -60,7 +61,14 @@ export function DragonTigerPage() {
   const [wallet, setWallet] = useState<Wallet | null>(null);
   const [history, setHistory] = useState<GameRound[]>([]);
   const [showRules, setShowRules] = useState(false);
+  const [showRanking, setShowRanking] = useState(false);
   const [myBets, setMyBets] = useState<GameBet[]>([]);
+  const [localPlacedBets, setLocalPlacedBets] = useState<Array<{
+    roundId: string;
+    prediction: string;
+    amount: number;
+    placedAt: number;
+  }>>([]);
   const [catalogGame, setCatalogGame] = useState<CatalogGame | null>(null);
   const [publicBets, setPublicBets] = useState<PublicBet[]>([]);
   const [recentLiveBets, setRecentLiveBets] = useState<PublicBet[]>([]);
@@ -517,10 +525,28 @@ export function DragonTigerPage() {
   const dragonCard = (activeRound?.result_data?.dragon_card as string) || undefined;
   const tigerCard = (activeRound?.result_data?.tiger_card as string) || undefined;
 
-  /* ── fallback: capture completed live round from polling if WS was disconnected ── */
+  /* ── fallback: capture completed live round from history or round if WS was disconnected ── */
   useEffect(() => {
     if (animatingRef.current || displayRound) return;
     if (!initialMountDoneRef.current) return;
+
+    // Check latest historical completed round first (most reliable after round settlement)
+    const latestHist = history[0];
+    if (
+      latestHist &&
+      latestHist.status === 'COMPLETED' &&
+      latestHist.result_data?.dragon_card &&
+      latestHist.result_data?.tiger_card &&
+      latestHist.id !== lastAnimatedRoundIdRef.current
+    ) {
+      lastAnimatedRoundIdRef.current = latestHist.id;
+      const normalized = extractDtResult(latestHist.result_data, latestHist);
+      if (normalized) {
+        roundResultMapRef.current[latestHist.id] = normalized;
+      }
+      setDisplayRound(latestHist);
+      return;
+    }
 
     const rd = round?.result_data;
     const hasCards = Boolean(rd?.dragon_card && rd?.tiger_card);
@@ -532,7 +558,7 @@ export function DragonTigerPage() {
       }
       setDisplayRound(round!);
     }
-  }, [round?.id, round?.status, round?.result_data, displayRound]);
+  }, [round?.id, round?.status, round?.result_data, history, displayRound]);
 
   useEffect(() => {
     if (!displayRound) {
@@ -560,27 +586,27 @@ export function DragonTigerPage() {
     const delay = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
     const run = async () => {
-      // 1. Cards deal in
+      // 1. Cards deal in promptly (BUG-055)
       setPhase('revealing');
       setDragonFlipped(false);
       setTigerFlipped(false);
       setShowPlayer(false);
       setWinnerResult(null);
 
-      // Dragon card slide + flip (faster reveal: 200ms lead-in)
-      await delay(200);
+      // Dragon card slide + flip (faster reveal: 100ms lead-in)
+      await delay(100);
       if (cancelled) return;
       setDragonFlipped(true);
       audio.playFlip();
 
-      // Tiger card slide + flip (faster reveal: 450ms deal & flip)
-      await delay(450);
+      // Tiger card slide + flip (faster reveal: 250ms deal & flip)
+      await delay(250);
       if (cancelled) return;
       setTigerFlipped(true);
       audio.playFlip();
 
-      // Both cards visible — brief pause before result display (450ms)
-      await delay(450);
+      // Both cards visible — brief pause before result display (200ms)
+      await delay(200);
       if (cancelled) return;
 
       // 2. Authoritative winner output display
@@ -597,16 +623,14 @@ export function DragonTigerPage() {
         setWinnerResult('TIE');
       }
 
-      // Winner animation plays, then show player outcome banner & win/loss sound
-      await delay(600);
-      if (cancelled) return;
+      // Show player outcome banner immediately!
       setShowPlayer(true);
 
       const displayRoundIdVal = displayRound.id;
       if (resultSoundPlayedRef.current !== displayRoundIdVal) {
         const userBets = myBetsRef.current.filter((b) => b.round_id === displayRoundIdVal);
-        const isUserWin = userBets.some((b) => b.status === 'WON');
-        const isUserLoss = userBets.some((b) => b.status === 'LOST') && !isUserWin;
+        const isUserWin = userBets.some((b) => b.status === 'WON') || (resVal && userBets.some((b) => b.prediction === resVal));
+        const isUserLoss = userBets.some((b) => b.status === 'LOST') || (resVal && userBets.some((b) => b.prediction !== resVal));
         if (isUserWin) {
           audio.playWin();
           resultSoundPlayedRef.current = displayRoundIdVal;
@@ -616,8 +640,8 @@ export function DragonTigerPage() {
         }
       }
 
-      // 3. RESULT HOLD: Hold everything on screen for 2.2 seconds so user clearly sees the winner!
-      await delay(2200);
+      // 3. RESULT HOLD: Hold everything on screen for 2.4 seconds so user clearly sees the winner!
+      await delay(2400);
       if (cancelled) return;
 
       // 4. Clear — next round takes over
@@ -649,13 +673,37 @@ export function DragonTigerPage() {
     };
   }, [displayRound, applyRoundStart]);
 
-  /* ── bet matching ── */
+  /* ── bet matching (incorporating both server-settled and immediate local bets) ── */
   const displayRoundId = displayRound?.id || round?.id;
-  const roundBets = useMemo(
-    () => myBets.filter((b) => displayRoundId && b.round_id === displayRoundId),
-    [myBets, displayRoundId],
-  );
   const activeWinnerSide = winnerResult || (displayRound?.result_data?.result as WinningSide | null);
+
+  const roundBets = useMemo<GameBet[]>(() => {
+    if (!displayRoundId) return [];
+    const serverBets = myBets.filter((b) => b.round_id === displayRoundId);
+    if (serverBets.length > 0) return serverBets;
+
+    // Fallback: If server hasn't returned updated myBets for this round yet, synthesize from local tracking
+    const local = localPlacedBets.filter((b) => b.roundId === displayRoundId);
+    if (local.length === 0) return [];
+
+    return local.map((l, idx) => ({
+      id: `local-${l.roundId}-${l.prediction}-${idx}`,
+      user_id: wallet?.user_id || '',
+      game_id: game?.id || '',
+      round_id: l.roundId,
+      prediction: l.prediction,
+      amount: l.amount,
+      entry_fee_amount: Math.round(l.amount * 0.05),
+      stake_amount: l.amount - Math.round(l.amount * 0.05),
+      gross_win_amount: null,
+      winning_fee_amount: null,
+      net_win_amount: null,
+      status: (activeWinnerSide ? (l.prediction === activeWinnerSide ? 'WON' : 'LOST') : 'PENDING') as any,
+      created_at: new Date(l.placedAt).toISOString(),
+      settled_at: null,
+    }));
+  }, [myBets, localPlacedBets, displayRoundId, activeWinnerSide, wallet?.user_id, game?.id]);
+
   const wonThisRound = roundBets.some((b) =>
     b.status === 'WON' || (activeWinnerSide && b.prediction === activeWinnerSide)
   );
@@ -681,6 +729,15 @@ export function DragonTigerPage() {
     return roundBets.reduce((sum, b) => sum + (b.amount || 0), 0);
   }, [roundBets]);
 
+  const totalUserWinnings = useMemo(() => {
+    return myBets.reduce((sum, b) => {
+      if (b.status === 'WON' && b.net_win_amount) {
+        return sum + b.net_win_amount / 100;
+      }
+      return sum;
+    }, 0);
+  }, [myBets]);
+
   /* ── place bet ── */
   const handleBet = async (predictionKey?: string) => {
     const prediction = predictionKey || selected;
@@ -688,9 +745,16 @@ export function DragonTigerPage() {
     if (round.status !== 'BETTING' || isBettingLocked || countdown <= 0) return;
     setBetting(true);
     try {
-      await gameService.placeBet(round.id, prediction, amount, game.id);
+      const placed = await gameService.placeBet(round.id, prediction, amount, game.id);
       setSelected(prediction);
       audio.playChip();
+      if (placed) {
+        setMyBets((prev) => [placed, ...prev.filter((b) => b.id !== placed.id)]);
+      }
+      setLocalPlacedBets((prev) => [
+        ...prev,
+        { roundId: round.id, prediction, amount, placedAt: Date.now() },
+      ]);
       await fetchAll();
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: { error?: { message?: string } } } };
@@ -709,7 +773,22 @@ export function DragonTigerPage() {
   const tigerPublicTotal = useMemo(() => tigerPublicBets.reduce((sum, b) => sum + b.amount, 0), [tigerPublicBets]);
   const tiePublicTotal = useMemo(() => tiePublicBets.reduce((sum, b) => sum + b.amount, 0), [tiePublicBets]);
 
-  const totalPublicBettors = publicBets.length;
+  // Unique players calculation (BUG-052)
+  const totalPublicBettors = useMemo(() => {
+    if (gameState?.unique_players !== undefined && gameState.unique_players > 0) {
+      const tokens = new Set(publicBets.map((b) => b.player_token).filter(Boolean));
+      return Math.max(gameState.unique_players, tokens.size);
+    }
+    const uniqueTokens = new Set(publicBets.map((b) => b.player_token).filter(Boolean));
+    if (uniqueTokens.size > 0) {
+      return uniqueTokens.size;
+    }
+    if (publicBets.length > 0) {
+      return 1;
+    }
+    return 0;
+  }, [gameState?.unique_players, publicBets]);
+
   const totalPublicVolume = useMemo(() => publicBets.reduce((sum, b) => sum + b.amount, 0), [publicBets]);
 
   /* ── DRAGON | TIE | TIGER order (matches reference) ── */
@@ -770,10 +849,16 @@ export function DragonTigerPage() {
           {/* HUD top-left: Back + Ranking + Rules */}
           <div className="absolute top-1.5 left-2 z-30 flex items-center gap-1.5">
             <button onClick={() => navigate('/dashboard')} className="px-3 py-1 rounded-full bg-black/60 hover:bg-black/80 border border-white/20 text-xs font-bold text-white transition-colors flex items-center gap-1 shadow-md">← Exit</button>
-            <div className="flex items-center gap-1 bg-black/50 pl-1 pr-2.5 py-1 rounded-full border border-yellow-500/40">
-              <span className="text-yellow-400 text-base">🏆</span>
-              <span className="text-[9px] text-yellow-300 font-bold tracking-wider">Ranking</span>
-            </div>
+            <button
+              type="button"
+              onClick={() => setShowRanking(true)}
+              className="flex items-center gap-1 bg-black/60 hover:bg-black/80 active:scale-95 pl-1.5 pr-2.5 py-1 rounded-full border border-yellow-500/40 cursor-pointer transition-all shadow-md"
+              title="Ranking"
+              aria-label="Ranking"
+            >
+              <span className="text-yellow-400 text-sm">🏆</span>
+              <span className="text-[10px] text-yellow-300 font-bold tracking-wider">Ranking</span>
+            </button>
             <button
               type="button"
               onClick={() => setShowRules(true)}
@@ -816,8 +901,15 @@ export function DragonTigerPage() {
             <div className="bg-black/60 rounded-full px-3 py-1 border border-yellow-500/30">
                 <span className="text-yellow-400 font-bold text-xs">₹{wallet?.balance_inr ?? '0.00'}</span>
               </div>
-              <button className="flex items-center gap-1 bg-gradient-to-r from-yellow-400 to-yellow-600 px-2.5 py-1.5 rounded-full text-black font-black text-[10px] shadow-lg border border-yellow-200">
-                ADD <span className="text-sm">₹</span>
+              <button
+                type="button"
+                onClick={() => navigate('/deposit')}
+                className="flex items-center gap-1 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-bold text-xs px-3 py-1.5 rounded-full shadow-lg border border-emerald-400/50 cursor-pointer active:scale-95 transition-all"
+                title="Add Amount"
+                aria-label="Add Amount"
+              >
+                <span className="text-sm font-black leading-none">+</span>
+                <span>Add Amount</span>
               </button>
               <button
                 onClick={audio.toggleMute}
@@ -939,6 +1031,47 @@ export function DragonTigerPage() {
               winnerResult={winnerResult}
             />
           </div>
+
+          {/* Centered High-Impact Result Announcement (BUG-051) */}
+          {showPlayer && winnerResult && (
+            <div className="absolute inset-0 z-40 flex items-center justify-center pointer-events-none px-4">
+              <div
+                className={`flex flex-col items-center justify-center px-6 py-3.5 rounded-2xl backdrop-blur-xl border-2 shadow-2xl animate-pop-in ${
+                  wonThisRound
+                    ? 'bg-emerald-950/95 border-emerald-400 text-white shadow-[0_0_40px_rgba(52,211,153,0.6)]'
+                    : lostThisRound
+                    ? 'bg-rose-950/95 border-rose-400 text-white shadow-[0_0_40px_rgba(244,63,94,0.6)]'
+                    : 'bg-zinc-950/95 border-yellow-400 text-white shadow-[0_0_35px_rgba(250,204,21,0.5)]'
+                }`}
+                style={{ minWidth: 'min(280px, 85vw)' }}
+              >
+                <div className="text-[11px] font-black tracking-widest uppercase px-3 py-0.5 rounded-full bg-black/50 border border-white/20 mb-1">
+                  {wonThisRound ? '🎉 ROUND RESULT' : lostThisRound ? '❌ ROUND RESULT' : '🏆 ROUND RESULT'}
+                </div>
+                <div className="text-2xl sm:text-3xl font-black tracking-wide drop-shadow-md">
+                  {wonThisRound
+                    ? 'YOU WIN!'
+                    : lostThisRound
+                    ? 'YOU LOSE'
+                    : winnerResult === 'DRAGON'
+                    ? '🐉 DRAGON WINS!'
+                    : winnerResult === 'TIGER'
+                    ? '🐅 TIGER WINS!'
+                    : '🤝 TIE!'}
+                </div>
+                {(wonThisRound || lostThisRound) && (
+                  <div className={`text-2xl sm:text-3xl font-mono font-black mt-0.5 ${wonThisRound ? 'text-emerald-300' : 'text-rose-300'}`}>
+                    {wonThisRound ? `+₹${paiseToRupees(userWinningAmountPaise)}` : `-₹${paiseToRupees(userTotalBetPaise)}`}
+                  </div>
+                )}
+                <div className="text-xs font-bold text-white/90 mt-1">
+                  {userTotalBetPaise > 0
+                    ? `Bet: ₹${paiseToRupees(userTotalBetPaise)} • Winner: ${winnerResult}`
+                    : `Winning Side: ${winnerResult}`}
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Countdown Timer (below cards, center) */}
           <div className="absolute left-1/2 -translate-x-1/2 z-30 flex flex-col items-center" style={{ bottom: '-2px' }}>
@@ -1136,6 +1269,13 @@ export function DragonTigerPage() {
           payouts={DRAGON_TIGER_RULES_DATA.payouts}
           tips={DRAGON_TIGER_RULES_DATA.tips}
           onClose={() => setShowRules(false)}
+        />
+      )}
+
+      {showRanking && (
+        <DragonTigerRankingModal
+          onClose={() => setShowRanking(false)}
+          myWinAmount={totalUserWinnings}
         />
       )}
     </div>
