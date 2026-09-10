@@ -322,6 +322,16 @@ export const TRIPLE_777_RULES_DATA: {
       icon: '🕹️',
       body: 'Select your spin stake (minimum ₹10) and press SPIN. If all 3 reels align matching symbols, your payout is automatically credited to your wallet.',
     },
+    {
+      title: '⚡ Turbo Mode',
+      icon: '⚡',
+      body: 'Toggle TURBO on for ultra-fast 0.4-second spins! Turbo mode accelerates the reels and bypasses routine modal popups so you can enjoy instant, continuous action. Major jackpot and big win celebrations still display fully.',
+    },
+    {
+      title: '🔁 Auto Spin',
+      icon: '🔁',
+      body: 'Tap AUTO to queue 10 automated consecutive spins at your current stake. You can stop Auto spin anytime by tapping STOP, and it automatically pauses on massive wins or if wallet balance runs low.',
+    },
   ],
   payouts: [
     { name: '7 7 7 (Triple Sevens)', payout: '100x Stake', desc: 'Grand Vegas Jackpot' },
@@ -331,6 +341,8 @@ export const TRIPLE_777_RULES_DATA: {
     { name: '🍒 🍒 🍒 (Cherries)', payout: '5x Stake', desc: 'Classic Cherry' },
   ],
   tips: [
+    'Use Turbo mode when you want high-speed spins without popup interruptions.',
+    'Combine Auto + Turbo for rapid-fire automated rounds.',
     'Manage your bankroll by setting steady spin sizes.',
     'Jackpot RTP is certified provably fair.',
   ],

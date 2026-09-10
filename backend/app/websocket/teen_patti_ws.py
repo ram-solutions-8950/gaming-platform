@@ -627,7 +627,7 @@ async def teen_patti_socket(websocket: WebSocket, table_id: str) -> None:
         await manager.disconnect(table_id, user_id)
         async with lock:
             h = teen_patti_manager.get(table_id)
-            if h and h.phase == Phase.WAITING:
+            if h:
                 h.remove_seat(user_id)
                 await _broadcast_state(table_id)
         await manager.broadcast(table_id, {"type": "event", "event": "left", "seat": user_id})
@@ -667,11 +667,10 @@ async def _handle_action(table_id: str, user_id: str, msg: dict) -> None:
                 await _start_hand(table_id)
             return
         elif action == "leave":
-            if hand.phase in (Phase.WAITING, Phase.FINISHED):
-                hand.remove_seat(user_id)
-                await manager.disconnect(table_id, user_id)
-                await manager.broadcast(table_id, {"type": "event", "event": "left", "seat": user_id})
-                await _broadcast_state(table_id)
+            hand.remove_seat(user_id)
+            await manager.disconnect(table_id, user_id)
+            await manager.broadcast(table_id, {"type": "event", "event": "left", "seat": user_id})
+            await _broadcast_state(table_id)
             return
         elif action == "sync":
             await _broadcast_state(table_id)

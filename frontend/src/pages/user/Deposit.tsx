@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { ArrowLeft } from 'lucide-react';
 import { Card } from '../../components/common/Card';
 import api from '../../services/api';
 
@@ -77,6 +79,7 @@ function loadRazorpayScript(): Promise<boolean> {
 }
 
 export function DepositPage() {
+  const navigate = useNavigate();
   const [amount, setAmount] = useState('');
   const [amountError, setAmountError] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
@@ -256,11 +259,23 @@ export function DepositPage() {
 
   return (
     <div className="deposit-page w-full max-w-xl mx-auto space-y-4">
-      <div className="deposit-page-header flex items-center justify-between">
-        <h1 className="deposit-page-title text-xl sm:text-2xl font-extrabold text-white">
-          Deposit Funds
-        </h1>
-        <span className="deposit-page-badge text-xs text-brand-400 bg-brand-500/10 border border-brand-500/20 px-2.5 py-1 rounded-full font-semibold">
+      <div className="deposit-page-header flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+          <button
+            type="button"
+            onClick={() => navigate(-1)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-900/60 hover:bg-purple-800/80 border border-purple-400/40 text-xs font-bold text-white transition active:scale-95 cursor-pointer shadow-md shrink-0"
+            title="Go Back"
+            aria-label="Go Back"
+          >
+            <ArrowLeft size={14} />
+            <span>Back</span>
+          </button>
+          <h1 className="deposit-page-title text-xl sm:text-2xl font-extrabold text-white truncate">
+            Deposit Funds
+          </h1>
+        </div>
+        <span className="deposit-page-badge text-xs text-brand-400 bg-brand-500/10 border border-brand-500/20 px-2.5 py-1 rounded-full font-semibold shrink-0">
           Instant Credit ⚡
         </span>
       </div>

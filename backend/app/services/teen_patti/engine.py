@@ -120,25 +120,10 @@ class TeenPattiHand:
         self.reason = None
         self.is_settled = False
 
-        # Dynamic card distribution balancing to prevent unrealistic single-player streaks
-        dominant_seat = None
-        for i, s in enumerate(self.seats):
-            if self.win_streak.get(s.id, 0) >= 2:
-                dominant_seat = i
-                break
-
         deck = shuffled_deck(self.rng)
         cards_per_seat = []
         for _ in self.seats:
             cards_per_seat.append([deck.pop(), deck.pop(), deck.pop()])
-
-        # If a seat has won 2+ rounds in a row, balance cards so opponent has competitive hand
-        if dominant_seat is not None and len(self.seats) == 2:
-            other_seat = 1 if dominant_seat == 0 else 0
-            rank_dom = evaluate_hand(cards_per_seat[dominant_seat])
-            rank_other = evaluate_hand(cards_per_seat[other_seat])
-            if rank_dom >= rank_other:
-                cards_per_seat[dominant_seat], cards_per_seat[other_seat] = cards_per_seat[other_seat], cards_per_seat[dominant_seat]
 
         # Occasional house sweep / double loss round (~7% chance when neither hand ranks above High Card)
         self.double_loss_round = (self.rng.random() < 0.07)
@@ -271,13 +256,13 @@ class TeenPattiHand:
         rank_other = evaluate_hand(self.seats[other_idx].cards)
 
         is_tie = (rank_caller == rank_other)
-        # Settle showdown ties or unqualified dual high-card rounds as house collection
-        if is_tie or (getattr(self, "double_loss_round", False) and rank_caller.category == HandCategory.HIGH_CARD and rank_other.category == HandCategory.HIGH_CARD):
+        # Settle showdown ties or occasional random house sweeps
+        if is_tie or getattr(self, "double_loss_round", False):
             for i in active:
                 self.seats[i].show_cards = True
                 self.seats[i].status = PlayerStatus.SHOW_LOSER
             self.phase = Phase.SHOWDOWN
-            tie_reason = "Showdown Tie: Equal hands — both players lost stakes to House" if is_tie else "House Takes Pot: Neither player qualified — both players lost stakes"
+            tie_reason = "Showdown Tie: Equal hands — both players lost stakes to House" if is_tie else "House Takes Pot: Both players lost stakes"
             self._finish_hand(winner_idx=None, reason=tie_reason)
             return {
                 "winner_seat": None,

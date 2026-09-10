@@ -85,22 +85,47 @@ export const LudoDice: React.FC<Props> = ({
     onRoll();
   };
 
-  // Render authentic high-roller 6-face dots with concave obsidian & ruby crystal
-  const renderDots = (num: number) => {
-    const dotsMap: Record<number, string[]> = {
-      1: ['center'],
-      2: ['top-left', 'bottom-right'],
-      3: ['top-left', 'center', 'bottom-right'],
-      4: ['top-left', 'top-right', 'bottom-left', 'bottom-right'],
-      5: ['top-left', 'top-right', 'center', 'bottom-left', 'bottom-right'],
-      6: ['top-left', 'top-right', 'mid-left', 'mid-right', 'bottom-left', 'bottom-right'],
-    };
+  // 3x3 Grid Placement for authentic dice face dots (1..6)
+  const DICE_GRID_PIPS: Record<number, Array<{ row: number; col: number; isCenter?: boolean }>> = {
+    1: [{ row: 2, col: 2, isCenter: true }],
+    2: [
+      { row: 1, col: 1 },
+      { row: 3, col: 3 },
+    ],
+    3: [
+      { row: 1, col: 1 },
+      { row: 2, col: 2, isCenter: true },
+      { row: 3, col: 3 },
+    ],
+    4: [
+      { row: 1, col: 1 },
+      { row: 1, col: 3 },
+      { row: 3, col: 1 },
+      { row: 3, col: 3 },
+    ],
+    5: [
+      { row: 1, col: 1 },
+      { row: 1, col: 3 },
+      { row: 2, col: 2, isCenter: true },
+      { row: 3, col: 1 },
+      { row: 3, col: 3 },
+    ],
+    6: [
+      { row: 1, col: 1 },
+      { row: 1, col: 3 },
+      { row: 2, col: 1 },
+      { row: 2, col: 3 },
+      { row: 3, col: 1 },
+      { row: 3, col: 3 },
+    ],
+  };
 
-    const activeDots = dotsMap[num] || dotsMap[1];
+  const renderDots = (num: number) => {
+    const activePips = DICE_GRID_PIPS[num] || DICE_GRID_PIPS[1];
 
     return (
       <div
-        className={`ludo-dice-3d relative w-18 h-18 sm:w-20 sm:h-20 rounded-[20px] p-3 flex items-center justify-center select-none ${
+        className={`ludo-dice-3d relative w-16 h-16 sm:w-20 sm:h-20 rounded-[20px] p-2.5 sm:p-3 grid grid-cols-3 grid-rows-3 select-none ${
           rolling
             ? 'animate-dice-roll-3d'
             : isMyTurn && canRoll
@@ -114,46 +139,20 @@ export const LudoDice: React.FC<Props> = ({
           <div className="absolute bottom-1.5 right-1.5 w-6 h-6 rounded-full bg-white/25 blur-[1.5px] pointer-events-none" />
         </div>
 
-        {/* Top Left Pip */}
-        {activeDots.includes('top-left') && (
-          <span className="ludo-dice-pip absolute top-3 left-3 w-3.5 h-3.5 rounded-full" />
-        )}
-
-        {/* Top Right Pip */}
-        {activeDots.includes('top-right') && (
-          <span className="ludo-dice-pip absolute top-3 right-3 w-3.5 h-3.5 rounded-full" />
-        )}
-
-        {/* Middle Left Pip */}
-        {activeDots.includes('mid-left') && (
-          <span className="ludo-dice-pip absolute top-[calc(50%-7px)] left-3 w-3.5 h-3.5 rounded-full" />
-        )}
-
-        {/* Center Pip: Luxurious Ruby Red on 1, Obsidian on 3 and 5 */}
-        {activeDots.includes('center') && (
+        {activePips.map((pip, idx) => (
           <span
-            className={`ludo-dice-pip absolute rounded-full ${
-              num === 1
-                ? 'ludo-dice-pip--ruby w-4.5 h-4.5'
-                : 'w-3.5 h-3.5'
+            key={idx}
+            className={`ludo-dice-pip place-self-center rounded-full ${
+              pip.isCenter && num === 1
+                ? 'ludo-dice-pip--ruby w-4 h-4 sm:w-4.5 sm:h-4.5'
+                : 'w-3 h-3 sm:w-3.5 sm:h-3.5'
             }`}
+            style={{
+              gridRow: pip.row,
+              gridColumn: pip.col,
+            }}
           />
-        )}
-
-        {/* Middle Right Pip */}
-        {activeDots.includes('mid-right') && (
-          <span className="ludo-dice-pip absolute top-[calc(50%-7px)] right-3 w-3.5 h-3.5 rounded-full" />
-        )}
-
-        {/* Bottom Left Pip */}
-        {activeDots.includes('bottom-left') && (
-          <span className="ludo-dice-pip absolute bottom-3 left-3 w-3.5 h-3.5 rounded-full" />
-        )}
-
-        {/* Bottom Right Pip */}
-        {activeDots.includes('bottom-right') && (
-          <span className="ludo-dice-pip absolute bottom-3 right-3 w-3.5 h-3.5 rounded-full" />
-        )}
+        ))}
       </div>
     );
   };

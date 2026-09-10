@@ -26,7 +26,7 @@ from .models import LiveRound, LiveBet, RoundPhase, BetStatus
 
 logger = get_logger("aviator_engine")
 
-HOUSE_EDGE = 0.06          # 6% house edge (94% RTP, standard for commercial crash games)
+HOUSE_EDGE = 0.04          # 4% house edge (96% RTP, official commercial standard for crash games)
 BETTING_DURATION = 10.0    # seconds
 COOLDOWN_DURATION = 3.0    # seconds
 MULTIPLIER_TICK_INTERVAL = 0.25   # server snapshot interval (4 per second)
@@ -63,18 +63,18 @@ def compute_crash_point(server_seed: str, nonce: int) -> float:
     h = int(h_bytes[:13], 16)
     e = 2 ** 52
     if h == e:
-        # Avoid division by zero — instant crash
-        return 1.00
+        # Avoid division by zero
+        return 1.10
 
-    # Approx 6% instant/early takeoff crashes (1.00x - 1.15x) to maintain house edge
-    if (h % 17) == 0:
-        early_mult = 1.00 + round(((h % 16) / 100.0), 2)
+    # Approx 3% instant/early takeoff crashes (1.10x - 1.25x) to maintain house edge without frustrating instant wipes
+    if (h % 33) == 0:
+        early_mult = 1.10 + round(((h % 16) / 100.0), 2)
         return round(early_mult, 2)
 
     u = h / e
     raw = (1.0 / (1.0 - u)) * (1.0 - HOUSE_EDGE)
-    if raw <= 1.00:
-        return 1.00
+    if raw <= 1.10:
+        return 1.10
 
     if raw <= 2.00:
         val = raw

@@ -101,7 +101,7 @@ function ResultOverlay({
   const myLossRupees = (myLossPaise / 100).toFixed(2);
 
   return (
-    <div className="absolute inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-40 p-2 sm:p-4 overflow-y-auto select-none">
+    <div className="fixed inset-0 z-[90] bg-black/90 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 overflow-y-auto select-none">
       <div className="w-full max-w-sm max-h-[96vh] bg-gradient-to-b from-[#1d0d33] via-[#120824] to-[#0a0316] border-2 border-amber-500/50 rounded-2xl shadow-[0_0_50px_rgba(0,0,0,0.9)] p-3 sm:p-4 flex flex-col items-center justify-center gap-1.5 text-center my-auto overflow-y-auto">
         <p className="font-display text-base sm:text-lg text-gold-400 font-extrabold tracking-wide">
           {isGameOver
@@ -160,14 +160,14 @@ function ResultOverlay({
         </div>
         <p className="text-[8px] text-slate-500 font-mono hidden sm:block">Table: {state.table_id.slice(0, 8)}</p>
         {isGameOver ? (
-          <div className="flex gap-2 mt-1 w-full max-w-[17rem] justify-center">
+          <div className="flex flex-wrap gap-2 mt-1 w-full max-w-[17rem] justify-center">
             <button
               type="button"
               className="flex-1 py-2 px-3 bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 text-slate-950 font-black text-xs rounded-xl shadow-lg border border-amber-300 hover:brightness-110 active:scale-95 transition-all cursor-pointer whitespace-nowrap"
               disabled={playAgainBusy}
               onClick={onPlayAgain}
             >
-              {playAgainBusy ? "Creating…" : "🔁 Play Again"}
+              {playAgainBusy ? "Creating…" : "🔁 New Game"}
             </button>
             <button
               type="button"
@@ -416,21 +416,8 @@ export default function GameTable({ onBack, onExit, customTableId }: { onBack?: 
 
 
   async function handlePlayAgain() {
-    if (!table) return;
     setPlayAgainBusy(true);
-    try {
-      const fresh = await RummyApi.createTable({
-        name: table.name,
-        mode: table.mode,
-        max_players: table.max_players,
-        num_deals: table.num_deals,
-        entry_fee_paise: table.entry_fee_paise,
-        pool_limit: table.pool_limit,
-      });
-      navigate(`/games/rummy?tableId=${fresh.id}`);
-    } finally {
-      setPlayAgainBusy(false);
-    }
+    navigate('/games/rummy');
   }
 
   useEffect(() => {

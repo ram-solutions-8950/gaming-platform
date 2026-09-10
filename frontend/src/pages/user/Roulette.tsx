@@ -936,17 +936,7 @@ export function RoulettePage() {
           </button>
         </div>
 
-        {/* Lucky 3Patti Badge */}
-        <div
-          className="roulette-lucky-badge cursor-pointer hover:scale-105 active:scale-95 transition-all"
-          onClick={() => setToastMessage('🎰 Jackpot Pool: ₹12,85,420! Playing Roulette round.')}
-          title="Lucky 3 Patti & Jackpot"
-        >
-          <div className="lucky-badge-content">
-            <span className="badge-sub">JACKPOT</span>
-            <span className="badge-main">LUCKY 3PATTI</span>
-          </div>
-        </div>
+
       </footer>
 
       {/* Floating Toast Notification */}

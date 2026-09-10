@@ -7,7 +7,6 @@ interface Props {
   legalTokenIndices: number[];
   onTokenClick: (tokenIndex: number) => void;
   isMyTurn?: boolean;
-  myColor?: LudoColor | null;
 }
 
 // 52 Common Track Cells in clockwise order (Grid 15x15, 0..14)
@@ -56,11 +55,8 @@ export const LudoBoard: React.FC<Props> = ({
   legalTokenIndices,
   onTokenClick,
   isMyTurn,
-  myColor,
 }) => {
-  const shouldRotate180 = myColor === 'YELLOW' || myColor === 'GREEN';
-
-  // Convert token position to (cx, cy) on 1500x1500 board (with player perspective rotation)
+  // Convert token position to (cx, cy) on 1500x1500 board
   const getTokenCoords = (token: LudoToken, color: LudoColor): [number, number] => {
     let gx = 0;
     let gy = 0;
@@ -82,11 +78,6 @@ export const LudoBoard: React.FC<Props> = ({
       };
       const trackIndex = (startOffsets[color] + token.position) % 52;
       [gx, gy] = TRACK_COORDINATES[trackIndex];
-    }
-
-    if (shouldRotate180) {
-      gx = 14 - gx;
-      gy = 14 - gy;
     }
 
     return [gx * 100 + 50, gy * 100 + 50];
@@ -333,8 +324,8 @@ export const LudoBoard: React.FC<Props> = ({
         {/* Board Background */}
         <rect width="1500" height="1500" fill="#0b1120" rx="32" />
 
-        {/* 4 Large Corner Yards with Beveled Trays & Sunk Sockets (Rotated 180 when player is Yellow/Green so player is on Left) */}
-        <g transform={shouldRotate180 ? 'rotate(180 750 750)' : undefined}>
+        {/* 4 Large Corner Yards with Beveled Trays & Sunk Sockets */}
+        <g>
           {/* Red Yard (Top Left) */}
           <g>
             <rect x="0" y="0" width="600" height="600" fill="url(#yardRedGrad)" rx="24" />
@@ -519,146 +510,142 @@ export const LudoBoard: React.FC<Props> = ({
                   transition: 'transform 0.25s ease',
                 }}
               >
-                {/* Active Turn Ground Halo & Pulse Rings */}
+                {/* Active Turn Ground Halo & Pulse Rings (BUG-004) */}
                 {isLegal && (
                   <g>
+                    {/* Multi-layered Pulsing Golden Beacon Aura */}
                     <ellipse
                       cx={rawCx}
-                      cy={rawCy + 14}
-                      rx="48"
-                      ry="22"
-                      fill="rgba(245, 158, 11, 0.35)"
+                      cy={rawCy + 15}
+                      rx="52"
+                      ry="24"
+                      fill="rgba(245, 158, 11, 0.4)"
                       stroke="#fbbf24"
-                      strokeWidth="4"
+                      strokeWidth="5"
                       className="ludo-token-pulse-ring"
                     />
                     <ellipse
                       cx={rawCx}
-                      cy={rawCy + 14}
-                      rx="36"
-                      ry="16"
-                      fill="none"
+                      cy={rawCy + 15}
+                      rx="38"
+                      ry="17"
+                      fill="rgba(254, 240, 138, 0.25)"
                       stroke="#fef08a"
-                      strokeWidth="2.5"
-                      strokeDasharray="6,4"
+                      strokeWidth="3"
+                      strokeDasharray="8,5"
                     />
-                    {/* Bouncing Golden Floating Pointer Arrow Above Pawn */}
+                    {/* Bouncing Golden Floating 3D Pointer Arrow Above Pawn (BUG-004) */}
                     <g className="ludo-token-bounce-arrow pointer-events-none">
                       <polygon
-                        points={`${cx},${cy - 66} ${cx - 16},${cy - 92} ${cx + 16},${cy - 92}`}
+                        points={`${cx},${cy - 80} ${cx - 18},${cy - 108} ${cx + 18},${cy - 108}`}
                         fill="#f59e0b"
                         stroke="#ffffff"
-                        strokeWidth="2.5"
-                        filter="drop-shadow(0 4px 8px rgba(0,0,0,0.8))"
+                        strokeWidth="3"
+                        filter="drop-shadow(0 6px 12px rgba(0,0,0,0.85))"
                       />
                       <polygon
-                        points={`${cx},${cy - 70} ${cx - 10},${cy - 88} ${cx + 10},${cy - 88}`}
+                        points={`${cx},${cy - 84} ${cx - 12},${cy - 103} ${cx + 12},${cy - 103}`}
                         fill="#fef08a"
                       />
+                      {/* Floating glowing crown star atop arrow */}
+                      <circle cx={cx} cy={cy - 118} r="10" fill="#f59e0b" stroke="#ffffff" strokeWidth="2" filter="drop-shadow(0 2px 4px rgba(0,0,0,0.6))" />
+                      <text x={cx} y={cy - 114} textAnchor="middle" fontSize="13" fontWeight="900" fill="#ffffff">★</text>
                     </g>
                   </g>
                 )}
 
-                {/* 3D Luxury Translucent Jewel Glass Pawn (Matching Reference Image) */}
-                <g className={isLegal ? 'ludo-movable-pawn' : ''} filter={isLegal ? 'url(#goldLegalGlow)' : 'url(#pawnDropShadow)'}>
-                  {/* Ground Contact Shadow */}
-                  <ellipse cx={cx} cy={cy + 17} rx="30" ry="10" fill="rgba(0,0,0,0.6)" />
+                {/* 3D Luxury Arcade Pawn (BUG-006) */}
+                <g
+                  className={isLegal ? 'ludo-movable-pawn' : ''}
+                  filter={isLegal ? 'url(#goldLegalGlow)' : 'url(#pawnDropShadow)'}
+                  opacity={isMyTurn && isTurn && !isLegal && legalTokenIndices.length > 0 ? 0.45 : 1}
+                  style={{ transition: 'opacity 0.25s ease' }}
+                >
+                  {/* Ground Contact Shadow with Ambient Occlusion */}
+                  <ellipse cx={cx} cy={cy + 18} rx="32" ry="11" fill="rgba(0,0,0,0.65)" />
 
-                  {/* Pawn Base: Bottom Shadow Rim */}
-                  <ellipse cx={cx} cy={cy + 12} rx="26" ry="9" fill={baseRim} />
+                  {/* Metallic Heavyweight Base Rim (Outer Gold Trim) */}
+                  <ellipse cx={cx} cy={cy + 13} rx="28" ry="10" fill="url(#goldCollar)" stroke={baseRim} strokeWidth="1" />
                   
-                  {/* Pawn Base: Top Plate Disc */}
+                  {/* Pawn Base Top Plate: Rich Color Bevel */}
                   <ellipse
                     cx={cx}
-                    cy={cy + 9}
+                    cy={cy + 10}
                     rx="26"
                     ry="8"
-                    fill={`url(#${colorKey}BodyGrad)`}
+                    fill={`url(#${colorKey}HeadGrad)`}
                     stroke={isLegal ? '#fef08a' : 'rgba(255,255,255,0.7)'}
-                    strokeWidth={isLegal ? 2.5 : 1.2}
+                    strokeWidth={isLegal ? 3 : 1.2}
                   />
 
-                  {/* Conical Flared Jewel Glass Body */}
+                  {/* Sleek Aerodynamic 3D Pawn Body */}
                   <path
-                    d={`M ${cx - 22},${cy + 9} C ${cx - 20},${cy - 6} ${cx - 10},${cy - 22} ${cx - 8},${cy - 30} L ${cx + 8},${cy - 30} C ${cx + 10},${cy - 22} ${cx + 20},${cy - 6} ${cx + 22},${cy + 9} Z`}
-                    fill={`url(#${colorKey}BodyGrad)`}
-                    stroke={isLegal ? '#fef08a' : 'none'}
-                    strokeWidth={isLegal ? 2 : 0}
+                    d={`M ${cx - 22},${cy + 10} C ${cx - 20},${cy - 5} ${cx - 11},${cy - 22} ${cx - 8},${cy - 30} L ${cx + 8},${cy - 30} C ${cx + 11},${cy - 22} ${cx + 20},${cy - 5} ${cx + 22},${cy + 10} Z`}
+                    fill={`url(#${colorKey}HeadGrad)`}
+                    stroke={isLegal ? '#fef08a' : 'rgba(255,255,255,0.4)'}
+                    strokeWidth={isLegal ? 2.5 : 0.8}
                   />
 
-                  {/* Inner Caustic Refraction Glow in Body Base */}
-                  <ellipse
-                    cx={cx}
-                    cy={cy + 2}
-                    rx="14"
-                    ry="7"
-                    fill={`url(#${colorKey}CausticGrad)`}
-                    opacity="0.8"
-                  />
-
-                  {/* Vertical Longitudinal Glass Sheen Highlight down Left Flank */}
+                  {/* Vertical Gloss Specular Sheen down Flank */}
                   <path
-                    d={`M ${cx - 15},${cy + 7} C ${cx - 14},${cy - 6} ${cx - 7},${cy - 20} ${cx - 5},${cy - 28} L ${cx - 2},${cy - 28} C ${cx - 4},${cy - 20} ${cx - 10},${cy - 6} ${cx - 10},${cy + 7} Z`}
+                    d={`M ${cx - 15},${cy + 8} C ${cx - 14},${cy - 5} ${cx - 8},${cy - 18} ${cx - 5},${cy - 26} L ${cx - 1},${cy - 26} C ${cx - 4},${cy - 18} ${cx - 10},${cy - 5} ${cx - 10},${cy + 8} Z`}
                     fill="#ffffff"
                     opacity="0.45"
                   />
 
-                  {/* Right Side Subtle Glass Rim Highlight */}
-                  <path
-                    d={`M ${cx + 17},${cy + 7} C ${cx + 15},${cy - 4} ${cx + 9},${cy - 20} ${cx + 6},${cy - 28}`}
-                    fill="none"
-                    stroke="rgba(255,255,255,0.4)"
-                    strokeWidth="1.2"
-                  />
+                  {/* Embossed Golden Arcade Star Insignia on Chest */}
+                  <text
+                    x={cx}
+                    y={cy - 4}
+                    textAnchor="middle"
+                    fontSize="16"
+                    fontWeight="900"
+                    fill="#fef08a"
+                    stroke="#b45309"
+                    strokeWidth="0.8"
+                    filter="drop-shadow(0 1px 2px rgba(0,0,0,0.8))"
+                  >
+                    ★
+                  </text>
 
-                  {/* Metallic Polished Gold Collar Ring */}
+                  {/* Polished Gold Collar Ring */}
                   <ellipse
                     cx={cx}
                     cy={cy - 30}
-                    rx="12"
+                    rx="13"
                     ry="4.5"
                     fill="url(#goldCollar)"
                     stroke="#78350f"
-                    strokeWidth="0.8"
+                    strokeWidth="1"
                   />
 
-                  {/* Spherical 3D Jewel Glass Head */}
+                  {/* Spherical 3D High-Gloss Crown Head */}
                   <circle
                     cx={cx}
                     cy={cy - 48}
-                    r="19"
+                    r="20"
                     fill={`url(#${colorKey}HeadGrad)`}
-                    stroke={isLegal ? '#fef08a' : 'rgba(255,255,255,0.5)'}
-                    strokeWidth={isLegal ? 2.5 : 1}
+                    stroke={isLegal ? '#fef08a' : 'rgba(255,255,255,0.7)'}
+                    strokeWidth={isLegal ? 3 : 1.2}
                   />
 
-                  {/* Head Bottom-Right Inner Caustic Refraction Glow */}
-                  <ellipse
-                    cx={cx + 5}
-                    cy={cy - 41}
-                    rx="9"
-                    ry="5"
-                    fill={`url(#${colorKey}CausticGrad)`}
-                    opacity="0.85"
-                  />
-
-                  {/* Head Top-Left Specular Crescent Glint */}
+                  {/* Crown Specular Glint (Crescent Glint) */}
                   <ellipse
                     cx={cx - 6}
                     cy={cy - 54}
-                    rx="6.5"
-                    ry="3.5"
+                    rx="7"
+                    ry="4"
                     fill="#ffffff"
-                    opacity="0.9"
+                    opacity="0.85"
                     transform={`rotate(-25 ${cx - 6} ${cy - 54})`}
                   />
-                  {/* Pinpoint Sparkle Highlight */}
-                  <circle cx={cx - 10} cy={cy - 48} r="2.2" fill="#ffffff" opacity="0.95" />
+                  {/* Pinpoint Sparkle Star */}
+                  <circle cx={cx - 11} cy={cy - 48} r="2.5" fill="#ffffff" opacity="0.95" />
                 </g>
 
                 {/* Enlarged touch area for mobile click comfort */}
                 {isLegal && (
-                  <circle cx={cx} cy={cy - 24} r="48" fill="transparent" />
+                  <circle cx={cx} cy={cy - 24} r="54" fill="transparent" />
                 )}
               </g>
             );

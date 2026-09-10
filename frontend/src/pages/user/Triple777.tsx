@@ -39,6 +39,7 @@ export function Triple777Page() {
   const [stake, setStake] = useState<number>(10);
   const [turbo, setTurbo] = useState<boolean>(false);
   const [autoSpinsLeft, setAutoSpinsLeft] = useState<number | null>(null);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const [spinning, setSpinning] = useState<boolean>(false);
   const [spinReels, setSpinReels] = useState<[string, string, string]>(['7', 'BAR', 'CHERRY']);
@@ -67,11 +68,27 @@ export function Triple777Page() {
   const autoSpinActiveRef = useRef<boolean>(false);
   const autoSpinsRemainingRef = useRef<number>(0);
   const autoSpinTimerRef = useRef<any>(null);
+  const toastTimerRef = useRef<any>(null);
   const turboRef = useRef<boolean>(false);
   const balanceRef = useRef<number>(balance);
   balanceRef.current = balance;
   const stakeRef = useRef<number>(stake);
   stakeRef.current = stake;
+
+  const handleToggleTurbo = useCallback(() => {
+    soundManager.play('button_click');
+    haptics.spin();
+    setTurbo((prev) => {
+      const next = !prev;
+      turboRef.current = next;
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+      setToastMessage(next ? '⚡ TURBO ON: Spins 3× faster, results shown instantly!' : '⚡ TURBO OFF: Normal spin speed restored');
+      toastTimerRef.current = setTimeout(() => {
+        setToastMessage(null);
+      }, 2200);
+      return next;
+    });
+  }, []);
 
   const stopAutoSpin = useCallback(() => {
     autoSpinActiveRef.current = false;
@@ -284,8 +301,8 @@ export function Triple777Page() {
               setErrorMessage('Auto spin stopped: Insufficient balance.');
             }
           } else {
-            // Snappy auto advance: 350ms in turbo, 700ms in normal
-            const nextSpinDelay = isTurbo ? 350 : 700;
+            // Snappy auto advance: 200ms in turbo, 700ms in normal
+            const nextSpinDelay = isTurbo ? 200 : 700;
             autoSpinTimerRef.current = setTimeout(() => {
               if (autoSpinActiveRef.current) {
                 handleSpin(stakeRef.current, turboRef.current);
@@ -293,8 +310,14 @@ export function Triple777Page() {
             }, nextSpinDelay);
           }
         } else {
-          // Manual spin: display outcome popup
-          setShowResultPopup(true);
+          // Manual spin: In turbo mode, skip routine modal popups for instant continuous play
+          if (isTurbo) {
+            if (response.tier === 'jackpot' || response.tier === 'bigwin') {
+              setShowResultPopup(true);
+            }
+          } else {
+            setShowResultPopup(true);
+          }
         }
       }, revealDelay);
     } catch (err: any) {
@@ -453,12 +476,27 @@ export function Triple777Page() {
         </header>
 
         {/* ── 2. Main Slot Machine Stage (Portrait) ── */}
-        <main className="t777-stage">
+        <main className="t777-stage relative">
+          {/* Floating Toast Notification */}
+          {toastMessage && (
+            <div className="t777-floating-toast">
+              {toastMessage}
+            </div>
+          )}
+
           {/* Jackpot Banner */}
           <div className="t777-jackpot-banner">
             <span className="t777-jackpot-tag">👑 JACKPOT</span>
             <span className="t777-jackpot-val">₹{jackpot.toLocaleString()}</span>
           </div>
+
+          {/* Turbo Mode Active Badge */}
+          {turbo && (
+            <div className="t777-turbo-badge">
+              <Zap size={12} className="fill-amber-300 text-amber-200 animate-pulse" />
+              <span>⚡ TURBO: Ultra-Fast Spins Active</span>
+            </div>
+          )}
 
           {/* Error Banner */}
           {errorMessage && (
@@ -548,23 +586,17 @@ export function Triple777Page() {
             {/* Turbo Toggle */}
             <button
               type="button"
-              onClick={() => {
-                setTurbo((prev) => {
-                  const next = !prev;
-                  turboRef.current = next;
-                  return next;
-                });
-              }}
+              onClick={handleToggleTurbo}
               className={`t777-toggle-btn t777-toggle-btn--turbo ${
-                turbo ? 't777-toggle-btn--active' : ''
+                turbo ? 't777-toggle-btn--active t777-toggle-btn--turbo-active' : ''
               }`}
-              title="Turbo Mode: Fast 2× Spin Speed"
+              title="Turbo Mode: Ultra-Fast Spins with Instant Results"
             >
-              <Zap size={15} className={turbo ? 'fill-amber-300 text-amber-200' : 'text-slate-400'} />
+              <Zap size={16} className={turbo ? 'fill-amber-300 text-amber-100 animate-pulse' : 'text-slate-400'} />
               <div className="flex flex-col items-center leading-none">
                 <span className="text-[10px] font-black">TURBO</span>
-                <span className={`text-[8px] font-bold ${turbo ? 'text-amber-100' : 'text-slate-400'}`}>
-                  {turbo ? '2× FAST' : 'OFF'}
+                <span className={`text-[8px] font-extrabold ${turbo ? 'text-amber-100' : 'text-slate-400'}`}>
+                  {turbo ? '⚡ ULTRA' : 'OFF'}
                 </span>
               </div>
             </button>
@@ -592,16 +624,20 @@ export function Triple777Page() {
               </div>
             </button>
 
-            {/* Large Glossy Green SPIN Button */}
+            {/* Large Glossy Green SPIN Button (With Turbo indicator when active) */}
             <button
               type="button"
               disabled={spinning || autoSpinsLeft !== null}
               onClick={() => handleSpin(stake, turbo)}
-              className="t777-spin-btn"
+              className={`t777-spin-btn ${turbo ? 't777-spin-btn--turbo' : ''}`}
               aria-label="Spin Slot Machine"
             >
-              <Play size={20} fill="#052e16" />
-              <span>{spinning ? (turbo ? 'FAST SPINNING...' : 'SPINNING...') : `SPIN ₹${stake}`}</span>
+              {turbo ? <Zap size={20} className="fill-amber-400 text-amber-200" /> : <Play size={20} fill="#052e16" />}
+              <span>
+                {spinning
+                  ? (turbo ? '⚡ FAST SPINNING...' : 'SPINNING...')
+                  : (turbo ? `⚡ TURBO SPIN ₹${stake}` : `SPIN ₹${stake}`)}
+              </span>
             </button>
           </div>
         </footer>

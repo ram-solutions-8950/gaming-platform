@@ -25,8 +25,8 @@ export const LudoPlayerPanel: React.FC<Props> = ({
 
   return (
     <div
-      className={`ludo-player-card relative flex items-center justify-between p-2.5 sm:p-3 rounded-xl border transition-all duration-300 ${
-        isCurrentTurn ? `${style.border} ${style.bg} shadow-lg ring-2 ring-amber-400/40` : 'border-slate-800 bg-slate-900/60 opacity-80'
+      className={`ludo-player-card relative flex items-center justify-between px-3 py-2 sm:py-2.5 rounded-xl border transition-all duration-300 min-h-[58px] ${
+        isCurrentTurn ? `${style.border} ${style.bg} shadow-lg ring-2 ring-amber-400/50` : 'border-slate-800 bg-slate-900/60 opacity-80'
       }`}
     >
       {/* Left: Avatar & Name */}
@@ -56,7 +56,7 @@ export const LudoPlayerPanel: React.FC<Props> = ({
       </div>
 
       {/* Right: Timeout Warning Dots & Home Score */}
-      <div className="flex flex-col items-end gap-1">
+      <div className="flex flex-col items-end justify-center gap-1.5 shrink-0">
         {/* Home Score */}
         <div className="flex items-center gap-1">
           <span className="text-[10px] text-slate-400">Home:</span>
@@ -64,7 +64,7 @@ export const LudoPlayerPanel: React.FC<Props> = ({
         </div>
 
         {/* 3 Timeout Warning Indicators */}
-        <div className="flex items-center gap-1" title="Missed turn count (3 misses = forfeit)">
+        <div className="flex items-center gap-1.5 py-0.5" title="Missed turn count (3 misses = forfeit)">
           {[0, 1, 2].map((idx) => {
             const hasTimedOut = player.consecutive_timeouts > idx;
             return (

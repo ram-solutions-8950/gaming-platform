@@ -9,9 +9,9 @@ function randomSymbol(allSymbols: string[]): string {
   return allSymbols[Math.floor(Math.random() * allSymbols.length)];
 }
 
-function buildStrip(target: string, allSymbols: string[]): string[] {
+function buildStrip(target: string, allSymbols: string[], blurLen: number = BLUR_LEN): string[] {
   const strip: string[] = [];
-  for (let i = 0; i < BLUR_LEN; i++) strip.push(randomSymbol(allSymbols));
+  for (let i = 0; i < blurLen; i++) strip.push(randomSymbol(allSymbols));
   strip.push(randomSymbol(allSymbols), target, randomSymbol(allSymbols));
   return strip;
 }
@@ -55,16 +55,17 @@ function Reel({ symbols, target, spinToken, reelIndex, pace }: ReelProps) {
   useEffect(() => {
     if (spinToken === prevToken.current) return;
     prevToken.current = spinToken;
-    const newStrip = buildStrip(target, symbols);
+    const blurLen = pace === "turbo" ? 8 : BLUR_LEN;
+    const newStrip = buildStrip(target, symbols, blurLen);
     setAnimate(false);
     setStrip(newStrip);
     setOffset(0);
     const raf = requestAnimationFrame(() => {
       setAnimate(true);
-      setOffset(BLUR_LEN * SYMBOL_HEIGHT);
+      setOffset(blurLen * SYMBOL_HEIGHT);
     });
     return () => cancelAnimationFrame(raf);
-  }, [spinToken, target, symbols]);
+  }, [spinToken, target, symbols, pace]);
 
   const duration = REEL_STOPS_MS[pace][reelIndex] / 1000;
 

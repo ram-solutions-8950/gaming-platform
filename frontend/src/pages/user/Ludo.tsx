@@ -65,7 +65,7 @@ export const Ludo: React.FC = () => {
       bannerTimerRef.current = setTimeout(() => {
         setBanner(null);
         bannerTimerRef.current = null;
-      }, 2400);
+      }, 1400);
     },
     []
   );
@@ -574,7 +574,6 @@ export const Ludo: React.FC = () => {
 
   // Identify Player Info
   const myPlayer = matchState?.players.find((p) => p.user_id === user?.id);
-  const myColor = myPlayer?.color || null;
   const isMyTurn = Boolean(
     myPlayer &&
       matchState?.status === 'IN_PROGRESS' &&
@@ -586,24 +585,14 @@ export const Ludo: React.FC = () => {
   const winnerPlayer = matchState?.players.find((p) => p.rank === 1) || null;
   const isWinnerMe = Boolean(winnerPlayer && myPlayer && winnerPlayer.user_id === myPlayer.user_id);
 
-  // Perspective orientation: player's home/yard is always on the Left side
-  const shouldRotate180 = myColor === 'YELLOW' || myColor === 'GREEN';
-
-  // Position Players at the 4 Corners matching Board Yards
-  // In normal orientation: Top-Left: Red, Bottom-Left: Blue, Top-Right: Green, Bottom-Right: Yellow
-  // When rotated 180 (so myPlayer Yellow/Green is on Left):
-  // Top-Left: Yellow, Bottom-Left: Green, Top-Right: Blue, Bottom-Right: Red
+  // Authentic 4-Corner mapping matching Board Yards:
+  // Top-Left: Red, Bottom-Left: Blue, Top-Right: Green, Bottom-Right: Yellow
   const redPlayer = matchState?.players.find((p) => p.color === 'RED');
   const greenPlayer = matchState?.players.find((p) => p.color === 'GREEN');
   const bluePlayer = matchState?.players.find((p) => p.color === 'BLUE');
   const yellowPlayer = matchState?.players.find((p) => p.color === 'YELLOW');
 
-  const topLeftPlayer = shouldRotate180 ? yellowPlayer : redPlayer;
-  const bottomLeftPlayer = shouldRotate180 ? greenPlayer : bluePlayer;
-  const topRightPlayer = shouldRotate180 ? bluePlayer : greenPlayer;
-  const bottomRightPlayer = shouldRotate180 ? redPlayer : yellowPlayer;
-
-  // Movable tokens calculation with fallback
+  // Movable tokens calculation with fallback (BUG-004)
   const legalTokenIndices = React.useMemo(() => {
     if (!matchState || !isMyTurn) return [];
     if (matchState.legal_token_indices && matchState.legal_token_indices.length > 0) {
@@ -620,12 +609,18 @@ export const Ludo: React.FC = () => {
       .map((t) => t.token_index);
   }, [matchState, isMyTurn, diceDisplayValue, myPlayer]);
 
-  // Determine dynamic dice side:
-  // If active turn is on the left side, display dice on the left side!
-  const activeColor = matchState?.current_turn_color || myColor || 'RED';
-  const isLeftSideActive = shouldRotate180
-    ? activeColor === 'YELLOW' || activeColor === 'GREEN'
-    : activeColor === 'RED' || activeColor === 'BLUE';
+  // Smart Auto-Move (BUG-005): If there is only ONE legal move, auto-dispatch smoothly
+  // after a brief 400ms visual confirmation so turns transition smoothly without delays.
+  useEffect(() => {
+    if (!isMyTurn || rollingDice || !matchState || matchState.last_dice_roll === null) return;
+    if (legalTokenIndices.length === 1) {
+      const tokenIdx = legalTokenIndices[0];
+      const autoTimer = setTimeout(() => {
+        handleMoveToken(tokenIdx);
+      }, 400);
+      return () => clearTimeout(autoTimer);
+    }
+  }, [isMyTurn, rollingDice, matchState?.last_dice_roll, legalTokenIndices]);
 
   // Hardware & popstate Back Button Handler
   useEffect(() => {
@@ -760,44 +755,44 @@ export const Ludo: React.FC = () => {
             </div>
           </div>
 
-          {/* Arena Stage: Centered Board flanked by Corner Player Panels & Corner Dice */}
+          {/* Arena Stage: Centered Board flanked by Corner Player Panels & Corner Dice (BUG-003) */}
           <div className="ludo-arena-stage w-full flex-1 flex flex-row items-center justify-between gap-2 sm:gap-4 overflow-hidden min-h-0 px-1 sm:px-3">
-            {/* Left Side: P1 Red (Top-Left) & P3 Blue / Left Dice */}
-            {/* Left Side: Top-Left & Bottom-Left / Left Dice */}
+            {/* Left Column: Top-Left (RED) & Bottom-Left (BLUE) */}
             <div className="ludo-side-col-left h-full flex flex-col justify-between items-start w-[170px] sm:w-[210px] shrink-0 py-0.5">
-              {/* Top-Left Corner: Primary Player (always 'Me' when playing) */}
-              <div className="w-full">
-                {topLeftPlayer ? (
-                  <LudoPlayerPanel
-                    player={topLeftPlayer}
-                    isCurrentTurn={matchState.current_turn_color === topLeftPlayer.color}
-                    isMe={topLeftPlayer.user_id === user?.id}
-                  />
+              {/* Top-Left: RED Player Panel & Dice (when Red's turn) */}
+              <div className="w-full flex flex-col gap-1.5 items-start">
+                {redPlayer ? (
+                  <div className="w-full">
+                    <LudoPlayerPanel
+                      player={redPlayer}
+                      isCurrentTurn={matchState.current_turn_color === 'RED'}
+                      isMe={redPlayer.user_id === user?.id}
+                    />
+                  </div>
                 ) : (
-                  <div className="p-2 bg-slate-900/40 border border-dashed border-slate-800 rounded-xl text-center text-[10px] text-slate-500">
+                  <div className="w-full p-2 bg-slate-900/40 border border-dashed border-slate-800 rounded-xl text-center text-[10px] text-slate-500">
                     Empty Seat
                   </div>
                 )}
+                {matchState.current_turn_color === 'RED' && diceElement}
               </div>
 
-              {/* Bottom-Left Corner: Player & Dice Widget (when left side is active) */}
+              {/* Bottom-Left: BLUE Player Panel & Dice (when Blue's turn) */}
               <div className="w-full flex flex-col gap-1.5 items-start">
-                {bottomLeftPlayer && (
+                {matchState.current_turn_color === 'BLUE' && diceElement}
+                {bluePlayer ? (
                   <div className="w-full">
                     <LudoPlayerPanel
-                      player={bottomLeftPlayer}
-                      isCurrentTurn={matchState.current_turn_color === bottomLeftPlayer.color}
-                      isMe={bottomLeftPlayer.user_id === user?.id}
+                      player={bluePlayer}
+                      isCurrentTurn={matchState.current_turn_color === 'BLUE'}
+                      isMe={bluePlayer.user_id === user?.id}
                     />
                   </div>
-                )}
-                {!bottomLeftPlayer && (
+                ) : (
                   <div className="w-full p-2 bg-slate-900/40 border border-dashed border-slate-800 rounded-xl text-center text-[10px] text-slate-500">
                     {matchState.players.length === 2 ? '2P Match' : 'Empty Seat'}
                   </div>
                 )}
-
-                {isLeftSideActive && diceElement}
               </div>
             </div>
 
@@ -809,7 +804,6 @@ export const Ludo: React.FC = () => {
                 legalTokenIndices={legalTokenIndices}
                 onTokenClick={handleMoveToken}
                 isMyTurn={isMyTurn}
-                myColor={myColor}
               />
 
               {/* Interactive Quick Reaction Bar */}
@@ -832,41 +826,42 @@ export const Ludo: React.FC = () => {
               </div>
             </div>
 
-            {/* Right Side: Top-Right & Bottom-Right / Right Dice */}
+            {/* Right Column: Top-Right (GREEN) & Bottom-Right (YELLOW) */}
             <div className="ludo-side-col-right h-full flex flex-col justify-between items-end w-[170px] sm:w-[210px] shrink-0 py-0.5">
-              {/* Top-Right Corner: Opponent Player */}
-              <div className="w-full">
-                {topRightPlayer ? (
-                  <LudoPlayerPanel
-                    player={topRightPlayer}
-                    isCurrentTurn={matchState.current_turn_color === topRightPlayer.color}
-                    isMe={topRightPlayer.user_id === user?.id}
-                  />
+              {/* Top-Right: GREEN Player Panel & Dice (when Green's turn) */}
+              <div className="w-full flex flex-col gap-1.5 items-end">
+                {greenPlayer ? (
+                  <div className="w-full">
+                    <LudoPlayerPanel
+                      player={greenPlayer}
+                      isCurrentTurn={matchState.current_turn_color === 'GREEN'}
+                      isMe={greenPlayer.user_id === user?.id}
+                    />
+                  </div>
                 ) : (
-                  <div className="p-2 bg-slate-900/40 border border-dashed border-slate-800 rounded-xl text-center text-[10px] text-slate-500">
+                  <div className="w-full p-2 bg-slate-900/40 border border-dashed border-slate-800 rounded-xl text-center text-[10px] text-slate-500">
                     {matchState.players.length === 2 ? '2P Match' : 'Empty Seat'}
                   </div>
                 )}
+                {matchState.current_turn_color === 'GREEN' && diceElement}
               </div>
 
-              {/* Bottom-Right Corner: Player & Dice Widget (when right side is active) */}
+              {/* Bottom-Right: YELLOW Player Panel & Dice (when Yellow's turn) */}
               <div className="w-full flex flex-col gap-1.5 items-end">
-                {bottomRightPlayer && (
+                {matchState.current_turn_color === 'YELLOW' && diceElement}
+                {yellowPlayer ? (
                   <div className="w-full">
                     <LudoPlayerPanel
-                      player={bottomRightPlayer}
-                      isCurrentTurn={matchState.current_turn_color === bottomRightPlayer.color}
-                      isMe={bottomRightPlayer.user_id === user?.id}
+                      player={yellowPlayer}
+                      isCurrentTurn={matchState.current_turn_color === 'YELLOW'}
+                      isMe={yellowPlayer.user_id === user?.id}
                     />
                   </div>
-                )}
-                {!bottomRightPlayer && (
+                ) : (
                   <div className="w-full p-2 bg-slate-900/40 border border-dashed border-slate-800 rounded-xl text-center text-[10px] text-slate-500">
                     Empty Seat
                   </div>
                 )}
-
-                {!isLeftSideActive && diceElement}
               </div>
             </div>
           </div>

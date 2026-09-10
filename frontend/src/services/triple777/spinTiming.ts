@@ -4,7 +4,7 @@ export type SpinPace = "normal" | "turbo" | "jackpot";
 export const REEL_STOPS_MS: Record<SpinPace, [number, number, number]> = {
   normal: [900, 1300, 1700],
   jackpot: [900, 1400, 1800],
-  turbo: [400, 700, 1000],
+  turbo: [350, 500, 650],
 };
 
 export const REVEAL_BUFFER_MS: Record<SpinPace, number> = {

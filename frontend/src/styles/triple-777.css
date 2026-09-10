@@ -568,3 +568,71 @@
   0% { transform: translate(0, 0) scale(1); opacity: 1; }
   100% { transform: var(--particle-end) scale(0); opacity: 0; }
 }
+
+/* ── 6. Turbo Mode & Feedback Toast (BUG-010) ── */
+.t777-floating-toast {
+  position: absolute;
+  top: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.95), rgba(180, 83, 9, 0.95));
+  border: 1.5px solid #FDE68A;
+  color: #FFFFFF;
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.7), 0 0 14px rgba(245, 158, 11, 0.6);
+  z-index: 40;
+  animation: t777-toast-in 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  pointer-events: none;
+}
+
+@keyframes t777-toast-in {
+  0% { transform: translate(-50%, -10px) scale(0.9); opacity: 0; }
+  100% { transform: translate(-50%, 0) scale(1); opacity: 1; }
+}
+
+.t777-turbo-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(245, 158, 11, 0.2);
+  border: 1px solid rgba(251, 191, 36, 0.6);
+  color: #FDE68A;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.6px;
+  padding: 2px 10px;
+  border-radius: 12px;
+  box-shadow: 0 0 10px rgba(245, 158, 11, 0.35);
+  animation: t777-turbo-pulse 1.2s infinite alternate;
+}
+
+@keyframes t777-turbo-pulse {
+  0% { transform: scale(1); box-shadow: 0 0 6px rgba(245, 158, 11, 0.3); }
+  100% { transform: scale(1.03); box-shadow: 0 0 14px rgba(245, 158, 11, 0.7); }
+}
+
+.t777-toggle-btn--turbo-active {
+  background: linear-gradient(135deg, #F59E0B, #B45309) !important;
+  border-color: #FDE68A !important;
+  color: #FFFFFF !important;
+  box-shadow: 0 0 12px rgba(245, 158, 11, 0.6), inset 0 0 8px rgba(254, 240, 138, 0.3);
+}
+
+.t777-spin-btn--turbo {
+  background: linear-gradient(180deg, #F59E0B 0%, #D97706 60%, #92400E 100%) !important;
+  border-color: #FEF08A !important;
+  color: #FFFFFF !important;
+  box-shadow: 0 4px 20px rgba(245, 158, 11, 0.6), 0 0 15px rgba(251, 191, 36, 0.5) !important;
+  animation: t777-turbo-spin-glow 1.5s infinite alternate;
+}
+
+@keyframes t777-turbo-spin-glow {
+  0% { box-shadow: 0 4px 18px rgba(245, 158, 11, 0.5), 0 0 10px rgba(251, 191, 36, 0.4); }
+  100% { box-shadow: 0 4px 24px rgba(245, 158, 11, 0.85), 0 0 20px rgba(251, 191, 36, 0.8); }
+}
+
