@@ -24,7 +24,7 @@
   border-bottom: 1px solid rgba(212, 175, 55, 0.28);
   z-index: 50;
   min-width: 0;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .gt-header-cluster {
@@ -588,4 +588,38 @@
 }
 .btn-danger:hover {
   filter: brightness(1.1);
+}
+
+.gt-turn-banner {
+  position: absolute;
+  top: 0.65rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 25;
+  padding: 0.25rem 0.85rem;
+  border-radius: 9999px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  pointer-events: none;
+  white-space: nowrap;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.gt-turn-mine {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: #ffffff;
+  border: 1.5px solid rgba(167, 243, 208, 0.8);
+  box-shadow: 0 0 20px rgba(16, 185, 129, 0.6);
+}
+
+.gt-turn-opponent {
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  color: #0f172a;
+  border: 1.5px solid rgba(253, 230, 138, 0.9);
+  box-shadow: 0 0 16px rgba(245, 158, 11, 0.5);
 }

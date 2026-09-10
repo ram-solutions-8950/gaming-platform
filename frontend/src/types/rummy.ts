@@ -33,7 +33,7 @@ export type ServerMessage =
   | { type: "error"; message: string };
 
 export interface ClientAction {
-  action: "join" | "start" | "draw" | "discard" | "declare" | "drop" | "sync";
+  action: "join" | "start" | "draw" | "discard" | "declare" | "drop" | "leave" | "sync";
   source?: "stock" | "discard";
   card?: string;
   groups?: string[][];

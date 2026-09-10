@@ -282,6 +282,54 @@ class DealsRummyGame:
         self._settle_deal(winner=p)
         return result
 
+    def player_leave(self, player_id: str) -> None:
+        """Handle a player leaving, disconnecting, or forfeiting the table.
+
+        - If WAITING: remove the player cleanly from the table seats.
+        - If GAME_OVER: no-op.
+        - If DEAL_OVER: player eliminated; if <= 1 live players left, game over.
+        - If DEALING / AWAIT_DRAW / AWAIT_DISCARD: player forfeits current deal
+          with maximum 80 points penalty. If only 1 active player remains,
+          that player is awarded the deal win, and the game ends immediately.
+        """
+        if self.phase == Phase.WAITING:
+            self.players = [p for p in self.players if p.id != player_id]
+            for i, p in enumerate(self.players):
+                p.seat = i
+            return
+
+        if self.phase == Phase.GAME_OVER:
+            return
+
+        p = next((p for p in self.players if p.id == player_id), None)
+        if p is None:
+            return
+
+        if self.phase == Phase.DEAL_OVER:
+            p.eliminated = True
+            live = self._live_players()
+            if len(live) <= 1:
+                self.phase = Phase.GAME_OVER
+                self.winner_id = live[0].id if live else None
+            return
+
+        was_current = (bool(self.players) and self.current_player().id == player_id)
+        if p.status == PlayerStatus.ACTIVE:
+            p.status = PlayerStatus.LOST
+            p.deal_points = 80
+        p.eliminated = True
+
+        active = self._active_players()
+        if len(active) == 1:
+            self._settle_deal(winner=active[0])
+            self.phase = Phase.GAME_OVER
+            self.winner_id = active[0].id
+        elif len(active) == 0:
+            self.phase = Phase.GAME_OVER
+        else:
+            if was_current:
+                self._advance_turn()
+
     # ---- deal resolution -----------------------------------------------------------
     def _maybe_end_by_attrition_or_advance(self) -> None:
         active = self._active_players()

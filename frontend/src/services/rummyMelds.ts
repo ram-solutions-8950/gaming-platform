@@ -229,3 +229,41 @@ export function autoArrange(codes: string[], wildRank: number | null): string[][
 
   return groups;
 }
+
+/**
+ * Group cards into standard suit groups (Spades, Hearts, Clubs, Diamonds),
+ * each sorted by rank, with jokers/wilds in their own group.
+ */
+export function groupBySuits(codes: string[], wildRank: number | null): string[][] {
+  const suitsOrder: ("S" | "H" | "C" | "D")[] = ["S", "H", "C", "D"];
+  const suitMap: Record<string, string[]> = { S: [], H: [], C: [], D: [] };
+  const jokers: string[] = [];
+
+  for (const code of codes) {
+    const card = parseCard(code);
+    if (isWild(card, wildRank)) {
+      jokers.push(code);
+    } else if (card.suit && suitMap[card.suit]) {
+      suitMap[card.suit].push(code);
+    } else {
+      jokers.push(code);
+    }
+  }
+
+  const groups: string[][] = [];
+  for (const suit of suitsOrder) {
+    const cards = suitMap[suit];
+    if (cards.length > 0) {
+      cards.sort((a, b) => {
+        const ca = parseCard(a);
+        const cb = parseCard(b);
+        return ca.rank - cb.rank;
+      });
+      groups.push(cards);
+    }
+  }
+  if (jokers.length > 0) {
+    groups.push(jokers);
+  }
+  return groups;
+}

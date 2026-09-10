@@ -8,6 +8,7 @@ interface Props {
   wild?: boolean;
   faceDown?: boolean;
   draggable?: boolean;
+  disabled?: boolean;
   onDragStart?: (e: DragEvent) => void;
   onDragEnd?: () => void;
   className?: string;
@@ -31,7 +32,7 @@ function parse(code: string) {
 }
 
 export default function PlayingCard({
-  code, selected, onClick, small, wild, faceDown, draggable, onDragStart, onDragEnd, className,
+  code, selected, onClick, small, wild, faceDown, draggable, disabled, onDragStart, onDragEnd, className,
 }: Props) {
   const size = [small ? "w-12 h-[4.5rem]" : "w-20 h-28", className].filter(Boolean).join(" ");
 
@@ -57,22 +58,22 @@ export default function PlayingCard({
   return (
     <button
       type="button"
-      onClick={onClick}
-      draggable={draggable}
-      onDragStart={onDragStart}
-      onDragEnd={onDragEnd}
+      disabled={disabled}
+      onClick={disabled ? undefined : onClick}
+      draggable={disabled ? false : draggable}
+      onDragStart={disabled ? undefined : onDragStart}
+      onDragEnd={disabled ? undefined : onDragEnd}
       className={[
         size,
         "relative rounded-lg shadow-lg select-none border",
-        // Scoped to real mouse pointers only — on touch devices ":hover" can stick
-        // after a tap, shifting the card and making the *next* tap land on the
-        // wrong spot (the classic "button won't respond a second time" symptom).
-        "transition-transform [@media(hover:hover)]:hover:-translate-y-1.5 [@media(hover:hover)]:hover:shadow-xl",
-        draggable ? "cursor-grab active:cursor-grabbing" : "",
+        disabled
+          ? "cursor-default pointer-events-none opacity-85"
+          : "transition-transform [@media(hover:hover)]:hover:-translate-y-1.5 [@media(hover:hover)]:hover:shadow-xl",
+        draggable && !disabled ? "cursor-grab active:cursor-grabbing" : "",
         wild
           ? "bg-gradient-to-br from-gold-300 to-gold-500 border-gold-600"
           : "bg-gradient-to-b from-white to-slate-50 border-slate-300",
-        selected ? "-translate-y-3 ring-2 ring-gold-500 shadow-glow" : "",
+        selected && !disabled ? "-translate-y-3 ring-2 ring-gold-500 shadow-glow" : "",
       ].join(" ")}
     >
       {c.joker ? (

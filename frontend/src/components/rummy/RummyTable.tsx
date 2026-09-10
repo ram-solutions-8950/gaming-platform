@@ -8,7 +8,7 @@ import PlayingCard from "./PlayingCard";
 import "./RummyTable.css";
 import RulesModal from "./RulesModal";
 import { useRummySocket } from "../../hooks/useRummySocket";
-import { autoArrange, classifyGroup, deadwoodPoints, isWild, parseCard, sortHand } from "../../services/rummyMelds";
+import { autoArrange, classifyGroup, deadwoodPoints, isWild, parseCard, sortHand, groupBySuits } from "../../services/rummyMelds";
 import { RummyApi, type RummyTableOut } from "../../services/rummy";
 import type { TableState } from "../../types/rummy";
 import { useAuthStore } from "../../store/authStore";
@@ -101,77 +101,185 @@ function ResultOverlay({
   const myLossRupees = (myLossPaise / 100).toFixed(2);
 
   return (
-    <div className="absolute inset-0 rounded-[50%] bg-black/85 flex flex-col items-center justify-center gap-1.5 z-30 px-6 text-center overflow-hidden">
-      <p className="font-display text-base sm:text-lg text-gold-400 font-extrabold">
-        {isGameOver
-          ? isPool
-            ? iWon ? "🏆 POOL WINNER" : "🏁 POOL OVER"
-            : "🏁 GAME OVER"
-          : iWasEliminatedThisDeal
-            ? "🚫 YOU'RE OUT"
-            : iWon
-              ? "🏆 YOU WIN"
-              : winner
-                ? `🏆 ${winner.name} wins the deal`
-                : "Deal over"}
-      </p>
+    <div className="absolute inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-40 p-2 sm:p-4 overflow-y-auto select-none">
+      <div className="w-full max-w-sm max-h-[96vh] bg-gradient-to-b from-[#1d0d33] via-[#120824] to-[#0a0316] border-2 border-amber-500/50 rounded-2xl shadow-[0_0_50px_rgba(0,0,0,0.9)] p-3 sm:p-4 flex flex-col items-center justify-center gap-1.5 text-center my-auto overflow-y-auto">
+        <p className="font-display text-base sm:text-lg text-gold-400 font-extrabold tracking-wide">
+          {isGameOver
+            ? isPool
+              ? iWon ? "🏆 POOL WINNER" : "🏁 POOL OVER"
+              : iWon ? "🏆 GAME WINNER" : "🏁 GAME OVER"
+            : iWasEliminatedThisDeal
+              ? "🚫 YOU'RE OUT"
+              : iWon
+                ? "🏆 YOU WIN"
+                : winner
+                  ? `🏆 ${winner.name} wins the deal`
+                  : "Deal over"}
+        </p>
 
-      {/* Explicit Bet & Win Display */}
-      {entryFeePaise > 0 && (
-        <div className="flex items-center justify-center gap-2.5 bg-black/80 border border-amber-500/40 rounded-xl px-3.5 py-1 text-xs font-bold my-0.5">
-          <span className="text-slate-300">
-            Bet: <span className="text-amber-300">₹{entryFeeRupees.toFixed(2)}</span>
-          </span>
-          <span className="text-slate-600">•</span>
-          <span className={iWon ? "text-emerald-400 font-black" : "text-rose-400 font-black"}>
-            {iWon ? `Won: +₹${totalPoolRupees}` : `Lost: -₹${myLossRupees}`}
-          </span>
-        </div>
-      )}
+        {/* Explicit Bet & Win Display */}
+        {entryFeePaise > 0 && (
+          <div className="flex items-center justify-center gap-2.5 bg-black/80 border border-amber-500/40 rounded-xl px-3.5 py-1 text-xs font-bold my-0.5">
+            <span className="text-slate-300">
+              Bet: <span className="text-amber-300">₹{entryFeeRupees.toFixed(2)}</span>
+            </span>
+            <span className="text-slate-600">•</span>
+            <span className={iWon ? "text-emerald-400 font-black" : "text-rose-400 font-black"}>
+              {iWon ? `Won: +₹${totalPoolRupees}` : `Lost: -₹${myLossRupees}`}
+            </span>
+          </div>
+        )}
 
-      <div className="w-full max-w-[17rem] space-y-1 my-1">
-        {state.players.map((p) => {
-          const pLossRupees = ((Math.min(p.deal_points * pointValuePaise, entryFeePaise)) / 100).toFixed(2);
-          return (
-            <div key={p.id} className="flex justify-between items-center text-[11px] bg-ink-900/80 rounded px-2.5 py-1">
-              <span className={p.id === meId ? "text-gold-300 font-bold" : "text-slate-200 font-medium"}>
-                {p.name}
-                {isPool && p.eliminated && <span className="ml-1 text-[8px] text-red-400 uppercase">out</span>}
-              </span>
-              <span className="flex items-center gap-1.5 font-mono">
-                <span className={p.id === state.winner_id ? "text-emerald-400 font-bold" : "text-rose-400 font-bold"}>
-                  {p.id === state.winner_id
-                    ? (entryFeePaise > 0 ? `+₹${totalPoolRupees}` : `+${pool}`)
-                    : (entryFeePaise > 0 ? `-₹${pLossRupees}` : `-${p.deal_points}`)}
+        <div className="w-full max-w-[17rem] space-y-1 my-1">
+          {state.players.map((p) => {
+            const pLossRupees = ((Math.min(p.deal_points * pointValuePaise, entryFeePaise)) / 100).toFixed(2);
+            return (
+              <div key={p.id} className="flex justify-between items-center text-[11px] bg-ink-900/80 rounded px-2.5 py-1">
+                <span className={p.id === meId ? "text-gold-300 font-bold" : "text-slate-200 font-medium"}>
+                  {p.name}
+                  {isPool && p.eliminated && <span className="ml-1 text-[8px] text-red-400 uppercase">out</span>}
                 </span>
-                <span className="text-[9px] text-slate-400">
-                  ({p.deal_points} pts)
-                </span>
-                {isPool && (
-                  <span className="text-[9px] text-slate-500 font-mono">
-                    {p.total_score}/{state.pool_limit}
+                <span className="flex items-center gap-1.5 font-mono">
+                  <span className={p.id === state.winner_id ? "text-emerald-400 font-bold" : "text-rose-400 font-bold"}>
+                    {p.id === state.winner_id
+                      ? (entryFeePaise > 0 ? `+₹${totalPoolRupees}` : `+${pool}`)
+                      : (entryFeePaise > 0 ? `-₹${pLossRupees}` : `-${p.deal_points}`)}
                   </span>
-                )}
-              </span>
-            </div>
-          );
-        })}
-      </div>
-      <p className="text-[8px] text-slate-500 font-mono hidden sm:block">Table: {state.table_id.slice(0, 8)}</p>
-      {isGameOver ? (
-        <div className="flex gap-1.5 mt-1">
-          <button className="btn-gold rounded-full px-3 py-1 text-xs" disabled={playAgainBusy} onClick={onPlayAgain}>
-            {playAgainBusy ? "Creating…" : "🔁 Play Again"}
+                  <span className="text-[9px] text-slate-400">
+                    ({p.deal_points} pts)
+                  </span>
+                  {isPool && (
+                    <span className="text-[9px] text-slate-500 font-mono">
+                      {p.total_score}/{state.pool_limit}
+                    </span>
+                  )}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+        <p className="text-[8px] text-slate-500 font-mono hidden sm:block">Table: {state.table_id.slice(0, 8)}</p>
+        {isGameOver ? (
+          <div className="flex gap-2 mt-1 w-full max-w-[17rem] justify-center">
+            <button
+              type="button"
+              className="flex-1 py-2 px-3 bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 text-slate-950 font-black text-xs rounded-xl shadow-lg border border-amber-300 hover:brightness-110 active:scale-95 transition-all cursor-pointer whitespace-nowrap"
+              disabled={playAgainBusy}
+              onClick={onPlayAgain}
+            >
+              {playAgainBusy ? "Creating…" : "🔁 Play Again"}
+            </button>
+            <button
+              type="button"
+              className="py-2 px-3 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs rounded-xl border border-slate-700 active:scale-95 transition-all cursor-pointer whitespace-nowrap"
+              onClick={onBackToLobby}
+            >
+              Back to Lobby
+            </button>
+          </div>
+        ) : (
+          <button type="button" className="btn-gold rounded-full px-5 py-1.5 text-xs mt-1 cursor-pointer font-bold shadow-md" onClick={onContinue}>
+            Continue
           </button>
-          <button className="btn-ghost rounded-full px-3 py-1 text-xs" onClick={onBackToLobby}>
-            Back to Lobby
+        )}
+      </div>
+    </div>
+  );
+}
+
+function SettingsModal({
+  onClose,
+  onOpenRules,
+  onLeave,
+  soundOn,
+  onToggleSound,
+  tableId,
+}: {
+  onClose: () => void;
+  onOpenRules: () => void;
+  onLeave: () => void;
+  soundOn: boolean;
+  onToggleSound: () => void;
+  tableId: string;
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-[90] flex items-center justify-center bg-black/85 backdrop-blur-md p-4 animate-fade-in select-none"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-sm bg-gradient-to-b from-[#1e0a38] via-[#130426] to-[#0a0117] border-2 border-amber-500/50 rounded-3xl p-5 shadow-2xl text-white flex flex-col gap-4"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between border-b border-white/10 pb-3">
+          <div className="flex items-center gap-2">
+            <span className="text-xl">⚙️</span>
+            <h3 className="font-display font-black text-base text-amber-300 tracking-wide uppercase">Table Settings</h3>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white flex items-center justify-center text-sm font-bold transition cursor-pointer"
+          >
+            ✕
           </button>
         </div>
-      ) : (
-        <button className="btn-gold rounded-full px-4 py-1 text-xs mt-1" onClick={onContinue}>
-          Continue
-        </button>
-      )}
+
+        <div className="flex flex-col gap-2.5">
+          {/* Sound Toggle */}
+          <div className="flex items-center justify-between p-3 rounded-2xl bg-white/5 border border-white/10">
+            <div className="flex items-center gap-2.5">
+              {soundOn ? <Volume2 size={18} className="text-amber-400" /> : <VolumeX size={18} className="text-slate-400" />}
+              <div>
+                <div className="text-xs font-bold text-slate-100">Sound Effects</div>
+                <div className="text-[10px] text-slate-400">{soundOn ? "Card & victory sounds enabled" : "Muted"}</div>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={onToggleSound}
+              className={`px-3 py-1 rounded-full text-xs font-extrabold transition active:scale-95 cursor-pointer ${
+                soundOn
+                  ? "bg-gradient-to-r from-amber-500 to-yellow-400 text-slate-950 shadow-md shadow-amber-500/20"
+                  : "bg-slate-800 text-slate-400 border border-slate-700"
+              }`}
+            >
+              {soundOn ? "ON" : "OFF"}
+            </button>
+          </div>
+
+          {/* Rules Button */}
+          <button
+            type="button"
+            onClick={() => { onClose(); onOpenRules(); }}
+            className="w-full flex items-center justify-between p-3 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 transition active:scale-95 text-left cursor-pointer"
+          >
+            <div className="flex items-center gap-2.5">
+              <span className="text-base">📖</span>
+              <div>
+                <div className="text-xs font-bold text-slate-100">Rummy Rules</div>
+                <div className="text-[10px] text-slate-400">Pure/impure sequences & valid show guide</div>
+              </div>
+            </div>
+            <span className="text-amber-400 text-sm font-bold">➔</span>
+          </button>
+
+          {/* Table ID Information */}
+          <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-black/40 border border-white/5 text-[10px] font-mono text-slate-400">
+            <span>Table ID:</span>
+            <span className="text-amber-300 font-bold">{tableId.slice(0, 12)}…</span>
+          </div>
+
+          {/* Leave Table Button */}
+          <button
+            type="button"
+            onClick={() => { onClose(); onLeave(); }}
+            className="w-full mt-1 py-2.5 rounded-xl bg-gradient-to-r from-red-600 to-rose-700 hover:brightness-110 text-white text-xs font-extrabold shadow-md border border-red-500/40 transition active:scale-95 cursor-pointer flex items-center justify-center gap-1.5"
+          >
+            🚪 Leave Table
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -463,7 +571,14 @@ export default function GameTable({ onBack, onExit, customTableId }: { onBack?: 
   const dropPoints = phase === "await_draw" && hand.length === 13 ? FIRST_DROP_POINTS : MIDDLE_DROP_POINTS;
   const dropCost = pointValue != null ? `₹${(dropPoints * pointValue).toFixed(2)}` : `${dropPoints}`;
 
+  const isGameOver = !state || state.phase === "deal_over" || state.phase === "game_over";
+  const isPlayingPhase = phase === "await_draw" || phase === "await_discard";
+  const isMyTurnActive = Boolean(myTurn && isPlayingPhase && !isGameOver);
+  const activeTurnPlayer = state?.players?.find((p) => p.id === state?.turn);
+  const [autoSortStep, setAutoSortStep] = useState<number>(0);
+
   function toggleSelect(code: string) {
+    if (isGameOver) return;
     setSelected((s) => {
       const next = new Set(s);
       if (next.has(code)) next.delete(code);
@@ -473,6 +588,7 @@ export default function GameTable({ onBack, onExit, customTableId }: { onBack?: 
   }
 
   function shiftLeft(i: number) {
+    if (isGameOver) return;
     setGroups((gs) => {
       if (i <= 0) return gs;
       const copy = gs.map((g) => [...g]);
@@ -484,6 +600,7 @@ export default function GameTable({ onBack, onExit, customTableId }: { onBack?: 
   }
 
   function shiftRight(i: number) {
+    if (isGameOver) return;
     setGroups((gs) => {
       if (i >= gs.length - 1) return gs;
       const copy = gs.map((g) => [...g]);
@@ -495,7 +612,7 @@ export default function GameTable({ onBack, onExit, customTableId }: { onBack?: 
   }
 
   function groupSelected() {
-    if (selected.size < 2) return;
+    if (isGameOver || selected.size < 2) return;
     setGroups((gs) => {
       const order = gs.flat().filter((c) => selected.has(c));
       const remaining = gs.map((g) => g.filter((c) => !selected.has(c))).filter((g) => g.length > 0);
@@ -505,7 +622,7 @@ export default function GameTable({ onBack, onExit, customTableId }: { onBack?: 
   }
 
   function ungroupSelected() {
-    if (selected.size === 0) return;
+    if (isGameOver || selected.size === 0) return;
     setGroups((gs) => {
       const pulled = gs.flat().filter((c) => selected.has(c));
       const remaining = gs.map((g) => g.filter((c) => !selected.has(c))).filter((g) => g.length > 0);
@@ -515,6 +632,7 @@ export default function GameTable({ onBack, onExit, customTableId }: { onBack?: 
   }
 
   function resetGroups() {
+    if (isGameOver) return;
     const all = [...groups.flat(), ...(finishCard ? [finishCard] : [])];
     setGroups(all.length > 0 ? [all] : []);
     setFinishCard(null);
@@ -522,6 +640,7 @@ export default function GameTable({ onBack, onExit, customTableId }: { onBack?: 
   }
 
   function doSort() {
+    if (isGameOver) return;
     const all = [...groups.flat(), ...(finishCard ? [finishCard] : [])];
     setGroups(all.length > 0 ? [sortHand(all)] : []);
     setFinishCard(null);
@@ -529,13 +648,24 @@ export default function GameTable({ onBack, onExit, customTableId }: { onBack?: 
   }
 
   function doAutoSort() {
+    if (isGameOver) return;
     const all = [...groups.flat(), ...(finishCard ? [finishCard] : [])];
-    setGroups(autoArrange(all, wildRank));
+    if (all.length === 0) return;
+
+    if (autoSortStep % 2 === 0) {
+      setGroups(autoArrange(all, wildRank));
+      announce("✨ Arranged by Melds", [], 2000);
+    } else {
+      setGroups(groupBySuits(all, wildRank));
+      announce("✨ Grouped by Suits", [], 2000);
+    }
+    setAutoSortStep((prev) => prev + 1);
     setFinishCard(null);
     setSelected(new Set());
   }
 
   function toggleFinishSlot() {
+    if (isGameOver) return;
     if (finishCard) {
       setGroups((gs) => [...gs, [finishCard]]);
       setFinishCard(null);
@@ -553,6 +683,7 @@ export default function GameTable({ onBack, onExit, customTableId }: { onBack?: 
   // Identifies the target group by one of its existing cards rather than its index,
   // since removing the dragged card can shift/prune indices before the drop resolves.
   function dropOnGroup(targetSample: string | null) {
+    if (isGameOver) return;
     const code = dragCode;
     setDragCode(null);
     if (!code) return;
@@ -569,6 +700,7 @@ export default function GameTable({ onBack, onExit, customTableId }: { onBack?: 
   }
 
   function dropOnFinishSlot() {
+    if (isGameOver) return;
     const code = dragCode;
     setDragCode(null);
     if (!code) return;
@@ -629,10 +761,21 @@ export default function GameTable({ onBack, onExit, customTableId }: { onBack?: 
           {table && <span className="gt-chip gt-hide-narrow">{modeName}</span>}
         </div>
         <div className="gt-header-cluster">
-          <span className="gt-chip !border-amber-500/40 !bg-slate-900/90 text-amber-300 font-extrabold flex items-center gap-1.5 shadow-sm">
-            <span className="text-[10px] text-slate-400 font-bold uppercase hidden sm:inline">BALANCE:</span>
-            <span>₹{walletBalance !== null ? (walletBalance / 100).toFixed(2) : "..."}</span>
-          </span>
+          <div className="flex items-center gap-1.5">
+            <span className="gt-chip !border-amber-500/40 !bg-slate-900/90 text-amber-300 font-extrabold flex items-center gap-1.5 shadow-sm">
+              <span className="text-[10px] text-slate-400 font-bold uppercase hidden sm:inline">BALANCE:</span>
+              <span>₹{walletBalance !== null ? (walletBalance / 100).toFixed(2) : "..."}</span>
+            </span>
+            <button
+              type="button"
+              onClick={() => navigate("/deposit")}
+              className="gt-chip !bg-gradient-to-r !from-emerald-500 !to-teal-600 hover:!from-emerald-400 hover:!to-teal-500 !text-white !font-bold !border-emerald-400/50 shadow-md transition-all active:scale-95 cursor-pointer flex items-center gap-1"
+              title="Add Amount"
+            >
+              <Plus size={13} strokeWidth={3} />
+              <span>Add Amount</span>
+            </button>
+          </div>
           {table && table.entry_fee_paise > 0 && (
             <span className="gt-chip !border-emerald-500/40 !bg-slate-900/90 text-emerald-400 font-bold flex items-center gap-1 shadow-sm">
               <span className="text-[10px] text-slate-400 uppercase">BET:</span>
@@ -653,16 +796,15 @@ export default function GameTable({ onBack, onExit, customTableId }: { onBack?: 
               ⏱ 0:{secondsLeft.toString().padStart(2, "0")}
             </span>
           )}
-          <div className="relative">
-            <button className="gt-chip !px-2" onClick={() => setSettingsMenuOpen((v) => !v)} aria-label="Settings">
-              <Settings size={15} />
-            </button>
-            {settingsMenuOpen && (
-              <div className="absolute right-0 top-9 w-40 rounded-xl border border-white/10 bg-[#0D0B1B]/95 backdrop-blur-xl shadow-2xl overflow-hidden z-[70]">
-                <button className="w-full text-left px-4 py-3 text-sm text-slate-200 hover:bg-white/5" onClick={() => { setSettingsMenuOpen(false); setRulesOpen(true); }}>📖 Rules</button>
-              </div>
-            )}
-          </div>
+          <button
+            type="button"
+            className="gt-chip !px-2 cursor-pointer hover:bg-white/10"
+            onClick={() => setSettingsMenuOpen(true)}
+            aria-label="Settings"
+            title="Table Settings"
+          >
+            <Settings size={15} />
+          </button>
         </div>
       </header>
 
@@ -678,9 +820,9 @@ export default function GameTable({ onBack, onExit, customTableId }: { onBack?: 
         </div>
 
         <div className="gt-rails gt-rails-right">
-          <button type="button" className="gt-rail-btn" disabled={hand.length === 0} onClick={doSort}><Shuffle size={15} /><span>Sort</span></button>
-          <button type="button" className="gt-rail-btn" disabled={hand.length === 0} onClick={doAutoSort}><Sparkles size={15} className="text-[#F4C542]" /><span>Auto Sort</span></button>
-          <button type="button" className="gt-rail-btn" onClick={resetGroups}><RotateCcw size={15} /><span>Reset</span></button>
+          <button type="button" className="gt-rail-btn" disabled={hand.length === 0 || isGameOver} onClick={doSort}><Shuffle size={15} /><span>Sort</span></button>
+          <button type="button" className="gt-rail-btn" disabled={hand.length === 0 || isGameOver} onClick={doAutoSort}><Sparkles size={15} className="text-[#F4C542]" /><span>Auto Sort</span></button>
+          <button type="button" className="gt-rail-btn" disabled={isGameOver} onClick={resetGroups}><RotateCcw size={15} /><span>Reset</span></button>
         </div>
 
         <div className="gt-table">
@@ -688,22 +830,42 @@ export default function GameTable({ onBack, onExit, customTableId }: { onBack?: 
             <div className="gt-watermark">RUMMY</div>
           </div>
 
+          {/* Central Turn Announcement Badge (BUG-040) */}
+          {isPlayingPhase && !showingResult && (
+            <div className={`gt-turn-banner ${isMyTurnActive ? "gt-turn-mine animate-pulse" : "gt-turn-opponent"}`}>
+              {isMyTurnActive ? (
+                <span>👉 YOUR TURN: {phase === "await_draw" ? "Pick Open or Closed Card" : "Discard or Declare"}</span>
+              ) : (
+                <span>⏳ {activeTurnPlayer?.name || "Player"}'s Turn ({secondsLeft !== null ? `${secondsLeft}s` : "..."})</span>
+              )}
+            </div>
+          )}
+
           <div className={`relative z-10 pt-1 text-center ${showingResult ? "invisible" : ""}`}>
             <div className="flex justify-center gap-5 flex-wrap px-6">
-              {opponents.map((p) => (
-                <div key={p.id} className="text-center relative">
-                  <div className="relative gt-seat-avatar">
-                    <div className={`absolute inset-0 rounded-full bg-gradient-to-br from-[#2B3045] to-[#090B14] border-2 flex items-center justify-center font-display font-bold text-sm ${state?.turn === p.id ? "border-[#F4C542] shadow-[0_0_18px_rgba(244,197,66,.45)]" : "border-white/30"}`}>{p.name.slice(0, 2).toUpperCase()}</div>
-                    {state?.turn === p.id && secondsLeft !== null && <TurnRing seconds={secondsLeft} total={table?.turn_seconds ?? 30} size={40} />}
-                    {state?.turn === p.id && secondsLeft !== null && <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-[#0B1020] border-2 border-[#F4C542] flex items-center justify-center text-[7px] font-mono font-bold text-[#F4C542]">{secondsLeft}</span>}
-                    {(p.eliminated || p.status !== "active") && (
-                      <span className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-red-900 border border-red-600 flex items-center justify-center text-[7px]">✕</span>
+              {opponents.map((p) => {
+                const isOpponentTurn = state?.turn === p.id && isPlayingPhase && !isGameOver;
+                return (
+                  <div key={p.id} className="text-center relative">
+                    {/* Visual Indicator: Opponent Turn Badge (BUG-040) */}
+                    {isOpponentTurn && (
+                      <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 whitespace-nowrap bg-gradient-to-r from-amber-500 to-yellow-400 text-slate-950 font-black text-[8px] px-2 py-0.5 rounded-full shadow-lg border border-amber-300 animate-bounce flex items-center gap-1 z-30 pointer-events-none">
+                        <span>▶ TURN</span>
+                      </div>
                     )}
+                    <div className={`relative gt-seat-avatar ${isOpponentTurn ? "ring-4 ring-amber-400 ring-offset-2 ring-offset-black rounded-full" : ""}`}>
+                      <div className={`absolute inset-0 rounded-full bg-gradient-to-br from-[#2B3045] to-[#090B14] border-2 flex items-center justify-center font-display font-bold text-sm ${isOpponentTurn ? "border-[#F4C542] shadow-[0_0_24px_rgba(244,197,66,.8)]" : "border-white/30"}`}>{p.name.slice(0, 2).toUpperCase()}</div>
+                      {isOpponentTurn && secondsLeft !== null && <TurnRing seconds={secondsLeft} total={table?.turn_seconds ?? 30} size={40} />}
+                      {isOpponentTurn && secondsLeft !== null && <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-[#0B1020] border-2 border-[#F4C542] flex items-center justify-center text-[7px] font-mono font-bold text-[#F4C542]">{secondsLeft}</span>}
+                      {(p.eliminated || p.status !== "active") && (
+                        <span className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-red-900 border border-red-600 flex items-center justify-center text-[7px]">✕</span>
+                      )}
+                    </div>
+                    <div className={`text-[10px] font-semibold mt-0.5 leading-tight ${isOpponentTurn ? "text-amber-300 font-extrabold" : "text-white"}`}>{p.name}</div>
+                    <div className="text-[8px] text-white/70 leading-tight">🪙{p.chips} · 🂠{p.hand_count}</div>
                   </div>
-                  <div className="text-[10px] font-semibold text-white mt-0.5 leading-tight">{p.name}</div>
-                  <div className="text-[8px] text-white/70 leading-tight">🪙{p.chips} · 🂠{p.hand_count}</div>
-                </div>
-              ))}
+                );
+              })}
               {phase === "waiting" && Array.from({ length: emptySeats }).map((_, i) => (
                 <div key={`empty-${i}`} className="text-center opacity-40">
                   <div className="gt-seat-avatar rounded-full border-2 border-dashed border-white/30 flex items-center justify-center"><span className="text-lg text-white/40">?</span></div>
@@ -762,10 +924,17 @@ export default function GameTable({ onBack, onExit, customTableId }: { onBack?: 
 
           {me && (
             <div className={`relative z-10 text-center pb-1 ${showingResult ? "invisible" : ""}`}>
-              <div className="relative gt-seat-avatar">
-                <div className={`absolute inset-0 rounded-full bg-gradient-to-br from-[#2B3045] to-[#090B14] border-2 flex items-center justify-center font-display font-bold text-xs ${myTurn ? "border-[#F4C542] shadow-[0_0_18px_rgba(244,197,66,.45)]" : "border-white/30"}`}>{me.name.slice(0, 2).toUpperCase()}</div>
-                {myTurn && secondsLeft !== null && <TurnRing seconds={secondsLeft} total={table?.turn_seconds ?? 30} size={36} />}
+              {/* Visual Indicator: YOUR TURN Badge (BUG-040) */}
+              {isMyTurnActive && (
+                <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 whitespace-nowrap bg-gradient-to-r from-emerald-500 via-green-400 to-emerald-500 text-slate-950 font-black text-[9px] px-2.5 py-0.5 rounded-full shadow-[0_0_15px_rgba(16,185,129,0.9)] border border-green-200 animate-pulse flex items-center gap-1 z-30 pointer-events-none">
+                  <span>✨ YOUR TURN</span>
+                </div>
+              )}
+              <div className={`relative gt-seat-avatar ${isMyTurnActive ? "ring-4 ring-emerald-400 ring-offset-2 ring-offset-black rounded-full" : ""}`}>
+                <div className={`absolute inset-0 rounded-full bg-gradient-to-br from-[#2B3045] to-[#090B14] border-2 flex items-center justify-center font-display font-bold text-xs ${isMyTurnActive ? "border-emerald-400 shadow-[0_0_22px_rgba(16,185,129,.8)]" : "border-white/30"}`}>{me.name.slice(0, 2).toUpperCase()}</div>
+                {isMyTurnActive && secondsLeft !== null && <TurnRing seconds={secondsLeft} total={table?.turn_seconds ?? 30} size={36} />}
               </div>
+              <div className={`text-[10px] font-semibold mt-0.5 leading-tight ${isMyTurnActive ? "text-emerald-400 font-extrabold" : "text-white"}`}>You ({me.name})</div>
             </div>
           )}
 
@@ -776,7 +945,7 @@ export default function GameTable({ onBack, onExit, customTableId }: { onBack?: 
       </main>
 
       <footer className="gt-footer">
-        <div className="gt-hand">
+        <div className={`gt-hand ${isGameOver ? "pointer-events-none opacity-80" : ""}`}>
           {groups.map((group, i) => {
             const meldType = classifyGroup(group, wildRank);
             const valid = meldType !== "invalid";
@@ -786,7 +955,7 @@ export default function GameTable({ onBack, onExit, customTableId }: { onBack?: 
                 key={i}
                 className={`gt-hand-group ${dragCode && !group.includes(dragCode) ? "ring-2 ring-[#F4C542]/60 border-[#F4C542]/40" : ""}`}
                 onDragOver={(e) => e.preventDefault()}
-                onDrop={() => dropOnGroup(group.find((c) => c !== dragCode) ?? null)}
+                onDrop={() => !isGameOver && dropOnGroup(group.find((c) => c !== dragCode) ?? null)}
               >
                 <div className="gt-hand-cards">
                   {group.map((code, ci) => (
@@ -797,23 +966,24 @@ export default function GameTable({ onBack, onExit, customTableId }: { onBack?: 
                         className="gt-card-hand"
                         selected={selected.has(code)}
                         wild={isWild(parseCard(code), wildRank)}
+                        disabled={isGameOver}
                         onClick={() => toggleSelect(code)}
-                        draggable
-                        onDragStart={() => setDragCode(code)}
+                        draggable={!isGameOver}
+                        onDragStart={() => !isGameOver && setDragCode(code)}
                         onDragEnd={() => setDragCode(null)}
                       />
                     </div>
                   ))}
                 </div>
                 <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-medium ${valid ? "bg-green-700/60 text-green-200" : "bg-red-800/70 text-red-200"}`}>
-                  <button className="w-3.5 h-3.5 flex items-center justify-center" disabled={i === 0} onClick={() => shiftLeft(i)}>◀</button>
+                  <button className="w-3.5 h-3.5 flex items-center justify-center disabled:opacity-40" disabled={i === 0 || isGameOver} onClick={() => shiftLeft(i)}>◀</button>
                   <span className="whitespace-nowrap">{valid ? meldType.replace("_", " ") : `Invalid (${points})`}</span>
-                  <button className="w-3.5 h-3.5 flex items-center justify-center" disabled={i === groups.length - 1} onClick={() => shiftRight(i)}>▶</button>
+                  <button className="w-3.5 h-3.5 flex items-center justify-center disabled:opacity-40" disabled={i === groups.length - 1 || isGameOver} onClick={() => shiftRight(i)}>▶</button>
                 </div>
               </div>
             );
           })}
-          {dragCode && (
+          {dragCode && !isGameOver && (
             <div className="shrink-0 w-14 h-20 rounded-lg border-2 border-dashed border-[#F4C542]/60 text-[9px] text-[#F4C542] flex items-center justify-center text-center animate-pulse" onDragOver={(e) => e.preventDefault()} onDrop={() => dropOnGroup(null)}>
               + New group
             </div>
@@ -824,25 +994,25 @@ export default function GameTable({ onBack, onExit, customTableId }: { onBack?: 
           <div className="gt-stat">
             <span className="gt-stat-box">{chipsLabel}</span>
             <span className="gt-stat-box">Total {me?.deal_points ?? 0}</span>
-            {selected.size > 0 && (
+            {selected.size > 0 && !isGameOver && (
               <button type="button" className="gt-icon-btn" onClick={ungroupSelected} aria-label="Ungroup"><Minus size={14} /></button>
             )}
-            {selected.size >= 2 && (
+            {selected.size >= 2 && !isGameOver && (
               <button type="button" className="gt-icon-btn" onClick={groupSelected} aria-label="Group"><Plus size={14} /></button>
             )}
           </div>
           <div className="flex items-center gap-1.5 shrink-0">
-            {canDiscard && (
+            {canDiscard && !isGameOver && (
               <button type="button" className="gt-btn-discard inline-flex items-center justify-center gap-1" onClick={doDiscard}>
                 <Trash2 size={13} /> Discard
               </button>
             )}
-            {canDrop && (
+            {canDrop && !isGameOver && (
               <button type="button" className="gt-btn-drop inline-flex items-center justify-center gap-1" onClick={() => send({ action: "drop" })}>
                 <Flag size={13} /> Drop {dropCost}
               </button>
             )}
-            {canDeclare && (
+            {canDeclare && !isGameOver && (
               <button type="button" className="gt-btn-declare inline-flex items-center justify-center gap-1" onClick={doDeclare}>
                 <Trophy size={13} /> Declare
               </button>
@@ -852,6 +1022,16 @@ export default function GameTable({ onBack, onExit, customTableId }: { onBack?: 
       </footer>
 
       {rulesOpen && <RulesModal onClose={() => setRulesOpen(false)} />}
+      {settingsMenuOpen && (
+        <SettingsModal
+          onClose={() => setSettingsMenuOpen(false)}
+          onOpenRules={() => setRulesOpen(true)}
+          onLeave={() => setLeaveConfirmOpen(true)}
+          soundOn={soundOn}
+          onToggleSound={toggleSound}
+          tableId={tableId}
+        />
+      )}
       {leaveConfirmOpen && (
         <div
           className="fixed inset-0 z-[100] flex items-center justify-center bg-black/85 backdrop-blur-md p-4 animate-fade-in select-none"
@@ -882,7 +1062,11 @@ export default function GameTable({ onBack, onExit, customTableId }: { onBack?: 
                 <button
                   type="button"
                   className="py-2.5 px-3 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-600 hover:from-amber-400 hover:to-yellow-500 text-slate-950 text-xs font-black shadow-md transition active:scale-95 cursor-pointer uppercase tracking-wider"
-                  onClick={() => { setLeaveConfirmOpen(false); handleBackToLobby(); }}
+                  onClick={() => {
+                    setLeaveConfirmOpen(false);
+                    try { send({ action: "leave" }); } catch {}
+                    handleBackToLobby();
+                  }}
                 >
                   To Lobby
                 </button>
@@ -890,7 +1074,11 @@ export default function GameTable({ onBack, onExit, customTableId }: { onBack?: 
               <button
                 type="button"
                 className="py-2.5 px-3 rounded-xl bg-gradient-to-r from-red-600 via-rose-600 to-red-700 hover:brightness-110 text-xs font-black text-white shadow-lg shadow-red-900/40 border border-red-400/50 transition active:scale-95 cursor-pointer uppercase tracking-wider"
-                onClick={() => { setLeaveConfirmOpen(false); handleExitToDashboard(); }}
+                onClick={() => {
+                  setLeaveConfirmOpen(false);
+                  try { send({ action: "leave" }); } catch {}
+                  handleExitToDashboard();
+                }}
               >
                 Exit to Dashboard
               </button>

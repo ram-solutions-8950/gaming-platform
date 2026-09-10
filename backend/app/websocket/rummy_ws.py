@@ -470,12 +470,45 @@ async def game_socket(websocket: WebSocket, table_id: str) -> None:
     except WebSocketDisconnect:
         await manager.disconnect(table_id, user_id)
         await manager.broadcast(table_id, {"type": "event", "event": "left", "player": user_id})
+        await _handle_player_leave(table_id, user_id)
     except Exception as exc:
         await manager.send_to_user(table_id, user_id, {"type": "error", "message": str(exc)})
         await manager.disconnect(table_id, user_id)
+        await _handle_player_leave(table_id, user_id)
 
 
 _MUTATING_ACTIONS = {"start", "draw", "discard", "drop", "declare"}
+
+
+async def _handle_player_leave(table_id: str, user_id: str) -> None:
+    game = game_manager.get(table_id)
+    if game is None:
+        return
+    if not any(p.id == user_id for p in game.players):
+        return
+    if game.phase == Phase.GAME_OVER:
+        return
+
+    game.player_leave(user_id)
+
+    if game.phase == Phase.GAME_OVER:
+        _cancel_timer(table_id)
+        _settle_real_money(table_id, game)
+        await manager.broadcast(table_id, {
+            "type": "event",
+            "event": "game_over",
+            "winner": game.winner_id,
+            "reason": "opponent_left",
+        })
+    elif game.phase == Phase.DEAL_OVER:
+        _cancel_timer(table_id)
+        _settle_real_money(table_id, game)
+        await manager.broadcast(table_id, {"type": "event", "event": "deal_over"})
+    elif game.phase in (Phase.AWAIT_DRAW, Phase.AWAIT_DISCARD):
+        _arm_timer(table_id)
+        _maybe_trigger_bot_turn(table_id)
+
+    await _broadcast_state(table_id)
 
 
 async def _handle_action(table_id: str, user_id: str, msg: dict) -> None:
@@ -505,6 +538,10 @@ async def _handle_action(table_id: str, user_id: str, msg: dict) -> None:
             await manager.broadcast(table_id, {"type": "event", "event": "declared",
                                                "player": user_id, "valid": result.valid,
                                                "reason": result.reason})
+        elif action == "leave":
+            await manager.broadcast(table_id, {"type": "event", "event": "left", "player": user_id})
+            await _handle_player_leave(table_id, user_id)
+            return
         elif action == "sync":
             pass
         else:

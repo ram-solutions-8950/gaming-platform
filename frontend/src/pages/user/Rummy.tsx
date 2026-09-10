@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   Trophy, Play, ArrowLeft, RotateCcw,
-  BookOpen, History, Flame, Zap
+  BookOpen, History, Flame, Zap, Plus,
 } from "lucide-react";
 import GameTable from "../../components/rummy/RummyTable";
 import MatchSearchOverlay from "../../components/rummy/MatchSearchOverlay";
@@ -218,9 +218,18 @@ export function RummyPage() {
           </div>
 
           <div className="rummy-header-right flex items-center gap-3">
-            <div className="rummy-balance-box bg-slate-900/80 border border-amber-500/30 rounded-xl px-4 py-1.5 flex items-center gap-2">
+            <div className="rummy-balance-box bg-slate-900/80 border border-amber-500/30 rounded-xl px-3.5 py-1.5 flex items-center gap-2 shadow-sm">
               <span className="text-xs text-slate-400 font-medium">Balance:</span>
               <span className="text-base font-bold text-amber-400 font-mono">₹{balance.toFixed(2)}</span>
+              <button
+                type="button"
+                onClick={() => navigate('/deposit')}
+                className="ml-1.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white text-xs font-bold px-2.5 py-1 rounded-lg flex items-center gap-1 shadow-sm transition active:scale-95 cursor-pointer"
+                title="Add Amount"
+              >
+                <Plus size={12} strokeWidth={3} />
+                <span>Add Amount</span>
+              </button>
             </div>
             <button
               onClick={() => setRulesOpen(true)}
