@@ -62,9 +62,8 @@ export function Triple777Page() {
   const symbols = config?.symbols ?? ['7', 'BAR', 'CHERRY', 'LEMON', 'BELL', 'STAR', 'COIN'];
 
   const spinLockRef = useRef(false);
-  const userDismissedBlockerRef = useRef(false);
-
-  // Auto spin & Turbo runtime refs (BUG-010)
+  const userDismissedBlockerRef = useRef<boolean>(false);
+  // Auto-spin & Turbo mode runtime state references
   const autoSpinActiveRef = useRef<boolean>(false);
   const autoSpinsRemainingRef = useRef<number>(0);
   const autoSpinTimerRef = useRef<any>(null);
@@ -268,7 +267,7 @@ export function Triple777Page() {
           soundManager.play('reel_stop');
         }
 
-        // Auto spin chaining (BUG-010)
+        // Auto-spin sequencing
         if (autoSpinActiveRef.current) {
           const remaining = autoSpinsRemainingRef.current - 1;
           autoSpinsRemainingRef.current = remaining;
@@ -294,7 +293,7 @@ export function Triple777Page() {
             }, nextSpinDelay);
           }
         } else {
-          // Manual spin: display clear win/loss result popup (BUG-008)
+          // Manual spin: display outcome popup
           setShowResultPopup(true);
         }
       }, revealDelay);
@@ -487,7 +486,7 @@ export function Triple777Page() {
 
         {/* ── 3. Bottom Betting & Spin Controls (Stacked Portrait) ── */}
         <footer className="t777-bottom-panel">
-          {/* Row 1: Bet Stepper + Quick Chips strictly [10, 20, 50, 100] (BUG-011) */}
+          {/* Row 1: Bet Stepper + Quick Chips */}
           <div className="t777-controls-row">
             {/* Bet Stepper: [- | Stake | +] */}
             <div className="t777-stepper-group">
@@ -525,7 +524,7 @@ export function Triple777Page() {
               </button>
             </div>
 
-            {/* Quick Bet Chips: 10, 20, 50, 100 (BUG-011) */}
+            {/* Quick Bet Chips: 10, 20, 50, 100 */}
             <div className="t777-quick-chips">
               {BET_OPTIONS.map((chipStake) => (
                 <button
@@ -544,7 +543,7 @@ export function Triple777Page() {
             </div>
           </div>
 
-          {/* Row 2: Turbo + Auto + Large Spin Button (BUG-010) */}
+          {/* Row 2: Turbo + Auto + Large Spin Button */}
           <div className="t777-actions-row">
             {/* Turbo Toggle */}
             <button

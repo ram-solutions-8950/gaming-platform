@@ -26,20 +26,37 @@ def register(request: Request, data: RegisterIn, db: Session = Depends(get_db)):
 @limiter.limit("20/minute")
 def login(data: LoginIn, request: Request, db: Session = Depends(get_db)):
     try:
-        tokens = auth_service.login_user(db, data.email, data.password, ip_address=request.client.host)
+        header_platform = request.headers.get("x-client-platform") or request.headers.get("X-Client-Platform")
+        ua = request.headers.get("user-agent", "").lower()
+        client_platform = data.client_platform or header_platform
+        if not client_platform and ("corona888-app" in ua or "capacitor" in ua):
+            client_platform = "apk"
+
+        tokens = auth_service.login_user(
+            db,
+            data.email,
+            data.password,
+            ip_address=request.client.host if request.client else None,
+            client_platform=client_platform,
+        )
         return success_response(tokens)
     except ValueError as e:
-        return error_response("LOGIN_ERROR", str(e), status_code=401)
+        status_code = 403 if "mobile application" in str(e).lower() else 401
+        return error_response("LOGIN_ERROR", str(e), status_code=status_code)
 
 
 @router.post("/refresh")
 @limiter.limit("20/minute")
 def refresh(request: Request, data: RefreshIn, db: Session = Depends(get_db)):
     try:
-        tokens = auth_service.refresh_tokens(db, data.refresh_token)
+        header_platform = request.headers.get("x-client-platform") or request.headers.get("X-Client-Platform")
+        ua = request.headers.get("user-agent", "").lower()
+        client_platform = header_platform or ("apk" if ("corona888-app" in ua or "capacitor" in ua) else None)
+        tokens = auth_service.refresh_tokens(db, data.refresh_token, client_platform=client_platform)
         return success_response(tokens)
     except ValueError as e:
-        return error_response("REFRESH_ERROR", str(e), status_code=401)
+        status_code = 403 if "mobile application" in str(e).lower() else 401
+        return error_response("REFRESH_ERROR", str(e), status_code=status_code)
 
 
 @router.post("/logout")
@@ -50,5 +67,9 @@ def logout(request: Request, data: LogoutIn, current_user: User = Depends(requir
 
 
 @router.get("/me")
-def me(current_user: User = Depends(require_user)):
+def me(request: Request, current_user: User = Depends(require_user)):
+    header_platform = request.headers.get("x-client-platform") or request.headers.get("X-Client-Platform")
+    ua = request.headers.get("user-agent", "").lower()
+    if (header_platform == "apk" or "corona888-app" in ua or "capacitor" in ua) and current_user.role.value != "USER":
+        return error_response("FORBIDDEN", "Admin accounts cannot access the mobile application. Please use the Web Admin Portal.", status_code=403)
     return success_response(UserOut.model_validate(current_user).model_dump())

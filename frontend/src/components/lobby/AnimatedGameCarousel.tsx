@@ -321,14 +321,77 @@ export const AnimatedGameCarousel: React.FC<Props> = ({
     }
   }, [currentIndex, totalSets]);
 
+  const gridRef = useRef<HTMLDivElement>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+
+  const checkScroll = useCallback(() => {
+    const el = gridRef.current;
+    if (!el) return;
+    setCanScrollLeft(el.scrollLeft > 12);
+    setCanScrollRight(el.scrollLeft < el.scrollWidth - el.clientWidth - 12);
+  }, []);
+
+  const currentSet = sets[currentIndex] || { games: [] };
+
+  useEffect(() => {
+    const el = gridRef.current;
+    if (!el) return;
+    const t = setTimeout(checkScroll, 150);
+    el.addEventListener('scroll', checkScroll, { passive: true });
+    window.addEventListener('resize', checkScroll);
+    return () => {
+      clearTimeout(t);
+      el.removeEventListener('scroll', checkScroll);
+      window.removeEventListener('resize', checkScroll);
+    };
+  }, [checkScroll, currentSet.games]);
+
+  const handleScrollNav = (dir: 'left' | 'right') => {
+    const el = gridRef.current;
+    if (!el) return;
+    const scrollAmount = Math.max(el.clientWidth * 0.65, 200);
+    el.scrollBy({
+      left: dir === 'left' ? -scrollAmount : scrollAmount,
+      behavior: 'smooth',
+    });
+  };
+
+  const handleWheel = (e: React.WheelEvent) => {
+    const el = gridRef.current;
+    if (!el) return;
+    if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+      el.scrollLeft += e.deltaY;
+    }
+  };
+
   if (!sets.length) {
     return null;
   }
 
-  const currentSet = sets[currentIndex];
-
   return (
     <div className="game-carousel-container">
+      {canScrollLeft && (
+        <button
+          type="button"
+          className="carousel-side-nav carousel-side-nav--left"
+          onClick={() => handleScrollNav('left')}
+          aria-label="Scroll games left"
+        >
+          ‹
+        </button>
+      )}
+      {canScrollRight && (
+        <button
+          type="button"
+          className="carousel-side-nav carousel-side-nav--right"
+          onClick={() => handleScrollNav('right')}
+          aria-label="Scroll games right"
+        >
+          ›
+        </button>
+      )}
+
       <div
         className={`game-carousel-track ${
           isTransitioning
@@ -338,7 +401,7 @@ export const AnimatedGameCarousel: React.FC<Props> = ({
             : 'slide-in'
         }`}
       >
-        <div className="game-carousel-grid">
+        <div className="game-carousel-grid" ref={gridRef} onWheel={handleWheel}>
           {currentSet.games.map((game) => {
             const aviator = isAviatorGame(game);
             const dragonTiger = isDragonTigerGame(game);

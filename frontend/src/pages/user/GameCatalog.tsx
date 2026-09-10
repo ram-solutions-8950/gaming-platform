@@ -44,12 +44,12 @@ export function GameCatalogPage() {
           </div>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6">
+        <div className="flex flex-row overflow-x-auto gap-4 pb-4 scrollbar-thin snap-x snap-mandatory sm:grid sm:grid-cols-2 xl:grid-cols-3 sm:overflow-x-visible">
           {games.map((game) => (
             <div
               key={game.id}
               onClick={() => handlePlay(game.slug)}
-              className="bg-dark-900 border border-dark-700 rounded-xl overflow-hidden hover:border-brand-500 hover:shadow-[0_0_15px_rgba(239,68,68,0.15)] transition-all duration-300 cursor-pointer group"
+              className="bg-dark-900 border border-dark-700 rounded-xl overflow-hidden hover:border-brand-500 hover:shadow-[0_0_15px_rgba(239,68,68,0.15)] transition-all duration-300 cursor-pointer group min-w-[260px] sm:min-w-0 snap-start flex-shrink-0 sm:flex-shrink"
             >
               <div className="h-40 bg-dark-800 flex items-center justify-center relative overflow-hidden">
                 <div className="absolute inset-0 bg-gradient-to-br from-brand-900/40 to-dark-900/80 group-hover:opacity-75 transition-opacity" />

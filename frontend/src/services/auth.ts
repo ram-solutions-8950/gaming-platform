@@ -1,6 +1,7 @@
 import api, { API_BASE_URL } from './api';
 import axios from 'axios';
 import { authStorage } from './authStorage';
+import { isNativePlatform } from '../utils/platform';
 import type { User } from '../types';
 
 export const authService = {
@@ -21,8 +22,13 @@ export const authService = {
     return res.data;
   },
 
-  async login(email: string, password: string) {
-    const res = await api.post('/auth/login', { email, password });
+  async login(email: string, password: string, client_platform?: string) {
+    const platform = client_platform || (isNativePlatform() ? 'apk' : 'web');
+    const res = await api.post('/auth/login', {
+      email,
+      password,
+      client_platform: platform,
+    });
     if (res.data?.success && res.data?.data?.access_token) {
       authStorage.setTokens(res.data.data.access_token, res.data.data.refresh_token || '');
       if (res.data.data.user) {

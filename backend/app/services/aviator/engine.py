@@ -30,7 +30,7 @@ HOUSE_EDGE = 0.06          # 6% house edge (94% RTP, standard for commercial cra
 BETTING_DURATION = 10.0    # seconds
 COOLDOWN_DURATION = 3.0    # seconds
 MULTIPLIER_TICK_INTERVAL = 0.25   # server snapshot interval (4 per second)
-GROWTH_RATE = 0.09         # dynamic balanced exponential growth rate (BUG-028 balanced timing)
+GROWTH_RATE = 0.09         # dynamic balanced exponential growth rate for engaging flight timing
 
 
 # ──────────────────────────────────────────────────────────────

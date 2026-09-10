@@ -40,11 +40,16 @@ import { useAuthStore } from './store/authStore';
 import { authService } from './services/auth';
 import { authStorage } from './services/authStorage';
 import { soundManager } from './services/soundManager';
+import { isNativePlatform } from './utils/platform';
 
 function ProtectedRoute({ adminOnly = false }: { adminOnly?: boolean }) {
   const { user, isLoading } = useAuthStore();
   if (isLoading) return null;
   if (!user) return <Navigate to="/login" replace />;
+  if (isNativePlatform() && (user.role === 'ADMIN' || user.role === 'SUPER_ADMIN')) {
+    authStorage.clearTokens();
+    return <Navigate to="/login" replace />;
+  }
   if (adminOnly && user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN') return <Navigate to="/dashboard" replace />;
   return <Outlet />;
 }
@@ -126,6 +131,12 @@ function App() {
       // If cached user exists from a previous session, restore it immediately so ProtectedRoute
       // doesn't flash login while the network request is completing
       if (cachedUser && !isCancelled) {
+        if (isNativePlatform() && cachedUser.role !== 'USER') {
+          authStorage.clearTokens();
+          setUser(null);
+          setLoading(false);
+          return;
+        }
         setUser(cachedUser);
       }
 
@@ -133,6 +144,12 @@ function App() {
       try {
         const me = await authService.me();
         if (!isCancelled) {
+          if (isNativePlatform() && me.role !== 'USER') {
+            authStorage.clearTokens();
+            setUser(null);
+            setLoading(false);
+            return;
+          }
           setUser(me);
           setLoading(false);
         }
@@ -147,6 +164,12 @@ function App() {
               const refreshOk = await authService.refreshSession();
               if (refreshOk) {
                 const refreshedMe = await authService.me();
+                if (isNativePlatform() && refreshedMe.role !== 'USER') {
+                  authStorage.clearTokens();
+                  setUser(null);
+                  setLoading(false);
+                  return;
+                }
                 setUser(refreshedMe);
                 setLoading(false);
                 return;

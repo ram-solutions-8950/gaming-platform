@@ -132,7 +132,7 @@ export const TeenPattiTable: React.FC<TeenPattiTableProps> = ({
 
   return (
     <div className="tp-arena-container">
-      {/* Top Navigation & Status Bar — placed outside oval felt to prevent overlapping player (BUG-036) */}
+      {/* Top Navigation & Status Bar — placed outside oval felt to prevent overlapping player */}
       <div className="tp-top-header-bar">
         {/* Left: Lobby Exit + Live Status */}
         <div className="flex items-center gap-2 shrink-0">
@@ -148,13 +148,13 @@ export const TeenPattiTable: React.FC<TeenPattiTableProps> = ({
           </div>
         </div>
 
-        {/* Center: Consistent Crown icon next to Royal (BUG-037) */}
+        {/* Center: Crown icon and game branding */}
         <div className="tp-brand-pill">
           <Crown size={15} className="text-amber-400 fill-amber-400 shrink-0" />
           <span className="font-extrabold text-xs text-amber-300 uppercase tracking-wider">Royal Teen Patti</span>
         </div>
 
-        {/* Right: Total Balance + Add Amount (+) button (BUG-032) + Rules Modal */}
+        {/* Right: Total Balance + Add Amount (+) button + Rules Modal */}
         <div className="flex items-center gap-2 shrink-0">
           <div className="tp-balance-pill">
             <span className="tp-balance-label">TOTAL BALANCE:</span>
@@ -186,7 +186,7 @@ export const TeenPattiTable: React.FC<TeenPattiTableProps> = ({
 
       {/* Main Oval Table */}
       <div className="tp-table-oval">
-        {/* In-table waiting notice when 2nd player has not yet joined (BUG-038) */}
+        {/* In-table waiting notice when 2nd player has not yet joined */}
         {gameState.phase === 'waiting' && gameState.seats.length < 2 && (
           <div className="tp-waiting-badge">
             <span className="animate-spin text-xs">⏳</span>

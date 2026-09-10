@@ -120,7 +120,7 @@ class TeenPattiHand:
         self.reason = None
         self.is_settled = False
 
-        # BUG-033: Balance dealing to prevent consecutive repeated wins
+        # Dynamic card distribution balancing to prevent unrealistic single-player streaks
         dominant_seat = None
         for i, s in enumerate(self.seats):
             if self.win_streak.get(s.id, 0) >= 2:
@@ -271,7 +271,7 @@ class TeenPattiHand:
         rank_other = evaluate_hand(self.seats[other_idx].cards)
 
         is_tie = (rank_caller == rank_other)
-        # BUG-033: Both players lose on showdown tie or unqualified double-loss round
+        # Settle showdown ties or unqualified dual high-card rounds as house collection
         if is_tie or (getattr(self, "double_loss_round", False) and rank_caller.category == HandCategory.HIGH_CARD and rank_other.category == HandCategory.HIGH_CARD):
             for i in active:
                 self.seats[i].show_cards = True

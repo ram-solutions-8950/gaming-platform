@@ -13,6 +13,7 @@ class RegisterIn(BaseModel):
 class LoginIn(BaseModel):
     email: EmailStr
     password: str
+    client_platform: Optional[str] = None
 
 
 class RefreshIn(BaseModel):

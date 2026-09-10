@@ -247,7 +247,7 @@ _MIN_PLAYERS_TO_START = 2
 def _schedule_bot_fill(table_id: str) -> None:
     """Schedules bots to fill up to the minimum player count for virtual practice tables.
     In real-money 2-player multiplayer tables, bots are never injected so real players
-    wait for real opponents (BUG-038)."""
+    wait for real opponents."""
     _, mode = _load_config(table_id)
     if mode == "real":
         return
@@ -605,7 +605,7 @@ async def teen_patti_socket(websocket: WebSocket, table_id: str) -> None:
         await manager.send_to_user(table_id, user_id, {"type": "event", "event": "joined"})
         await _broadcast_state(table_id)
 
-        # BUG-038: Start only when both players have joined the table
+        # Start hand once minimum required players have joined the table
         if len(hand.seats) >= _MIN_PLAYERS_TO_START and hand.phase == Phase.WAITING:
             async def _auto_start_delayed():
                 try:

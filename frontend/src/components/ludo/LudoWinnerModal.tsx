@@ -32,7 +32,7 @@ export const LudoWinnerModal: React.FC<Props> = ({
       }}
     >
       <div className="relative flex flex-col items-center gap-3 sm:gap-5 p-4 sm:p-8 bg-gradient-to-b from-slate-900 via-slate-950 to-amber-950/60 border border-amber-500/50 rounded-2xl sm:rounded-3xl shadow-[0_0_50px_rgba(245,158,11,0.3)] max-w-sm w-full text-center max-h-[calc(100dvh-24px)] overflow-y-auto scrollbar-hide my-auto">
-        {/* Back Button (BUG-002) */}
+        {/* Back Button */}
         <div className="w-full flex justify-start">
           <button
             type="button"
@@ -61,7 +61,7 @@ export const LudoWinnerModal: React.FC<Props> = ({
           </p>
         </div>
 
-        {/* Bet & Win & Balance Metrics Box (BUG-001) */}
+        {/* Bet & Win & Balance Summary */}
         <div className="w-full py-3 px-4 bg-slate-900/80 rounded-2xl border border-amber-500/30 flex justify-around items-center">
           {entryFee !== undefined && entryFee > 0 && (
             <div className="flex flex-col items-center">

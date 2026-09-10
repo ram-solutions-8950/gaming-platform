@@ -14,7 +14,7 @@
   box-sizing: border-box;
 }
 
-/* ── Top Header Bar (BUG-036, BUG-032, BUG-037) ── */
+/* ── Top Header Bar ── */
 .tp-top-header-bar {
   width: 100%;
   max-width: 1100px;

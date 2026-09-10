@@ -24,7 +24,7 @@ router = APIRouter(prefix="/games/triple-777", tags=["Triple 777"])
 
 # Symbol definitions and weights
 SYMBOLS = ["7", "BAR", "CHERRY", "LEMON", "BELL", "STAR", "COIN"]
-# Weighted for realistic challenging slot RNG; '7' weight is 1 for rare jackpot hits (BUG-007, BUG-009)
+# Weighted for balanced slot RTP; '7' weight is 1 for high-volatility jackpot hits
 SYMBOL_WEIGHTS = [1, 6, 11, 16, 22, 22, 22]
 
 PAYTABLE_3_MATCH = {
@@ -165,7 +165,7 @@ def spin(
             else:
                 tier = "win"
         elif reels[0] == reels[1]:
-            # 2 of a kind payline match (left-to-right near-miss / consolation win) (BUG-009)
+            # 2 of a kind payline match (left-to-right near-miss / consolation win)
             won = True
             win_symbol = reels[0]
             multiplier = float(PAYTABLE_2_MATCH_MULTIPLIER)

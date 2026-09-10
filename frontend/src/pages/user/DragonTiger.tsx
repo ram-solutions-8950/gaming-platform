@@ -586,7 +586,7 @@ export function DragonTigerPage() {
     const delay = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
     const run = async () => {
-      // 1. Cards deal in promptly (BUG-055)
+      // Prompt card dealing and flip sequence
       setPhase('revealing');
       setDragonFlipped(false);
       setTigerFlipped(false);
@@ -773,7 +773,7 @@ export function DragonTigerPage() {
   const tigerPublicTotal = useMemo(() => tigerPublicBets.reduce((sum, b) => sum + b.amount, 0), [tigerPublicBets]);
   const tiePublicTotal = useMemo(() => tiePublicBets.reduce((sum, b) => sum + b.amount, 0), [tiePublicBets]);
 
-  // Unique players calculation (BUG-052)
+  // Distinct active players count
   const totalPublicBettors = useMemo(() => {
     if (gameState?.unique_players !== undefined && gameState.unique_players > 0) {
       const tokens = new Set(publicBets.map((b) => b.player_token).filter(Boolean));
@@ -1032,7 +1032,7 @@ export function DragonTigerPage() {
             />
           </div>
 
-          {/* Centered High-Impact Result Announcement (BUG-051) */}
+          {/* Centered High-Impact Result Announcement Overlay */}
           {showPlayer && winnerResult && (
             <div className="absolute inset-0 z-40 flex items-center justify-center pointer-events-none px-4">
               <div

@@ -82,7 +82,7 @@ class RouletteRound:
         self.winning_color: Optional[str] = None
         self.bets: List[BetItem] = []
         self.settled = False
-        # Realistic table pool simulation (BUG-025 & BUG-026)
+        # Dynamic table pool simulation
         # Represents dynamic active betting from other players at the table
         self.base_table_pool_paise = random.randint(18500, 32500) * 100
 
@@ -274,7 +274,7 @@ class RouletteEngine:
         Picks the winning European Roulette pocket (0-36).
         Implements anti-streak balancing to prevent repetitive consecutive wins
         on outside bets (e.g. Red streaks, Black streaks) and preserves realistic
-        European house edge (BUG-022).
+        European house edge.
         """
         # Count consecutive identical color outcomes at the tail of history
         consecutive_red = 0
@@ -404,7 +404,7 @@ class RouletteEngine:
             my_bet_total_paise = 0
             total_bet_paise = sum(b.amount_paise for b in rnd.bets)
 
-            # Aggregate active bets pool from all table players (BUG-025 & BUG-026)
+            # Aggregate active bets pool from all table players
             active_pool = rnd.get_table_pool_paise()
 
             if user_id:

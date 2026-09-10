@@ -200,7 +200,7 @@ def test_andar_bahar_settlement_wallet_safety(db: Session, set_admin_fee, test_u
     initial_balance = wallet.balance
     assert initial_balance == 10000  # ₹100.00
 
-    # Place ₹50 bet on BAHAR (min bet is ₹50 / 5000 paise per BUG-049)
+    # Place ₹50 bet on BAHAR (minimum bet is ₹50 / 5000 paise)
     rd = ab_engine.create_round(db)
     bet = ab_engine.place_bet(db, user.id, rd.id, "BAHAR", 5000, game_id=game.id)
     db.refresh(wallet)

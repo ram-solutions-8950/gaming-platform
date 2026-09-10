@@ -5,6 +5,7 @@ import { Eye, EyeOff, Mail, Lock } from 'lucide-react';
 import { authService } from '../../services/auth';
 import { useAuthStore } from '../../store/authStore';
 import { GlitterRain } from '../../components/common/GlitterRain';
+import { isNativePlatform } from '../../utils/platform';
 import splashBg from '../../assets/corona888-logo.webp';
 import '../../styles/login-page.css';
 
@@ -38,19 +39,27 @@ export function LoginPage() {
         localStorage.removeItem('saved_email');
       }
 
-      const res = await authService.login(data.email, data.password);
+      const isApp = isNativePlatform();
+      const res = await authService.login(data.email, data.password, isApp ? 'apk' : 'web');
       if (res.success) {
         try {
           sessionStorage.removeItem('referral_popup_shown_this_session');
         } catch {}
         const me = await authService.me();
+        if (isApp && me.role !== 'USER') {
+          await authService.logout();
+          setUser(null);
+          setError('Admin accounts cannot log in via the mobile application. Please use the Web Admin Portal.');
+          return;
+        }
         setUser(me);
         navigate(me.role === 'USER' ? '/dashboard' : '/admin/dashboard');
       } else {
         setError(res.error?.message || 'Login failed');
       }
     } catch (e: any) {
-      setError(e.response?.data?.error?.message || 'Login failed');
+      const backendMsg = e.response?.data?.error?.message || e.response?.data?.detail || e.message;
+      setError(backendMsg || 'Login failed');
     } finally {
       setLoading(false);
     }

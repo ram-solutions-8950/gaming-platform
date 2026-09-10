@@ -431,7 +431,7 @@
   box-shadow: 0 2px 8px rgba(0,0,0,0.5);
 }
 
-/* ---- On-Screen Result Announcement Overlay (BUG-048) -------------------- */
+/* ---- On-Screen Result Announcement Overlay -------------------- */
 .andar-bahar-container .ab-result-banner {
   position: absolute;
   top: 45%;

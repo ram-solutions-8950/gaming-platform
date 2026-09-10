@@ -830,7 +830,7 @@ export default function GameTable({ onBack, onExit, customTableId }: { onBack?: 
             <div className="gt-watermark">RUMMY</div>
           </div>
 
-          {/* Central Turn Announcement Badge (BUG-040) */}
+          {/* Central Turn Announcement Banner */}
           {isPlayingPhase && !showingResult && (
             <div className={`gt-turn-banner ${isMyTurnActive ? "gt-turn-mine animate-pulse" : "gt-turn-opponent"}`}>
               {isMyTurnActive ? (
@@ -847,7 +847,7 @@ export default function GameTable({ onBack, onExit, customTableId }: { onBack?: 
                 const isOpponentTurn = state?.turn === p.id && isPlayingPhase && !isGameOver;
                 return (
                   <div key={p.id} className="text-center relative">
-                    {/* Visual Indicator: Opponent Turn Badge (BUG-040) */}
+                    {/* Opponent Active Turn Indicator */}
                     {isOpponentTurn && (
                       <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 whitespace-nowrap bg-gradient-to-r from-amber-500 to-yellow-400 text-slate-950 font-black text-[8px] px-2 py-0.5 rounded-full shadow-lg border border-amber-300 animate-bounce flex items-center gap-1 z-30 pointer-events-none">
                         <span>▶ TURN</span>
@@ -924,7 +924,7 @@ export default function GameTable({ onBack, onExit, customTableId }: { onBack?: 
 
           {me && (
             <div className={`relative z-10 text-center pb-1 ${showingResult ? "invisible" : ""}`}>
-              {/* Visual Indicator: YOUR TURN Badge (BUG-040) */}
+              {/* Active Player Turn Badge */}
               {isMyTurnActive && (
                 <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 whitespace-nowrap bg-gradient-to-r from-emerald-500 via-green-400 to-emerald-500 text-slate-950 font-black text-[9px] px-2.5 py-0.5 rounded-full shadow-[0_0_15px_rgba(16,185,129,0.9)] border border-green-200 animate-pulse flex items-center gap-1 z-30 pointer-events-none">
                   <span>✨ YOUR TURN</span>

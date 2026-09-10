@@ -52,7 +52,7 @@ export const Ludo: React.FC = () => {
   const [diceDisplayValue, setDiceDisplayValue] = useState<number | null>(null);
   const [diceStatusNotice, setDiceStatusNotice] = useState<string | null>(null);
 
-  // Floating reactions & celebration banners (BUG-006)
+  // Floating reactions & celebration banners
   const [reactions, setReactions] = useState<FloatingReaction[]>([]);
   const [banner, setBanner] = useState<CelebrationBanner | null>(null);
   const bannerTimerRef = useRef<any>(null);
@@ -215,7 +215,7 @@ export const Ludo: React.FC = () => {
           setRollingDice(false);
           setDiceDisplayValue(rollVal);
 
-          // Update matchState safely without overwriting newer state (BUG-005)
+          // Update matchState safely without overwriting newer state
           setMatchState((current) => {
             if (!current) return rolledState;
             // If already on a newer state (token moved or turn already passed), preserve latest
@@ -226,7 +226,7 @@ export const Ludo: React.FC = () => {
           });
           setTimerSeconds(rolledState.remaining_timer_seconds ?? 10);
 
-          // Trigger Lucky 6 Celebration Banner (BUG-006)
+          // Trigger Lucky 6 Celebration Banner
           if (rollVal === 6) {
             soundManager.play('cashout');
             const isMe = rolledState.players.some((p) => p.user_id === user?.id && p.color === rolledState.current_turn_color);
@@ -300,7 +300,7 @@ export const Ludo: React.FC = () => {
           const reason = msg.data?.reason;
           triggerDiceRollAnimation(rollVal, turnEnded, reason, msg.state);
         } else if (msg.type === 'TOKEN_MOVED' && msg.state) {
-          // Immediately cancel any pending roll timers to prevent state regression (BUG-005)
+          // Immediately cancel any pending roll timers to prevent state regression
           if (rollCycleTimerRef.current) {
             clearInterval(rollCycleTimerRef.current);
             rollCycleTimerRef.current = null;
@@ -603,7 +603,7 @@ export const Ludo: React.FC = () => {
   const topRightPlayer = shouldRotate180 ? bluePlayer : greenPlayer;
   const bottomRightPlayer = shouldRotate180 ? redPlayer : yellowPlayer;
 
-  // Movable tokens calculation with fallback (BUG-004)
+  // Movable tokens calculation with fallback
   const legalTokenIndices = React.useMemo(() => {
     if (!matchState || !isMyTurn) return [];
     if (matchState.legal_token_indices && matchState.legal_token_indices.length > 0) {
@@ -627,7 +627,7 @@ export const Ludo: React.FC = () => {
     ? activeColor === 'YELLOW' || activeColor === 'GREEN'
     : activeColor === 'RED' || activeColor === 'BLUE';
 
-  // Hardware & popstate Back Button Handler (BUG-002)
+  // Hardware & popstate Back Button Handler
   useEffect(() => {
     const handleAndroidBack = (): boolean => {
       if (showExitConfirm) {
@@ -707,7 +707,7 @@ export const Ludo: React.FC = () => {
       {/* 2. ACTIVE MATCH VIEW (Centered Board + 4 Corners + Dynamic Dice Placement) */}
       {matchState && (
         <div className="ludo-active-match w-full max-w-7xl h-full flex flex-col gap-1 sm:gap-2 items-center justify-between overflow-hidden">
-          {/* Header Bar with Total Balance (BUG-001) & Contextual Back Button (BUG-002) */}
+          {/* Header Bar with Total Balance & Contextual Back Button */}
           <div className="ludo-game-header w-full flex items-center justify-between px-3 py-1.5 bg-slate-900/90 backdrop-blur-md rounded-xl border border-slate-800 shadow-md shrink-0">
             <div className="flex items-center gap-3">
               <button
@@ -729,7 +729,7 @@ export const Ludo: React.FC = () => {
               </div>
             </div>
 
-            {/* Total Balance Pill (BUG-001) */}
+            {/* Total Balance Pill */}
             <div className="flex items-center gap-1.5 px-2.5 sm:px-3.5 py-1 bg-slate-950/80 rounded-full border border-amber-500/40 shadow-inner">
               <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Total Balance:</span>
               <span className="text-xs sm:text-sm font-black text-amber-400">
@@ -760,7 +760,7 @@ export const Ludo: React.FC = () => {
             </div>
           </div>
 
-          {/* Arena Stage: Centered Board flanked by Corner Player Panels & Corner Dice (BUG-003) */}
+          {/* Arena Stage: Centered Board flanked by Corner Player Panels & Corner Dice */}
           <div className="ludo-arena-stage w-full flex-1 flex flex-row items-center justify-between gap-2 sm:gap-4 overflow-hidden min-h-0 px-1 sm:px-3">
             {/* Left Side: P1 Red (Top-Left) & P3 Blue / Left Dice */}
             {/* Left Side: Top-Left & Bottom-Left / Left Dice */}
@@ -801,7 +801,7 @@ export const Ludo: React.FC = () => {
               </div>
             </div>
 
-            {/* Center Stage: Ludo Board (Centered Horizontally & Vertically) + Quick Reactions (BUG-006) */}
+            {/* Center Stage: Ludo Board (Centered Horizontally & Vertically) + Quick Reactions */}
             <div className="ludo-board-center-stage flex-1 flex flex-col items-center justify-center h-full max-h-full overflow-hidden p-1 relative">
               <LudoBoard
                 players={matchState.players}
@@ -812,7 +812,7 @@ export const Ludo: React.FC = () => {
                 myColor={myColor}
               />
 
-              {/* Interactive Quick Reaction Bar (BUG-006) */}
+              {/* Interactive Quick Reaction Bar */}
               <div className="mt-1 sm:mt-1.5 flex items-center justify-center gap-1 sm:gap-2 px-2.5 sm:px-3 py-1 bg-slate-900/90 backdrop-blur-md rounded-full border border-slate-700/70 shadow-lg shrink-0 z-20">
                 <span className="text-[10px] text-amber-400 font-bold uppercase tracking-wider hidden sm:inline mr-1">
                   React:
@@ -871,7 +871,7 @@ export const Ludo: React.FC = () => {
             </div>
           </div>
 
-          {/* Winner Modal (BUG-001 & BUG-002) */}
+          {/* Winner Celebration Modal */}
           {matchState.status === 'COMPLETED' && (
             <LudoWinnerModal
               winnerPlayer={winnerPlayer}
@@ -942,7 +942,7 @@ export const Ludo: React.FC = () => {
         </div>
       )}
 
-      {/* Celebration Banner Overlay (BUG-006) */}
+      {/* Celebration Banner Overlay */}
       {banner && (
         <div className="fixed top-12 sm:top-14 left-1/2 -translate-x-1/2 z-[70] pointer-events-none animate-banner-pop max-w-sm sm:max-w-md w-[92%]">
           <div
@@ -967,7 +967,7 @@ export const Ludo: React.FC = () => {
         </div>
       )}
 
-      {/* Floating Reactions Overlay (BUG-006) */}
+      {/* Floating Reactions Overlay */}
       <div className="fixed inset-0 pointer-events-none z-[60] overflow-hidden">
         {reactions.map((r) => (
           <div

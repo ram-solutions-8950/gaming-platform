@@ -1,5 +1,5 @@
 """
-Unit tests for Aviator provably fair math, crash distribution, and balanced flight timing (BUG-028).
+Unit tests for Aviator provably fair math, crash distribution, and balanced flight timing.
 """
 import hashlib
 import hmac
@@ -80,7 +80,7 @@ def test_crash_point_always_gte_one():
 
 def test_crash_timing_balanced_not_crashing_under_5_seconds_at_2x():
     """
-    BUG-028: Flight timing must give players engaging duration.
+    Flight timing must provide players an engaging duration.
     Reaching 2.0x multiplier should take ~7.7 seconds (well above 5 seconds).
     """
     t_2x = time_for_multiplier(2.0)

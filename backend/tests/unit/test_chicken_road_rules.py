@@ -1,5 +1,5 @@
 """
-Unit tests for Chicken Road game schemas and bet constraints (BUG-016).
+Unit tests for Chicken Road game schemas and bet constraints.
 """
 import pytest
 from pydantic import ValidationError
@@ -13,7 +13,7 @@ def test_start_game_allowed_bets():
         assert model.bet_amount == bet
 
 def test_start_game_bet_exceeding_max_rejected():
-    """Verify bet amount cannot increase beyond 100 (BUG-016)."""
+    """Verify bet amount cannot increase beyond 100."""
     with pytest.raises(ValidationError):
         StartGameIn(bet_amount=101, difficulty="MEDIUM")
 

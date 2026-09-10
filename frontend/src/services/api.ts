@@ -1,13 +1,10 @@
 import axios from 'axios';
 import { authStorage } from './authStorage';
+import { isNativePlatform } from '../utils/platform';
 
 const configuredApiUrl = import.meta.env.VITE_API_URL?.trim();
 
-const isCapacitor =
-  typeof (window as any).Capacitor !== 'undefined' ||
-  (typeof window !== 'undefined' &&
-    (window.location.protocol === 'capacitor:' ||
-      window.location.protocol === 'ionic:'));
+const isCapacitor = isNativePlatform();
 
 const isLocalHost =
   !isCapacitor &&
@@ -33,9 +30,14 @@ const api = axios.create({
 api.interceptors.request.use((config) => {
   const token = authStorage.getAccessToken();
 
+  config.headers = config.headers ?? {};
+
   if (token) {
-    config.headers = config.headers ?? {};
     config.headers.Authorization = `Bearer ${token}`;
+  }
+
+  if (isNativePlatform()) {
+    config.headers['X-Client-Platform'] = 'apk';
   }
 
   return config;

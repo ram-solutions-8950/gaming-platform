@@ -61,7 +61,7 @@ export const ShowdownOverlay: React.FC<ShowdownOverlayProps> = ({
           </button>
         )}
 
-        {/* Clear Win / Loss Title (BUG-035) */}
+        {/* Win / Loss Outcome Title */}
         {isDoubleLoss ? (
           <h2 style={{ fontSize: '1.5rem', fontWeight: 900, color: '#ef4444', textTransform: 'uppercase', margin: '0 0 6px' }}>
             ❌ BOTH PLAYERS LOST
@@ -76,7 +76,7 @@ export const ShowdownOverlay: React.FC<ShowdownOverlayProps> = ({
           </h2>
         )}
 
-        {/* Net Amount Result: Positive for winner, Negative for loser (BUG-035) */}
+        {/* Net Amount Result: Positive for winner, Negative for loser */}
         <div style={{
           fontSize: '1.6rem',
           fontWeight: 900,

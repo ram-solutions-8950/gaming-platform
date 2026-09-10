@@ -6,7 +6,7 @@ from app.services.teen_patti.hand_rank import HandCategory, evaluate_hand
 
 
 def test_valid_boot_tiers_includes_all_modes():
-    # BUG-034: Verify all game modes are supported: Gold Royale (1000), Diamond Lounge (2500),
+    # Verify all game modes are supported: Gold Royale (1000), Diamond Lounge (2500),
     # Platinum Arena (5000), High Roller VIP (10000), plus smaller tiers.
     expected = {100, 500, 1000, 2500, 5000, 10000}
     assert expected.issubset(VALID_BOOT_TIERS)
@@ -15,7 +15,7 @@ def test_valid_boot_tiers_includes_all_modes():
 
 
 def test_teen_patti_two_player_lifecycle():
-    # BUG-038: 2-player table
+    # Two-player table lifecycle
     cfg = GameConfig(boot_amount=1000, max_players=2, turn_seconds=15)
     hand = TeenPattiHand(config=cfg)
     assert hand.config.max_players == 2
@@ -46,7 +46,7 @@ def test_teen_patti_two_player_lifecycle():
 
 
 def test_teen_patti_tie_double_loss():
-    # BUG-033: When hands tie on showdown, both players lose stakes to house
+    # When hands tie on showdown, both players lose stakes to house
     cfg = GameConfig(boot_amount=1000, max_players=2)
     hand = TeenPattiHand(config=cfg)
     hand.add_seat("u1", "P1")
@@ -72,7 +72,7 @@ def test_teen_patti_tie_double_loss():
 
 
 def test_teen_patti_streak_balancing():
-    # BUG-033: Verify streak tracking breaks consecutive multi-win streaks
+    # Verify streak tracking breaks consecutive multi-win streaks
     cfg = GameConfig(boot_amount=1000, max_players=2)
     hand = TeenPattiHand(config=cfg)
     hand.add_seat("u1", "P1")

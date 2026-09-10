@@ -92,7 +92,7 @@ export const LudoBoard: React.FC<Props> = ({
     return [gx * 100 + 50, gy * 100 + 50];
   };
 
-  // Multiple Tokens Clustering: Prevent overlapping when multiple tokens share a cell (BUG-006)
+  // Multiple Tokens Clustering: Prevent visual overlap when multiple tokens occupy the same cell
   const cellOccupants = React.useMemo(() => {
     const map = new Map<string, Array<{ playerId: string; tokenIndex: number }>>();
     const startOffsets: Record<LudoColor, number> = {
@@ -188,7 +188,7 @@ export const LudoBoard: React.FC<Props> = ({
             </feMerge>
           </filter>
 
-          {/* Active Legal Token Glow Filter (BUG-004) */}
+          {/* Active Legal Token Glow Filter */}
           <filter id="goldLegalGlow" x="-50%" y="-50%" width="200%" height="200%">
             <feGaussianBlur in="SourceAlpha" stdDeviation="10" result="blur" />
             <feFlood floodColor="#f59e0b" floodOpacity="0.95" result="goldColor" />
@@ -519,7 +519,7 @@ export const LudoBoard: React.FC<Props> = ({
                   transition: 'transform 0.25s ease',
                 }}
               >
-                {/* Active Turn Ground Halo & Pulse Rings (BUG-004) */}
+                {/* Active Turn Ground Halo & Pulse Rings */}
                 {isLegal && (
                   <g>
                     <ellipse
@@ -542,7 +542,7 @@ export const LudoBoard: React.FC<Props> = ({
                       strokeWidth="2.5"
                       strokeDasharray="6,4"
                     />
-                    {/* Bouncing Golden Floating Pointer Arrow Above Pawn (BUG-004) */}
+                    {/* Bouncing Golden Floating Pointer Arrow Above Pawn */}
                     <g className="ludo-token-bounce-arrow pointer-events-none">
                       <polygon
                         points={`${cx},${cy - 66} ${cx - 16},${cy - 92} ${cx + 16},${cy - 92}`}

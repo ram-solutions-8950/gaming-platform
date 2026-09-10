@@ -126,14 +126,14 @@ export function SlotReels({ symbols, reels, spinToken, pace = "normal" }: SlotRe
         ))}
       </div>
 
-      {/* left marquee bulbs (BUG-012) */}
+      {/* left marquee illumination bulbs */}
       <div className="absolute -left-1.5 top-3 bottom-3 flex flex-col justify-between pointer-events-none z-10">
         {Array.from({ length: BULB_COUNT_V }, (_, i) => (
           <span key={`left-${i}`} className="t777-bulb" style={{ animationDelay: `${(i % 5) * 0.15 + 0.25}s` }} />
         ))}
       </div>
 
-      {/* right marquee bulbs (BUG-012) */}
+      {/* right marquee illumination bulbs */}
       <div className="absolute -right-1.5 top-3 bottom-3 flex flex-col justify-between pointer-events-none z-10">
         {Array.from({ length: BULB_COUNT_V }, (_, i) => (
           <span key={`right-${i}`} className="t777-bulb" style={{ animationDelay: `${(i % 5) * 0.15 + 0.75}s` }} />

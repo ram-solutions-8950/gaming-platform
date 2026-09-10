@@ -83,7 +83,13 @@ def register_user(db: Session, name: str, username: str, email: str, password: s
     return user
 
 
-def login_user(db: Session, email: str, password: str, ip_address: Optional[str] = None) -> dict:
+def login_user(
+    db: Session,
+    email: str,
+    password: str,
+    ip_address: Optional[str] = None,
+    client_platform: Optional[str] = None,
+) -> dict:
     email_lower = email.lower()
     user = db.query(User).filter(func.lower(User.email) == email_lower).first()
 
@@ -91,6 +97,11 @@ def login_user(db: Session, email: str, password: str, ip_address: Optional[str]
         raise ValueError("Invalid email or password")
     if user.status != UserStatus.ACTIVE:
         raise ValueError(f"Account is {user.status.value.lower()}")
+
+    # Disallow administrator accounts from logging in through native mobile / APK clients
+    if client_platform and client_platform.strip().lower() in ("apk", "mobile", "android", "capacitor"):
+        if user.role != UserRole.USER:
+            raise ValueError("Admin accounts cannot log in via the mobile application. Please use the desktop web admin portal.")
 
     access_token = create_access_token(str(user.id), user.role.value)
     raw_refresh, hashed_refresh, expires_at = create_refresh_token()
@@ -105,7 +116,7 @@ def login_user(db: Session, email: str, password: str, ip_address: Optional[str]
     return {"access_token": access_token, "refresh_token": raw_refresh, "token_type": "bearer"}
 
 
-def refresh_tokens(db: Session, raw_refresh_token: str) -> dict:
+def refresh_tokens(db: Session, raw_refresh_token: str, client_platform: Optional[str] = None) -> dict:
     token_hash = hash_refresh_token(raw_refresh_token)
     rt = db.query(RefreshToken).filter(
         RefreshToken.token_hash == token_hash,
@@ -114,6 +125,11 @@ def refresh_tokens(db: Session, raw_refresh_token: str) -> dict:
 
     if not rt or rt.expires_at.replace(tzinfo=timezone.utc) < datetime.now(timezone.utc):
         raise ValueError("Invalid or expired refresh token")
+
+    if client_platform and client_platform.strip().lower() in ("apk", "mobile", "android", "capacitor"):
+        user_check = db.query(User).filter(User.id == rt.user_id).first()
+        if user_check and user_check.role != UserRole.USER:
+            raise ValueError("Admin accounts cannot access the mobile application. Please use the desktop web admin portal.")
 
     user = db.query(User).filter(User.id == rt.user_id).first()
     if not user or user.status != UserStatus.ACTIVE:

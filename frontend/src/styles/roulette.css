@@ -124,7 +124,7 @@
   color: #fff;
 }
 
-/* Trends Pill (BUG-019) */
+/* Trends Pill */
 .roulette-trend-pill {
   display: flex;
   align-items: center;
@@ -234,7 +234,7 @@
   transform: scale(1.1);
 }
 
-/* Top Right Area & Total Coin Balance (BUG-017) */
+/* Top Right Area & Total Coin Balance */
 .roulette-top-right {
   display: flex;
   align-items: center;
@@ -329,7 +329,7 @@
   position: relative;
 }
 
-/* VIP Sidebar on Left (BUG-020: Permanently visible chat & cards) */
+/* VIP Sidebar on Left: Permanently visible chat & cards */
 .roulette-vip-sidebar {
   width: 76px;
   min-width: 76px;
@@ -480,7 +480,7 @@
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   3. ROULETTE BOARD FELT TABLE (BUG-023: Horizontal Scroll & Drag)
+   3. ROULETTE BOARD FELT TABLE: Horizontal Scroll & Drag
    ═══════════════════════════════════════════════════════════════ */
 .roulette-board-container {
   flex: 1;
@@ -523,7 +523,7 @@
   user-select: none;
 }
 
-/* Start Betting Standby Overlay (BUG-021) */
+/* Start Betting Standby Overlay */
 .roulette-start-betting-overlay {
   position: absolute;
   top: 50%;
@@ -911,7 +911,7 @@
   gap: 3px;
 }
 
-/* Status Metrics (BUG-025 & BUG-026: Visible immediately & separated) */
+/* Status Metrics: Table Total, Status, and User Stake */
 .roulette-status-panel {
   display: flex;
   align-items: center;
@@ -1049,7 +1049,7 @@
   font-size: 10px;
 }
 
-/* Lucky 3Patti Badge (BUG-027: flex-shrink 0, never cut off on mobile) */
+/* Lucky 3Patti Badge: flex-shrink 0, full viewport visibility */
 .roulette-lucky-badge {
   display: flex;
   align-items: center;
