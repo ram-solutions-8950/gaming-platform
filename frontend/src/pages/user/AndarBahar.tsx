@@ -25,13 +25,14 @@ import "../../styles/andar-bahar.css";
 
 type Phase = "betting" | "closed" | "dealing" | "result";
 
-const CHIPS = [10, 50, 100, 500, 1000, 5000];
+const MIN_STAKE = 50;
+const CHIPS = [50, 100, 500, 1000, 5000];
 const STAKE_STEP = 10;
 
 export function AndarBaharPage() {
   const navigate = useNavigate();
   const [balance, setBalance] = useState<number>(1000);
-  const [stake, setStake] = useState<number>(50);
+  const [stake, setStake] = useState<number>(MIN_STAKE);
   const [phase, setPhase] = useState<Phase>("betting");
   const [myBet, setMyBet] = useState<{ side: Side; amount: number; roundId: string } | null>(null);
   const [selectedSide, setSelectedSide] = useState<Side | null>(null);
@@ -45,6 +46,12 @@ export function AndarBaharPage() {
   const [andar, setAndar] = useState<Card[]>([]);
   const [bahar, setBahar] = useState<Card[]>([]);
   const [result, setResult] = useState<{ won: boolean; text: string } | null>(null);
+  const [resultBanner, setResultBanner] = useState<{
+    type: "win" | "lose" | "neutral";
+    title: string;
+    amount?: number;
+    subText?: string;
+  } | null>(null);
   const [winningSide, setWinningSide] = useState<Side | null>(null);
   const [timeLeft, setTimeLeft] = useState(15);
   const [calcCountdown, setCalcCountdown] = useState<number | null>(null);
@@ -153,6 +160,7 @@ export function AndarBaharPage() {
       setAndar([]);
       setBahar([]);
       setResult(null);
+      setResultBanner(null);
       setWinningSide(null);
       setMyBet(null);
       myBetRef.current = null;
@@ -236,19 +244,36 @@ export function AndarBaharPage() {
         const totalReturn = bet.amount + netProfit;
         setResult({
           won: true,
-          text: `YOU WON! Bet: ₹${bet.amount} • Won: +₹${totalReturn} (${winner.toUpperCase()})`,
+          text: `🎉 YOU WIN! Bet: ₹${bet.amount} • Won: +₹${totalReturn} (${winner.toUpperCase()})`,
+        });
+        setResultBanner({
+          type: "win",
+          title: "YOU WIN!",
+          amount: totalReturn,
+          subText: `Bet: ₹${bet.amount} on ${winner.toUpperCase()} • Won +₹${totalReturn}`,
         });
         soundManager.play("win_clap");
       } else if (didLose) {
         setResult({
           won: false,
-          text: `BET LOST: Bet: ₹${bet.amount} • ${winner.toUpperCase()} Wins`,
+          text: `❌ YOU LOSE! Bet: ₹${bet.amount} • ${winner.toUpperCase()} Won`,
+        });
+        setResultBanner({
+          type: "lose",
+          title: "YOU LOSE",
+          amount: bet.amount,
+          subText: `Bet: ₹${bet.amount} on ${bet.side.toUpperCase()} • Winner: ${winner.toUpperCase()}`,
         });
         soundManager.play("loss");
       } else {
         setResult({
           won: true,
-          text: `${winner.toUpperCase()} WINS!`,
+          text: `🏆 ${winner.toUpperCase()} WINS!`,
+        });
+        setResultBanner({
+          type: "neutral",
+          title: `${winner.toUpperCase()} WINS!`,
+          subText: `Target Rank: ${rankLabel(rd.middle?.rank || 0)}`,
         });
       }
       setPhase("result");
@@ -535,6 +560,11 @@ export function AndarBaharPage() {
       return;
     }
 
+    if (stake < MIN_STAKE) {
+      setServerError(`Minimum bet amount is ₹${MIN_STAKE}.`);
+      return;
+    }
+
     if (stake > balance) {
       setServerError("Insufficient wallet balance for this bet amount.");
       return;
@@ -571,7 +601,7 @@ export function AndarBaharPage() {
   }
 
   function adjustStake(delta: number) {
-    setStake((s) => Math.max(STAKE_STEP, Math.min(balance, s + delta)));
+    setStake((s) => Math.max(MIN_STAKE, Math.min(balance, s + delta)));
   }
 
   if (portraitPhone) {
@@ -594,22 +624,25 @@ export function AndarBaharPage() {
             <button className="iconbtn !px-2.5 !py-1 flex items-center gap-1 font-bold text-xs" title="Leave Game" onClick={() => setConfirmLeave(true)}>
               ← Exit
             </button>
-            <button
-              type="button"
-              className="iconbtn !px-2.5 !py-1 flex items-center gap-1 font-bold text-xs !bg-amber-500/20 !border-amber-500/40 text-amber-300 cursor-pointer"
-              title="Rules & Guide"
-              onClick={() => setRulesPopup("rules")}
-            >
-              ❓ Rules
-            </button>
             <span className="brand">
               <small>♠♣</small> ANDAR BAHAR <small>♣♠</small>
             </span>
           </div>
           <div className="header-right">
-            <span className="balance">
-              <small>₹</small> {balance}
-            </span>
+            <div className="ab-balance-group">
+              <span className="balance">
+                <small>₹</small> {balance}
+              </span>
+              <button
+                type="button"
+                onClick={() => navigate("/deposit")}
+                className="ab-add-amount-btn"
+                title="Add Amount"
+              >
+                <span className="ab-add-plus">+</span>
+                <span>Add Amount</span>
+              </button>
+            </div>
             <span className="live-badge">● LIVE</span>
             <span className={`timer-box${phase === "betting" && timeLeft <= 5 ? " warn" : phase === "closed" ? " calc" : ""}`}>
               <small>{phase === "betting" ? "BETTING TIME" : phase === "closed" ? "CALCULATING" : phase === "result" ? "RESULT" : "STATUS"}</small>
@@ -653,6 +686,23 @@ export function AndarBaharPage() {
         </div>
 
         <div className="table-wrap">
+          {resultBanner && phase === "result" && (
+            <div className={`ab-result-banner ${resultBanner.type}`}>
+              <div className="ab-result-banner-badge">
+                {resultBanner.type === "win" ? "🏆 ROUND RESULT" : resultBanner.type === "lose" ? "❌ ROUND RESULT" : "🎴 ROUND RESULT"}
+              </div>
+              <div className="ab-result-banner-title">{resultBanner.title}</div>
+              {resultBanner.amount !== undefined && (
+                <div className="ab-result-banner-amount">
+                  {resultBanner.type === "win" ? `+₹${resultBanner.amount}` : `-₹${resultBanner.amount}`}
+                </div>
+              )}
+              {resultBanner.subText && (
+                <div className="ab-result-banner-sub">{resultBanner.subText}</div>
+              )}
+            </div>
+          )}
+
           <div className="table-oval">
             <div className={`side-col andar${phase === "result" && winningSide === "andar" ? " win" : ""}`}>
               <span className="side-name andar">ANDAR</span>
@@ -769,13 +819,21 @@ export function AndarBaharPage() {
             </div>
 
             <div className="stake-group">
-              <span className="group-label">Bet Amount</span>
+              <span className="group-label">Bet Amount (Min ₹{MIN_STAKE})</span>
               <div className="bet-stepper">
-                <button disabled={phase !== "betting" || !!myBet} onClick={() => adjustStake(-STAKE_STEP)}>
+                <button
+                  disabled={phase !== "betting" || !!myBet || stake <= MIN_STAKE}
+                  onClick={() => adjustStake(-STAKE_STEP)}
+                  title={stake <= MIN_STAKE ? `Minimum bet is ₹${MIN_STAKE}` : "Decrease Bet"}
+                >
                   −
                 </button>
                 <span>₹{stake}</span>
-                <button disabled={phase !== "betting" || !!myBet} onClick={() => adjustStake(STAKE_STEP)}>
+                <button
+                  disabled={phase !== "betting" || !!myBet || stake >= balance}
+                  onClick={() => adjustStake(STAKE_STEP)}
+                  title="Increase Bet"
+                >
                   +
                 </button>
               </div>

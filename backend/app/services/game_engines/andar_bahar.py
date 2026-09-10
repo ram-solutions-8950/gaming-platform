@@ -30,7 +30,7 @@ DEFAULT_CONFIG = {
     "betting_duration_seconds": 15,
     "allowed_bets": {"andar": True, "bahar": True},
     "payouts": {"andar": 0.8, "bahar": 0.8},
-    "min_bet": 1000,
+    "min_bet": 5000,
     "max_bet": 500000,
 }
 
@@ -136,7 +136,7 @@ def merge_andar_bahar_config(game: Game) -> dict:
     cfg["betting_duration_seconds"] = 15
     cfg["allowed_bets"] = {**cfg["allowed_bets"], **(incoming.get("allowed_bets") or {})}
     cfg["payouts"] = {**cfg["payouts"], **(incoming.get("payouts") or {})}
-    cfg["min_bet"] = int(incoming["min_bet"]) if incoming.get("min_bet") is not None else int(game.min_bet)
+    cfg["min_bet"] = max(5000, int(incoming["min_bet"])) if incoming.get("min_bet") is not None else max(5000, int(game.min_bet))
     cfg["max_bet"] = int(incoming["max_bet"]) if incoming.get("max_bet") is not None else int(game.max_bet)
     return cfg
 
@@ -210,7 +210,7 @@ class AndarBaharEngine(GameEngine):
             description="Traditional Indian card game: Andar vs Bahar.",
             icon_url="🎴",
             status=GameStatus.ACTIVE,
-            min_bet=1000,
+            min_bet=5000,
             max_bet=500000,
             config=copy.deepcopy(DEFAULT_CONFIG),
         )

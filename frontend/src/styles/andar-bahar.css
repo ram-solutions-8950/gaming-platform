@@ -99,6 +99,45 @@
   opacity: 0.8;
 }
 
+.andar-bahar-container .ab-balance-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.andar-bahar-container .ab-add-amount-btn {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  border: 1px solid rgba(110, 231, 183, 0.7);
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.4);
+  color: #ffffff;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-weight: 800;
+  font-size: 11px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  white-space: nowrap;
+}
+
+.andar-bahar-container .ab-add-amount-btn:hover {
+  background: linear-gradient(135deg, #34d399 0%, #10b981 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.6);
+}
+
+.andar-bahar-container .ab-add-amount-btn:active {
+  transform: scale(0.95);
+}
+
+.andar-bahar-container .ab-add-plus {
+  font-size: 14px;
+  font-weight: 900;
+  line-height: 1;
+}
+
 .andar-bahar-container .balance {
   background: linear-gradient(180deg, #1A002E 0%, #0D0017 100%);
   border: 1px solid rgba(255, 210, 26, 0.45);
@@ -390,6 +429,104 @@
   background: repeating-linear-gradient(45deg, #8a1717 0 4px, #4d0b0b 4px 8px);
   border: 2px solid #fff;
   box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+}
+
+/* ---- On-Screen Result Announcement Overlay (BUG-048) -------------------- */
+.andar-bahar-container .ab-result-banner {
+  position: absolute;
+  top: 45%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 16px 32px;
+  border-radius: 20px;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  text-align: center;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.85), 0 0 35px rgba(0, 0, 0, 0.6);
+  pointer-events: none;
+  min-width: 250px;
+  max-width: 90%;
+  animation: ab-result-pop 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+@keyframes ab-result-pop {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.6);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+.andar-bahar-container .ab-result-banner.win {
+  background: radial-gradient(circle at center, rgba(16, 185, 129, 0.96) 0%, rgba(6, 95, 70, 0.98) 100%);
+  border: 2px solid #34d399;
+  box-shadow: 0 0 40px rgba(52, 211, 153, 0.6), 0 20px 50px rgba(0, 0, 0, 0.85);
+}
+
+.andar-bahar-container .ab-result-banner.lose {
+  background: radial-gradient(circle at center, rgba(239, 68, 68, 0.96) 0%, rgba(153, 27, 27, 0.98) 100%);
+  border: 2px solid #f87171;
+  box-shadow: 0 0 40px rgba(239, 68, 68, 0.6), 0 20px 50px rgba(0, 0, 0, 0.85);
+}
+
+.andar-bahar-container .ab-result-banner.neutral {
+  background: radial-gradient(circle at center, rgba(30, 41, 59, 0.96) 0%, rgba(15, 23, 42, 0.98) 100%);
+  border: 2px solid #fbbf24;
+  box-shadow: 0 0 35px rgba(251, 191, 36, 0.4), 0 20px 50px rgba(0, 0, 0, 0.85);
+}
+
+.andar-bahar-container .ab-result-banner-badge {
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  padding: 3px 12px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.45);
+  color: #ffffff;
+  margin-bottom: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+}
+
+.andar-bahar-container .ab-result-banner-title {
+  font-size: 26px;
+  font-weight: 900;
+  letter-spacing: 1.5px;
+  color: #ffffff;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.7);
+  line-height: 1.1;
+}
+
+.andar-bahar-container .ab-result-banner-amount {
+  font-size: 28px;
+  font-weight: 900;
+  font-family: monospace;
+  margin-top: 4px;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.7);
+}
+
+.andar-bahar-container .ab-result-banner.win .ab-result-banner-amount {
+  color: #a7f3d0;
+}
+
+.andar-bahar-container .ab-result-banner.lose .ab-result-banner-amount {
+  color: #fecaca;
+}
+
+.andar-bahar-container .ab-result-banner-sub {
+  font-size: 12px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.92);
+  margin-top: 6px;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.7);
 }
 
 /* Result Banner */
