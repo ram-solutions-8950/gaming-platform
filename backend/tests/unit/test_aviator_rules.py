@@ -45,8 +45,20 @@ def test_provably_fair_independent_calculation():
     ).hexdigest()
     h = int(h_bytes[:13], 16)
     e = 2 ** 52
-    raw = (e / (e - h)) * (1 - HOUSE_EDGE)
-    calc = max(1.0, math.floor(raw * 100) / 100)
+    if h == e:
+        calc = 1.00
+    elif (h % 17) == 0:
+        calc = round(1.00 + ((h % 16) / 100.0), 2)
+    else:
+        u = h / e
+        raw = (1.0 / (1.0 - u)) * (1.0 - HOUSE_EDGE)
+        if raw <= 1.00:
+            calc = 1.00
+        elif raw <= 2.00:
+            calc = raw
+        else:
+            calc = 2.00 + math.pow(raw - 2.00, 0.58)
+        calc = max(1.00, min(50.00, math.floor(calc * 100) / 100))
 
     assert expected == calc
 
@@ -94,17 +106,54 @@ def test_multiplier_roundtrip():
 
 def test_crash_distribution_healthy_rtp():
     """
-    Over 5,000 rounds, distribution should reflect 3% house edge (97% RTP):
-    - Median around 1.8x - 2.1x
-    - Instant crashes (1.00x) around ~2-5%
+    Over 10,000 rounds, distribution should reflect balanced casino math:
+    - > 52% of rounds crash before 2.0x (curbing excessive winnings)
+    - <= 3.5% of rounds reach >= 10.0x (jackpots are rare and exciting)
+    - Mean multiplier is tightly controlled (< 4.0x, down from 15.5x)
+    - Median is balanced around 1.6x - 2.0x
     """
     seed = "distribution_test_seed_fairness"
-    crashes = [compute_crash_point(seed, n) for n in range(1, 5001)]
-    instant_crashes = sum(1 for c in crashes if c == 1.00)
-    instant_pct = instant_crashes / 5000.0
-
-    assert instant_pct < 0.06, f"Too many instant crashes: {instant_pct:.2%}"
-
+    crashes = [compute_crash_point(seed, n) for n in range(1, 10001)]
+    under_2x = sum(1 for c in crashes if c < 2.00) / len(crashes)
+    over_10x = sum(1 for c in crashes if c >= 10.00) / len(crashes)
+    mean = sum(crashes) / len(crashes)
     sorted_crashes = sorted(crashes)
-    median = sorted_crashes[2500]
-    assert 1.70 <= median <= 2.20, f"Median crash {median} outside expected range"
+    median = sorted_crashes[len(crashes) // 2]
+
+    assert under_2x > 0.52, f"Expected >52% sub-2x crashes, got {under_2x:.1%}"
+    assert over_10x <= 0.035, f"Expected <=3.5% >=10x crashes, got {over_10x:.1%}"
+    assert mean < 4.0, f"Expected mean < 4.0x, got {mean:.2f}x"
+    assert 1.60 <= median <= 2.00, f"Median crash {median} outside expected range"
+
+
+def test_aviator_engine_anti_streak():
+    """
+    Verify AviatorEngine prevents consecutive high multipliers (>= 4.0x)
+    and clusters of mega multipliers (>= 10.0x).
+    """
+    from unittest.mock import MagicMock
+    from app.services.aviator.engine import AviatorEngine
+
+    engine = AviatorEngine()
+    db = MagicMock()
+    db.query.return_value.filter.return_value.order_by.return_value.limit.return_value.all.return_value = []
+
+    crashes = []
+    for _ in range(200):
+        rnd = engine.create_round(db)
+        crashes.append(rnd.crash_point)
+        engine.start_flight(db)
+        engine.crash_round(db)
+
+    # 1. No consecutive >= 4.0x
+    for i in range(len(crashes) - 1):
+        assert not (crashes[i] >= 4.0 and crashes[i + 1] >= 4.0), (
+            f"Found consecutive high rounds: {crashes[i]}x and {crashes[i+1]}x"
+        )
+
+    # 2. No more than 1 >= 10.0x in any 5-round window
+    for i in range(len(crashes) - 5):
+        window = crashes[i : i + 5]
+        assert sum(1 for c in window if c >= 10.0) <= 1, (
+            f"Found clustering of >=10x in window: {window}"
+        )

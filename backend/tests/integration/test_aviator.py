@@ -153,8 +153,20 @@ class TestProvablyFair:
         ).hexdigest()
         h = int(h_bytes[:13], 16)
         e = 2 ** 52
-        raw = (e / (e - h)) * (1 - HOUSE_EDGE)
-        independent = max(1.0, math.floor(raw * 100) / 100)
+        if h == e:
+            independent = 1.00
+        elif (h % 17) == 0:
+            independent = round(1.00 + ((h % 16) / 100.0), 2)
+        else:
+            u = h / e
+            raw = (1.0 / (1.0 - u)) * (1.0 - HOUSE_EDGE)
+            if raw <= 1.00:
+                independent = 1.00
+            elif raw <= 2.00:
+                independent = raw
+            else:
+                independent = 2.00 + math.pow(raw - 2.00, 0.58)
+            independent = max(1.00, min(50.00, math.floor(independent * 100) / 100))
 
         assert expected == independent
 

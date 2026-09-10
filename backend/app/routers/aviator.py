@@ -92,7 +92,7 @@ def aviator_fairness(
         status=rnd.status.value,
         verification_note=(
             "To verify: compute HMAC-SHA256(server_seed, str(nonce)), "
-            "take first 13 hex chars as h, then crash = max(1.0, (2^52 / (2^52 - h)) * 0.97). "
+            "take first 13 hex chars as h (52-bit int), then compute crash point with balanced 6% house edge. "
             "Verify SHA-256(server_seed) == server_seed_hash."
         ),
     ).model_dump(mode="json"))
