@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import {
   History,
   ArrowDownToLine,
@@ -24,16 +24,17 @@ type FilterTab = 'ALL' | 'DEPOSITS' | 'WITHDRAWALS' | 'GAMES';
 function formatTxDate(dateStr: string): string {
   try {
     const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr || '—';
     const day = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
     const time = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     return `${day} • ${time}`;
   } catch {
-    return dateStr;
+    return dateStr || '—';
   }
 }
 
 function formatAmount(amountInPaisa: number): string {
-  const inr = amountInPaisa / 100;
+  const inr = (amountInPaisa || 0) / 100;
   return inr.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
@@ -79,6 +80,7 @@ function getTxIconBoxClass(type: TxType): string {
 }
 
 function formatTxTitle(tx: WalletTransaction): string {
+  if (!tx) return 'Transaction';
   switch (tx.type) {
     case 'GAME_WIN':
       return 'Game Win';
@@ -116,28 +118,75 @@ function getStatusPillClass(status: TxStatus): string {
 
 export function TransactionsPage() {
   const [txs, setTxs] = useState<WalletTransaction[]>([]);
+  const [page, setPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeFilter, setActiveFilter] = useState<FilterTab>('ALL');
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [selectedTx, setSelectedTx] = useState<WalletTransaction | null>(null);
+  const observerTargetRef = useRef<HTMLDivElement | null>(null);
 
-  const fetchTransactions = () => {
-    setLoading(true);
+  const PAGE_SIZE = 25;
+
+  const fetchTransactions = (pageNum = 1, append = false) => {
+    if (pageNum === 1) {
+      setLoading(true);
+    } else {
+      setLoadingMore(true);
+    }
     setError(null);
     walletService
-      .getTransactions(1, 50)
-      .then((t) => setTxs(t.items || []))
+      .getTransactions(pageNum, PAGE_SIZE)
+      .then((res: any) => {
+        const items: WalletTransaction[] = res?.items || [];
+        const total = res?.total ?? items.length;
+        setTotalCount(total);
+        setPage(pageNum);
+        if (append) {
+          setTxs((prev) => {
+            const existingIds = new Set(prev.map((item) => item.id));
+            const newItems = items.filter((item) => !existingIds.has(item.id));
+            return [...prev, ...newItems];
+          });
+        } else {
+          setTxs(items);
+        }
+      })
       .catch((err) => {
         console.error('Failed to fetch transactions:', err);
         setError('Unable to load transactions. Please try again.');
       })
-      .finally(() => setLoading(false));
+      .finally(() => {
+        setLoading(false);
+        setLoadingMore(false);
+      });
   };
 
   useEffect(() => {
-    fetchTransactions();
+    fetchTransactions(1, false);
   }, []);
+
+  const hasMore = txs.length < totalCount;
+
+  // Auto-load next page when user scrolls down
+  useEffect(() => {
+    const target = observerTargetRef.current;
+    if (!target) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !loading && !loadingMore) {
+          fetchTransactions(page + 1, true);
+        }
+      },
+      { threshold: 0.1, rootMargin: '120px' }
+    );
+
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [hasMore, loading, loadingMore, page]);
 
   const handleCopyRef = (e: React.MouseEvent, refId: string) => {
     e.stopPropagation();
@@ -227,7 +276,7 @@ export function TransactionsPage() {
             <p className="casino-tx-error-title">{error}</p>
             <button
               type="button"
-              onClick={fetchTransactions}
+              onClick={() => fetchTransactions(1, false)}
               className="casino-tx-retry-btn"
             >
               Try Again
@@ -247,8 +296,9 @@ export function TransactionsPage() {
         ) : (
           /* Transaction Item List */
           filteredTxs.map((tx) => {
+            if (!tx || !tx.id) return null;
             const isCredit = CREDIT_TYPES.includes(tx.type);
-            const formatted = formatAmount(tx.amount);
+            const formatted = formatAmount(tx.amount || 0);
             const refStr = tx.reference_id || tx.id;
 
             return (
@@ -309,6 +359,32 @@ export function TransactionsPage() {
               </div>
             );
           })
+        )}
+
+        {/* Continuous scroll loading sentinel & controls */}
+        {!loading && filteredTxs.length > 0 && (
+          <div ref={observerTargetRef} className="w-full flex flex-col items-center justify-center py-2 min-h-[36px]">
+            {loadingMore && (
+              <div className="flex items-center gap-2 text-xs text-purple-300 font-bold py-3 animate-pulse">
+                <div className="w-4 h-4 rounded-full border-2 border-amber-400 border-t-transparent animate-spin" />
+                <span>Loading more activity...</span>
+              </div>
+            )}
+            {hasMore && !loadingMore && (
+              <button
+                type="button"
+                onClick={() => fetchTransactions(page + 1, true)}
+                className="my-2 px-5 py-2 rounded-xl bg-purple-900/60 hover:bg-purple-800/80 border border-amber-400/40 text-xs font-black text-amber-300 shadow-md active:scale-95 transition cursor-pointer"
+              >
+                Load More Activity ({txs.length} of {totalCount})
+              </button>
+            )}
+            {!hasMore && (
+              <div className="text-[11px] font-semibold text-gray-400 py-3">
+                ✓ All {txs.length} activities loaded
+              </div>
+            )}
+          </div>
         )}
       </div>
 

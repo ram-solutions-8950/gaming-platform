@@ -14,6 +14,7 @@ class UserOut(BaseModel):
     status: UserStatus
     created_at: datetime
     last_login_at: Optional[datetime] = None
+    avatar_url: Optional[str] = None
 
     model_config = {"from_attributes": True}
 
@@ -21,6 +22,7 @@ class UserOut(BaseModel):
 class UserUpdateIn(BaseModel):
     name: Optional[str] = None
     username: Optional[str] = None
+    avatar_url: Optional[str] = None
 
 
 class AdminUserStatusUpdateIn(BaseModel):

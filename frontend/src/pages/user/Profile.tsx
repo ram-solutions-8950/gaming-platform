@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { Camera } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import { Card } from '../../components/common/Card';
 import { Input } from '../../components/common/Input';
@@ -7,11 +8,15 @@ import { Badge } from '../../components/common/Badge';
 import { referralService, type ReferralStats, type ReferralHistoryItem } from '../../services/referral';
 import api from '../../services/api';
 
+const AVATAR_PRESETS = ['👑', '🐉', '🐅', '🦁', '💎', '🃏', '🎲', '🎯'];
+
 export function ProfilePage() {
   const { user, setUser } = useAuthStore();
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [name, setName] = useState(user?.name ?? '');
   const [username, setUsername] = useState(user?.username ?? '');
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [msg, setMsg] = useState('');
   const [err, setErr] = useState('');
 
@@ -32,6 +37,79 @@ export function ProfilePage() {
       else setErr(res.data.error?.message || 'Failed');
     } catch (e: any) { setErr(e.response?.data?.error?.message || 'Failed'); }
     finally { setSaving(false); }
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      setErr('Please select a valid image file (JPEG, PNG, WebP).');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setErr('Image file must be less than 5MB.');
+      return;
+    }
+
+    setUploading(true);
+    setErr('');
+    setMsg('');
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await api.post('/users/me/avatar', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      if (res.data.success) {
+        setUser(res.data.data);
+        setMsg('Profile photo updated successfully!');
+      } else {
+        setErr(res.data.error?.message || 'Failed to upload photo');
+      }
+    } catch (err: any) {
+      setErr(err.response?.data?.error?.message || 'Failed to upload photo');
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const handlePresetSelect = async (preset: string) => {
+    setUploading(true);
+    setErr('');
+    setMsg('');
+    try {
+      const res = await api.patch('/users/me', { avatar_url: preset });
+      if (res.data.success) {
+        setUser(res.data.data);
+        setMsg('Profile avatar updated!');
+      } else {
+        setErr(res.data.error?.message || 'Failed to update avatar');
+      }
+    } catch (err: any) {
+      setErr(err.response?.data?.error?.message || 'Failed to update avatar');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleRemovePhoto = async () => {
+    setUploading(true);
+    setErr('');
+    setMsg('');
+    try {
+      const res = await api.patch('/users/me', { avatar_url: '' });
+      if (res.data.success) {
+        setUser(res.data.data);
+        setMsg('Profile photo removed.');
+      }
+    } catch (err: any) {
+      setErr('Failed to remove photo');
+    } finally {
+      setUploading(false);
+    }
   };
 
   const referralLink = refStats?.referral_code
@@ -55,9 +133,84 @@ export function ProfilePage() {
         <div className="profile-inner-grid grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
           {/* Left Column: Avatar & Summary */}
           <div className="profile-summary md:col-span-4 flex flex-col items-center justify-center p-4 bg-dark-800/60 rounded-2xl border border-dark-700 text-center">
-            <div className="profile-avatar w-20 h-20 bg-gradient-to-br from-brand-500 to-gold-500 rounded-full flex items-center justify-center text-3xl font-extrabold text-white shadow-xl shadow-brand-500/20 mb-3 border-2 border-white/20">
-              {user?.name?.charAt(0).toUpperCase()}
+            {/* Avatar with Camera Overlay */}
+            <div className="relative group mb-3">
+              <div className="profile-avatar w-24 h-24 bg-gradient-to-br from-brand-500 via-purple-600 to-gold-500 rounded-full flex items-center justify-center text-4xl font-extrabold text-white shadow-xl shadow-brand-500/20 border-2 border-white/30 overflow-hidden">
+                {user?.avatar_url && (user.avatar_url.startsWith('http') || user.avatar_url.startsWith('/uploads')) ? (
+                  <img src={user.avatar_url} alt={user.name} className="w-full h-full object-cover" />
+                ) : user?.avatar_url ? (
+                  <span className="text-4xl leading-none">{user.avatar_url}</span>
+                ) : (
+                  user?.name?.charAt(0).toUpperCase() || 'U'
+                )}
+              </div>
+
+              {/* Upload trigger button */}
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploading}
+                className="absolute bottom-0 right-0 p-2 rounded-full bg-gold-500 hover:bg-gold-400 text-black shadow-lg border-2 border-dark-900 cursor-pointer active:scale-95 transition"
+                title="Upload Profile Photo"
+                aria-label="Upload Profile Photo"
+              >
+                <Camera size={14} className="font-bold" />
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                className="hidden"
+                onChange={handleFileUpload}
+              />
             </div>
+
+            <div className="flex items-center gap-2 mb-2">
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploading}
+                className="text-[11px] font-bold text-gold-400 hover:text-gold-300 underline cursor-pointer"
+              >
+                {uploading ? 'Uploading...' : 'Change Photo'}
+              </button>
+              {user?.avatar_url && (
+                <button
+                  type="button"
+                  onClick={handleRemovePhoto}
+                  disabled={uploading}
+                  className="text-[11px] font-bold text-rose-400 hover:text-rose-300 underline cursor-pointer"
+                >
+                  Remove
+                </button>
+              )}
+            </div>
+
+            {/* Casino Avatar Presets */}
+            <div className="w-full pt-2 border-t border-dark-700/60 mt-1 mb-3">
+              <span className="text-[10px] uppercase font-bold text-gray-400 tracking-wider block mb-1.5">
+                Choose VIP Avatar
+              </span>
+              <div className="flex flex-wrap items-center justify-center gap-1.5">
+                {AVATAR_PRESETS.map((p) => (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => handlePresetSelect(p)}
+                    disabled={uploading}
+                    className={`w-7 h-7 rounded-lg bg-dark-900 border flex items-center justify-center text-sm cursor-pointer hover:scale-110 active:scale-95 transition ${
+                      user?.avatar_url === p
+                        ? 'border-gold-400 bg-gold-500/20 shadow-md shadow-gold-500/30'
+                        : 'border-dark-700 hover:border-gray-500'
+                    }`}
+                    title={`Select ${p}`}
+                  >
+                    {p}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <h3 className="profile-name-text text-base font-extrabold text-white truncate max-w-full">{user?.name}</h3>
             <p className="profile-email-text text-xs text-gray-400 font-mono mt-0.5 truncate max-w-full">{user?.email}</p>
 

@@ -7,6 +7,7 @@ interface Props {
   legalTokenIndices: number[];
   onTokenClick: (tokenIndex: number) => void;
   isMyTurn?: boolean;
+  myColor?: LudoColor | null;
 }
 
 // 52 Common Track Cells in clockwise order (Grid 15x15, 0..14)
@@ -55,32 +56,39 @@ export const LudoBoard: React.FC<Props> = ({
   legalTokenIndices,
   onTokenClick,
   isMyTurn,
+  myColor,
 }) => {
-  // Convert token position to (cx, cy) on 1500x1500 board
+  const shouldRotate180 = myColor === 'YELLOW' || myColor === 'GREEN';
+
+  // Convert token position to (cx, cy) on 1500x1500 board (with player perspective rotation)
   const getTokenCoords = (token: LudoToken, color: LudoColor): [number, number] => {
+    let gx = 0;
+    let gy = 0;
     if (token.position === -1) {
-      const [gx, gy] = YARD_COORDINATES[color][token.token_index];
-      return [gx * 100 + 50, gy * 100 + 50];
-    }
-    if (token.position >= 56 || token.is_home) {
-      const [gx, gy] = HOME_CENTERS[color];
-      return [gx * 100 + 50, gy * 100 + 50];
-    }
-    if (token.position > 50) {
+      [gx, gy] = YARD_COORDINATES[color][token.token_index];
+    } else if (token.position >= 56 || token.is_home) {
+      [gx, gy] = HOME_CENTERS[color];
+    } else if (token.position > 50) {
       // Home stretch (steps 51..55 -> indices 0..4)
       const stretchIdx = token.position - 51;
-      const [gx, gy] = HOME_PATHS[color][stretchIdx];
-      return [gx * 100 + 50, gy * 100 + 50];
+      [gx, gy] = HOME_PATHS[color][stretchIdx];
+    } else {
+      // Common track
+      const startOffsets: Record<LudoColor, number> = {
+        RED: 0,
+        GREEN: 13,
+        YELLOW: 26,
+        BLUE: 39,
+      };
+      const trackIndex = (startOffsets[color] + token.position) % 52;
+      [gx, gy] = TRACK_COORDINATES[trackIndex];
     }
-    // Common track
-    const startOffsets: Record<LudoColor, number> = {
-      RED: 0,
-      GREEN: 13,
-      YELLOW: 26,
-      BLUE: 39,
-    };
-    const trackIndex = (startOffsets[color] + token.position) % 52;
-    const [gx, gy] = TRACK_COORDINATES[trackIndex];
+
+    if (shouldRotate180) {
+      gx = 14 - gx;
+      gy = 14 - gy;
+    }
+
     return [gx * 100 + 50, gy * 100 + 50];
   };
 
@@ -228,75 +236,96 @@ export const LudoBoard: React.FC<Props> = ({
             <stop offset="100%" stopColor="#475569" />
           </radialGradient>
 
-          {/* Metallic Gold Collar Ring */}
+          {/* Metallic Polished Gold Collar Ring */}
           <linearGradient id="goldCollar" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor="#92400e" />
-            <stop offset="30%" stopColor="#fef08a" />
-            <stop offset="60%" stopColor="#f59e0b" />
-            <stop offset="100%" stopColor="#78350f" />
-          </linearGradient>
-
-          {/* 3D Pawn Shading: Red */}
-          <radialGradient id="redHeadGrad" cx="30%" cy="25%" r="70%">
-            <stop offset="0%" stopColor="#ffffff" />
-            <stop offset="20%" stopColor="#fca5a5" />
-            <stop offset="50%" stopColor="#ef4444" />
-            <stop offset="85%" stopColor="#b91c1c" />
-            <stop offset="100%" stopColor="#7f1d1d" />
-          </radialGradient>
-          <linearGradient id="redBodyGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor="#991b1b" />
-            <stop offset="25%" stopColor="#ef4444" />
-            <stop offset="55%" stopColor="#f87171" />
-            <stop offset="80%" stopColor="#dc2626" />
-            <stop offset="100%" stopColor="#7f1d1d" />
-          </linearGradient>
-
-          {/* 3D Pawn Shading: Green */}
-          <radialGradient id="greenHeadGrad" cx="30%" cy="25%" r="70%">
-            <stop offset="0%" stopColor="#ffffff" />
-            <stop offset="20%" stopColor="#a7f3d0" />
-            <stop offset="50%" stopColor="#10b981" />
-            <stop offset="85%" stopColor="#047857" />
-            <stop offset="100%" stopColor="#064e3b" />
-          </radialGradient>
-          <linearGradient id="greenBodyGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor="#065f46" />
-            <stop offset="25%" stopColor="#10b981" />
-            <stop offset="55%" stopColor="#34d399" />
-            <stop offset="80%" stopColor="#059669" />
-            <stop offset="100%" stopColor="#022c22" />
-          </linearGradient>
-
-          {/* 3D Pawn Shading: Yellow */}
-          <radialGradient id="yellowHeadGrad" cx="30%" cy="25%" r="70%">
-            <stop offset="0%" stopColor="#ffffff" />
-            <stop offset="20%" stopColor="#fef08a" />
-            <stop offset="50%" stopColor="#f59e0b" />
-            <stop offset="85%" stopColor="#d97706" />
-            <stop offset="100%" stopColor="#78350f" />
-          </radialGradient>
-          <linearGradient id="yellowBodyGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor="#b45309" />
-            <stop offset="25%" stopColor="#fbbf24" />
-            <stop offset="55%" stopColor="#fde047" />
-            <stop offset="80%" stopColor="#f59e0b" />
+            <stop offset="0%" stopColor="#78350f" />
+            <stop offset="25%" stopColor="#f59e0b" />
+            <stop offset="50%" stopColor="#fef08a" />
+            <stop offset="75%" stopColor="#d97706" />
             <stop offset="100%" stopColor="#451a03" />
           </linearGradient>
 
-          {/* 3D Pawn Shading: Blue */}
-          <radialGradient id="blueHeadGrad" cx="30%" cy="25%" r="70%">
+          {/* 3D Translucent Jewel Glass Shading: Red (Ruby) */}
+          <radialGradient id="redHeadGrad" cx="35%" cy="30%" r="70%">
             <stop offset="0%" stopColor="#ffffff" />
-            <stop offset="20%" stopColor="#bfdbfe" />
-            <stop offset="50%" stopColor="#3b82f6" />
-            <stop offset="85%" stopColor="#1d4ed8" />
-            <stop offset="100%" stopColor="#1e3a8a" />
+            <stop offset="18%" stopColor="#fca5a5" />
+            <stop offset="45%" stopColor="#e11d48" />
+            <stop offset="75%" stopColor="#9f1239" />
+            <stop offset="100%" stopColor="#4c0519" />
+          </radialGradient>
+          <radialGradient id="redCausticGrad" cx="68%" cy="75%" r="55%">
+            <stop offset="0%" stopColor="#fda4af" stopOpacity="0.9" />
+            <stop offset="45%" stopColor="#f43f5e" stopOpacity="0.6" />
+            <stop offset="100%" stopColor="#9f1239" stopOpacity="0" />
+          </radialGradient>
+          <linearGradient id="redBodyGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor="#881337" />
+            <stop offset="20%" stopColor="#e11d48" />
+            <stop offset="48%" stopColor="#fb7185" />
+            <stop offset="78%" stopColor="#be123c" />
+            <stop offset="100%" stopColor="#4c0519" />
+          </linearGradient>
+
+          {/* 3D Translucent Jewel Glass Shading: Green (Emerald) */}
+          <radialGradient id="greenHeadGrad" cx="35%" cy="30%" r="70%">
+            <stop offset="0%" stopColor="#ffffff" />
+            <stop offset="18%" stopColor="#a7f3d0" />
+            <stop offset="45%" stopColor="#059669" />
+            <stop offset="75%" stopColor="#065f46" />
+            <stop offset="100%" stopColor="#022c22" />
+          </radialGradient>
+          <radialGradient id="greenCausticGrad" cx="68%" cy="75%" r="55%">
+            <stop offset="0%" stopColor="#6ee7b7" stopOpacity="0.9" />
+            <stop offset="45%" stopColor="#10b981" stopOpacity="0.6" />
+            <stop offset="100%" stopColor="#047857" stopOpacity="0" />
+          </radialGradient>
+          <linearGradient id="greenBodyGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor="#064e3b" />
+            <stop offset="20%" stopColor="#059669" />
+            <stop offset="48%" stopColor="#34d399" />
+            <stop offset="78%" stopColor="#047857" />
+            <stop offset="100%" stopColor="#022c22" />
+          </linearGradient>
+
+          {/* 3D Translucent Jewel Glass Shading: Yellow (Topaz/Amber) */}
+          <radialGradient id="yellowHeadGrad" cx="35%" cy="30%" r="70%">
+            <stop offset="0%" stopColor="#ffffff" />
+            <stop offset="18%" stopColor="#fef08a" />
+            <stop offset="45%" stopColor="#d97706" />
+            <stop offset="75%" stopColor="#b45309" />
+            <stop offset="100%" stopColor="#451a03" />
+          </radialGradient>
+          <radialGradient id="yellowCausticGrad" cx="68%" cy="75%" r="55%">
+            <stop offset="0%" stopColor="#fef08a" stopOpacity="0.9" />
+            <stop offset="45%" stopColor="#fbbf24" stopOpacity="0.6" />
+            <stop offset="100%" stopColor="#b45309" stopOpacity="0" />
+          </radialGradient>
+          <linearGradient id="yellowBodyGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor="#78350f" />
+            <stop offset="20%" stopColor="#d97706" />
+            <stop offset="48%" stopColor="#fde047" />
+            <stop offset="78%" stopColor="#b45309" />
+            <stop offset="100%" stopColor="#451a03" />
+          </linearGradient>
+
+          {/* 3D Translucent Jewel Glass Shading: Blue (Sapphire) */}
+          <radialGradient id="blueHeadGrad" cx="35%" cy="30%" r="70%">
+            <stop offset="0%" stopColor="#ffffff" />
+            <stop offset="18%" stopColor="#bfdbfe" />
+            <stop offset="45%" stopColor="#2563eb" />
+            <stop offset="75%" stopColor="#1e40af" />
+            <stop offset="100%" stopColor="#0f172a" />
+          </radialGradient>
+          <radialGradient id="blueCausticGrad" cx="68%" cy="75%" r="55%">
+            <stop offset="0%" stopColor="#93c5fd" stopOpacity="0.9" />
+            <stop offset="45%" stopColor="#3b82f6" stopOpacity="0.6" />
+            <stop offset="100%" stopColor="#1e40af" stopOpacity="0" />
           </radialGradient>
           <linearGradient id="blueBodyGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor="#1e40af" />
-            <stop offset="25%" stopColor="#3b82f6" />
-            <stop offset="55%" stopColor="#60a5fa" />
-            <stop offset="80%" stopColor="#2563eb" />
+            <stop offset="0%" stopColor="#1e3a8a" />
+            <stop offset="20%" stopColor="#2563eb" />
+            <stop offset="48%" stopColor="#60a5fa" />
+            <stop offset="78%" stopColor="#1d4ed8" />
             <stop offset="100%" stopColor="#0f172a" />
           </linearGradient>
         </defs>
@@ -304,138 +333,142 @@ export const LudoBoard: React.FC<Props> = ({
         {/* Board Background */}
         <rect width="1500" height="1500" fill="#0b1120" rx="32" />
 
-        {/* 4 Large Corner Yards with Beveled Trays & Sunk Sockets */}
-        {/* Red Yard (Top Left) */}
-        <g>
-          <rect x="0" y="0" width="600" height="600" fill="url(#yardRedGrad)" rx="24" />
-          <rect x="85" y="85" width="430" height="430" fill="url(#yardTrayGrad)" rx="36" stroke="#fbbf24" strokeWidth="3" strokeOpacity="0.6" />
-          
-          {[
-            [200, 200], [400, 200], [200, 400], [400, 400]
-          ].map(([sx, sy], idx) => (
-            <g key={`red-sock-${idx}`} transform={`translate(${sx}, ${sy})`}>
-              <circle cx="0" cy="0" r="54" fill="#1e293b" stroke="#ef4444" strokeWidth="3" />
-              <circle cx="0" cy="0" r="46" fill="url(#socketDepth)" stroke="rgba(255,255,255,0.2)" strokeWidth="1.5" />
-              <text x="0" y="8" fontSize="24" textAnchor="middle" fill="#ef4444" opacity="0.45">★</text>
-            </g>
-          ))}
-        </g>
+        {/* 4 Large Corner Yards with Beveled Trays & Sunk Sockets (Rotated 180 when player is Yellow/Green so player is on Left) */}
+        <g transform={shouldRotate180 ? 'rotate(180 750 750)' : undefined}>
+          {/* Red Yard (Top Left) */}
+          <g>
+            <rect x="0" y="0" width="600" height="600" fill="url(#yardRedGrad)" rx="24" />
+            <rect x="85" y="85" width="430" height="430" fill="url(#yardTrayGrad)" rx="36" stroke="#fbbf24" strokeWidth="3" strokeOpacity="0.6" />
+            
+            {[
+              [200, 200], [400, 200], [200, 400], [400, 400]
+            ].map(([sx, sy], idx) => (
+              <g key={`red-sock-${idx}`} transform={`translate(${sx}, ${sy})`}>
+                <circle cx="0" cy="0" r="54" fill="#1e293b" stroke="#ef4444" strokeWidth="3" />
+                <circle cx="0" cy="0" r="46" fill="url(#socketDepth)" stroke="rgba(255,255,255,0.2)" strokeWidth="1.5" />
+                <text x="0" y="8" fontSize="24" textAnchor="middle" fill="#ef4444" opacity="0.45">★</text>
+              </g>
+            ))}
+          </g>
 
-        {/* Green Yard (Top Right) */}
-        <g>
-          <rect x="900" y="0" width="600" height="600" fill="url(#yardGreenGrad)" rx="24" />
-          <rect x="985" y="85" width="430" height="430" fill="url(#yardTrayGrad)" rx="36" stroke="#fbbf24" strokeWidth="3" strokeOpacity="0.6" />
-          
-          {[
-            [1100, 200], [1300, 200], [1100, 400], [1300, 400]
-          ].map(([sx, sy], idx) => (
-            <g key={`green-sock-${idx}`} transform={`translate(${sx}, ${sy})`}>
-              <circle cx="0" cy="0" r="54" fill="#1e293b" stroke="#10b981" strokeWidth="3" />
-              <circle cx="0" cy="0" r="46" fill="url(#socketDepth)" stroke="rgba(255,255,255,0.2)" strokeWidth="1.5" />
-              <text x="0" y="8" fontSize="24" textAnchor="middle" fill="#10b981" opacity="0.45">★</text>
-            </g>
-          ))}
-        </g>
+          {/* Green Yard (Top Right) */}
+          <g>
+            <rect x="900" y="0" width="600" height="600" fill="url(#yardGreenGrad)" rx="24" />
+            <rect x="985" y="85" width="430" height="430" fill="url(#yardTrayGrad)" rx="36" stroke="#fbbf24" strokeWidth="3" strokeOpacity="0.6" />
+            
+            {[
+              [1100, 200], [1300, 200], [1100, 400], [1300, 400]
+            ].map(([sx, sy], idx) => (
+              <g key={`green-sock-${idx}`} transform={`translate(${sx}, ${sy})`}>
+                <circle cx="0" cy="0" r="54" fill="#1e293b" stroke="#10b981" strokeWidth="3" />
+                <circle cx="0" cy="0" r="46" fill="url(#socketDepth)" stroke="rgba(255,255,255,0.2)" strokeWidth="1.5" />
+                <text x="0" y="8" fontSize="24" textAnchor="middle" fill="#10b981" opacity="0.45">★</text>
+              </g>
+            ))}
+          </g>
 
-        {/* Yellow Yard (Bottom Right) */}
-        <g>
-          <rect x="900" y="900" width="600" height="600" fill="url(#yardYellowGrad)" rx="24" />
-          <rect x="985" y="985" width="430" height="430" fill="url(#yardTrayGrad)" rx="36" stroke="#fbbf24" strokeWidth="3" strokeOpacity="0.6" />
-          
-          {[
-            [1100, 1100], [1300, 1100], [1100, 1300], [1300, 1300]
-          ].map(([sx, sy], idx) => (
-            <g key={`yellow-sock-${idx}`} transform={`translate(${sx}, ${sy})`}>
-              <circle cx="0" cy="0" r="54" fill="#1e293b" stroke="#f59e0b" strokeWidth="3" />
-              <circle cx="0" cy="0" r="46" fill="url(#socketDepth)" stroke="rgba(255,255,255,0.2)" strokeWidth="1.5" />
-              <text x="0" y="8" fontSize="24" textAnchor="middle" fill="#f59e0b" opacity="0.45">★</text>
-            </g>
-          ))}
-        </g>
+          {/* Yellow Yard (Bottom Right) */}
+          <g>
+            <rect x="900" y="900" width="600" height="600" fill="url(#yardYellowGrad)" rx="24" />
+            <rect x="985" y="985" width="430" height="430" fill="url(#yardTrayGrad)" rx="36" stroke="#fbbf24" strokeWidth="3" strokeOpacity="0.6" />
+            
+            {[
+              [1100, 1100], [1300, 1100], [1100, 1300], [1300, 1300]
+            ].map(([sx, sy], idx) => (
+              <g key={`yellow-sock-${idx}`} transform={`translate(${sx}, ${sy})`}>
+                <circle cx="0" cy="0" r="54" fill="#1e293b" stroke="#f59e0b" strokeWidth="3" />
+                <circle cx="0" cy="0" r="46" fill="url(#socketDepth)" stroke="rgba(255,255,255,0.2)" strokeWidth="1.5" />
+                <text x="0" y="8" fontSize="24" textAnchor="middle" fill="#f59e0b" opacity="0.45">★</text>
+              </g>
+            ))}
+          </g>
 
-        {/* Blue Yard (Bottom Left) */}
-        <g>
-          <rect x="0" y="900" width="600" height="600" fill="url(#yardBlueGrad)" rx="24" />
-          <rect x="85" y="985" width="430" height="430" fill="url(#yardTrayGrad)" rx="36" stroke="#fbbf24" strokeWidth="3" strokeOpacity="0.6" />
-          
-          {[
-            [200, 1100], [400, 1100], [200, 1300], [400, 1300]
-          ].map(([sx, sy], idx) => (
-            <g key={`blue-sock-${idx}`} transform={`translate(${sx}, ${sy})`}>
-              <circle cx="0" cy="0" r="54" fill="#1e293b" stroke="#3b82f6" strokeWidth="3" />
-              <circle cx="0" cy="0" r="46" fill="url(#socketDepth)" stroke="rgba(255,255,255,0.2)" strokeWidth="1.5" />
-              <text x="0" y="8" fontSize="24" textAnchor="middle" fill="#3b82f6" opacity="0.45">★</text>
-            </g>
-          ))}
-        </g>
+          {/* Blue Yard (Bottom Left) */}
+          <g>
+            <rect x="0" y="900" width="600" height="600" fill="url(#yardBlueGrad)" rx="24" />
+            <rect x="85" y="985" width="430" height="430" fill="url(#yardTrayGrad)" rx="36" stroke="#fbbf24" strokeWidth="3" strokeOpacity="0.6" />
+            
+            {[
+              [200, 1100], [400, 1100], [200, 1300], [400, 1300]
+            ].map(([sx, sy], idx) => (
+              <g key={`blue-sock-${idx}`} transform={`translate(${sx}, ${sy})`}>
+                <circle cx="0" cy="0" r="54" fill="#1e293b" stroke="#3b82f6" strokeWidth="3" />
+                <circle cx="0" cy="0" r="46" fill="url(#socketDepth)" stroke="rgba(255,255,255,0.2)" strokeWidth="1.5" />
+                <text x="0" y="8" fontSize="24" textAnchor="middle" fill="#3b82f6" opacity="0.45">★</text>
+              </g>
+            ))}
+          </g>
 
-        {/* Common Track Grid Cells */}
-        {TRACK_COORDINATES.map(([gx, gy], i) => {
-          let cellFill = '#111827';
-          let isStart = false;
-          let isStar = [8, 21, 34, 47].includes(i);
+          {/* Common Track Grid Cells */}
+          {TRACK_COORDINATES.map(([gx, gy], i) => {
+            let cellFill = '#111827';
+            let isStart = false;
+            let isStar = [8, 21, 34, 47].includes(i);
 
-          if (i === 0) { cellFill = '#dc2626'; isStart = true; }
-          else if (i === 13) { cellFill = '#059669'; isStart = true; }
-          else if (i === 26) { cellFill = '#d97706'; isStart = true; }
-          else if (i === 39) { cellFill = '#2563eb'; isStart = true; }
+            if (i === 0) { cellFill = '#dc2626'; isStart = true; }
+            else if (i === 13) { cellFill = '#059669'; isStart = true; }
+            else if (i === 26) { cellFill = '#d97706'; isStart = true; }
+            else if (i === 39) { cellFill = '#2563eb'; isStart = true; }
 
-          return (
-            <g key={`track-${i}`}>
-              <rect
-                x={gx * 100}
-                y={gy * 100}
-                width="100"
-                height="100"
-                fill={cellFill}
-                stroke="#1f2937"
-                strokeWidth="2"
-              />
-              {isStar && (
-                <g>
-                  <circle cx={gx * 100 + 50} cy={gy * 100 + 50} r="32" fill="#0f172a" stroke="#fbbf24" strokeWidth="2" opacity="0.6" />
-                  <text
-                    x={gx * 100 + 50}
-                    y={gy * 100 + 64}
-                    fill="#fbbf24"
-                    fontSize="42"
-                    textAnchor="middle"
-                    fontWeight="bold"
-                  >
-                    ★
-                  </text>
-                </g>
-              )}
-              {isStart && (
-                <polygon
-                  points={`${gx * 100 + 25},${gy * 100 + 25} ${gx * 100 + 75},${gy * 100 + 50} ${gx * 100 + 25},${gy * 100 + 75}`}
-                  fill="#ffffff"
-                  opacity="0.8"
+            return (
+              <g key={`track-${i}`}>
+                <rect
+                  x={gx * 100}
+                  y={gy * 100}
+                  width="100"
+                  height="100"
+                  fill={cellFill}
+                  stroke="#1f2937"
+                  strokeWidth="2"
                 />
-              )}
-            </g>
-          );
-        })}
+                {isStar && (
+                  <g>
+                    <circle cx={gx * 100 + 50} cy={gy * 100 + 50} r="32" fill="#0f172a" stroke="#fbbf24" strokeWidth="2" opacity="0.6" />
+                    <text
+                      x={gx * 100 + 50}
+                      y={gy * 100 + 64}
+                      fill="#fbbf24"
+                      fontSize="42"
+                      textAnchor="middle"
+                      fontWeight="bold"
+                    >
+                      ★
+                    </text>
+                  </g>
+                )}
+                {isStart && (
+                  <polygon
+                    points={`${gx * 100 + 25},${gy * 100 + 25} ${gx * 100 + 75},${gy * 100 + 50} ${gx * 100 + 25},${gy * 100 + 75}`}
+                    fill="#ffffff"
+                    opacity="0.8"
+                  />
+                )}
+              </g>
+            );
+          })}
 
-        {/* Home Stretch Paths */}
-        {HOME_PATHS.RED.map(([gx, gy], i) => (
-          <rect key={`red-h-${i}`} x={gx * 100} y={gy * 100} width="100" height="100" fill="#dc2626" stroke="#450a0a" strokeWidth="2" opacity="0.9" />
-        ))}
-        {HOME_PATHS.GREEN.map(([gx, gy], i) => (
-          <rect key={`green-h-${i}`} x={gx * 100} y={gy * 100} width="100" height="100" fill="#059669" stroke="#022c22" strokeWidth="2" opacity="0.9" />
-        ))}
-        {HOME_PATHS.YELLOW.map(([gx, gy], i) => (
-          <rect key={`yellow-h-${i}`} x={gx * 100} y={gy * 100} width="100" height="100" fill="#d97706" stroke="#451a03" strokeWidth="2" opacity="0.9" />
-        ))}
-        {HOME_PATHS.BLUE.map(([gx, gy], i) => (
-          <rect key={`blue-h-${i}`} x={gx * 100} y={gy * 100} width="100" height="100" fill="#2563eb" stroke="#1e3a8a" strokeWidth="2" opacity="0.9" />
-        ))}
+          {/* Home Stretch Paths */}
+          {HOME_PATHS.RED.map(([gx, gy], i) => (
+            <rect key={`red-h-${i}`} x={gx * 100} y={gy * 100} width="100" height="100" fill="#dc2626" stroke="#450a0a" strokeWidth="2" opacity="0.9" />
+          ))}
+          {HOME_PATHS.GREEN.map(([gx, gy], i) => (
+            <rect key={`green-h-${i}`} x={gx * 100} y={gy * 100} width="100" height="100" fill="#059669" stroke="#022c22" strokeWidth="2" opacity="0.9" />
+          ))}
+          {HOME_PATHS.YELLOW.map(([gx, gy], i) => (
+            <rect key={`yellow-h-${i}`} x={gx * 100} y={gy * 100} width="100" height="100" fill="#d97706" stroke="#451a03" strokeWidth="2" opacity="0.9" />
+          ))}
+          {HOME_PATHS.BLUE.map(([gx, gy], i) => (
+            <rect key={`blue-h-${i}`} x={gx * 100} y={gy * 100} width="100" height="100" fill="#2563eb" stroke="#1e3a8a" strokeWidth="2" opacity="0.9" />
+          ))}
 
-        {/* Center Home Triangles */}
-        <polygon points="600,600 750,750 600,900" fill="#dc2626" />
-        <polygon points="600,600 750,750 900,600" fill="#059669" />
-        <polygon points="900,600 750,750 900,900" fill="#d97706" />
-        <polygon points="600,900 750,750 900,900" fill="#2563eb" />
+          {/* Center Home Triangles */}
+          <polygon points="600,600 750,750 600,900" fill="#dc2626" />
+          <polygon points="600,600 750,750 900,600" fill="#059669" />
+          <polygon points="900,600 750,750 900,900" fill="#d97706" />
+          <polygon points="600,900 750,750 900,900" fill="#2563eb" />
+        </g>
+
+        {/* Center Golden Medallion Crown (Always Upright) */}
         <circle cx="750" cy="750" r="64" fill="#090d16" stroke="#fbbf24" strokeWidth="5" />
         <text x="750" y="766" fill="#fbbf24" fontSize="44" textAnchor="middle" fontWeight="bold">👑</text>
 
@@ -526,25 +559,26 @@ export const LudoBoard: React.FC<Props> = ({
                   </g>
                 )}
 
-                {/* 3D Pawn Body with Drop Shadow & Hop Animation (BUG-004 & BUG-006) */}
+                {/* 3D Luxury Translucent Jewel Glass Pawn (Matching Reference Image) */}
                 <g className={isLegal ? 'ludo-movable-pawn' : ''} filter={isLegal ? 'url(#goldLegalGlow)' : 'url(#pawnDropShadow)'}>
                   {/* Ground Contact Shadow */}
-                  <ellipse cx={cx} cy={cy + 18} rx="32" ry="12" fill="rgba(0,0,0,0.65)" />
+                  <ellipse cx={cx} cy={cy + 17} rx="30" ry="10" fill="rgba(0,0,0,0.6)" />
 
                   {/* Pawn Base: Bottom Shadow Rim */}
-                  <ellipse cx={cx} cy={cy + 12} rx="28" ry="11" fill={baseRim} />
-                  {/* Pawn Base: Top Plate */}
+                  <ellipse cx={cx} cy={cy + 12} rx="26" ry="9" fill={baseRim} />
+                  
+                  {/* Pawn Base: Top Plate Disc */}
                   <ellipse
                     cx={cx}
                     cy={cy + 9}
-                    rx="28"
-                    ry="9"
+                    rx="26"
+                    ry="8"
                     fill={`url(#${colorKey}BodyGrad)`}
-                    stroke={isLegal ? '#fef08a' : 'rgba(255,255,255,0.6)'}
+                    stroke={isLegal ? '#fef08a' : 'rgba(255,255,255,0.7)'}
                     strokeWidth={isLegal ? 2.5 : 1.2}
                   />
 
-                  {/* Conical Tapered Waist Body */}
+                  {/* Conical Flared Jewel Glass Body */}
                   <path
                     d={`M ${cx - 22},${cy + 9} C ${cx - 20},${cy - 6} ${cx - 10},${cy - 22} ${cx - 8},${cy - 30} L ${cx + 8},${cy - 30} C ${cx + 10},${cy - 22} ${cx + 20},${cy - 6} ${cx + 22},${cy + 9} Z`}
                     fill={`url(#${colorKey}BodyGrad)`}
@@ -552,21 +586,32 @@ export const LudoBoard: React.FC<Props> = ({
                     strokeWidth={isLegal ? 2 : 0}
                   />
 
-                  {/* Token Number Medallion Badge on Body (BUG-006) */}
-                  <circle cx={cx} cy={cy - 8} r="8.5" fill="#090d16" stroke="url(#goldCollar)" strokeWidth="1.3" />
-                  <text
-                    x={cx}
-                    y={cy - 4}
-                    fontSize="10"
-                    fontWeight="900"
-                    textAnchor="middle"
-                    fill="#fbbf24"
-                    pointerEvents="none"
-                  >
-                    {token.token_index + 1}
-                  </text>
+                  {/* Inner Caustic Refraction Glow in Body Base */}
+                  <ellipse
+                    cx={cx}
+                    cy={cy + 2}
+                    rx="14"
+                    ry="7"
+                    fill={`url(#${colorKey}CausticGrad)`}
+                    opacity="0.8"
+                  />
 
-                  {/* Metallic Gold Collar Ring */}
+                  {/* Vertical Longitudinal Glass Sheen Highlight down Left Flank */}
+                  <path
+                    d={`M ${cx - 15},${cy + 7} C ${cx - 14},${cy - 6} ${cx - 7},${cy - 20} ${cx - 5},${cy - 28} L ${cx - 2},${cy - 28} C ${cx - 4},${cy - 20} ${cx - 10},${cy - 6} ${cx - 10},${cy + 7} Z`}
+                    fill="#ffffff"
+                    opacity="0.45"
+                  />
+
+                  {/* Right Side Subtle Glass Rim Highlight */}
+                  <path
+                    d={`M ${cx + 17},${cy + 7} C ${cx + 15},${cy - 4} ${cx + 9},${cy - 20} ${cx + 6},${cy - 28}`}
+                    fill="none"
+                    stroke="rgba(255,255,255,0.4)"
+                    strokeWidth="1.2"
+                  />
+
+                  {/* Metallic Polished Gold Collar Ring */}
                   <ellipse
                     cx={cx}
                     cy={cy - 30}
@@ -577,40 +622,38 @@ export const LudoBoard: React.FC<Props> = ({
                     strokeWidth="0.8"
                   />
 
-                  {/* Spherical 3D Head */}
+                  {/* Spherical 3D Jewel Glass Head */}
                   <circle
                     cx={cx}
                     cy={cy - 48}
                     r="19"
                     fill={`url(#${colorKey}HeadGrad)`}
-                    stroke={isLegal ? '#fef08a' : 'rgba(255,255,255,0.4)'}
-                    strokeWidth={isLegal ? 3 : 1}
+                    stroke={isLegal ? '#fef08a' : 'rgba(255,255,255,0.5)'}
+                    strokeWidth={isLegal ? 2.5 : 1}
                   />
 
-                  {/* Royal Crown Crest on Head (BUG-006) */}
-                  <text
-                    x={cx}
-                    y={cy - 43}
-                    fontSize="13"
-                    textAnchor="middle"
-                    fill="#ffffff"
-                    filter="drop-shadow(0 1px 2px rgba(0,0,0,0.8))"
-                    pointerEvents="none"
-                  >
-                    👑
-                  </text>
+                  {/* Head Bottom-Right Inner Caustic Refraction Glow */}
+                  <ellipse
+                    cx={cx + 5}
+                    cy={cy - 41}
+                    rx="9"
+                    ry="5"
+                    fill={`url(#${colorKey}CausticGrad)`}
+                    opacity="0.85"
+                  />
 
-                  {/* Specular Highlight Glints */}
+                  {/* Head Top-Left Specular Crescent Glint */}
                   <ellipse
                     cx={cx - 6}
                     cy={cy - 54}
                     rx="6.5"
                     ry="3.5"
                     fill="#ffffff"
-                    opacity="0.85"
+                    opacity="0.9"
                     transform={`rotate(-25 ${cx - 6} ${cy - 54})`}
                   />
-                  <circle cx={cx - 10} cy={cy - 48} r="2.2" fill="#ffffff" opacity="0.9" />
+                  {/* Pinpoint Sparkle Highlight */}
+                  <circle cx={cx - 10} cy={cy - 48} r="2.2" fill="#ffffff" opacity="0.95" />
                 </g>
 
                 {/* Enlarged touch area for mobile click comfort */}

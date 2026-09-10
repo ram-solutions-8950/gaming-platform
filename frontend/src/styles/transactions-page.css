@@ -132,21 +132,20 @@
 
 /* Card Container */
 .casino-tx-card-container {
-  background: rgba(16, 5, 34, 0.88);
-  border: 1px solid rgba(255, 210, 26, 0.22);
+  background: rgba(16, 5, 34, 0.96);
+  border: 1px solid rgba(255, 210, 26, 0.25);
   border-radius: 18px;
   padding: 14px;
   box-shadow:
     0 14px 40px rgba(0, 0, 0, 0.6),
     0 0 24px rgba(139, 43, 226, 0.14);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
   display: flex;
   flex-direction: column;
   gap: 8px;
   box-sizing: border-box;
   position: relative;
   z-index: 1;
+  min-height: 250px;
 }
 
 /* Transaction Item Row */
@@ -156,7 +155,7 @@
   align-items: center;
   gap: 12px;
   padding: 12px 14px;
-  background: rgba(28, 10, 56, 0.55);
+  background: rgba(28, 10, 56, 0.75);
   border: 1px solid rgba(139, 43, 226, 0.25);
   border-radius: 14px;
   cursor: pointer;
@@ -164,6 +163,7 @@
   box-sizing: border-box;
   text-align: left;
   width: 100%;
+  transform: translateZ(0);
 }
 
 .casino-tx-item:hover {

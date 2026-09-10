@@ -426,6 +426,32 @@
 
 .client-nav-item--active {
   color: #ffd21a !important;
+  background: linear-gradient(180deg, rgba(255, 210, 26, 0.28) 0%, rgba(255, 138, 0, 0.16) 100%) !important;
+  border: 1px solid rgba(255, 210, 26, 0.8) !important;
+  border-radius: 9px;
+  box-shadow: 0 0 12px rgba(255, 210, 26, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.25) !important;
+  transform: translateY(-2px);
+}
+
+.client-nav-item--active .client-nav-label {
+  color: #ffd21a !important;
+  font-weight: 900 !important;
+  text-shadow: 0 0 8px rgba(255, 210, 26, 0.85), 0 1px 2px rgba(0, 0, 0, 0.9);
+}
+
+.client-nav-item--active .client-nav-icon {
+  transform: scale(1.14);
+  filter: drop-shadow(0 0 6px rgba(255, 210, 26, 0.85));
+}
+
+.client-nav-indicator {
+  position: absolute;
+  bottom: 2px;
+  width: 14px;
+  height: 2px;
+  background: #ffd21a;
+  border-radius: 2px;
+  box-shadow: 0 0 6px #ffd21a;
 }
 
 .client-nav-icon {
@@ -449,13 +475,6 @@
   background: linear-gradient(135deg, rgba(239, 68, 68, 0.25), rgba(220, 38, 38, 0.1));
   border-radius: 8px;
   border: 1px solid rgba(239, 68, 68, 0.4);
-}
-
-.client-nav-item.nav-add-cash {
-  background: linear-gradient(135deg, rgba(34, 197, 94, 0.3), rgba(22, 163, 74, 0.15));
-  border-radius: 8px;
-  border: 1px solid rgba(34, 197, 94, 0.5);
-  color: #4ade80 !important;
 }
 
 /* ─── GLITTER PARTICLES ─── */
@@ -500,6 +519,7 @@
 .aviator-card-art,
 .roulette-card-art,
 .rummy-card-art,
+.ludo-card-art,
 .casino-card-art-container {
   position: absolute !important;
   inset: 0 !important;
@@ -518,6 +538,7 @@
 .triple-777-hero-img,
 .aviator-plane-img,
 .rummy-hero-img,
+.ludo-hero-img,
 .casino-card-art-img {
   position: absolute !important;
   left: 50% !important;
@@ -547,6 +568,7 @@
 .aviator-dark-overlay,
 .roulette-dark-overlay,
 .rummy-dark-overlay,
+.ludo-dark-overlay,
 .casino-card-art-overlay {
   position: absolute !important;
   inset: 0 !important;
@@ -642,6 +664,45 @@
   border-radius: 50%;
   background: #ffffff;
   box-shadow: 0 0 5px #ffffff;
+}
+
+/* Ludo 3D Luxury Card Artwork & Atmosphere */
+.game-card--ludo {
+  position: relative !important;
+  overflow: hidden !important;
+  isolation: isolate !important;
+  background: radial-gradient(circle at 50% 35%, rgba(30, 58, 138, 0.65) 0%, rgba(15, 23, 42, 0.96) 100%) !important;
+  border: 1px solid rgba(96, 165, 250, 0.45) !important;
+}
+
+.ludo-card-aura {
+  position: absolute !important;
+  left: 50% !important;
+  top: 45% !important;
+  width: 130% !important;
+  height: 130% !important;
+  transform: translate(-50%, -50%) !important;
+  border-radius: 50% !important;
+  background: radial-gradient(circle, rgba(59, 130, 246, 0.6) 0%, rgba(245, 158, 11, 0.25) 45%, transparent 70%) !important;
+  filter: blur(12px) !important;
+  opacity: 0.65 !important;
+  z-index: 0 !important;
+  animation: ludoAuraPulse 4s ease-in-out infinite !important;
+}
+
+@keyframes ludoAuraPulse {
+  0%, 100% { opacity: 0.55; transform: translate(-50%, -50%) scale(0.95); }
+  50% { opacity: 0.85; transform: translate(-50%, -50%) scale(1.05); }
+}
+
+.ludo-hero-img {
+  transform: translate(-50%, -50%) scale(1.05) !important;
+  filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.8)) drop-shadow(0 0 16px rgba(59, 130, 246, 0.3)) !important;
+  transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) !important;
+}
+
+.game-card--ludo:hover .ludo-hero-img {
+  transform: translate(-50%, -50%) scale(1.10) !important;
 }
 
 

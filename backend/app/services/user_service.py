@@ -8,7 +8,13 @@ def get_user_by_id(db: Session, user_id: UUID) -> Optional[User]:
     return db.query(User).filter(User.id == user_id).first()
 
 
-def update_user_profile(db: Session, user: User, name: Optional[str] = None, username: Optional[str] = None) -> User:
+def update_user_profile(
+    db: Session,
+    user: User,
+    name: Optional[str] = None,
+    username: Optional[str] = None,
+    avatar_url: Optional[str] = None,
+) -> User:
     if name is not None:
         user.name = name
     if username is not None:
@@ -16,6 +22,8 @@ def update_user_profile(db: Session, user: User, name: Optional[str] = None, use
         if existing:
             raise ValueError("Username already taken")
         user.username = username
+    if avatar_url is not None:
+        user.avatar_url = avatar_url
     db.commit()
     db.refresh(user)
     return user

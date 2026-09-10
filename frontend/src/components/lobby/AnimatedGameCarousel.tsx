@@ -7,6 +7,7 @@ import triple777Logo from '../../assets/triple-777-logo.webp';
 import pokerHero from '../../assets/poker-hero.webp';
 import teenPattiHero from '../../assets/teen-patti-hero.webp';
 import rummyHero from '../../assets/casino-cards-3d-emblem.webp';
+import ludoHero from '../../assets/ludo-hero-3d.webp';
 import { AnimatedCasinoGameLogo } from './AnimatedCasinoGameLogo';
 
 /* ─── Types ─── */
@@ -74,6 +75,11 @@ const isRummyGame = (game: GameCardData) => {
 const isRouletteGame = (game: GameCardData) => {
   const value = `${game.id} ${game.name} ${game.path}`.toLowerCase();
   return value.includes('roulette');
+};
+
+const isLudoGame = (game: GameCardData) => {
+  const value = `${game.id} ${game.name} ${game.path}`.toLowerCase();
+  return value.includes('ludo');
 };
 
 const isCardGame = (game: GameCardData) => {
@@ -246,6 +252,24 @@ const AviatorAnimatedArtwork: React.FC = () => {
   );
 };
 
+/* ─── Ludo Animated Artwork ─── */
+const LudoAnimatedArtwork: React.FC = () => {
+  return (
+    <div className="ludo-card-art" aria-hidden="true">
+      <div className="ludo-card-aura" />
+      <img
+        className="ludo-hero-img"
+        src={ludoHero}
+        alt="Ludo 3D VIP Board"
+        loading="lazy"
+        decoding="async"
+      />
+      <div className="ludo-dark-overlay" />
+      <div className="casino-card-art-sweep" />
+    </div>
+  );
+};
+
 /* ─── Component ─── */
 export const AnimatedGameCarousel: React.FC<Props> = ({
   sets,
@@ -325,6 +349,7 @@ export const AnimatedGameCarousel: React.FC<Props> = ({
             const triple777 = isTriple777Game(game);
             const poker = isPokerGame(game);
             const teenPatti = isTeenPattiGame(game);
+            const ludo = isLudoGame(game);
             const cardGame = isCardGame(game);
 
             const cardTypeClass = aviator
@@ -345,9 +370,11 @@ export const AnimatedGameCarousel: React.FC<Props> = ({
                             ? 'game-card--poker'
                             : teenPatti
                               ? 'game-card--teen-patti'
-                              : cardGame
-                                ? 'game-card--casino-card'
-                                : '';
+                              : ludo
+                                ? 'game-card--ludo'
+                                : cardGame
+                                  ? 'game-card--casino-card'
+                                  : '';
 
             const hasCustomArtwork =
               aviator ||
@@ -359,6 +386,7 @@ export const AnimatedGameCarousel: React.FC<Props> = ({
               triple777 ||
               poker ||
               teenPatti ||
+              ludo ||
               cardGame;
 
             return (
@@ -413,8 +441,11 @@ export const AnimatedGameCarousel: React.FC<Props> = ({
                   {/* Teen Patti full card artwork */}
                   {teenPatti && <TeenPattiAnimatedArtwork />}
 
+                  {/* Ludo full card artwork */}
+                  {ludo && <LudoAnimatedArtwork />}
+
                   {/* Universal 3D Casino Card Game Artwork for other cards */}
-                  {cardGame && !rummy && !dragonTiger && !andarBahar && !chickenRoad && !triple777 && !poker && !teenPatti && (
+                  {cardGame && !rummy && !dragonTiger && !andarBahar && !chickenRoad && !triple777 && !poker && !teenPatti && !ludo && (
                     <AnimatedCasinoGameLogo game={game.id} />
                   )}
 

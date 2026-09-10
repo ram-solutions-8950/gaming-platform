@@ -50,8 +50,14 @@ export const LobbyHeader: React.FC<Props> = ({ user, wallet }) => {
             ← Home
           </button>
         )}
-        <div className="w-7 h-7 rounded-full bg-gradient-to-br from-amber-400 via-purple-500 to-amber-500 flex items-center justify-center text-xs font-black text-white shrink-0 ring-1.5 ring-amber-400/90 shadow-md">
-          {user?.name?.charAt(0).toUpperCase() || 'U'}
+        <div className="w-7 h-7 rounded-full bg-gradient-to-br from-amber-400 via-purple-500 to-amber-500 flex items-center justify-center text-xs font-black text-white shrink-0 ring-1.5 ring-amber-400/90 shadow-md overflow-hidden">
+          {user?.avatar_url && (user.avatar_url.startsWith('http') || user.avatar_url.startsWith('/uploads')) ? (
+            <img src={user.avatar_url} alt={user.name} className="w-full h-full object-cover" />
+          ) : user?.avatar_url ? (
+            <span className="text-sm leading-none">{user.avatar_url}</span>
+          ) : (
+            user?.name?.charAt(0).toUpperCase() || 'U'
+          )}
         </div>
         <div className="flex flex-col min-w-0">
           <span className="text-[11px] font-black text-white truncate max-w-[85px] tracking-wide leading-none">{user?.name || 'Player'}</span>

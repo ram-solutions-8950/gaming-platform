@@ -33,6 +33,7 @@ class User(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=lambda: datetime.now(timezone.utc))
     last_login_at = Column(DateTime(timezone=True))
     referral_code = Column(String(50), unique=True, index=True, nullable=True)
+    avatar_url = Column(String(2048), nullable=True)
 
     wallet = relationship("Wallet", back_populates="user", uselist=False, lazy="select")
     refresh_tokens = relationship("RefreshToken", back_populates="user", lazy="select")

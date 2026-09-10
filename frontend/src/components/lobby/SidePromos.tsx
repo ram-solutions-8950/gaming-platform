@@ -2,18 +2,18 @@ import React from 'react';
 import '../../styles/side-promos.css';
 
 interface SidePromosProps {
-  onSelectPromo?: (promo: '30_cards' | 'lucky_spin' | 'cash_card') => void;
+  onSelectPromo?: (promo: 'free_bonus' | 'lucky_spin' | 'cash_card') => void;
 }
 
 export const SidePromos: React.FC<SidePromosProps> = ({ onSelectPromo }) => {
   return (
     <div className="side-promos" role="group" aria-label="Casino Mini Games">
-      {/* ─── 1. 30 CARDS ─── */}
+      {/* ─── 1. FREE BONUS ─── */}
       <button
         type="button"
         className="side-promo-btn"
-        onClick={() => onSelectPromo?.('30_cards')}
-        aria-label="30 Cards"
+        onClick={() => onSelectPromo?.('free_bonus')}
+        aria-label="Free Bonus"
       >
         <div className="side-promo-icon-wrap">
           <svg viewBox="0 0 72 64" fill="none" xmlns="http://www.w3.org/2000/svg" className="side-promo-svg">
@@ -86,7 +86,7 @@ export const SidePromos: React.FC<SidePromosProps> = ({ onSelectPromo }) => {
             <polygon points="56,6 58,10 62,12 58,14 56,18 54,14 50,12 54,10" fill="#FFF000" />
           </svg>
         </div>
-        <span className="side-promo-label">30 Cards</span>
+        <span className="side-promo-label">Free Bonus</span>
       </button>
 
       {/* ─── 2. LUCKY SPIN ─── */}

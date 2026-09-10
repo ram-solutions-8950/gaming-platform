@@ -35,10 +35,9 @@ const GAME_DEFS: GameCardDef[] = [
   { id: 'roulette', name: 'Roulette', subtitle: 'Casino', emoji: '🎡', gradient: 'gc-red', badge: 'HOT', path: '/games/roulette', category: ['ALL', 'CASINO'] },
   { id: 'chicken-road', name: 'Chicken Road', subtitle: 'Arcade', emoji: '🐔', gradient: 'gc-amber', badge: 'NEW', path: '/games/chicken-road', category: ['ALL', 'CASINO'] },
   { id: 'triple-777', name: 'Triple 777', subtitle: 'Classic Slots', emoji: '🎰', gradient: 'gc-rose', badge: 'HOT', path: '/games/triple-777', category: ['ALL', 'SLOTS', 'CASINO'] },
-  { id: 'ludo', name: 'Ludo V1', subtitle: 'Multiplayer Board', emoji: '🎲', gradient: 'gc-blue', badge: 'NEW', path: '/games/ludo', category: ['ALL', 'CASINO'] },
+  { id: 'ludo', name: 'Ludo', subtitle: 'Multiplayer Board', emoji: '🎲', gradient: 'gc-blue', badge: 'NEW', path: '/games/ludo', category: ['ALL', 'CASINO'] },
 ];
 
-const FEATURED_GAME = GAME_DEFS[0]; // Dragon Tiger
 const PLAYABLE_CATEGORIES = ['ALL', 'CASINO', 'CARDS', 'SLOTS'];
 
 /* ─── Glitter particles ─── */
@@ -174,8 +173,8 @@ export function DashboardPage() {
           useRewardStore.getState().openModal('lucky_spin');
         } else if (promo === 'cash_card') {
           useRewardStore.getState().openModal('7days');
-        } else if (promo === '30_cards') {
-          navigate('/games/andar-bahar');
+        } else if (promo === 'free_bonus') {
+          setActivePopup('free');
         }
       }}
     />
@@ -184,23 +183,24 @@ export function DashboardPage() {
       <div className="featured-game__content">
         <div className="featured-game__text">
           <span className="featured-game__badge">
-            FEATURED
+            JACKPOT
           </span>
 
-          <h3>{FEATURED_GAME.name}</h3>
+          <h3>Mega Prize</h3>
 
-          <p>Play & Win Grand Prizes</p>
+          <p>Spin & Win Grand Cash</p>
 
           <button
+            type="button"
             className="featured-game__btn"
-            onClick={() => handleGameClick(FEATURED_GAME.path)}
+            onClick={() => useRewardStore.getState().openModal('jackpot')}
           >
-            Play Now
+            Win Now
           </button>
         </div>
 
         <div className="featured-game__emoji">
-          {FEATURED_GAME.emoji}
+          🎟️
         </div>
       </div>
     </div>

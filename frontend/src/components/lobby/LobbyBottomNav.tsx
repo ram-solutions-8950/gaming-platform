@@ -1,5 +1,5 @@
 import React from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
+import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useRewardStore } from '../../store/rewardStore';
 
 interface NavItem {
@@ -67,19 +67,25 @@ const navItems: NavItem[] = [
     emoji: '🎟️',
     className: 'nav-jackpot',
   },
-
-  // ADD CASH
-  {
-    to: '/deposit',
-    label: 'ADD CASH',
-    emoji: '💰',
-    className: 'nav-add-cash',
-    action: true,
-  },
 ];
 
 export const LobbyBottomNav: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const activeModal = useRewardStore((s) => s.activeModal);
+
+  const isItemActive = (item: NavItem) => {
+    if (item.to) {
+      if (item.to === '/dashboard') {
+        return location.pathname === '/dashboard' || location.pathname === '/';
+      }
+      return location.pathname.startsWith(item.to);
+    }
+    if (item.label === 'VIP BONUS') return activeModal === 'vip';
+    if (item.label === 'Service') return activeModal === 'service';
+    if (item.label === 'Jackpot') return activeModal === 'jackpot';
+    return false;
+  };
 
   const handleAction = (item: NavItem) => {
     if (item.to) {
@@ -121,15 +127,7 @@ export const LobbyBottomNav: React.FC = () => {
       <div className="client-nav-inner">
 
         {navItems.map((item) => {
-          /*
-           * WORKING ROUTES:
-           *
-           * Home       → /dashboard
-           * Activity   → /transactions
-           * Wallet     → /wallet
-           * Profile    → /profile
-           * Add Cash   → /deposit
-           */
+          const active = isItemActive(item);
 
           if (item.to) {
             return (
@@ -140,7 +138,7 @@ export const LobbyBottomNav: React.FC = () => {
                   [
                     'client-nav-item',
                     item.className || '',
-                    isActive
+                    (isActive || active)
                       ? 'client-nav-item--active'
                       : '',
                   ]
@@ -156,6 +154,8 @@ export const LobbyBottomNav: React.FC = () => {
                 <span className="client-nav-label">
                   {item.label}
                 </span>
+
+                {(active) && <span className="client-nav-indicator" />}
               </NavLink>
             );
           }
@@ -168,9 +168,13 @@ export const LobbyBottomNav: React.FC = () => {
             <button
               key={item.label}
               type="button"
-              className={`client-nav-item ${
-                item.className || ''
-              }`}
+              className={[
+                'client-nav-item',
+                item.className || '',
+                active ? 'client-nav-item--active' : '',
+              ]
+                .filter(Boolean)
+                .join(' ')}
               onClick={() => handleAction(item)}
               aria-label={item.label}
             >
@@ -181,6 +185,8 @@ export const LobbyBottomNav: React.FC = () => {
               <span className="client-nav-label">
                 {item.label}
               </span>
+
+              {active && <span className="client-nav-indicator" />}
             </button>
           );
         })}

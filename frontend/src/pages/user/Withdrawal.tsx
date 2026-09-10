@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { ArrowLeft } from 'lucide-react';
 import { Card } from '../../components/common/Card';
 import { Badge } from '../../components/common/Badge';
 import { Loader } from '../../components/common/Loader';
@@ -38,6 +40,7 @@ function getStatusBadgeVariant(status: WithdrawalStatus) {
 }
 
 export function WithdrawalPage() {
+  const navigate = useNavigate();
   const [wallet, setWallet] = useState<Wallet | null>(null);
   const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([]);
   const [feeConfig, setFeeConfig] = useState<FeeConfig | null>(null);
@@ -138,9 +141,21 @@ export function WithdrawalPage() {
 
   return (
     <div className="withdrawal-page w-full max-w-3xl mx-auto space-y-4">
-      <div className="withdrawal-page-header flex items-center justify-between">
-        <h1 className="withdrawal-page-title text-xl sm:text-2xl font-extrabold text-white">Request Withdrawal</h1>
-        <div className="withdrawal-balance-box bg-dark-900 border border-dark-700 px-3 py-1.5 rounded-xl text-right">
+      <div className="withdrawal-page-header flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+          <button
+            type="button"
+            onClick={() => navigate('/wallet')}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-900/60 hover:bg-purple-800/80 border border-purple-400/40 text-xs font-bold text-white transition active:scale-95 cursor-pointer shadow-md shrink-0"
+            title="Back to Wallet"
+            aria-label="Back to Wallet"
+          >
+            <ArrowLeft size={14} />
+            <span>Back to Wallet</span>
+          </button>
+          <h1 className="withdrawal-page-title text-xl sm:text-2xl font-extrabold text-white truncate">Request Withdrawal</h1>
+        </div>
+        <div className="withdrawal-balance-box bg-dark-900 border border-dark-700 px-3 py-1.5 rounded-xl text-right shrink-0">
           <p className="withdrawal-balance-label text-[10px] text-gray-400">Available Balance</p>
           <p className="withdrawal-balance-val text-base font-extrabold text-gold-400">₹{wallet?.balance_inr ?? '0.00'}</p>
         </div>

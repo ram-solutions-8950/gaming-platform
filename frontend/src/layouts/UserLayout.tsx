@@ -116,8 +116,14 @@ export function UserLayout() {
 
         <div className="p-4 border-t border-dark-700">
           <div className="flex items-center gap-3 mb-3 px-2">
-            <div className="w-9 h-9 bg-gradient-to-br from-brand-500 to-gold-500 rounded-full flex items-center justify-center text-sm font-bold text-white shadow-inner">
-              {user?.name?.charAt(0).toUpperCase()}
+            <div className="w-9 h-9 bg-gradient-to-br from-brand-500 to-gold-500 rounded-full flex items-center justify-center text-sm font-bold text-white shadow-inner overflow-hidden">
+              {user?.avatar_url && (user.avatar_url.startsWith('http') || user.avatar_url.startsWith('/uploads')) ? (
+                <img src={user.avatar_url} alt={user.name} className="w-full h-full object-cover" />
+              ) : user?.avatar_url ? (
+                <span className="text-base leading-none">{user.avatar_url}</span>
+              ) : (
+                user?.name?.charAt(0).toUpperCase()
+              )}
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold text-gray-100 truncate">{user?.name}</p>

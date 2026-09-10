@@ -25,6 +25,12 @@ async def lifespan(app: FastAPI):
         Base.metadata.create_all(bind=engine)
         from .services.reward_service import seed_default_reward_configs
         with SessionLocal() as db:
+            from sqlalchemy import text
+            try:
+                db.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url TEXT;"))
+                db.commit()
+            except Exception:
+                db.rollback()
             seed_default_reward_configs(db)
             from .models.game_catalog import Game
             ab = db.query(Game).filter(Game.slug == "andar-bahar").first()
@@ -105,10 +111,14 @@ app.include_router(chicken_road.router, prefix=PREFIX)
 app.include_router(triple_777.router, prefix=PREFIX)
 app.include_router(roulette.router, prefix=PREFIX)
 
-# Static file serving — QR code uploads only
+# Static file serving — QR code and Avatar uploads
 QR_UPLOAD_DIR = Path(__file__).resolve().parent.parent / "uploads" / "qr"
 QR_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 app.mount("/uploads/qr", StaticFiles(directory=str(QR_UPLOAD_DIR)), name="qr_uploads")
+
+AVATAR_UPLOAD_DIR = Path(__file__).resolve().parent.parent / "uploads" / "avatars"
+AVATAR_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+app.mount("/uploads/avatars", StaticFiles(directory=str(AVATAR_UPLOAD_DIR)), name="avatar_uploads")
 
 
 @app.get("/api/v1/health", tags=["Health"])
