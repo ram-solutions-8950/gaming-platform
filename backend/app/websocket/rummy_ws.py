@@ -469,12 +469,16 @@ async def game_socket(websocket: WebSocket, table_id: str) -> None:
             await _handle_action(table_id, user_id, msg)
     except WebSocketDisconnect:
         await manager.disconnect(table_id, user_id)
-        await manager.broadcast(table_id, {"type": "event", "event": "left", "player": user_id})
-        await _handle_player_leave(table_id, user_id)
+        game = game_manager.get(table_id)
+        if game and game.phase == Phase.WAITING:
+            await manager.broadcast(table_id, {"type": "event", "event": "left", "player": user_id})
+            await _handle_player_leave(table_id, user_id)
     except Exception as exc:
         await manager.send_to_user(table_id, user_id, {"type": "error", "message": str(exc)})
         await manager.disconnect(table_id, user_id)
-        await _handle_player_leave(table_id, user_id)
+        game = game_manager.get(table_id)
+        if game and game.phase == Phase.WAITING:
+            await _handle_player_leave(table_id, user_id)
 
 
 _MUTATING_ACTIONS = {"start", "draw", "discard", "drop", "declare"}
@@ -538,7 +542,7 @@ async def _handle_action(table_id: str, user_id: str, msg: dict) -> None:
             await manager.broadcast(table_id, {"type": "event", "event": "declared",
                                                "player": user_id, "valid": result.valid,
                                                "reason": result.reason})
-        elif action == "leave":
+        elif action in ("leave", "forfeit"):
             await manager.broadcast(table_id, {"type": "event", "event": "left", "player": user_id})
             await _handle_player_leave(table_id, user_id)
             return

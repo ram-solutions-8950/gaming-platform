@@ -188,7 +188,7 @@ def test_dragon_tiger_settlement_wallet_safety(db: Session, set_admin_fee, test_
 
 
 def test_andar_bahar_settlement_wallet_safety(db: Session, set_admin_fee, test_user_wallet):
-    """Verify Andar Bahar: ₹10 bet, ₹8 profit @ 20% fee, ₹18 total return credited."""
+    """Verify Andar Bahar: ₹50 bet (min bet), ₹40 profit @ 20% fee, ₹82 total return credited."""
     user, wallet = test_user_wallet
     set_admin_fee("20.00")
 
@@ -200,11 +200,11 @@ def test_andar_bahar_settlement_wallet_safety(db: Session, set_admin_fee, test_u
     initial_balance = wallet.balance
     assert initial_balance == 10000  # ₹100.00
 
-    # Place ₹10 bet on BAHAR (1:1 odds)
+    # Place ₹50 bet on BAHAR (min bet is ₹50 / 5000 paise per BUG-049)
     rd = ab_engine.create_round(db)
-    bet = ab_engine.place_bet(db, user.id, rd.id, "BAHAR", 1000, game_id=game.id)
+    bet = ab_engine.place_bet(db, user.id, rd.id, "BAHAR", 5000, game_id=game.id)
     db.refresh(wallet)
-    assert wallet.balance == 9000
+    assert wallet.balance == 5000
 
     # Settle: BAHAR wins
     deal = {
@@ -221,6 +221,7 @@ def test_andar_bahar_settlement_wallet_safety(db: Session, set_admin_fee, test_u
     db.refresh(wallet)
 
     assert bet.status == GameBetStatus.WON
-    assert bet.winning_fee_amount == 200
-    assert bet.net_win_amount == 1800
-    assert wallet.balance == 10800  # ₹108.00 exact!
+    # Gross profit: 5000 * 0.8 = 4000. 20% winning fee = 800. Net profit = 3200. Total return = 8200.
+    assert bet.winning_fee_amount == 800
+    assert bet.net_win_amount == 8200
+    assert wallet.balance == 13200  # ₹132.00 exact!

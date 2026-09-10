@@ -181,12 +181,12 @@ def test_server_authoritative_settlement_andar_wins(db: Session, auth_user, ab_g
     assert settled_rd.status == GameRoundStatus.COMPLETED
     assert settled_rd.result_data["winner"] == "ANDAR"
     assert bet.status == GameBetStatus.WON
-    # Gross return: 9500 + round(9500 * 0.9) = 9500 + 8550 = 18050
-    # Net profit: 8550 -> 10% fee = 855 -> Final credit = 18050 - 855 = 17195
-    assert bet.gross_win_amount == 18050
-    assert bet.winning_fee_amount == 855
-    assert bet.net_win_amount == 17195
-    assert wallet.balance == balance_after_bet + 17195
+    # Gross return: 9500 + round(9500 * 0.8) = 9500 + 7600 = 17100
+    # Net profit: 7600 -> 10% fee = 760 -> Final credit = 17100 - 760 = 16340
+    assert bet.gross_win_amount == 17100
+    assert bet.winning_fee_amount == 760
+    assert bet.net_win_amount == 16340
+    assert wallet.balance == balance_after_bet + 16340
 
 
 def test_server_authoritative_settlement_bahar_wins(db: Session, auth_user, ab_game, fee_config):
@@ -220,12 +220,12 @@ def test_server_authoritative_settlement_bahar_wins(db: Session, auth_user, ab_g
 
     assert settled_rd.status == GameRoundStatus.COMPLETED
     assert bet.status == GameBetStatus.WON
-    # Gross return: 9500 + (9500 * 1.0) = 19000
-    # Net profit: 9500 -> 10% fee = 950 -> Final credit = 19000 - 950 = 18050
-    assert bet.gross_win_amount == 19000
-    assert bet.winning_fee_amount == 950
-    assert bet.net_win_amount == 18050
-    assert wallet.balance == balance_after_bet + 18050
+    # Gross return: 9500 + (9500 * 0.8) = 17100
+    # Net profit: 7600 -> 10% fee = 760 -> Final credit = 17100 - 760 = 16340
+    assert bet.gross_win_amount == 17100
+    assert bet.winning_fee_amount == 760
+    assert bet.net_win_amount == 16340
+    assert wallet.balance == balance_after_bet + 16340
 
 
 def test_settlement_losing_bet(db: Session, auth_user, ab_game):

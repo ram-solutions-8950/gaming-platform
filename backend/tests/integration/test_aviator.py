@@ -177,11 +177,11 @@ class TestProvablyFair:
 
 class TestDistribution:
     def test_house_edge_approximately_correct(self):
-        """Over many rounds, ~3% should crash at 1.0 (instant crash)."""
+        """Over many rounds, ~3-7% should crash at 1.0 (instant crash) with 6% house edge."""
         seed = generate_server_seed()
         instant = sum(1 for n in range(1, 10001) if compute_crash_point(seed, n) == 1.0)
-        # With 3% house edge, ~2-5% should be instant crashes
-        assert instant < 600, f"Too many instant crashes: {instant}/10000"
+        # With 6% house edge, ~4-8% should be instant crashes
+        assert instant < 800, f"Too many instant crashes: {instant}/10000"
 
     def test_median_crash_roughly_correct(self):
         """Median crash should be around 1.4× for 3% house edge."""
@@ -215,7 +215,7 @@ class TestBetting:
 
     def test_invalid_amount(self, db, aviator, user_a):
         aviator.create_round(db)
-        with pytest.raises(ValueError, match="positive"):
+        with pytest.raises(ValueError, match="Minimum bet amount|positive"):
             aviator.place_bet(db, user_a.id, slot=1, amount=0)
 
     def test_duplicate_slot_rejected(self, db, aviator, user_a):
