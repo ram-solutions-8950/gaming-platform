@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { teenPattiService, type TeenPattiTable } from '../../services/teenPatti';
 import { GameRulesModal } from '../common/GameRulesModal';
 import { TEEN_PATTI_RULES_DATA } from '../common/gameRulesData';
-import { HelpCircle, Crown } from 'lucide-react';
+import { HelpCircle, Crown, Plus } from 'lucide-react';
+import { walletService } from '../../services/wallet';
 
 interface TeenPattiLobbyProps {
   onJoinTable: (tableId: string) => void;
@@ -19,10 +20,20 @@ const BOOT_TIERS = [
 export const TeenPattiLobby: React.FC<TeenPattiLobbyProps> = ({ onJoinTable }) => {
   const navigate = useNavigate();
   const [tables, setTables] = useState<TeenPattiTable[]>([]);
+  const [walletBalance, setWalletBalance] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [joinError, setJoinError] = useState('');
   const [creatingTable, setCreatingTable] = useState(false);
   const [showRules, setShowRules] = useState(false);
+
+  const fetchWallet = async () => {
+    try {
+      const w = await walletService.getWallet();
+      setWalletBalance(w.balance || 0);
+    } catch (e) {
+      console.error('Failed to load wallet balance', e);
+    }
+  };
 
   const fetchTables = async () => {
     try {
@@ -38,6 +49,7 @@ export const TeenPattiLobby: React.FC<TeenPattiLobbyProps> = ({ onJoinTable }) =
 
   useEffect(() => {
     fetchTables();
+    fetchWallet();
   }, []);
 
   const handleCreateTierTable = async (tier: typeof BOOT_TIERS[0]) => {
@@ -78,7 +90,7 @@ export const TeenPattiLobby: React.FC<TeenPattiLobbyProps> = ({ onJoinTable }) =
   return (
     <div className="w-full max-w-5xl mx-auto p-3 sm:p-4 pb-32 text-white space-y-4">
       {/* Sticky Header Bar */}
-      <div className="sticky top-0 z-30 bg-[#020617]/95 backdrop-blur-md py-2.5 px-1 border-b border-white/10 flex items-center justify-between">
+      <div className="sticky top-0 z-30 bg-[#020617]/95 backdrop-blur-md py-2.5 px-1 border-b border-white/10 flex items-center justify-between gap-2">
         <button
           type="button"
           onClick={() => navigate('/dashboard')}
@@ -90,7 +102,23 @@ export const TeenPattiLobby: React.FC<TeenPattiLobbyProps> = ({ onJoinTable }) =
           <Crown size={22} className="text-amber-400 fill-amber-400 shrink-0" />
           <span>Royal Teen Patti</span>
         </h1>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-2 bg-slate-900/90 border border-amber-500/30 rounded-xl px-2.5 py-1 shadow-sm">
+            <span className="text-[10px] text-slate-400 font-bold tracking-wider">BALANCE:</span>
+            <span className="text-xs font-black text-amber-400">
+              ₹{walletBalance !== null ? (walletBalance / 100).toFixed(2) : '...'}
+            </span>
+            <button
+              type="button"
+              onClick={() => navigate('/deposit')}
+              className="flex items-center gap-1 px-2 py-0.5 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 text-white font-extrabold text-[11px] rounded-lg shadow-sm active:scale-95 transition cursor-pointer"
+              title="Add Amount"
+            >
+              <Plus size={11} strokeWidth={3} />
+              <span>Add Amount</span>
+            </button>
+          </div>
+
           <button
             type="button"
             onClick={() => setShowRules(true)}
