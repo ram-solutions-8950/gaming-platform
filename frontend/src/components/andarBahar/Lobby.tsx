@@ -119,7 +119,7 @@ export function Lobby({
                     {joiningTier === idx ? "Joining…" : "Play Now"}
                   </button>
                 ) : (
-                  <button className="action secondary" onClick={() => window.location.href = '/deposit'}>Add Cash</button>
+                  <button className="action secondary opacity-50 cursor-not-allowed" disabled>Low Balance</button>
                 )}
               </div>
             );

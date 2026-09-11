@@ -500,7 +500,8 @@ export const LudoBoard: React.FC<Props> = ({
             return (
               <g
                 key={`tok-${player.id}-${token.token_index}`}
-                onClick={() => {
+                onClick={(e) => {
+                  e.stopPropagation();
                   if (isLegal) onTokenClick(token.token_index);
                 }}
                 className={isLegal ? 'cursor-pointer' : ''}
@@ -508,6 +509,9 @@ export const LudoBoard: React.FC<Props> = ({
                   transformOrigin: `${cx}px ${cy}px`,
                   transform: scale !== 1 ? `scale(${scale})` : undefined,
                   transition: 'transform 0.25s ease',
+                  cursor: isLegal ? 'pointer' : 'default',
+                  pointerEvents: isLegal ? 'all' : 'auto',
+                  touchAction: 'manipulation',
                 }}
               >
                 {/* Active Turn Ground Halo & Pulse Rings (BUG-004) */}
@@ -645,7 +649,15 @@ export const LudoBoard: React.FC<Props> = ({
 
                 {/* Enlarged touch area for mobile click comfort */}
                 {isLegal && (
-                  <circle cx={cx} cy={cy - 24} r="54" fill="transparent" />
+                  <circle
+                    cx={cx}
+                    cy={cy - 24}
+                    r="60"
+                    fill="#ffffff"
+                    opacity="0.001"
+                    pointerEvents="all"
+                    style={{ cursor: 'pointer' }}
+                  />
                 )}
               </g>
             );

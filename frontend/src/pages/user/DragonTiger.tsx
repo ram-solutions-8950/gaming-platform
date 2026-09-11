@@ -896,28 +896,18 @@ export function DragonTigerPage() {
             </div>
           )}
 
-          {/* HUD top-right: Wallet + ADD */}
+          {/* HUD top-right: Wallet */}
           <div className="absolute top-1.5 right-2 z-30 flex items-center gap-1.5">
             <div className="bg-black/60 rounded-full px-3 py-1 border border-yellow-500/30">
-                <span className="text-yellow-400 font-bold text-xs">₹{wallet?.balance_inr ?? '0.00'}</span>
-              </div>
-              <button
-                type="button"
-                onClick={() => navigate('/deposit')}
-                className="flex items-center gap-1 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-bold text-xs px-3 py-1.5 rounded-full shadow-lg border border-emerald-400/50 cursor-pointer active:scale-95 transition-all"
-                title="Add Amount"
-                aria-label="Add Amount"
-              >
-                <span className="text-sm font-black leading-none">+</span>
-                <span>Add Amount</span>
-              </button>
-              <button
-                onClick={audio.toggleMute}
-                className="ml-2 w-8 h-8 rounded-full bg-black/50 border border-white/20 flex items-center justify-center text-sm hover:bg-black/70 transition-colors"
-                title={audio.muted ? "Unmute" : "Mute"}
-              >
-                {audio.muted ? "🔈" : "🔊"}
-              </button>
+              <span className="text-yellow-400 font-bold text-xs">₹{wallet?.balance_inr ?? '0.00'}</span>
+            </div>
+            <button
+              onClick={audio.toggleMute}
+              className="ml-2 w-8 h-8 rounded-full bg-black/50 border border-white/20 flex items-center justify-center text-sm hover:bg-black/70 transition-colors"
+              title={audio.muted ? "Unmute" : "Mute"}
+            >
+              {audio.muted ? "🔈" : "🔊"}
+            </button>
           </div>
 
           {/* Large Dragon Artwork (left background) */}

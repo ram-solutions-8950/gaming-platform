@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
-  ArrowLeft, Users, History, BarChart3, Volume2, VolumeX, Settings, Flag,
+  ArrowLeft, Users, History, BarChart3, Volume2, VolumeX, Flag,
   Trash2, RotateCcw, Sparkles, Shuffle, Trophy, MessageCircle, Minus, Plus,
+  Send,
 } from "lucide-react";
 import PlayingCard from "./PlayingCard";
 import "./RummyTable.css";
@@ -187,102 +188,6 @@ function ResultOverlay({
   );
 }
 
-function SettingsModal({
-  onClose,
-  onOpenRules,
-  onLeave,
-  soundOn,
-  onToggleSound,
-  tableId,
-}: {
-  onClose: () => void;
-  onOpenRules: () => void;
-  onLeave: () => void;
-  soundOn: boolean;
-  onToggleSound: () => void;
-  tableId: string;
-}) {
-  return (
-    <div
-      className="fixed inset-0 z-[90] flex items-center justify-center bg-black/85 backdrop-blur-md p-4 animate-fade-in select-none"
-      onClick={onClose}
-    >
-      <div
-        className="w-full max-w-sm bg-gradient-to-b from-[#1e0a38] via-[#130426] to-[#0a0117] border-2 border-amber-500/50 rounded-3xl p-5 shadow-2xl text-white flex flex-col gap-4"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between border-b border-white/10 pb-3">
-          <div className="flex items-center gap-2">
-            <span className="text-xl">⚙️</span>
-            <h3 className="font-display font-black text-base text-amber-300 tracking-wide uppercase">Table Settings</h3>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white flex items-center justify-center text-sm font-bold transition cursor-pointer"
-          >
-            ✕
-          </button>
-        </div>
-
-        <div className="flex flex-col gap-2.5">
-          {/* Sound Toggle */}
-          <div className="flex items-center justify-between p-3 rounded-2xl bg-white/5 border border-white/10">
-            <div className="flex items-center gap-2.5">
-              {soundOn ? <Volume2 size={18} className="text-amber-400" /> : <VolumeX size={18} className="text-slate-400" />}
-              <div>
-                <div className="text-xs font-bold text-slate-100">Sound Effects</div>
-                <div className="text-[10px] text-slate-400">{soundOn ? "Card & victory sounds enabled" : "Muted"}</div>
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={onToggleSound}
-              className={`px-3 py-1 rounded-full text-xs font-extrabold transition active:scale-95 cursor-pointer ${
-                soundOn
-                  ? "bg-gradient-to-r from-amber-500 to-yellow-400 text-slate-950 shadow-md shadow-amber-500/20"
-                  : "bg-slate-800 text-slate-400 border border-slate-700"
-              }`}
-            >
-              {soundOn ? "ON" : "OFF"}
-            </button>
-          </div>
-
-          {/* Rules Button */}
-          <button
-            type="button"
-            onClick={() => { onClose(); onOpenRules(); }}
-            className="w-full flex items-center justify-between p-3 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 transition active:scale-95 text-left cursor-pointer"
-          >
-            <div className="flex items-center gap-2.5">
-              <span className="text-base">📖</span>
-              <div>
-                <div className="text-xs font-bold text-slate-100">Rummy Rules</div>
-                <div className="text-[10px] text-slate-400">Pure/impure sequences & valid show guide</div>
-              </div>
-            </div>
-            <span className="text-amber-400 text-sm font-bold">➔</span>
-          </button>
-
-          {/* Table ID Information */}
-          <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-black/40 border border-white/5 text-[10px] font-mono text-slate-400">
-            <span>Table ID:</span>
-            <span className="text-amber-300 font-bold">{tableId.slice(0, 12)}…</span>
-          </div>
-
-          {/* Leave Table Button */}
-          <button
-            type="button"
-            onClick={() => { onClose(); onLeave(); }}
-            className="w-full mt-1 py-2.5 rounded-xl bg-gradient-to-r from-red-600 to-rose-700 hover:brightness-110 text-white text-xs font-extrabold shadow-md border border-red-500/40 transition active:scale-95 cursor-pointer flex items-center justify-center gap-1.5"
-          >
-            🚪 Leave Table
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 export default function GameTable({ onBack, onExit, customTableId }: { onBack?: () => void; onExit?: () => void; customTableId?: string } = {}) {
   const { tableId: paramTableId } = useParams();
@@ -403,16 +308,67 @@ export default function GameTable({ onBack, onExit, customTableId }: { onBack?: 
       setAnnounceCards([]);
     }, durationMs);
   }
-  const [settingsMenuOpen, setSettingsMenuOpen] = useState(false);
   const [rulesOpen, setRulesOpen] = useState(false);
+  const [historyModalOpen, setHistoryModalOpen] = useState(false);
+  const [historyData, setHistoryData] = useState<any[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [scoreModalOpen, setScoreModalOpen] = useState(false);
+  const [chatModalOpen, setChatModalOpen] = useState(false);
+  const [chatMessages, setChatMessages] = useState<{ id: string; sender: string; text: string; time: string }[]>([
+    { id: '1', sender: 'Dealer', text: 'Welcome to Indian Rummy! Enjoy the game.', time: '12:00' }
+  ]);
+  const [chatInput, setChatInput] = useState('');
+
   const [soundOn, setSoundOn] = useState(() => localStorage.getItem("rummy_sound") !== "off");
+
+  useEffect(() => {
+    const isOff = localStorage.getItem("rummy_sound") === "off" || localStorage.getItem("casinoSoundMuted") === "true";
+    if (isOff) {
+      soundManager.mute();
+      soundManager.stopMusic();
+      setSoundOn(false);
+    }
+  }, []);
+
   function toggleSound() {
     setSoundOn((v) => {
       const next = !v;
       localStorage.setItem("rummy_sound", next ? "on" : "off");
+      if (next) {
+        soundManager.unmute();
+      } else {
+        soundManager.mute();
+        soundManager.stopMusic();
+      }
       return next;
     });
   }
+
+  const openHistory = async () => {
+    setHistoryLoading(true);
+    setHistoryModalOpen(true);
+    try {
+      const data = await RummyApi.getHistory();
+      setHistoryData(data || []);
+    } catch {
+      setHistoryData([]);
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+  const sendChatMessage = (textToSend?: string) => {
+    const text = (textToSend !== undefined ? textToSend : chatInput).trim();
+    if (!text) return;
+    const newMsg = {
+      id: String(Date.now()),
+      sender: myUsername || 'You',
+      text,
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    };
+    setChatMessages((prev) => [...prev, newMsg]);
+    setChatInput('');
+  };
 
 
   async function handlePlayAgain() {
@@ -753,15 +709,6 @@ export default function GameTable({ onBack, onExit, customTableId }: { onBack?: 
               <span className="text-[10px] text-slate-400 font-bold uppercase hidden sm:inline">BALANCE:</span>
               <span>₹{walletBalance !== null ? (walletBalance / 100).toFixed(2) : "..."}</span>
             </span>
-            <button
-              type="button"
-              onClick={() => navigate("/deposit")}
-              className="gt-chip !bg-gradient-to-r !from-emerald-500 !to-teal-600 hover:!from-emerald-400 hover:!to-teal-500 !text-white !font-bold !border-emerald-400/50 shadow-md transition-all active:scale-95 cursor-pointer flex items-center gap-1"
-              title="Add Amount"
-            >
-              <Plus size={13} strokeWidth={3} />
-              <span>Add Amount</span>
-            </button>
           </div>
           {table && table.entry_fee_paise > 0 && (
             <span className="gt-chip !border-emerald-500/40 !bg-slate-900/90 text-emerald-400 font-bold flex items-center gap-1 shadow-sm">
@@ -783,23 +730,14 @@ export default function GameTable({ onBack, onExit, customTableId }: { onBack?: 
               ⏱ 0:{secondsLeft.toString().padStart(2, "0")}
             </span>
           )}
-          <button
-            type="button"
-            className="gt-chip !px-2 cursor-pointer hover:bg-white/10"
-            onClick={() => setSettingsMenuOpen(true)}
-            aria-label="Settings"
-            title="Table Settings"
-          >
-            <Settings size={15} />
-          </button>
         </div>
       </header>
 
       <main className="gt-main">
         <div className="gt-rails gt-rails-left">
-          <button type="button" className="gt-rail-btn" onClick={() => alert("History — coming soon")}><History size={15} /><span>History</span></button>
-          <button type="button" className="gt-rail-btn" onClick={() => alert("Score — coming soon")}><BarChart3 size={15} /><span>Score</span></button>
-          <button type="button" className="gt-rail-btn" onClick={() => alert("Chat — coming soon")}><MessageCircle size={15} /><span>Chat</span></button>
+          <button type="button" className="gt-rail-btn" onClick={openHistory}><History size={15} /><span>History</span></button>
+          <button type="button" className="gt-rail-btn" onClick={() => setScoreModalOpen(true)}><BarChart3 size={15} /><span>Score</span></button>
+          <button type="button" className="gt-rail-btn" onClick={() => setChatModalOpen(true)}><MessageCircle size={15} /><span>Chat</span></button>
           <button type="button" className="gt-rail-btn" onClick={toggleSound}>
             {soundOn ? <Volume2 size={15} /> : <VolumeX size={15} />}
             <span>{soundOn ? "Sound" : "Muted"}</span>
@@ -1009,16 +947,6 @@ export default function GameTable({ onBack, onExit, customTableId }: { onBack?: 
       </footer>
 
       {rulesOpen && <RulesModal onClose={() => setRulesOpen(false)} />}
-      {settingsMenuOpen && (
-        <SettingsModal
-          onClose={() => setSettingsMenuOpen(false)}
-          onOpenRules={() => setRulesOpen(true)}
-          onLeave={() => setLeaveConfirmOpen(true)}
-          soundOn={soundOn}
-          onToggleSound={toggleSound}
-          tableId={tableId}
-        />
-      )}
       {leaveConfirmOpen && (
         <div
           className="fixed inset-0 z-[100] flex items-center justify-center bg-black/85 backdrop-blur-md p-4 animate-fade-in select-none"
@@ -1073,6 +1001,208 @@ export default function GameTable({ onBack, onExit, customTableId }: { onBack?: 
           </div>
         </div>
       )}
+      {/* Table History Modal */}
+      {historyModalOpen && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/85 backdrop-blur-md p-4 animate-fade-in select-none"
+          onClick={() => setHistoryModalOpen(false)}
+        >
+          <div
+            className="w-full max-w-lg bg-gradient-to-b from-[#1c0836] via-[#120324] to-[#0a0117] border-2 border-amber-500/50 rounded-3xl p-5 shadow-2xl text-white flex flex-col max-h-[85vh]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-white/10 pb-3 mb-3">
+              <div className="flex items-center gap-2">
+                <History size={18} className="text-amber-400" />
+                <h3 className="font-display font-black text-base text-amber-300 tracking-wide uppercase">Table History</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setHistoryModalOpen(false)}
+                className="w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white flex items-center justify-center text-sm font-bold transition cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="overflow-y-auto space-y-2 flex-1 pr-1">
+              {historyLoading ? (
+                <div className="py-12 text-center text-slate-400 text-xs">Loading game history...</div>
+              ) : historyData.length === 0 ? (
+                <div className="py-12 text-center text-slate-500 text-xs">No previous hands recorded yet.</div>
+              ) : (
+                historyData.map((h: any) => (
+                  <div key={h.id} className="p-3 rounded-xl bg-white/5 border border-white/10 flex items-center justify-between text-xs">
+                    <div>
+                      <p className="font-semibold text-slate-200">Table: {h.table_id?.substring(0, 8)}</p>
+                      <p className="text-slate-400 text-[10px]">Deals played: {h.deals_played || 1}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-mono font-bold text-emerald-400">
+                        {h.prize_pool_paise > 0 ? `₹${(h.prize_pool_paise / 100).toFixed(2)}` : "FREE"}
+                      </p>
+                      <p className="text-slate-500 text-[10px]">
+                        {h.created_at ? new Date(h.created_at).toLocaleTimeString() : ""}
+                      </p>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Table Scorecard Modal */}
+      {scoreModalOpen && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/85 backdrop-blur-md p-4 animate-fade-in select-none"
+          onClick={() => setScoreModalOpen(false)}
+        >
+          <div
+            className="w-full max-w-md bg-gradient-to-b from-[#1c0836] via-[#120324] to-[#0a0117] border-2 border-amber-500/50 rounded-3xl p-5 shadow-2xl text-white flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-white/10 pb-3 mb-3">
+              <div className="flex items-center gap-2">
+                <BarChart3 size={18} className="text-amber-400" />
+                <h3 className="font-display font-black text-base text-amber-300 tracking-wide uppercase">
+                  Scorecard — Deal {state?.deal_number || 1}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setScoreModalOpen(false)}
+                className="w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white flex items-center justify-center text-sm font-bold transition cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b border-white/10 text-slate-400 uppercase tracking-wider text-[10px]">
+                    <th className="py-2 px-2">Player</th>
+                    <th className="py-2 px-2">Status</th>
+                    <th className="py-2 px-2 text-right">Deal Pts</th>
+                    <th className="py-2 px-2 text-right">Total Score</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                  {state?.players && state.players.length > 0 ? (
+                    state.players.map((p) => {
+                      const isMe = p.id === me?.id;
+                      return (
+                        <tr key={p.id} className={isMe ? "bg-amber-500/10" : ""}>
+                          <td className="py-2.5 px-2 font-semibold text-slate-200 flex items-center gap-1.5">
+                            <span>{p.name}</span>
+                            {isMe && <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40">YOU</span>}
+                          </td>
+                          <td className="py-2.5 px-2">
+                            <span className="capitalize text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-white/10">
+                              {p.status}
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-2 text-right font-mono font-bold text-amber-400">
+                            {p.deal_points} pts
+                          </td>
+                          <td className="py-2.5 px-2 text-right font-mono font-bold text-slate-300">
+                            {p.total_score} pts
+                          </td>
+                        </tr>
+                      );
+                    })
+                  ) : (
+                    <tr>
+                      <td colSpan={4} className="py-6 text-center text-slate-500">No players seated</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Table Chat Modal */}
+      {chatModalOpen && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/85 backdrop-blur-md p-4 animate-fade-in select-none"
+          onClick={() => setChatModalOpen(false)}
+        >
+          <div
+            className="w-full max-w-md bg-gradient-to-b from-[#1c0836] via-[#120324] to-[#0a0117] border-2 border-amber-500/50 rounded-3xl p-5 shadow-2xl text-white flex flex-col h-[420px]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-white/10 pb-3 mb-2">
+              <div className="flex items-center gap-2">
+                <MessageCircle size={18} className="text-amber-400" />
+                <h3 className="font-display font-black text-base text-amber-300 tracking-wide uppercase">Table Chat</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setChatModalOpen(false)}
+                className="w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white flex items-center justify-center text-sm font-bold transition cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Quick Messages */}
+            <div className="flex flex-wrap gap-1.5 mb-3">
+              {["Good luck! 🍀", "Well played! 👏", "Nice hand! 🔥", "Hurry up! ⏳", "GG! 🏆", "Thanks! 😊"].map((msg) => (
+                <button
+                  key={msg}
+                  type="button"
+                  onClick={() => sendChatMessage(msg)}
+                  className="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-slate-200 text-[11px] font-semibold transition active:scale-95 cursor-pointer"
+                >
+                  {msg}
+                </button>
+              ))}
+            </div>
+
+            {/* Chat Messages List */}
+            <div className="flex-1 overflow-y-auto space-y-2 pr-1 mb-3 bg-black/30 p-2.5 rounded-xl border border-white/5">
+              {chatMessages.map((m) => (
+                <div key={m.id} className="text-xs">
+                  <span className="font-bold text-amber-300 mr-1.5">{m.sender}:</span>
+                  <span className="text-slate-200">{m.text}</span>
+                  <span className="text-[9px] text-slate-500 ml-2">{m.time}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* Chat Input */}
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                sendChatMessage();
+              }}
+              className="flex gap-2"
+            >
+              <input
+                type="text"
+                value={chatInput}
+                onChange={(e) => setChatInput(e.target.value)}
+                placeholder="Type a message..."
+                maxLength={80}
+                className="flex-1 px-3 py-2 bg-slate-900 border border-white/10 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500/50"
+              />
+              <button
+                type="submit"
+                disabled={!chatInput.trim()}
+                className="px-3.5 py-2 bg-gradient-to-r from-amber-500 to-yellow-400 disabled:opacity-50 text-slate-950 font-bold text-xs rounded-xl flex items-center gap-1 transition active:scale-95 cursor-pointer"
+              >
+                <Send size={13} />
+                <span>Send</span>
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
       {lastError && <div className="fixed bottom-28 left-1/2 z-50 -translate-x-1/2 rounded-full border border-red-800 bg-black/90 px-6 py-3 text-sm text-red-300 shadow-2xl backdrop-blur-xl">⚠ {lastError}</div>}
     </div>
   );

@@ -21,7 +21,7 @@ export function PlayerSeat({
   if (!player) {
     return (
       <div className={`poker-seat seat-${seatIndex} empty`}>
-        <div className="empty-seat-pill">Empty</div>
+        <div className="empty-seat-placeholder" />
       </div>
     );
   }

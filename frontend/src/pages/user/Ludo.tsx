@@ -714,11 +714,11 @@ export const Ludo: React.FC = () => {
                 <ArrowLeft size={14} />
                 <span>{matchState.status === 'COMPLETED' ? 'Back' : 'Exit'}</span>
               </button>
-              <div>
-                <h1 className="text-xs sm:text-sm font-black text-amber-400 leading-tight">
+              <div className="shrink-0 whitespace-nowrap">
+                <h1 className="text-xs sm:text-sm font-black text-amber-400 leading-tight whitespace-nowrap">
                   LUDO {matchState.players.length}P
                 </h1>
-                <span className="text-[10px] text-slate-400">
+                <span className="text-[10px] text-slate-400 whitespace-nowrap">
                   Prize: ₹{(matchState.prize_pool / 100).toFixed(0)} • Entry: ₹{(matchState.entry_fee / 100).toFixed(0)}
                 </span>
               </div>
@@ -874,6 +874,7 @@ export const Ludo: React.FC = () => {
               prizePool={matchState.prize_pool}
               entryFee={matchState.entry_fee}
               userBalance={walletBalance}
+              forfeited={myPlayer ? (myPlayer.consecutive_timeouts >= 3 || myPlayer.rank === 99) : false}
               onReturnToLobby={handleReturnToLobby}
             />
           )}

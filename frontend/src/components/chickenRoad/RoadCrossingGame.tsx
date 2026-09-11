@@ -174,6 +174,11 @@ export const RoadCrossingGame: React.FC<RoadCrossingGameProps> = ({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
+  const callbacksRef = useRef({ onLaneCross, onCollision, onFinish });
+  useEffect(() => {
+    callbacksRef.current = { onLaneCross, onCollision, onFinish };
+  }, [onLaneCross, onCollision, onFinish]);
+
   const totalLanes = multipliers.length || 10;
   const roadWidth = totalLanes * LANE_WIDTH;
   const worldWidth = START_ZONE_WIDTH + roadWidth + FINISH_ZONE_WIDTH;
@@ -225,15 +230,14 @@ export const RoadCrossingGame: React.FC<RoadCrossingGameProps> = ({
     stateRef.current.worldWidth = worldWidth;
   }, [gameState, difficulty, totalLanes, worldWidth]);
 
-  // Snap chicken X to the correct lane position whenever currentLane changes
+  // Keep chicken position synced without overriding player input during ACTIVE game
   useEffect(() => {
     const s = stateRef.current;
-    if (currentLane === 0) {
+    if (gameState === 'READY' || currentLane === 0) {
       // Start zone — place chicken in the middle of the start pad
       s.chicken.x = 65;
-    } else {
-      // Centre of the crossed lane (one lane ahead = right edge of that lane)
-      s.chicken.x = START_ZONE_WIDTH + currentLane * LANE_WIDTH - LANE_WIDTH / 2;
+      s.chicken.vx = 0;
+      s.highestLaneCrossed = 0;
     }
     s.chicken.y = fixedY;
     s.currentLane = currentLane;
@@ -241,7 +245,7 @@ export const RoadCrossingGame: React.FC<RoadCrossingGameProps> = ({
     if (currentLane > s.highestLaneCrossed) {
       s.highestLaneCrossed = currentLane;
     }
-  }, [currentLane, fixedY]);
+  }, [currentLane, fixedY, gameState]);
 
   useEffect(() => {
     if (gameState === 'READY') {
@@ -465,13 +469,17 @@ export const RoadCrossingGame: React.FC<RoadCrossingGameProps> = ({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Set canvas dimensions with high-DPI scaling
+    // Set canvas dimensions with high-DPI scaling only when dimensions change
     const updateCanvasSize = () => {
       if (!containerRef.current || !canvas) return;
       const rect = containerRef.current.getBoundingClientRect();
       const dpr = window.devicePixelRatio || 1;
-      canvas.width = rect.width * dpr;
-      canvas.height = rect.height * dpr;
+      const targetW = Math.round(rect.width * dpr);
+      const targetH = Math.round(rect.height * dpr);
+      if (canvas.width !== targetW || canvas.height !== targetH) {
+        canvas.width = targetW;
+        canvas.height = targetH;
+      }
       canvas.style.width = `${rect.width}px`;
       canvas.style.height = `${rect.height}px`;
     };
@@ -622,7 +630,7 @@ export const RoadCrossingGame: React.FC<RoadCrossingGameProps> = ({
             s.highestLaneCrossed = currentCrossedLane;
             sounds.playLaneCross();
             spawnStarBurst(s.chicken.x, s.chicken.y);
-            onLaneCross(currentCrossedLane);
+            callbacksRef.current.onLaneCross(currentCrossedLane);
           }
         }
 
@@ -636,7 +644,7 @@ export const RoadCrossingGame: React.FC<RoadCrossingGameProps> = ({
           s.chicken.isWon = true;
           sounds.playWin();
           spawnStarBurst(s.chicken.x, s.chicken.y);
-          onFinish();
+          callbacksRef.current.onFinish();
         }
 
         // ──────────────────────────────────────────
@@ -670,7 +678,7 @@ export const RoadCrossingGame: React.FC<RoadCrossingGameProps> = ({
               s.screenShake = 16;
               spawnFeathers(s.chicken.x, s.chicken.y);
               sounds.playCollision();
-              onCollision(v.lane);
+              callbacksRef.current.onCollision(v.lane);
               break;
             }
           }
@@ -1179,7 +1187,7 @@ export const RoadCrossingGame: React.FC<RoadCrossingGameProps> = ({
       }
       window.clearTimeout(settleTimer);
     };
-  }, [onLaneCross, onCollision, onFinish, multipliers, fixedY]);
+  }, [fixedY]);
 
   return (
     <div ref={containerRef} className="chicken-road-canvas-container">

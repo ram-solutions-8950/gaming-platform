@@ -129,7 +129,7 @@ export function usePokerSocket(options: UsePokerSocketOptions) {
               setMyHoleCards(me.hole_cards);
             }
           }
-          if (s.phase === 'SHOWDOWN' && s.winners_summary) {
+          if ((s.phase === 'SHOWDOWN' || s.phase === 'SETTLEMENT') && s.winners_summary && s.winners_summary.length > 0) {
             options.onShowdown?.(s.winners_summary);
           }
         } else if (type === 'hole_cards') {

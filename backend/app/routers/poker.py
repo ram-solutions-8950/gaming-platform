@@ -187,7 +187,7 @@ def join_poker_table(
     return {"message": "Successfully joined table", "table_id": table.id}
 
 @router.post("/tables/{table_id}/leave")
-def leave_poker_table(
+async def leave_poker_table(
     table_id: str,
     current_user: User = Depends(require_user),
     db: Session = Depends(get_db)
@@ -227,6 +227,13 @@ def leave_poker_table(
         PokerPlayer.user_id == current_user.id
     ).delete()
     db.commit()
+
+    # Notify remaining table players via WebSocket
+    try:
+        from ..websocket.poker_ws import poker_ws_manager
+        await poker_ws_manager.broadcast_table_state(engine)
+    except Exception as e:
+        print(f"[POKER LEAVE BROADCAST] {e}")
 
     return {"message": "Left table successfully", "returned_stack": remaining_stack}
 

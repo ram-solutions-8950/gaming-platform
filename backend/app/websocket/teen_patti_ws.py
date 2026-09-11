@@ -627,7 +627,7 @@ async def teen_patti_socket(websocket: WebSocket, table_id: str) -> None:
         await manager.disconnect(table_id, user_id)
         async with lock:
             h = teen_patti_manager.get(table_id)
-            if h:
+            if h and h.phase in (Phase.WAITING, Phase.FINISHED):
                 h.remove_seat(user_id)
                 await _broadcast_state(table_id)
         await manager.broadcast(table_id, {"type": "event", "event": "left", "seat": user_id})

@@ -505,7 +505,7 @@ export function RoulettePage() {
           </div>
         </div>
 
-        {/* Top Right: Total Coin Balance & Add Cash */}
+        {/* Top Right: Total Coin Balance */}
         <div className="roulette-top-right">
           <div className="roulette-top-balance-pill" title="Total Coin Balance">
             <span className="roulette-top-balance-coin">🪙</span>
@@ -514,16 +514,6 @@ export function RoulettePage() {
               <span className="roulette-balance-value">₹{balance.toFixed(2)}</span>
             </div>
           </div>
-
-          <button
-            type="button"
-            className="roulette-add-cash-btn"
-            onClick={() => navigate('/wallet')}
-            aria-label="Add cash to wallet"
-          >
-            <span className="roulette-add-text">ADD</span>
-            <span className="roulette-add-coin">₹</span>
-          </button>
         </div>
       </header>
 
@@ -843,14 +833,10 @@ export function RoulettePage() {
 
       {/* ── Bottom Status & Control Bar ── */}
       <footer className="roulette-bottom-bar">
-        {/* User Balance & Avatar */}
+        {/* User Avatar */}
         <div className="roulette-user-profile">
           <div className="roulette-user-avatar-wrap">
             <div className="roulette-user-avatar-img" />
-          </div>
-          <div className="roulette-user-balance-pill">
-            <span className="text-amber-400 text-xs">🪙</span>
-            <span>₹{balance.toFixed(2)}</span>
           </div>
         </div>
 

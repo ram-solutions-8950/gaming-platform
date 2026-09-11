@@ -46,9 +46,9 @@ const navItems: NavItem[] = [
     className: 'nav-wallet',
   },
 
-  // SERVICE
+  // SERVICES
   {
-    label: 'Service',
+    label: 'Services',
     emoji: '🎧',
     className: 'nav-service',
   },
@@ -82,7 +82,7 @@ export const LobbyBottomNav: React.FC = () => {
       return location.pathname.startsWith(item.to);
     }
     if (item.label === 'VIP BONUS') return activeModal === 'vip';
-    if (item.label === 'Service') return activeModal === 'service';
+    if (item.label === 'Services' || item.label === 'Service') return activeModal === 'service';
     if (item.label === 'Jackpot') return activeModal === 'jackpot';
     return false;
   };
@@ -109,6 +109,7 @@ export const LobbyBottomNav: React.FC = () => {
         useRewardStore.getState().openModal('vip');
         break;
 
+      case 'Services':
       case 'Service':
         useRewardStore.getState().openModal('service');
         break;

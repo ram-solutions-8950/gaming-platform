@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   Trophy, Play, ArrowLeft, RotateCcw,
-  BookOpen, History, Flame, Zap, Plus,
+  BookOpen, History, Flame, Zap,
 } from "lucide-react";
 import GameTable from "../../components/rummy/RummyTable";
 import MatchSearchOverlay from "../../components/rummy/MatchSearchOverlay";
@@ -49,6 +49,7 @@ export function RummyPage() {
   const [rulesOpen, setRulesOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [history, setHistory] = useState<any[]>([]);
+  const [isRefreshingTables, setIsRefreshingTables] = useState(false);
 
   const token = authStorage.getAccessToken();
   const navigate = useNavigate();
@@ -178,10 +179,7 @@ export function RummyPage() {
 
   const handleExitDashboard = () => {
     matchmaking.reset();
-    setActiveTableId(null);
-    setSearchParams({}, { replace: true });
-    setNativeLandscape().catch(() => {});
-    navigate("/dashboard");
+    navigate("/dashboard", { replace: true });
   };
 
   // If inside a game table, render GameTable
@@ -221,15 +219,6 @@ export function RummyPage() {
             <div className="rummy-balance-box bg-slate-900/80 border border-amber-500/30 rounded-xl px-3.5 py-1.5 flex items-center gap-2 shadow-sm">
               <span className="text-xs text-slate-400 font-medium">Balance:</span>
               <span className="text-base font-bold text-amber-400 font-mono">₹{balance.toFixed(2)}</span>
-              <button
-                type="button"
-                onClick={() => navigate('/deposit')}
-                className="ml-1.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white text-xs font-bold px-2.5 py-1 rounded-lg flex items-center gap-1 shadow-sm transition active:scale-95 cursor-pointer"
-                title="Add Amount"
-              >
-                <Plus size={12} strokeWidth={3} />
-                <span>Add Amount</span>
-              </button>
             </div>
             <button
               onClick={() => setRulesOpen(true)}
@@ -453,6 +442,22 @@ export function RummyPage() {
                 </table>
               </div>
             )}
+
+            {/* Bottom Refresh Button for Open Public Tables */}
+            <div className="mt-4 pt-3 border-t border-white/5 flex items-center justify-center">
+              <button
+                type="button"
+                onClick={async () => {
+                  setIsRefreshingTables(true);
+                  await fetchTables();
+                  setTimeout(() => setIsRefreshingTables(false), 500);
+                }}
+                className="px-4 py-2 bg-slate-800/80 hover:bg-slate-700 active:scale-95 text-amber-300 font-bold text-xs rounded-xl border border-amber-500/30 flex items-center gap-2 transition shadow-sm cursor-pointer"
+              >
+                <RotateCcw size={14} className={isRefreshingTables ? "animate-spin" : ""} />
+                <span>Refresh Public Tables</span>
+              </button>
+            </div>
           </div>
         </div>
       </div>

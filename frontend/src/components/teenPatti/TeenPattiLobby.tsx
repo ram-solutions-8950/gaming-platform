@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { teenPattiService, type TeenPattiTable } from '../../services/teenPatti';
 import { GameRulesModal } from '../common/GameRulesModal';
 import { TEEN_PATTI_RULES_DATA } from '../common/gameRulesData';
-import { HelpCircle, Crown, Plus } from 'lucide-react';
+import { HelpCircle, Crown } from 'lucide-react';
 import { walletService } from '../../services/wallet';
 
 interface TeenPattiLobbyProps {
@@ -108,15 +108,6 @@ export const TeenPattiLobby: React.FC<TeenPattiLobbyProps> = ({ onJoinTable }) =
             <span className="text-xs font-black text-amber-400">
               ₹{walletBalance !== null ? (walletBalance / 100).toFixed(2) : '...'}
             </span>
-            <button
-              type="button"
-              onClick={() => navigate('/deposit')}
-              className="flex items-center gap-1 px-2 py-0.5 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 text-white font-extrabold text-[11px] rounded-lg shadow-sm active:scale-95 transition cursor-pointer"
-              title="Add Amount"
-            >
-              <Plus size={11} strokeWidth={3} />
-              <span>Add Amount</span>
-            </button>
           </div>
 
           <button

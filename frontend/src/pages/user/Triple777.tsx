@@ -1,6 +1,7 @@
+
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Plus, RotateCcw, ListOrdered, History, Zap, Play, RotateCw } from 'lucide-react';
+import { ArrowLeft, RotateCcw, ListOrdered, History, Zap, Play, RotateCw } from 'lucide-react';
 import { walletService } from '../../services/wallet';
 import * as api from '../../services/triple777/api';
 import { SlotReels } from '../../components/triple777/SlotReels';
@@ -241,7 +242,7 @@ export function Triple777Page() {
   const handleSpin = useCallback(async (currentStake: number, isTurbo: boolean) => {
     if (spinLockRef.current) return;
     if (balanceRef.current < currentStake) {
-      setErrorMessage('Insufficient balance. Please add cash to spin.');
+      setErrorMessage('Insufficient balance to spin.');
       stopAutoSpin();
       return;
     }
@@ -462,15 +463,6 @@ export function Triple777Page() {
             <div className="t777-balance-pill">
               <span className="text-[10px] text-gray-400 uppercase font-bold">₹</span>
               <span className="t777-balance-text">{balance.toFixed(2)}</span>
-              <button
-                type="button"
-                onClick={() => navigate('/deposit')}
-                className="t777-add-cash"
-                title="Add Cash"
-                aria-label="Add Cash"
-              >
-                <Plus size={14} />
-              </button>
             </div>
           </div>
         </header>

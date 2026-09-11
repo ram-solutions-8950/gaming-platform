@@ -633,15 +633,6 @@ export function AndarBaharPage() {
               <span className="balance">
                 <small>₹</small> {balance}
               </span>
-              <button
-                type="button"
-                onClick={() => navigate("/deposit")}
-                className="ab-add-amount-btn"
-                title="Add Amount"
-              >
-                <span className="ab-add-plus">+</span>
-                <span>Add Amount</span>
-              </button>
             </div>
             <span className="live-badge">● LIVE</span>
             <span className={`timer-box${phase === "betting" && timeLeft <= 5 ? " warn" : phase === "closed" ? " calc" : ""}`}>
@@ -859,7 +850,7 @@ export function AndarBaharPage() {
             {myBet
               ? `Bet of ₹${myBet.amount} placed on ${myBet.side.toUpperCase()}. Waiting for round to resolve…`
               : stake > balance
-              ? "Not enough balance — please lower your bet amount or deposit."
+              ? "Not enough balance — please lower your bet amount."
               : "Tap ANDAR or BAHAR to place your bet immediately. Settle securely on the server."}
           </p>
 

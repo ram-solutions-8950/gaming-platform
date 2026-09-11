@@ -106,12 +106,21 @@ class PokerEngine:
             return False, "Player not at table", 0
 
         remaining_stack = player.stack
-        if self.phase not in ['WAITING', 'SETTLEMENT'] and not player.is_folded:
-            # Fold player if hand is active
-            self.process_action(user_id, 'fold')
+        if self.phase not in ['WAITING', 'SETTLEMENT']:
+            # Unconditionally fold player if hand is active
+            player.is_folded = True
+            player.last_action = 'FOLD'
+            active_unfolded = self.get_active_unfolded_players()
+            if len(active_unfolded) <= 1:
+                if len(active_unfolded) == 1:
+                    self.settle_default_winner(active_unfolded[0])
+                else:
+                    self.phase = 'WAITING'
+            elif self.current_turn_seat_idx == player.seat_index:
+                self.advance_hand_state()
 
         self.players = [p for p in self.players if p.user_id != user_id]
-        if len(self.players) < 2 and self.phase not in ['WAITING', 'SETTLEMENT']:
+        if len(self.players) < 2 and self.phase not in ['SETTLEMENT']:
             self.phase = 'WAITING'
 
         return True, "Player left table", remaining_stack
@@ -123,6 +132,13 @@ class PokerEngine:
         return [p for p in self.players if not p.is_folded and not p.is_all_in and not p.is_sitting_out]
 
     def start_hand(self) -> Tuple[bool, str]:
+        # In practice mode, automatically rebuy/reload players or bots with 0 stack
+        if self.is_practice:
+            for p in self.players:
+                if p.stack <= 0:
+                    p.stack = max(2000, self.big_blind * 20)
+                    p.is_sitting_out = False
+
         active_players = [p for p in self.players if p.stack > 0 and not p.is_sitting_out]
         if len(active_players) < 2:
             self.phase = 'WAITING'

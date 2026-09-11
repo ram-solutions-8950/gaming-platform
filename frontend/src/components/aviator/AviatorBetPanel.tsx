@@ -9,6 +9,10 @@ interface AviatorBetPanelProps {
   walletBalancePaise: number;
   onPlaceBet: (slot: 1 | 2, amountPaise: number, autoCashout?: number | null) => void;
   onCashout: (slot: 1 | 2) => void;
+  isSingleSlot?: boolean;
+  onAddSlot?: () => void;
+  canClose?: boolean;
+  onClose?: () => void;
 }
 
 export const AviatorBetPanel: React.FC<AviatorBetPanelProps> = ({
@@ -19,6 +23,10 @@ export const AviatorBetPanel: React.FC<AviatorBetPanelProps> = ({
   walletBalancePaise,
   onPlaceBet,
   onCashout,
+  isSingleSlot,
+  onAddSlot,
+  canClose,
+  onClose,
 }) => {
   const [amountInput, setAmountInput] = useState<string>('10');
   const [autoCashoutEnabled, setAutoCashoutEnabled] = useState<boolean>(false);
@@ -95,36 +103,61 @@ export const AviatorBetPanel: React.FC<AviatorBetPanelProps> = ({
     <div className={`aviator-bet-card ${hasActiveBet ? 'active-bet' : ''}`}>
       {/* Top Header & Slot indicator */}
       <div className="aviator-bet-card-header">
-        <span className="slot-badge">SLOT {slot}</span>
-        <div className="auto-cashout-toggle">
-          <label className="flex items-center gap-1.5 cursor-pointer text-xs font-semibold text-gray-300">
-            <input
-              type="checkbox"
-              checked={autoCashoutEnabled}
-              disabled={hasActiveBet}
-              onChange={(e) => setAutoCashoutEnabled(e.target.checked)}
-              className="accent-brand-500 rounded cursor-pointer"
-            />
-            Auto Cash Out
-          </label>
-          {autoCashoutEnabled && (
-            <div className="auto-input-wrap">
+        <div className="slot-title-group">
+          <span className="slot-badge">SLOT {slot}</span>
+          {isSingleSlot && onAddSlot && (
+            <button
+              type="button"
+              onClick={onAddSlot}
+              className="add-slot-btn"
+              title="Add 2nd bet panel"
+            >
+              + 2nd Bet
+            </button>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="auto-cashout-toggle">
+            <label className="flex items-center gap-1.5 cursor-pointer text-xs font-semibold text-gray-300">
               <input
-                type="text"
-                inputMode="decimal"
+                type="checkbox"
+                checked={autoCashoutEnabled}
                 disabled={hasActiveBet}
-                value={autoCashoutInput}
-                onChange={(e) => setAutoCashoutInput(e.target.value)}
-                onBlur={() => {
-                  const val = parseFloat(autoCashoutInput);
-                  if (!val || val < 1.01) {
-                    setAutoCashoutInput('1.01');
-                  }
-                }}
-                className="auto-mult-input"
+                onChange={(e) => setAutoCashoutEnabled(e.target.checked)}
+                className="aviator-custom-checkbox cursor-pointer"
               />
-              <span className="auto-x">x</span>
-            </div>
+              <span className="text-[11px] font-semibold text-gray-300">Auto Cash Out</span>
+            </label>
+            {autoCashoutEnabled && (
+              <div className="auto-input-wrap">
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  disabled={hasActiveBet}
+                  value={autoCashoutInput}
+                  onChange={(e) => setAutoCashoutInput(e.target.value)}
+                  onBlur={() => {
+                    const val = parseFloat(autoCashoutInput);
+                    if (!val || val < 1.01) {
+                      setAutoCashoutInput('1.01');
+                    }
+                  }}
+                  className="auto-mult-input"
+                />
+                <span className="auto-x">x</span>
+              </div>
+            )}
+          </div>
+          {canClose && onClose && (
+            <button
+              type="button"
+              disabled={hasActiveBet}
+              onClick={onClose}
+              className="close-slot-btn"
+              title="Remove 2nd bet panel"
+            >
+              ✕
+            </button>
           )}
         </div>
       </div>
@@ -180,45 +213,9 @@ export const AviatorBetPanel: React.FC<AviatorBetPanelProps> = ({
             <button
               type="button"
               disabled={hasActiveBet || !isBettingPhase}
-              onClick={handleMin}
-              className="chip-btn chip-minmax chip-min"
-              title="Set to minimum bet (₹10)"
-            >
-              MIN
-            </button>
-            <button
-              type="button"
-              disabled={hasActiveBet || !isBettingPhase || amountRupees <= 10}
-              onClick={() => handleStep(-50)}
-              className="chip-btn chip-dec"
-              title="Decrease by ₹50"
-            >
-              -50
-            </button>
-            <button
-              type="button"
-              disabled={hasActiveBet || !isBettingPhase || amountRupees <= 10}
-              onClick={() => handleStep(-10)}
-              className="chip-btn chip-dec"
-              title="Decrease by ₹10"
-            >
-              -10
-            </button>
-            <button
-              type="button"
-              disabled={hasActiveBet || !isBettingPhase}
-              onClick={() => handlePresetClick(10)}
-              className="chip-btn chip-inc"
-              title="Increase by ₹10"
-            >
-              +10
-            </button>
-            <button
-              type="button"
-              disabled={hasActiveBet || !isBettingPhase}
               onClick={() => handlePresetClick(50)}
               className="chip-btn chip-inc"
-              title="Increase by ₹50"
+              title="Add ₹50"
             >
               +50
             </button>
@@ -227,9 +224,36 @@ export const AviatorBetPanel: React.FC<AviatorBetPanelProps> = ({
               disabled={hasActiveBet || !isBettingPhase}
               onClick={() => handlePresetClick(100)}
               className="chip-btn chip-inc"
-              title="Increase by ₹100"
+              title="Add ₹100"
             >
               +100
+            </button>
+            <button
+              type="button"
+              disabled={hasActiveBet || !isBettingPhase}
+              onClick={() => handlePresetClick(500)}
+              className="chip-btn chip-inc"
+              title="Add ₹500"
+            >
+              +500
+            </button>
+            <button
+              type="button"
+              disabled={hasActiveBet || !isBettingPhase}
+              onClick={() => handlePresetClick(1000)}
+              className="chip-btn chip-inc"
+              title="Add ₹1,000"
+            >
+              +1K
+            </button>
+            <button
+              type="button"
+              disabled={hasActiveBet || !isBettingPhase}
+              onClick={handleMin}
+              className="chip-btn chip-minmax"
+              title="Set to minimum bet (₹10)"
+            >
+              MIN
             </button>
             <button
               type="button"
@@ -253,7 +277,7 @@ export const AviatorBetPanel: React.FC<AviatorBetPanelProps> = ({
               type="button"
               disabled={hasActiveBet || !isBettingPhase}
               onClick={handleMax}
-              className="chip-btn chip-minmax chip-max"
+              className="chip-btn chip-minmax"
               title="Set to maximum bet"
             >
               MAX
@@ -266,11 +290,11 @@ export const AviatorBetPanel: React.FC<AviatorBetPanelProps> = ({
           {isBettingPhase ? (
             myBet ? (
               <div className="bet-placed-state">
-                <span className="text-xs uppercase font-bold text-emerald-400">BET READY</span>
-                <span className="text-base font-extrabold text-white">₹{(myBet.amount / 100).toFixed(0)}</span>
-                {myBet.auto_cashout && (
-                  <span className="text-[10px] text-gray-400">Auto: {myBet.auto_cashout.toFixed(2)}x</span>
-                )}
+                <span className="bet-placed-tag">✓ BET READY</span>
+                <span className="bet-placed-amount">₹{(myBet.amount / 100).toFixed(0)}</span>
+                <span className="bet-placed-sub">
+                  {myBet.auto_cashout ? `Auto: ${myBet.auto_cashout.toFixed(2)}x` : 'Waiting for takeoff'}
+                </span>
               </div>
             ) : (
               <button
@@ -295,27 +319,33 @@ export const AviatorBetPanel: React.FC<AviatorBetPanelProps> = ({
               </button>
             ) : (
               <div className="waiting-next-round">
-                <span className="text-xs font-semibold text-gray-400">ROUND IN FLIGHT</span>
-                <span className="text-xs font-bold text-brand-400">{multiplier.toFixed(2)}x</span>
+                <span className="waiting-tag">IN FLIGHT</span>
+                <span className="waiting-mult">{multiplier.toFixed(2)}x</span>
+                <span className="waiting-sub">Wait next round</span>
               </div>
             )
           ) : (
             /* CRASHED or SETTLED */
             <div className="round-ended-state">
               {isCashedOut ? (
-                <div className="cashed-out-badge" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
-                  <span className="text-[10px] text-emerald-200 font-bold uppercase tracking-wider">Bet: ₹{((myBet?.amount || 0) / 100).toFixed(0)}</span>
-                  <span className="text-sm font-black text-emerald-400">WON: ₹{((myBet?.payout || 0) / 100).toFixed(2)}</span>
-                  <span className="text-[10px] text-emerald-300 font-mono font-bold">@{myBet?.cashout_multiplier?.toFixed(2)}x</span>
+                <div className="cashed-out-badge">
+                  <span className="cashed-tag">🏆 CASHED OUT</span>
+                  <span className="cashed-won">₹{((myBet?.payout || 0) / 100).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                  <div className="cashed-meta">
+                    <span className="cashed-mult">@{myBet?.cashout_multiplier?.toFixed(2)}x</span>
+                    <span className="cashed-bet">Bet: ₹{((myBet?.amount || 0) / 100).toFixed(0)}</span>
+                  </div>
                 </div>
               ) : isLost ? (
-                <div className="lost-badge" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
-                  <span className="text-[10px] text-rose-300 font-bold uppercase tracking-wider">Bet: ₹{((myBet?.amount || 0) / 100).toFixed(0)}</span>
-                  <span className="text-xs font-black text-rose-400">CRASHED (LOST)</span>
+                <div className="lost-badge">
+                  <span className="lost-tag">💥 FLEW AWAY</span>
+                  <span className="lost-main">CRASHED</span>
+                  <span className="lost-sub">Lost ₹{((myBet?.amount || 0) / 100).toFixed(0)}</span>
                 </div>
               ) : (
                 <div className="waiting-next-round">
-                  <span className="text-xs font-semibold text-gray-400">WAIT FOR NEXT ROUND</span>
+                  <span className="waiting-tag">ROUND ENDED</span>
+                  <span className="waiting-sub">Next round starting...</span>
                 </div>
               )}
             </div>

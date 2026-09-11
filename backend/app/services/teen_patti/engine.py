@@ -98,7 +98,19 @@ class TeenPattiHand:
         if idx is None:
             return
         if self.phase == Phase.PLAYING and self.seats[idx].is_in_hand:
-            self.pack(user_id)
+            s = self.seats[idx]
+            s.status = PlayerStatus.PACKED
+            self.last_action = {
+                "seat": idx,
+                "user_id": user_id,
+                "action": "pack",
+                "pot": self.pot,
+            }
+            active = self._active_seats()
+            if len(active) == 1:
+                self._finish_hand(winner_idx=active[0], reason="All opponents packed")
+            elif idx == self.current_turn:
+                self._advance_turn()
         self.seats.pop(idx)
         if len(self.seats) < 2 and self.phase == Phase.PLAYING:
             active = self._active_seats()
@@ -256,8 +268,8 @@ class TeenPattiHand:
         rank_other = evaluate_hand(self.seats[other_idx].cards)
 
         is_tie = (rank_caller == rank_other)
-        # Settle showdown ties or occasional random house sweeps
-        if is_tie or getattr(self, "double_loss_round", False):
+        # Settle showdown ties or occasional random house sweeps (when neither hand ranks above High Card)
+        if is_tie or (getattr(self, "double_loss_round", False) and rank_caller.category <= HandCategory.HIGH_CARD and rank_other.category <= HandCategory.HIGH_CARD):
             for i in active:
                 self.seats[i].show_cards = True
                 self.seats[i].status = PlayerStatus.SHOW_LOSER

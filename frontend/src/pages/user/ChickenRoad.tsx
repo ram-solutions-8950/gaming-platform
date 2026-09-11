@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  ArrowLeft,
   Coins,
   Play,
   RotateCcw,
@@ -10,6 +9,7 @@ import {
   ChevronRight,
   Sparkles,
   Flame,
+  LogOut,
 } from 'lucide-react';
 import {
   chickenRoadService,
@@ -50,6 +50,7 @@ export function ChickenRoadPage() {
   const [isActionLoading, setIsActionLoading] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [showHowToPlay, setShowHowToPlay] = useState<boolean>(false);
+  const [showExitConfirm, setShowExitConfirm] = useState<boolean>(false);
 
   // Mobile steering button state
   const [externalSteer, setExternalSteer] = useState<'left' | 'right' | null>(null);
@@ -163,7 +164,7 @@ export function ChickenRoadPage() {
       return;
     }
     if (betAmount > balance) {
-      setErrorMessage('Insufficient balance. Please deposit to continue.');
+      setErrorMessage('Insufficient balance.');
       return;
     }
 
@@ -195,7 +196,7 @@ export function ChickenRoadPage() {
   };
 
   // Safe lane crossed callback from canvas
-  const handleLaneCross = async (laneIndex: number) => {
+  const handleLaneCross = useCallback(async (laneIndex: number) => {
     if (!activeRoundId || gameState !== 'ACTIVE') return;
 
     try {
@@ -208,10 +209,10 @@ export function ChickenRoadPage() {
     } catch (err) {
       console.error('Failed to register lane cross:', err);
     }
-  };
+  }, [activeRoundId, gameState]);
 
   // Collision callback from canvas
-  const handleCollision = async (laneIndex: number) => {
+  const handleCollision = useCallback(async (laneIndex: number) => {
     if (!activeRoundId || gameState !== 'ACTIVE') return;
 
     setGameState('LOST');
@@ -224,10 +225,10 @@ export function ChickenRoadPage() {
     } catch (err) {
       console.error('Failed to report collision:', err);
     }
-  };
+  }, [activeRoundId, gameState]);
 
   // Finish safe line reached callback from canvas
-  const handleFinish = async () => {
+  const handleFinish = useCallback(async () => {
     if (!activeRoundId || gameState !== 'ACTIVE') return;
 
     try {
@@ -243,7 +244,7 @@ export function ChickenRoadPage() {
     } catch (err) {
       console.error('Failed to complete finish:', err);
     }
-  };
+  }, [activeRoundId, gameState]);
 
   // Cashout mid-game callback
   const handleCashout = async () => {
@@ -287,16 +288,13 @@ export function ChickenRoadPage() {
         <div className="cr-header-left">
           <button
             type="button"
-            onClick={() => {
-              lockLandscape().catch(() => {});
-              navigate('/dashboard');
-            }}
+            onClick={() => setShowExitConfirm(true)}
             className="cr-header-back-btn"
-            title="Back to Home"
-            aria-label="Back to Home"
+            title="Exit Game"
+            aria-label="Exit Game"
           >
-            <ArrowLeft size={16} />
-            <span>Home</span>
+            <LogOut size={16} />
+            <span>Exit</span>
           </button>
         </div>
 
@@ -318,13 +316,6 @@ export function ChickenRoadPage() {
           <div className="cr-header-balance-pill">
             <Coins size={14} className="text-yellow-400" />
             <span className="cr-header-balance-text">₹{balance.toFixed(2)}</span>
-            <button
-              type="button"
-              onClick={() => navigate('/deposit')}
-              className="cr-header-add-cash"
-            >
-              +
-            </button>
           </div>
 
           <button
@@ -358,6 +349,13 @@ export function ChickenRoadPage() {
               <span className="cr-hud-label">Multiplier:</span>
               <span className="cr-hud-val cr-hud-val--gold">
                 {currentLane > 0 ? `${currentMultiplier.toFixed(2)}x` : '1.00x'}
+              </span>
+            </div>
+
+            <div className="cr-hud-pill">
+              <span className="cr-hud-label">Points:</span>
+              <span className="cr-hud-val text-amber-400 font-mono">
+                {currentLane * 100} / 1000 Pts
               </span>
             </div>
 
@@ -428,6 +426,11 @@ export function ChickenRoadPage() {
               <div className="cr-arcade-modal cr-arcade-modal--win">
                 <div className="cr-modal-badge">🏆</div>
                 <h2 className="cr-modal-heading">YOU WON</h2>
+                {currentLane >= 10 && (
+                  <div className="bg-amber-500/20 text-amber-300 text-[11px] font-black px-3 py-1 rounded-full border border-amber-500/40 uppercase tracking-wide">
+                    🎯 GOAL REACHED (1,000 PTS)
+                  </div>
+                )}
                 <div className="cr-modal-stat-row">
                   <div className="cr-modal-stat">
                     <span className="cr-modal-stat-label">Multiplier</span>
@@ -436,8 +439,10 @@ export function ChickenRoadPage() {
                     </span>
                   </div>
                   <div className="cr-modal-stat">
-                    <span className="cr-modal-stat-label">Bet</span>
-                    <span className="cr-modal-stat-val">₹{betAmount}</span>
+                    <span className="cr-modal-stat-label">Points Earned</span>
+                    <span className="cr-modal-stat-val text-amber-400">
+                      {currentLane * 100} Pts
+                    </span>
                   </div>
                 </div>
 
@@ -489,6 +494,41 @@ export function ChickenRoadPage() {
                   <RotateCcw size={16} />
                   <span>PLAY AGAIN</span>
                 </button>
+              </div>
+            </div>
+          )}
+
+          {/* Exit Confirmation Modal */}
+          {showExitConfirm && (
+            <div className="cr-overlay-backdrop">
+              <div className="cr-arcade-modal">
+                <div className="cr-modal-badge">🚪</div>
+                <h2 className="cr-modal-heading">Exit Game?</h2>
+                <p className="text-xs text-gray-300 m-0">
+                  {gameState === 'ACTIVE'
+                    ? 'An active round is currently in progress. Leaving now will forfeit your current round.'
+                    : 'Are you sure you want to exit the game?'}
+                </p>
+                <div className="flex gap-3 w-full mt-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowExitConfirm(false)}
+                    className="flex-1 py-2 px-4 rounded-xl bg-gray-700 hover:bg-gray-600 text-white font-bold text-sm transition"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowExitConfirm(false);
+                      lockLandscape().catch(() => {});
+                      navigate('/dashboard');
+                    }}
+                    className="flex-1 py-2 px-4 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold text-sm transition"
+                  >
+                    Leave Game
+                  </button>
+                </div>
               </div>
             </div>
           )}

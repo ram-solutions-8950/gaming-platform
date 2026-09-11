@@ -133,9 +133,12 @@ async def run_bot_turns(engine: PokerEngine, db: Session):
             await persist_hand_result(engine, db)
             await asyncio.sleep(4)
             if len(engine.players) < 2:
+                engine.phase = 'WAITING'
+                await poker_ws_manager.broadcast_table_state(engine)
                 return
             ok, _ = engine.start_hand()
             if not ok:
+                await poker_ws_manager.broadcast_table_state(engine)
                 return
             await broadcast_hand_start(engine)
     finally:
@@ -316,6 +319,19 @@ async def poker_websocket_endpoint(
         if table_id in poker_ws_manager.connections:
             engine = poker_manager.get_table(table_id)
             if engine:
+                if table_id not in poker_ws_manager.connections or user_id not in poker_ws_manager.connections[table_id]:
+                    p = engine.get_player_by_id(user_id)
+                    if p and engine.phase not in ['WAITING', 'SETTLEMENT'] and not p.is_folded:
+                        p.is_folded = True
+                        p.last_action = 'FOLD'
+                        active_unfolded = engine.get_active_unfolded_players()
+                        if len(active_unfolded) <= 1:
+                            if len(active_unfolded) == 1:
+                                engine.settle_default_winner(active_unfolded[0])
+                            else:
+                                engine.phase = 'WAITING'
+                        elif engine.current_turn_seat_idx == p.seat_index:
+                            engine.advance_hand_state()
                 await poker_ws_manager.broadcast_table_state(engine)
     except Exception as e:
         print(f"[POKER WS EXCEPTION] {e}")

@@ -22,6 +22,7 @@ export function AviatorPage() {
   const [recentCrashesList, setRecentCrashesList] = useState<number[]>([]);
   const [showRules, setShowRules] = useState<boolean>(false);
   const [showMobileBets, setShowMobileBets] = useState<boolean>(false);
+  const [activeSlots, setActiveSlots] = useState<1 | 2>(() => (typeof window !== 'undefined' && window.innerWidth < 640 ? 1 : 2));
 
   // Fetch current wallet balance
   const refreshWallet = useCallback(async () => {
@@ -223,7 +224,7 @@ export function AviatorPage() {
             bettingDuration={roundState.betting_duration}
           />
 
-          <div className="aviator-bet-panels-container">
+          <div className={`aviator-bet-panels-container ${activeSlots === 1 ? 'single-slot-mode' : 'dual-slot-mode'}`}>
             <AviatorBetPanel
               slot={1}
               phase={roundState.phase}
@@ -232,17 +233,23 @@ export function AviatorPage() {
               walletBalancePaise={walletBalancePaise}
               onPlaceBet={placeBet}
               onCashout={cashout}
+              isSingleSlot={activeSlots === 1}
+              onAddSlot={() => setActiveSlots(2)}
             />
 
-            <AviatorBetPanel
-              slot={2}
-              phase={roundState.phase}
-              multiplier={roundState.multiplier}
-              myBet={mySlot2Bet}
-              walletBalancePaise={walletBalancePaise}
-              onPlaceBet={placeBet}
-              onCashout={cashout}
-            />
+            {activeSlots === 2 && (
+              <AviatorBetPanel
+                slot={2}
+                phase={roundState.phase}
+                multiplier={roundState.multiplier}
+                myBet={mySlot2Bet}
+                walletBalancePaise={walletBalancePaise}
+                onPlaceBet={placeBet}
+                onCashout={cashout}
+                canClose={true}
+                onClose={() => setActiveSlots(1)}
+              />
+            )}
           </div>
         </section>
       </main>

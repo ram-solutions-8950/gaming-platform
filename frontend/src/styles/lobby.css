@@ -549,9 +549,8 @@
 
 /* Specific nav item highlights */
 .client-nav-item.nav-refer {
-  background: linear-gradient(135deg, rgba(239, 68, 68, 0.25), rgba(220, 38, 38, 0.1));
-  border-radius: 8px;
-  border: 1px solid rgba(239, 68, 68, 0.4);
+  background: transparent;
+  border: none;
 }
 
 /* ─── GLITTER PARTICLES ─── */

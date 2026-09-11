@@ -1,5 +1,4 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useTeenPattiSocket } from '../../hooks/useTeenPattiSocket';
 import { PlayerSeat } from './PlayerSeat';
 import { BettingControls } from './BettingControls';
@@ -9,7 +8,7 @@ import { soundManager } from '../../services/soundManager';
 import { walletService } from '../../services/wallet';
 import { GameRulesModal } from '../common/GameRulesModal';
 import { TEEN_PATTI_RULES_DATA } from '../common/gameRulesData';
-import { HelpCircle, Crown, Plus } from 'lucide-react';
+import { HelpCircle, Crown } from 'lucide-react';
 import './TeenPattiTable.css';
 
 interface TeenPattiTableProps {
@@ -21,7 +20,6 @@ export const TeenPattiTable: React.FC<TeenPattiTableProps> = ({
   tableId,
   onLeaveTable,
 }) => {
-  const navigate = useNavigate();
   const [walletBalance, setWalletBalance] = useState<number | null>(null);
   const [showRules, setShowRules] = useState<boolean>(false);
   const [showdownDismissed, setShowdownDismissed] = useState<boolean>(false);
@@ -161,15 +159,6 @@ export const TeenPattiTable: React.FC<TeenPattiTableProps> = ({
             <span className="tp-balance-val">
               ₹{walletBalance !== null ? (walletBalance / 100).toFixed(2) : '...'}
             </span>
-            <button
-              type="button"
-              onClick={() => navigate('/deposit')}
-              className="tp-add-amount-btn"
-              title="Add Amount / Top Up Balance"
-            >
-              <Plus size={11} strokeWidth={3} />
-              <span>Add Amount</span>
-            </button>
           </div>
 
           <button
