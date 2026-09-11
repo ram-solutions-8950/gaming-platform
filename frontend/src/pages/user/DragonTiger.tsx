@@ -1079,9 +1079,9 @@ export function DragonTigerPage() {
         </div>
 
         {/* ═══════════ HISTORY STRIP ═══════════ */}
-        <div className="shrink-0 flex justify-center px-4 py-0.5 sm:py-1 z-20 flex-none -mt-1 sm:-mt-2 mb-0.5" style={{ height: 'clamp(28px, 6.2dvh, 48px)' }}>
-          <div className="flex gap-1.5 sm:gap-2 items-center bg-black/75 px-3.5 sm:px-5 py-1 rounded-full border border-yellow-500/20 overflow-x-auto max-w-[92%] scrollbar-hide h-full shadow-[0_4px_16px_rgba(0,0,0,0.6)] backdrop-blur-md">
-            {history.map((r, idx) => {
+        <div className="shrink-0 flex justify-center px-2 py-0.5 sm:py-1 z-20 flex-none my-0.5" style={{ height: 'clamp(26px, 5.5dvh, 42px)' }}>
+          <div className="flex gap-1.5 sm:gap-2 items-center bg-black/80 px-3 sm:px-4 py-0.5 rounded-full border border-yellow-500/30 overflow-hidden max-w-[85%] h-full shadow-[0_4px_16px_rgba(0,0,0,0.6)] backdrop-blur-md">
+            {history.slice(0, 10).map((r, idx) => {
               const res = r.result_data?.result as string | undefined;
               const isLatest = idx === 0;
               const bg = res === 'DRAGON'
@@ -1096,7 +1096,7 @@ export function DragonTigerPage() {
                   <div
                     key={r.id}
                     title="Latest Result"
-                    className={`relative shrink-0 w-[clamp(24px,5.2dvh,34px)] h-[clamp(24px,5.2dvh,34px)] rounded-full ${bg} flex items-center justify-center text-[10px] sm:text-xs font-black text-white border-2 border-yellow-300 shadow-[0_0_14px_rgba(250,204,21,0.95),0_0_5px_rgba(250,204,21,0.7)] ring-2 ring-yellow-400/80 ring-offset-1 ring-offset-black`}
+                    className={`relative shrink-0 w-[clamp(20px,4.5dvh,28px)] h-[clamp(20px,4.5dvh,28px)] rounded-full ${bg} flex items-center justify-center text-[9px] sm:text-xs font-black text-white border-2 border-yellow-300 shadow-[0_0_12px_rgba(250,204,21,0.9)] ring-1 ring-yellow-400/80`}
                   >
                     {txt}
                   </div>
@@ -1106,14 +1106,14 @@ export function DragonTigerPage() {
               return (
                 <div
                   key={r.id}
-                  className={`shrink-0 w-[clamp(18px,4dvh,26px)] h-[clamp(18px,4dvh,26px)] rounded-full ${bg} flex items-center justify-center text-[8px] sm:text-[10px] font-bold text-white/85 border border-white/25 shadow-sm opacity-80 hover:opacity-100 transition-opacity`}
+                  className={`shrink-0 w-[clamp(16px,3.8dvh,24px)] h-[clamp(16px,3.8dvh,24px)] rounded-full ${bg} flex items-center justify-center text-[8px] sm:text-[9px] font-bold text-white/90 border border-white/25 shadow-sm opacity-85 hover:opacity-100 transition-opacity`}
                 >
                   {txt}
                 </div>
               );
             })}
-            <div className="shrink-0 w-[clamp(18px,4dvh,26px)] h-[clamp(18px,4dvh,26px)] rounded-full bg-zinc-700/80 flex items-center justify-center border border-white/20 text-white/80 opacity-75">
-              <span className="text-[9px] sm:text-[11px]">📈</span>
+            <div className="shrink-0 w-[clamp(16px,3.8dvh,24px)] h-[clamp(16px,3.8dvh,24px)] rounded-full bg-zinc-800 flex items-center justify-center border border-white/20 text-white/80 opacity-80">
+              <span className="text-[8px] sm:text-[10px]">📈</span>
             </div>
           </div>
         </div>
@@ -1189,11 +1189,11 @@ export function DragonTigerPage() {
         <div className="shrink-0 flex items-center justify-between gap-1 sm:gap-2 px-1 sm:px-2 pb-1 sm:pb-2 pt-1 z-20 flex-none" style={{ height: 'clamp(46px, 15dvh, 80px)' }}>
 
           {/* User avatar */}
-          <div className="flex items-center gap-1 sm:gap-1.5 bg-black/60 rounded-full border border-white/10 p-1 pr-2 sm:pr-3 shrink-0 h-full max-h-[44px] sm:max-h-[48px]">
-            <div className="w-8 h-8 sm:w-10 sm:h-10 bg-zinc-700 rounded-full border-2 border-yellow-500 flex items-center justify-center text-sm shadow-inner">👤</div>
+          <div className="flex items-center gap-1 sm:gap-1.5 bg-black/60 rounded-full border border-yellow-500/30 p-1 pr-2 sm:pr-3 shrink-0 h-full max-h-[44px] sm:max-h-[48px]">
+            <div className="w-8 h-8 sm:w-9 sm:h-9 bg-gradient-to-br from-amber-500 to-amber-700 rounded-full border-2 border-yellow-400 flex items-center justify-center text-sm shadow-[0_0_8px_rgba(250,204,21,0.5)] shrink-0">👑</div>
             <div className="flex flex-col min-w-0">
-              <p className="text-[8px] text-zinc-400 leading-none truncate">You</p>
-              <p className="text-[10px] sm:text-xs font-bold text-yellow-400 leading-tight truncate">
+              <p className="text-[8px] text-yellow-400 font-extrabold leading-none truncate">VIP</p>
+              <p className="text-[10px] sm:text-xs font-bold text-white leading-tight truncate">
                 ₹{paiseToRupees(roundBets.reduce((acc, b) => acc + b.amount, 0))}
               </p>
             </div>

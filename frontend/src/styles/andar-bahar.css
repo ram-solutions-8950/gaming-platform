@@ -13,7 +13,7 @@
   --win: #7bf59b;
   --lose: #ff8a7a;
   --rail-w: 64px;
-  --header-h: 44px;
+  --header-h: calc(40px + var(--safe-top));
 
   position: fixed;
   inset: 0;
@@ -54,8 +54,8 @@
   width: 100%;
   height: 100%;
   display: grid;
-  grid-template-rows: var(--header-h) 1fr auto;
-  grid-template-columns: var(--rail-w) 1fr 280px;
+  grid-template-rows: var(--header-h) minmax(0, 1fr) auto;
+  grid-template-columns: var(--rail-w) minmax(0, 1fr) 280px;
   grid-template-areas:
     "header header header"
     "rail table history"
@@ -70,7 +70,8 @@
   align-items: center;
   justify-content: space-between;
   padding: var(--safe-top) max(var(--safe-right), 12px) 0 max(var(--safe-left), 12px);
-  min-height: calc(44px + var(--safe-top));
+  height: var(--header-h);
+  min-height: var(--header-h);
   background: linear-gradient(180deg, #32105F, #21003F);
   border-bottom: 1px solid rgba(255, 210, 26, 0.25);
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
@@ -227,6 +228,29 @@
   border-color: rgba(244, 208, 104, 0.4);
 }
 
+.andar-bahar-container .ab-exit-btn {
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  color: #fff;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+  line-height: 1;
+}
+
+.andar-bahar-container .ab-exit-btn:hover {
+  background: rgba(255, 255, 255, 0.22);
+  border-color: rgba(244, 208, 104, 0.5);
+}
+
 /* ---- Left Navigation Rail ------------------------------------------------- */
 .andar-bahar-container .rail {
   grid-area: rail;
@@ -278,25 +302,28 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 8px;
+  padding: 4px 8px;
   overflow: hidden;
+  min-height: 0;
 }
 
 .andar-bahar-container .table-oval {
-  width: min(720px, 98%);
-  height: min(280px, 85%);
+  width: min(700px, 98%);
+  height: 100%;
+  max-height: clamp(160px, 46dvh, 240px);
   background: radial-gradient(ellipse at center, #156241 0%, #0c3d27 70%, #072316 100%);
-  border: 4px solid rgba(244, 208, 104, 0.35);
+  border: 3.5px solid rgba(244, 208, 104, 0.45);
   border-radius: 999px;
   box-shadow:
     inset 0 0 30px rgba(0,0,0,0.6),
     0 8px 30px rgba(0,0,0,0.6);
   display: grid;
-  grid-template-columns: 1fr 120px 1fr;
+  grid-template-columns: 1fr clamp(80px, 16vw, 120px) 1fr;
   align-items: center;
-  padding: 12px 20px;
-  gap: 10px;
+  padding: 8px 16px;
+  gap: 8px;
   position: relative;
+  margin: auto;
 }
 
 .andar-bahar-container .side-col {
@@ -1241,52 +1268,77 @@
 }
 
 /* Compact Landscape scaling for Android mobile screens */
-@media (max-height: 480px) {
+@media (max-height: 540px) {
   .andar-bahar-container {
-    --header-h: calc(36px + var(--safe-top));
-    --rail-w: 52px;
+    --header-h: calc(34px + var(--safe-top));
+    --rail-w: 48px;
+  }
+  .andar-bahar-container .app-header {
+    padding: var(--safe-top) max(var(--safe-right), 8px) 0 max(var(--safe-left), 8px);
   }
   .andar-bahar-container .table-wrap {
     padding: 2px 4px;
+    min-height: 0;
   }
   .andar-bahar-container .table-oval {
-    height: min(200px, 92%);
-    padding: 6px 14px;
+    height: 100%;
+    max-height: clamp(140px, 46dvh, 210px);
+    padding: 4px 12px;
     gap: 6px;
   }
   .andar-bahar-container .side-col {
-    padding: 4px;
+    padding: 3px 4px;
   }
   .andar-bahar-container .side-name {
     font-size: 11px;
+    margin-bottom: 1px;
+  }
+  .andar-bahar-container .side-count {
+    font-size: 9px;
+    margin-bottom: 2px;
   }
   .andar-bahar-container .pile {
-    max-height: 80px;
+    max-height: 70px;
     gap: 2px;
   }
   .andar-bahar-container .card {
-    width: 34px;
-    height: 48px;
+    width: 32px;
+    height: 44px;
     padding: 2px 1px;
   }
   .andar-bahar-container .card .r,
   .andar-bahar-container .card .s {
-    font-size: 11px;
+    font-size: 10px;
   }
   .andar-bahar-container .card-back {
-    width: 34px;
-    height: 48px;
+    width: 32px;
+    height: 44px;
+  }
+  .andar-bahar-container .result {
+    font-size: 12px;
+    min-height: 18px;
+    margin-top: 2px;
   }
   .andar-bahar-container .app-footer {
-    padding: 4px max(var(--safe-right), 12px) max(var(--safe-bottom), 4px) max(var(--safe-left), 12px);
-    gap: 4px;
+    padding: 3px max(var(--safe-right), 8px) max(var(--safe-bottom), 3px) max(var(--safe-left), 8px);
+    gap: 2px;
+  }
+  .andar-bahar-container .chip-select {
+    padding: 4px 10px;
+    font-size: 11.5px;
+  }
+  .andar-bahar-container .bet-stepper {
+    padding: 2px 4px;
   }
   .andar-bahar-container .bet {
-    padding: 6px 14px;
+    padding: 5px 14px;
     font-size: 12px;
-    min-width: 90px;
+    min-width: 85px;
   }
   .andar-bahar-container .hint {
-    font-size: 9px;
+    display: none;
+  }
+  .andar-bahar-container .progress-row {
+    display: none;
   }
 }

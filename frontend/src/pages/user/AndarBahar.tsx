@@ -621,7 +621,7 @@ export function AndarBaharPage() {
       <div className="app">
         <header className="app-header">
           <div className="header-left">
-            <button className="iconbtn !px-2.5 !py-1 flex items-center gap-1 font-bold text-xs" title="Leave Game" onClick={() => setConfirmLeave(true)}>
+            <button className="ab-exit-btn" title="Leave Game" onClick={() => setConfirmLeave(true)}>
               ← Exit
             </button>
             <span className="brand">
