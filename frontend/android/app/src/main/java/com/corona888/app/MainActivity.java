@@ -3,6 +3,7 @@ package com.corona888.app;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.content.pm.ActivityInfo;
+import android.graphics.Color;
 import android.os.Build;
 import android.os.Bundle;
 import android.view.View;
@@ -13,6 +14,7 @@ import android.webkit.JavascriptInterface;
 import android.webkit.ValueCallback;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
+import androidx.core.view.WindowCompat;
 import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
@@ -27,6 +29,7 @@ public class MainActivity extends BridgeActivity {
         // Inject direct JavaScript Interfaces into the WebView for zero-latency native access
         if (getBridge() != null && getBridge().getWebView() != null) {
             WebView webView = getBridge().getWebView();
+            webView.setBackgroundColor(Color.BLACK);
             WebSettings settings = webView.getSettings();
 
             // Lock text zoom to 100% so user device font scaling does not distort game layouts
@@ -54,6 +57,8 @@ public class MainActivity extends BridgeActivity {
 
     private void applyEdgeToEdgeAndImmersive() {
         try {
+            WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
+
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                 WindowManager.LayoutParams lp = getWindow().getAttributes();
                 lp.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
@@ -61,6 +66,9 @@ public class MainActivity extends BridgeActivity {
             }
 
             getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+            getWindow().setStatusBarColor(Color.BLACK);
+            getWindow().setNavigationBarColor(Color.BLACK);
+            getWindow().getDecorView().setBackgroundColor(Color.BLACK);
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                 WindowInsetsController controller = getWindow().getInsetsController();

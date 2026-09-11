@@ -1238,14 +1238,15 @@
   .aviator-top-nav {
     height: 38px !important;
     min-height: 38px !important;
-    padding: 0 10px !important;
+    padding: 0 max(var(--safe-right), 10px) 0 max(var(--safe-left), 10px) !important;
   }
   .aviator-history-bar {
     height: 28px !important;
     min-height: 28px !important;
+    padding: 0 max(var(--safe-right), 8px) 0 max(var(--safe-left), 8px) !important;
   }
   .aviator-bet-panels-container {
-    padding: 4px 8px !important;
+    padding: 4px max(var(--safe-right), 8px) max(var(--safe-bottom), 4px) max(var(--safe-left), 8px) !important;
     gap: 6px !important;
     min-height: 94px !important;
     flex-shrink: 0 !important;
@@ -1306,15 +1307,15 @@
   .aviator-top-nav {
     height: 32px !important;
     min-height: 32px !important;
-    padding: 0 6px !important;
+    padding: 0 max(var(--safe-right), 8px) 0 max(var(--safe-left), 8px) !important;
   }
   .aviator-history-bar {
     height: 24px !important;
     min-height: 24px !important;
-    padding: 0 6px !important;
+    padding: 0 max(var(--safe-right), 6px) 0 max(var(--safe-left), 6px) !important;
   }
   .aviator-bet-panels-container {
-    padding: 2px 6px !important;
+    padding: 2px max(var(--safe-right), 6px) max(var(--safe-bottom), 2px) max(var(--safe-left), 6px) !important;
     gap: 4px !important;
     min-height: 82px !important;
   }
