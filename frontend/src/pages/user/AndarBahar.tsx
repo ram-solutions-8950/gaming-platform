@@ -2,7 +2,6 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { CardView } from "../../components/andarBahar/CardView";
 import { HistoryPanel } from "../../components/andarBahar/HistoryPanel";
-import { ProgressStepper } from "../../components/andarBahar/ProgressStepper";
 import type { Card } from "../../game/andarBahar/deck";
 import { rankLabel } from "../../game/andarBahar/deck";
 import type { Side } from "../../game/andarBahar/andarBahar";
@@ -36,7 +35,6 @@ export function AndarBaharPage() {
   const [phase, setPhase] = useState<Phase>("betting");
   const [myBet, setMyBet] = useState<{ side: Side; amount: number; roundId: string } | null>(null);
   const [selectedSide, setSelectedSide] = useState<Side | null>(null);
-  const [showChipMenu, setShowChipMenu] = useState(false);
   const [isPlacingBet, setIsPlacingBet] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
 
@@ -45,7 +43,6 @@ export function AndarBaharPage() {
   const [middle, setMiddle] = useState<Card | null>(null);
   const [andar, setAndar] = useState<Card[]>([]);
   const [bahar, setBahar] = useState<Card[]>([]);
-  const [result, setResult] = useState<{ won: boolean; text: string } | null>(null);
   const [resultBanner, setResultBanner] = useState<{
     type: "win" | "lose" | "neutral";
     title: string;
@@ -159,7 +156,6 @@ export function AndarBaharPage() {
       setMiddle(null);
       setAndar([]);
       setBahar([]);
-      setResult(null);
       setResultBanner(null);
       setWinningSide(null);
       setMyBet(null);
@@ -242,10 +238,6 @@ export function AndarBaharPage() {
       if (didWin) {
         const netProfit = Math.round(bet.amount * (PAYOUT[winner] ?? 0.8));
         const totalReturn = bet.amount + netProfit;
-        setResult({
-          won: true,
-          text: `🎉 YOU WIN! Bet: ₹${bet.amount} • Won: +₹${totalReturn} (${winner.toUpperCase()})`,
-        });
         setResultBanner({
           type: "win",
           title: "YOU WIN!",
@@ -254,10 +246,6 @@ export function AndarBaharPage() {
         });
         soundManager.play("win_clap");
       } else if (didLose) {
-        setResult({
-          won: false,
-          text: `❌ YOU LOSE! Bet: ₹${bet.amount} • ${winner.toUpperCase()} Won`,
-        });
         setResultBanner({
           type: "lose",
           title: "YOU LOSE",
@@ -266,10 +254,6 @@ export function AndarBaharPage() {
         });
         soundManager.play("loss");
       } else {
-        setResult({
-          won: true,
-          text: `🏆 ${winner.toUpperCase()} WINS!`,
-        });
         setResultBanner({
           type: "neutral",
           title: `${winner.toUpperCase()} WINS!`,
@@ -589,7 +573,6 @@ export function AndarBaharPage() {
       setMyBet(placedBet);
       myBetRef.current = placedBet;
       setBalance((b) => b - stake);
-      setShowChipMenu(false);
     } catch (err: any) {
       const msg = err.response?.data?.error?.message || err.message || "Failed to place bet";
       setServerError(msg);
@@ -618,37 +601,86 @@ export function AndarBaharPage() {
 
   return (
     <div className="andar-bahar-container">
-      <div className="app">
-        <header className="app-header">
-          <div className="header-left">
-            <button className="ab-exit-btn" title="Leave Game" onClick={() => setConfirmLeave(true)}>
-              ← Exit
-            </button>
-            <span className="brand">
-              <small>♠♣</small> ANDAR BAHAR <small>♣♠</small>
-            </span>
-          </div>
-          <div className="header-right">
-            <div className="ab-balance-group">
-              <span className="balance">
-                <small>₹</small> {balance}
-              </span>
-            </div>
-            <span className="live-badge">● LIVE</span>
-            <span className={`timer-box${phase === "betting" && timeLeft <= 5 ? " warn" : phase === "closed" ? " calc" : ""}`}>
-              <small>{phase === "betting" ? "BETTING TIME" : phase === "closed" ? "CALCULATING" : phase === "result" ? "RESULT" : "STATUS"}</small>
-              {phase === "betting"
-                ? `${String(timeLeft).padStart(2, "0")}s`
-                : phase === "closed"
-                ? `${calcCountdown !== null && calcCountdown > 0 ? `${calcCountdown}s` : "0s"}`
-                : phase === "result"
-                ? (winningSide ? winningSide.toUpperCase() : "WIN")
-                : "--"}
-            </span>
+      <div className="ab-app">
+        {/* ── Top Header Bar ── */}
+        <header className="ab-header">
+          <div className="ab-header-left">
             <button
-              className={`iconbtn${!soundOn ? " muted" : ""}`}
-              aria-label={soundOn ? "Mute Sound" : "Unmute Sound"}
-              title={soundOn ? "Sound ON (Click to Mute)" : "Sound OFF (Click to Unmute)"}
+              type="button"
+              className="ab-btn-exit"
+              title="Leave Game"
+              onClick={() => setConfirmLeave(true)}
+            >
+              <span className="ab-exit-arrow">←</span>
+              <span>Exit</span>
+            </button>
+
+            <div className="ab-brand-badge">
+              <span className="ab-brand-title">ANDAR BAHAR</span>
+              <span className="ab-brand-sub">LIVE CASINO</span>
+            </div>
+          </div>
+
+          <div className="ab-header-center">
+            <span className="ab-live-pill">
+              <span className="ab-live-dot" /> LIVE
+            </span>
+
+            <div className={`ab-phase-pill ab-phase-${phase}`}>
+              {phase === "betting" ? (
+                <>
+                  <span className="ab-phase-icon">⏱️</span>
+                  <span className="ab-phase-label">BETTING</span>
+                  <span className="ab-phase-timer">{String(timeLeft).padStart(2, "0")}s</span>
+                </>
+              ) : phase === "closed" ? (
+                <>
+                  <span className="ab-phase-icon">⏳</span>
+                  <span className="ab-phase-label">CALCULATING</span>
+                  <span className="ab-phase-timer">{calcCountdown !== null && calcCountdown > 0 ? `${calcCountdown}s` : "0s"}</span>
+                </>
+              ) : phase === "dealing" ? (
+                <>
+                  <span className="ab-phase-icon animate-spin">🎴</span>
+                  <span className="ab-phase-label">DEALING CARDS</span>
+                </>
+              ) : (
+                <>
+                  <span className="ab-phase-icon">🏆</span>
+                  <span className="ab-phase-label">{winningSide ? `${winningSide.toUpperCase()} WINS` : "RESULT"}</span>
+                </>
+              )}
+            </div>
+          </div>
+
+          <div className="ab-header-right">
+            <div className="ab-wallet-pill">
+              <span className="ab-coin-icon">🪙</span>
+              <span className="ab-wallet-val">₹{balance.toLocaleString("en-IN")}</span>
+            </div>
+
+            <button
+              type="button"
+              className="ab-icon-btn"
+              title="Round History"
+              onClick={() => setShowHistory(true)}
+            >
+              📜
+            </button>
+
+            <button
+              type="button"
+              className="ab-icon-btn"
+              title="Game Rules"
+              onClick={() => setRulesPopup("rules")}
+            >
+              ❓
+            </button>
+
+            <button
+              type="button"
+              className={`ab-icon-btn ${!soundOn ? "muted" : ""}`}
+              title={soundOn ? "Mute" : "Unmute"}
               onClick={handleToggleSound}
             >
               {soundOn ? "🔊" : "🔇"}
@@ -656,27 +688,144 @@ export function AndarBaharPage() {
           </div>
         </header>
 
-        <div className="rail">
-          <button type="button" className="rail-btn" onClick={() => setRulesPopup("how")}>
-            <span className="rail-icon">📖</span>How to Play
-          </button>
-          <button type="button" className="rail-btn" onClick={() => setRulesPopup("rules")}>
-            <span className="rail-icon">📋</span>Rules
-          </button>
-          <button
-            type="button"
-            className="rail-btn"
-            onClick={(e) => {
-              e.stopPropagation();
-              setShowHistory((v) => !v);
-            }}
-            aria-label="Toggle History"
-          >
-            <span className="rail-icon">📜</span>History
-          </button>
-        </div>
+        {/* ── Main Arena Area ── */}
+        <main className="ab-main-arena">
+          {/* Live Bead Plate (Roadmap Strip) */}
+          <div className="ab-roadmap-bar">
+            <span className="ab-roadmap-label">TRENDS</span>
+            <div className="ab-bead-list">
+              {history.slice(0, 14).map((entry, idx) => {
+                const isAndar = entry.winner === "andar";
+                const isLatest = idx === 0;
+                return (
+                  <div
+                    key={entry.id || idx}
+                    className={`ab-bead ${isAndar ? "bead-andar" : "bead-bahar"} ${isLatest ? "bead-latest" : ""}`}
+                    title={`Round ${history.length - idx}: ${isAndar ? "Andar" : "Bahar"}`}
+                  >
+                    {isAndar ? "A" : "B"}
+                  </div>
+                );
+              })}
+              {history.length === 0 && (
+                <span className="ab-bead-empty">Waiting for previous rounds...</span>
+              )}
+            </div>
+          </div>
 
-        <div className="table-wrap">
+          {/* ── The Casino Velvet Table ── */}
+          <div className="ab-table-container">
+            <div className="ab-felt-table">
+              {/* ANDAR Zone (Left Section) */}
+              <div
+                className={`ab-table-zone zone-andar ${phase === "result" && winningSide === "andar" ? "zone-win" : ""} ${myBet?.side === "andar" ? "zone-has-bet" : ""}`}
+                onClick={() => handlePlaceBet("andar")}
+                title="Click to place bet on Andar"
+              >
+                <div className="ab-zone-header">
+                  <span className="ab-zone-title text-andar">ANDAR</span>
+                  <span className="ab-zone-payout">1.8×</span>
+                  <span className="ab-card-counter">{andar.length} {andar.length === 1 ? "Card" : "Cards"}</span>
+                </div>
+
+                {/* Dealt Cards Tray */}
+                <div className="ab-cards-tray">
+                  {andar.map((c, idx) => (
+                    <div key={idx} className="ab-card-deal-anim" style={{ animationDelay: `${idx * 0.04}s` }}>
+                      <CardView card={c} />
+                    </div>
+                  ))}
+                  {andar.length === 0 && (
+                    <div className="ab-card-slot-placeholder">
+                      <span className="ab-slot-text">ANDAR SLOTS</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Active Chip on table */}
+                {myBet?.side === "andar" && (
+                  <div className="ab-placed-chip-badge chip-glow-blue">
+                    <span className="ab-chip-icon">🪙</span>
+                    <span>₹{myBet.amount}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* JOKER / OPEN CARD (Center Pedestal) */}
+              <div className="ab-center-pedestal">
+                <div className="ab-pedestal-rim">
+                  <div className="ab-pedestal-tag">OPEN CARD</div>
+                  <div className="ab-pedestal-card-holder">
+                    {middle ? (
+                      <div className="ab-open-card-reveal">
+                        <CardView card={middle} />
+                      </div>
+                    ) : phase === "closed" ? (
+                      <div className="card-back calc-pulse">
+                        <span className="text-yellow-400 font-black text-xs">
+                          {calcCountdown !== null && calcCountdown > 0 ? `⏳ ${calcCountdown}` : "⏳ ..."}
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="card-back" />
+                    )}
+                  </div>
+
+                  {middle ? (
+                    <div className="ab-target-badge">
+                      <span>TARGET: <strong>{rankLabel(middle.rank)}</strong></span>
+                    </div>
+                  ) : (
+                    <div className="ab-target-placeholder">TRUMP CARD</div>
+                  )}
+                </div>
+              </div>
+
+              {/* BAHAR Zone (Right Section) */}
+              <div
+                className={`ab-table-zone zone-bahar ${phase === "result" && winningSide === "bahar" ? "zone-win" : ""} ${myBet?.side === "bahar" ? "zone-has-bet" : ""}`}
+                onClick={() => handlePlaceBet("bahar")}
+                title="Click to place bet on Bahar"
+              >
+                <div className="ab-zone-header">
+                  <span className="ab-zone-title text-bahar">BAHAR</span>
+                  <span className="ab-zone-payout">1.8×</span>
+                  <span className="ab-card-counter">{bahar.length} {bahar.length === 1 ? "Card" : "Cards"}</span>
+                </div>
+
+                {/* Dealt Cards Tray */}
+                <div className="ab-cards-tray">
+                  {bahar.map((c, idx) => (
+                    <div key={idx} className="ab-card-deal-anim" style={{ animationDelay: `${idx * 0.04}s` }}>
+                      <CardView card={c} />
+                    </div>
+                  ))}
+                  {bahar.length === 0 && (
+                    <div className="ab-card-slot-placeholder">
+                      <span className="ab-slot-text">BAHAR SLOTS</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Active Chip on table */}
+                {myBet?.side === "bahar" && (
+                  <div className="ab-placed-chip-badge chip-glow-orange">
+                    <span className="ab-chip-icon">🪙</span>
+                    <span>₹{myBet.amount}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Server Error Toast */}
+          {serverError && (
+            <div className="ab-floating-error-toast">
+              <span>⚠️ {serverError}</span>
+            </div>
+          )}
+
+          {/* Round Result Modal / Overlay */}
           {resultBanner && phase === "result" && (
             <div className={`ab-result-banner ${resultBanner.type}`}>
               <div className="ab-result-banner-badge">
@@ -693,77 +842,97 @@ export function AndarBaharPage() {
               )}
             </div>
           )}
+        </main>
 
-          <div className="table-oval">
-            <div className={`side-col andar${phase === "result" && winningSide === "andar" ? " win" : ""}`}>
-              <span className="side-name andar">ANDAR</span>
-              <span className="side-count">
-                {andar.length} card{andar.length === 1 ? "" : "s"}
-              </span>
-              <div className="pile">
-                {andar.map((c, idx) => (
-                  <CardView key={idx} card={c} />
-                ))}
-              </div>
+        {/* ── Bottom Betting Control Console ── */}
+        <footer className="ab-bottom-console">
+          {/* Chip Tray Selector */}
+          <div className="ab-chip-tray">
+            <span className="ab-tray-label">CHIPS</span>
+            <div className="ab-chips-list">
+              {CHIPS.map((chipVal) => {
+                const isSelected = stake === chipVal;
+                return (
+                  <button
+                    key={chipVal}
+                    type="button"
+                    disabled={phase !== "betting" || !!myBet}
+                    className={`ab-chip-token chip-${chipVal} ${isSelected ? "chip-selected" : ""}`}
+                    onClick={() => {
+                      soundManager.play("bet_coin");
+                      setStake(chipVal);
+                    }}
+                  >
+                    <div className="ab-chip-dashed-ring" />
+                    <span className="ab-chip-label">
+                      {chipVal >= 1000 ? `${chipVal / 1000}k` : chipVal}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
 
-            <div className="middle-wrap">
-              <span className="middle-label">Open Card</span>
-              {middle ? (
-                <CardView card={middle} />
-              ) : phase === "closed" ? (
-                <div className="card-back calc-pulse">
-                  <span className="text-yellow-400 font-black text-xs">
-                    {calcCountdown !== null && calcCountdown > 0 ? `⏳ ${calcCountdown}` : "⏳ ..."}
-                  </span>
-                </div>
-              ) : (
-                <div className="card-back" />
-              )}
-              {middle && <span className="target-rank">TARGET RANK: {rankLabel(middle.rank)}</span>}
-            </div>
-
-            <div className={`side-col bahar${phase === "result" && winningSide === "bahar" ? " win" : ""}`}>
-              <span className="side-name bahar">BAHAR</span>
-              <span className="side-count">
-                {bahar.length} card{bahar.length === 1 ? "" : "s"}
-              </span>
-              <div className="pile">
-                {bahar.map((c, idx) => (
-                  <CardView key={idx} card={c} />
-                ))}
-              </div>
+            {/* Stepper for fine adjustments */}
+            <div className="ab-stake-stepper">
+              <button
+                type="button"
+                className="ab-stepper-btn"
+                disabled={phase !== "betting" || !!myBet || stake <= MIN_STAKE}
+                onClick={() => adjustStake(-STAKE_STEP)}
+                title="Decrease bet by ₹10"
+              >
+                −
+              </button>
+              <span className="ab-stepper-val">₹{stake}</span>
+              <button
+                type="button"
+                className="ab-stepper-btn"
+                disabled={phase !== "betting" || !!myBet || stake >= balance}
+                onClick={() => adjustStake(STAKE_STEP)}
+                title="Increase bet by ₹10"
+              >
+                +
+              </button>
             </div>
           </div>
 
-          <div className={`result ${result ? (result.won ? "win" : "lose") : ""}`}>
-            {result?.text ??
-              (phase === "dealing" ? (
-                "Server dealing cards…"
-              ) : phase === "closed" ? (
-                <div className="calc-banner">
-                  <span className="calc-spinner">⚙</span>
-                  <span>
-                    {calcCountdown !== null && calcCountdown > 0 ? (
-                      <>CALCULATING RESULT... <strong>{calcCountdown}</strong></>
-                    ) : (
-                      "WAITING FOR RESULT..."
-                    )}
-                  </span>
-                </div>
-              ) : myBet ? (
-                `Bet Placed on ${myBet.side.toUpperCase()} (₹${myBet.amount}) — Waiting for Deal…`
-              ) : (
-                "Select ANDAR or BAHAR to place your bet"
-              ))}
+          {/* Action Betting Pads */}
+          <div className="ab-action-pads">
+            <button
+              type="button"
+              className={`ab-pad-btn pad-andar ${(myBet?.side === "andar" || selectedSide === "andar") ? "pad-locked" : ""}`}
+              disabled={phase !== "betting" || !!myBet || isPlacingBet}
+              onClick={() => handlePlaceBet("andar")}
+            >
+              <span className="ab-pad-title">ANDAR</span>
+              <span className="ab-pad-sub">
+                {myBet?.side === "andar"
+                  ? `LOCKED ₹${myBet.amount}`
+                  : isPlacingBet && selectedSide === "andar"
+                  ? "PLACING..."
+                  : `BET ₹${stake} (1.8×)`}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              className={`ab-pad-btn pad-bahar ${(myBet?.side === "bahar" || selectedSide === "bahar") ? "pad-locked" : ""}`}
+              disabled={phase !== "betting" || !!myBet || isPlacingBet}
+              onClick={() => handlePlaceBet("bahar")}
+            >
+              <span className="ab-pad-title">BAHAR</span>
+              <span className="ab-pad-sub">
+                {myBet?.side === "bahar"
+                  ? `LOCKED ₹${myBet.amount}`
+                  : isPlacingBet && selectedSide === "bahar"
+                  ? "PLACING..."
+                  : `BET ₹${stake} (1.8×)`}
+              </span>
+            </button>
           </div>
-          {serverError && <div className="result lose">{serverError}</div>}
-        </div>
+        </footer>
 
-        {/* Desktop History Sidebar */}
-        <HistoryPanel entries={history} />
-
-        {/* Mobile / APK History Drawer */}
+        {/* History Drawer Modal */}
         {showHistory && (
           <div className="history-backdrop" onClick={() => setShowHistory(false)} />
         )}
@@ -774,90 +943,6 @@ export function AndarBaharPage() {
             onClose={() => setShowHistory(false)}
           />
         </div>
-
-        <footer className="app-footer">
-          <div className="bet-row">
-            <div className="chip-group">
-              <span className="group-label">Chip Size</span>
-              <div className="chip-select-wrap">
-                <button
-                  className="chip-select"
-                  disabled={phase !== "betting" || !!myBet}
-                  onClick={() => setShowChipMenu((v) => !v)}
-                >
-                  ₹{stake} <span className="chip-select-caret">▼</span>
-                </button>
-                {showChipMenu && (
-                  <>
-                    <div className="chip-menu-backdrop" onClick={() => setShowChipMenu(false)} />
-                    <div className="chip-menu">
-                      {CHIPS.map((c) => (
-                        <button
-                          key={c}
-                          className={`chip-menu-item${stake === c ? " active" : ""}`}
-                          onClick={() => {
-                            setStake(c);
-                            setShowChipMenu(false);
-                          }}
-                        >
-                          ₹{c}
-                        </button>
-                      ))}
-                    </div>
-                  </>
-                )}
-              </div>
-            </div>
-
-            <div className="stake-group">
-              <span className="group-label">Bet Amount (Min ₹{MIN_STAKE})</span>
-              <div className="bet-stepper">
-                <button
-                  disabled={phase !== "betting" || !!myBet || stake <= MIN_STAKE}
-                  onClick={() => adjustStake(-STAKE_STEP)}
-                  title={stake <= MIN_STAKE ? `Minimum bet is ₹${MIN_STAKE}` : "Decrease Bet"}
-                >
-                  −
-                </button>
-                <span>₹{stake}</span>
-                <button
-                  disabled={phase !== "betting" || !!myBet || stake >= balance}
-                  onClick={() => adjustStake(STAKE_STEP)}
-                  title="Increase Bet"
-                >
-                  +
-                </button>
-              </div>
-            </div>
-
-            <button
-              className={`bet andar${(myBet?.side === "andar" || selectedSide === "andar") ? " selected" : ""}`}
-              disabled={phase !== "betting" || !!myBet || isPlacingBet}
-              onClick={() => handlePlaceBet("andar")}
-            >
-              ANDAR<small>{myBet?.side === "andar" ? `BET LOCKED ₹${myBet.amount}` : isPlacingBet && selectedSide === "andar" ? "PLACING…" : "pays 1.8×"}</small>
-            </button>
-            <button
-              className={`bet bahar${(myBet?.side === "bahar" || selectedSide === "bahar") ? " selected" : ""}`}
-              disabled={phase !== "betting" || !!myBet || isPlacingBet}
-              onClick={() => handlePlaceBet("bahar")}
-            >
-              BAHAR<small>{myBet?.side === "bahar" ? `BET LOCKED ₹${myBet.amount}` : isPlacingBet && selectedSide === "bahar" ? "PLACING…" : "pays 1.8×"}</small>
-            </button>
-          </div>
-
-          <p className="hint">
-            {myBet
-              ? `Bet of ₹${myBet.amount} placed on ${myBet.side.toUpperCase()}. Waiting for round to resolve…`
-              : stake > balance
-              ? "Not enough balance — please lower your bet amount."
-              : "Tap ANDAR or BAHAR to place your bet immediately. Settle securely on the server."}
-          </p>
-
-          <div className="progress-row">
-            <ProgressStepper phase={phase} />
-          </div>
-        </footer>
 
         {rulesPopup && (
           <GameRulesModal

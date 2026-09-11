@@ -1,19 +1,15 @@
 /* =========================================================
-   ANDAR BAHAR GAME STYLESHEET
+   ANDAR BAHAR LIVE CASINO STYLESHEET
+   Luxury casino aesthetic with authentic felt, roadmap & 3D chips
    ========================================================= */
 
 .andar-bahar-container {
-  --green-dark: #061c12;
-  --green-mid: #0b3824;
-  --green-felt: #115336;
-  --gold: #f4d068;
-  --gold-2: #c99e32;
-  --andar: #1d5fff;
-  --bahar: #ff471a;
-  --win: #7bf59b;
-  --lose: #ff8a7a;
-  --rail-w: 64px;
-  --header-h: calc(40px + var(--safe-top));
+  --gold-light: #fff3c4;
+  --gold-main: #ffd700;
+  --gold-dark: #b8860b;
+  --blue-glow: #3b82f6;
+  --orange-glow: #f97316;
+  --emerald-win: #10b981;
 
   position: fixed;
   inset: 0;
@@ -25,19 +21,10 @@
   padding: 0;
   box-sizing: border-box;
   background:
-    radial-gradient(
-      ellipse at 50% 15%,
-      rgba(139,43,226,.30) 0%,
-      rgba(61,8,117,.18) 35%,
-      transparent 70%
-    ),
-    linear-gradient(
-      180deg,
-      #200044 0%,
-      #3D0875 45%,
-      #18002F 100%
-    );
-  color: #fff;
+    radial-gradient(ellipse at 50% 15%, rgba(139, 43, 226, 0.28) 0%, rgba(61, 8, 117, 0.2) 40%, transparent 75%),
+    radial-gradient(circle at 50% 90%, rgba(16, 185, 129, 0.1) 0%, transparent 60%),
+    linear-gradient(180deg, #18032b 0%, #290847 45%, #10021f 100%);
+  color: #ffffff;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   user-select: none;
   -webkit-user-select: none;
@@ -49,375 +36,615 @@
   box-sizing: border-box;
 }
 
-/* App Shell (Landscape Layout) */
-.andar-bahar-container .app {
+/* Main App Shell (Edge-to-Edge Centered) */
+.andar-bahar-container .ab-app {
   width: 100%;
   height: 100%;
-  display: grid;
-  grid-template-rows: var(--header-h) minmax(0, 1fr) auto;
-  grid-template-columns: var(--rail-w) minmax(0, 1fr) 280px;
-  grid-template-areas:
-    "header header header"
-    "rail table history"
-    "footer footer footer";
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
   overflow: hidden;
+  position: relative;
 }
 
-/* ---- Header --------------------------------------------------------------- */
-.andar-bahar-container .app-header {
-  grid-area: header;
+/* =========================================================
+   1. TOP NAVIGATION HEADER
+   ========================================================= */
+.andar-bahar-container .ab-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: var(--safe-top) max(var(--safe-right), 12px) 0 max(var(--safe-left), 12px);
-  height: var(--header-h);
-  min-height: var(--header-h);
-  background: linear-gradient(180deg, #32105F, #21003F);
-  border-bottom: 1px solid rgba(255, 210, 26, 0.25);
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
-  z-index: 10;
+  height: calc(44px + var(--safe-top));
+  min-height: calc(44px + var(--safe-top));
+  background: rgba(12, 3, 24, 0.88);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(255, 215, 0, 0.22);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  z-index: 30;
+  gap: 8px;
 }
 
-.andar-bahar-container .header-left,
-.andar-bahar-container .header-right {
+.andar-bahar-container .ab-header-left,
+.andar-bahar-container .ab-header-center,
+.andar-bahar-container .ab-header-right {
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
-.andar-bahar-container .brand {
-  font-weight: 900;
+/* Exit Button */
+.andar-bahar-container .ab-btn-exit {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  color: #ffffff;
+  height: 30px;
+  padding: 0 12px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+  font-size: 11.5px;
+  font-weight: 800;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+.andar-bahar-container .ab-btn-exit:hover {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 215, 0, 0.5);
+  transform: translateY(-1px);
+}
+
+.andar-bahar-container .ab-exit-arrow {
+  font-size: 13px;
+  line-height: 1;
+}
+
+/* Brand Title */
+.andar-bahar-container .ab-brand-badge {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.05;
+}
+
+.andar-bahar-container .ab-brand-title {
   font-size: 15px;
-  letter-spacing: 1px;
-  background: linear-gradient(180deg, #fff2be, #FFD21A);
+  font-weight: 900;
+  letter-spacing: 1.5px;
+  background: linear-gradient(180deg, #fff7c2 0%, #ffd700 50%, #b8860b 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
-  text-shadow: 0 1px 8px rgba(244, 208, 104, 0.4);
+  filter: drop-shadow(0 1px 4px rgba(245, 215, 110, 0.4));
 }
 
-.andar-bahar-container .brand small {
-  font-size: 10px;
-  opacity: 0.8;
-}
-
-.andar-bahar-container .ab-balance-group {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.andar-bahar-container .ab-add-amount-btn {
-  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-  border: 1px solid rgba(110, 231, 183, 0.7);
-  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.4);
-  color: #ffffff;
-  padding: 3px 9px;
-  border-radius: 999px;
+.andar-bahar-container .ab-brand-sub {
+  font-size: 7.5px;
   font-weight: 800;
-  font-size: 11px;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  cursor: pointer;
-  transition: all 0.18s ease;
-  white-space: nowrap;
-}
-
-.andar-bahar-container .ab-add-amount-btn:hover {
-  background: linear-gradient(135deg, #34d399 0%, #10b981 100%);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.6);
-}
-
-.andar-bahar-container .ab-add-amount-btn:active {
-  transform: scale(0.95);
-}
-
-.andar-bahar-container .ab-add-plus {
-  font-size: 14px;
-  font-weight: 900;
-  line-height: 1;
-}
-
-.andar-bahar-container .balance {
-  background: linear-gradient(180deg, #1A002E 0%, #0D0017 100%);
-  border: 1px solid rgba(255, 210, 26, 0.45);
-  box-shadow: 0 0 10px rgba(255, 210, 26, 0.2), inset 0 1px 2px rgba(0, 0, 0, 0.8);
-  padding: 4px 12px;
-  border-radius: 999px;
-  font-weight: 800;
-  font-size: 13px;
-  color: #FFD21A;
-}
-
-.andar-bahar-container .live-badge {
-  background: rgba(255, 71, 26, 0.2);
-  color: #ff6b4a;
-  border: 1px solid rgba(255, 71, 26, 0.5);
-  border-radius: 999px;
-  padding: 3px 8px;
-  font-size: 10px;
-  font-weight: 800;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.andar-bahar-container .timer-box {
-  background: rgba(16, 0, 31, 0.85);
-  border: 1px solid rgba(255, 210, 26, 0.4);
-  box-shadow: 0 0 10px rgba(255, 210, 26, 0.2);
-  border-radius: 8px;
-  padding: 3px 8px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  line-height: 1;
-  font-weight: 900;
-  font-size: 13px;
-}
-
-.andar-bahar-container .timer-box small {
-  font-size: 8px;
-  color: rgba(255,255,255,0.6);
-  margin-bottom: 2px;
-  font-weight: 700;
-}
-
-.andar-bahar-container .timer-box.warn {
-  border-color: #ff471a;
-  color: #ff704d;
-  animation: ab-pulse 0.6s infinite alternate;
-}
-
-.andar-bahar-container .timer-box.calc {
-  border-color: #ffd21a;
-  color: #ffd21a;
-  box-shadow: 0 0 12px rgba(255, 210, 26, 0.4);
-  animation: ab-pulse 0.8s infinite alternate;
-}
-
-@keyframes ab-pulse {
-  from { opacity: 0.8; transform: scale(1); }
-  to { opacity: 1; transform: scale(1.05); }
-}
-
-.andar-bahar-container .iconbtn {
-  background: rgba(255,255,255,0.08);
-  border: 1px solid rgba(255,255,255,0.15);
-  color: #fff;
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  font-size: 14px;
-  transition: all 0.15s ease;
-}
-
-.andar-bahar-container .iconbtn.muted {
-  opacity: 0.65;
-  border-color: rgba(255, 71, 26, 0.4);
-  color: #ff8a7a;
-}
-
-.andar-bahar-container .iconbtn:hover {
-  background: rgba(255,255,255,0.15);
-  border-color: rgba(244, 208, 104, 0.4);
-}
-
-.andar-bahar-container .ab-exit-btn {
-  background: rgba(255, 255, 255, 0.12);
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  color: #fff;
-  height: 28px;
-  padding: 0 10px;
-  border-radius: 8px;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  cursor: pointer;
-  font-size: 12px;
-  font-weight: 800;
-  white-space: nowrap;
-  transition: all 0.15s ease;
-  line-height: 1;
-}
-
-.andar-bahar-container .ab-exit-btn:hover {
-  background: rgba(255, 255, 255, 0.22);
-  border-color: rgba(244, 208, 104, 0.5);
-}
-
-/* ---- Left Navigation Rail ------------------------------------------------- */
-.andar-bahar-container .rail {
-  grid-area: rail;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 4px 10px max(var(--safe-left), 4px);
-  background: rgba(4, 16, 10, 0.6);
-  border-right: 1px solid rgba(255,255,255,0.06);
-  z-index: 25;
-}
-
-.andar-bahar-container .rail-btn {
-  background: none;
-  border: none;
-  color: rgba(255,255,255,0.7);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 3px;
-  font-size: 9px;
-  font-weight: 700;
-  cursor: pointer;
-  padding: 6px 2px;
-  border-radius: 6px;
-  width: 100%;
-  transition: all 0.15s ease;
-  pointer-events: auto;
-  touch-action: manipulation;
-  position: relative;
-  z-index: 26;
-}
-
-.andar-bahar-container .rail-btn:hover {
-  color: #fff;
-  background: rgba(255,255,255,0.08);
-}
-
-.andar-bahar-container .rail-icon {
-  font-size: 16px;
-}
-
-/* ---- Table Play Arena ----------------------------------------------------- */
-.andar-bahar-container .table-wrap {
-  grid-area: table;
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 4px 8px;
-  overflow: hidden;
-  min-height: 0;
-}
-
-.andar-bahar-container .table-oval {
-  width: min(700px, 98%);
-  height: 100%;
-  max-height: clamp(160px, 46dvh, 240px);
-  background: radial-gradient(ellipse at center, #156241 0%, #0c3d27 70%, #072316 100%);
-  border: 3.5px solid rgba(244, 208, 104, 0.45);
-  border-radius: 999px;
-  box-shadow:
-    inset 0 0 30px rgba(0,0,0,0.6),
-    0 8px 30px rgba(0,0,0,0.6);
-  display: grid;
-  grid-template-columns: 1fr clamp(80px, 16vw, 120px) 1fr;
-  align-items: center;
-  padding: 8px 16px;
-  gap: 8px;
-  position: relative;
-  margin: auto;
-}
-
-.andar-bahar-container .side-col {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  height: 100%;
-  border-radius: 16px;
-  padding: 8px;
-  background: rgba(0,0,0,0.25);
-  border: 1px solid rgba(255,255,255,0.08);
-  transition: all 0.3s ease;
-  overflow: hidden;
-}
-
-.andar-bahar-container .side-col.andar {
-  border-color: rgba(29, 95, 255, 0.3);
-}
-
-.andar-bahar-container .side-col.bahar {
-  border-color: rgba(255, 71, 26, 0.3);
-}
-
-.andar-bahar-container .side-col.win {
-  border-color: var(--win);
-  background: rgba(123, 245, 155, 0.15);
-  box-shadow: 0 0 20px rgba(123, 245, 155, 0.4);
-}
-
-.andar-bahar-container .side-name {
-  font-weight: 900;
-  font-size: 13px;
-  letter-spacing: 1px;
-  margin-bottom: 2px;
-}
-
-.andar-bahar-container .side-name.andar {
-  color: #709eff;
-}
-
-.andar-bahar-container .side-name.bahar {
-  color: #ff8566;
-}
-
-.andar-bahar-container .side-count {
-  font-size: 10px;
-  color: rgba(255,255,255,0.6);
-  margin-bottom: 6px;
-}
-
-.andar-bahar-container .pile {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 4px;
-  overflow-y: auto;
-  max-height: 140px;
-  width: 100%;
-  padding: 2px;
-}
-
-/* Open/Joker Card Middle Area */
-.andar-bahar-container .middle-wrap {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-}
-
-.andar-bahar-container .middle-label {
-  font-size: 10px;
-  font-weight: 800;
+  letter-spacing: 2px;
+  color: rgba(255, 215, 0, 0.65);
   text-transform: uppercase;
-  color: var(--gold);
+}
+
+/* Live Badge */
+.andar-bahar-container .ab-live-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(220, 38, 38, 0.2);
+  border: 1px solid rgba(239, 68, 68, 0.55);
+  border-radius: 999px;
+  padding: 2.5px 8px;
+  font-size: 9.5px;
+  font-weight: 900;
+  color: #fca5a5;
   letter-spacing: 0.5px;
 }
 
-.andar-bahar-container .target-rank {
-  font-size: 10px;
-  font-weight: 800;
-  background: rgba(0,0,0,0.6);
-  padding: 2px 6px;
-  border-radius: 4px;
-  color: #fff;
-  border: 1px solid rgba(244, 208, 104, 0.3);
+.andar-bahar-container .ab-live-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #ef4444;
+  box-shadow: 0 0 6px #ef4444;
+  animation: ab-live-blink 1s infinite alternate;
 }
 
-/* Playing Cards */
+@keyframes ab-live-blink {
+  from { opacity: 0.4; }
+  to { opacity: 1; }
+}
+
+/* Phase / Timer Pill */
+.andar-bahar-container .ab-phase-pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3.5px 12px;
+  border-radius: 999px;
+  font-weight: 900;
+  font-size: 11.5px;
+  letter-spacing: 0.5px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.4);
+  white-space: nowrap;
+}
+
+.andar-bahar-container .ab-phase-betting {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.25), rgba(6, 95, 70, 0.35));
+  border: 1.5px solid #10b981;
+  color: #a7f3d0;
+  box-shadow: 0 0 15px rgba(16, 185, 129, 0.35);
+}
+
+.andar-bahar-container .ab-phase-closed {
+  background: linear-gradient(135deg, rgba(234, 179, 8, 0.25), rgba(161, 98, 7, 0.35));
+  border: 1.5px solid #eab308;
+  color: #fef08a;
+  box-shadow: 0 0 15px rgba(234, 179, 8, 0.35);
+  animation: ab-phase-pulse 0.8s infinite alternate;
+}
+
+.andar-bahar-container .ab-phase-dealing {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.25), rgba(29, 78, 216, 0.35));
+  border: 1.5px solid #3b82f6;
+  color: #bfdbfe;
+  box-shadow: 0 0 15px rgba(59, 130, 246, 0.35);
+}
+
+.andar-bahar-container .ab-phase-result {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.35), rgba(180, 83, 9, 0.45));
+  border: 1.5px solid #f59e0b;
+  color: #fef3c7;
+  box-shadow: 0 0 20px rgba(245, 158, 11, 0.5);
+  animation: ab-phase-pulse 0.6s infinite alternate;
+}
+
+@keyframes ab-phase-pulse {
+  from { transform: scale(0.98); opacity: 0.9; }
+  to { transform: scale(1.02); opacity: 1; }
+}
+
+.andar-bahar-container .ab-phase-icon {
+  font-size: 13px;
+  line-height: 1;
+}
+
+.andar-bahar-container .ab-phase-timer {
+  background: rgba(0, 0, 0, 0.4);
+  padding: 1px 6px;
+  border-radius: 6px;
+  font-size: 11px;
+}
+
+/* Wallet Balance Pill */
+.andar-bahar-container .ab-wallet-pill {
+  background: linear-gradient(180deg, #1c0d02 0%, #0c0501 100%);
+  border: 1.5px solid rgba(255, 215, 0, 0.55);
+  box-shadow: 0 0 12px rgba(255, 215, 0, 0.25), inset 0 1px 3px rgba(0, 0, 0, 0.8);
+  padding: 3.5px 12px;
+  border-radius: 999px;
+  font-weight: 900;
+  font-size: 12.5px;
+  color: #ffd700;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+
+.andar-bahar-container .ab-coin-icon {
+  font-size: 13px;
+}
+
+/* Quick Action Buttons (History, Rules, Sound) */
+.andar-bahar-container .ab-icon-btn {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  color: #ffffff;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 13.5px;
+  transition: all 0.15s ease;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+.andar-bahar-container .ab-icon-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 215, 0, 0.5);
+  transform: scale(1.06);
+}
+
+.andar-bahar-container .ab-icon-btn.muted {
+  opacity: 0.6;
+  border-color: rgba(239, 68, 68, 0.4);
+}
+
+/* =========================================================
+   2. MAIN ARENA: ROADMAP & VELVET CASINO TABLE
+   ========================================================= */
+.andar-bahar-container .ab-main-arena {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 10px;
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+}
+
+/* Live Bead Plate (Roadmap Strip) */
+.andar-bahar-container .ab-roadmap-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(0, 0, 0, 0.72);
+  border: 1px solid rgba(255, 215, 0, 0.28);
+  border-radius: 999px;
+  padding: 2.5px 12px;
+  margin-bottom: 4px;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
+  max-width: 96%;
+}
+
+.andar-bahar-container .ab-roadmap-label {
+  font-size: 8.5px;
+  font-weight: 900;
+  letter-spacing: 1.5px;
+  color: #ffd700;
+  text-transform: uppercase;
+}
+
+.andar-bahar-container .ab-bead-list {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.andar-bahar-container .ab-bead-list::-webkit-scrollbar {
+  display: none;
+}
+
+.andar-bahar-container .ab-bead {
+  width: 19px;
+  height: 19px;
+  border-radius: 50%;
+  font-size: 9.5px;
+  font-weight: 900;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.6);
+  flex-shrink: 0;
+  transition: transform 0.2s ease;
+}
+
+.andar-bahar-container .bead-andar {
+  background: radial-gradient(circle at 35% 35%, #60a5fa 0%, #2563eb 60%, #1e40af 100%);
+  border: 1px solid #93c5fd;
+}
+
+.andar-bahar-container .bead-bahar {
+  background: radial-gradient(circle at 35% 35%, #fb923c 0%, #ea580c 60%, #9a3412 100%);
+  border: 1px solid #fdba74;
+}
+
+.andar-bahar-container .bead-latest {
+  border: 2px solid #ffd700 !important;
+  box-shadow: 0 0 10px #ffd700, 0 2px 6px rgba(0, 0, 0, 0.6);
+  transform: scale(1.15);
+  animation: ab-latest-bead 1s infinite alternate;
+}
+
+@keyframes ab-latest-bead {
+  from { box-shadow: 0 0 5px #ffd700; }
+  to { box-shadow: 0 0 12px #ffd700; }
+}
+
+.andar-bahar-container .ab-bead-empty {
+  font-size: 9.5px;
+  color: rgba(255, 255, 255, 0.5);
+  font-style: italic;
+}
+
+/* Table Outer Wrapper */
+.andar-bahar-container .ab-table-container {
+  width: 100%;
+  max-width: 840px;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px;
+}
+
+/* =========================================================
+   3. THE CASINO FELT TABLE
+   ========================================================= */
+.andar-bahar-container .ab-felt-table {
+  width: 100%;
+  height: 100%;
+  max-height: 250px;
+  background: radial-gradient(ellipse at 50% 30%, #0f5433 0%, #0a3822 65%, #051d11 100%);
+  border: 6px solid #231206;
+  border-radius: 40px;
+  outline: 2px solid rgba(245, 215, 110, 0.6);
+  box-shadow:
+    0 18px 45px rgba(0, 0, 0, 0.85),
+    inset 0 2px 6px rgba(255, 255, 255, 0.18),
+    inset 0 0 35px rgba(0, 0, 0, 0.7);
+  display: grid;
+  grid-template-columns: 1fr 135px 1fr;
+  gap: 8px;
+  padding: 8px 14px;
+  position: relative;
+  user-select: none;
+}
+
+/* Interactive Table Betting Zones (Andar & Bahar) */
+.andar-bahar-container .ab-table-zone {
+  border-radius: 16px;
+  background: rgba(0, 0, 0, 0.32);
+  border: 1.5px solid rgba(255, 255, 255, 0.12);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 6px 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
+  height: 100%;
+}
+
+.andar-bahar-container .ab-table-zone:hover {
+  background: rgba(255, 255, 255, 0.04);
+  transform: translateY(-1px);
+}
+
+.andar-bahar-container .zone-andar {
+  border-color: rgba(59, 130, 246, 0.45);
+}
+
+.andar-bahar-container .zone-andar:hover {
+  border-color: rgba(96, 165, 250, 0.8);
+  box-shadow: 0 0 16px rgba(59, 130, 246, 0.35);
+}
+
+.andar-bahar-container .zone-bahar {
+  border-color: rgba(249, 115, 22, 0.45);
+}
+
+.andar-bahar-container .zone-bahar:hover {
+  border-color: rgba(251, 146, 60, 0.8);
+  box-shadow: 0 0 16px rgba(249, 115, 22, 0.35);
+}
+
+.andar-bahar-container .zone-win {
+  border-color: #34d399 !important;
+  box-shadow: 0 0 25px rgba(52, 211, 153, 0.6) !important;
+  background: rgba(16, 185, 129, 0.18) !important;
+  animation: ab-win-glow 1s infinite alternate;
+}
+
+@keyframes ab-win-glow {
+  from { box-shadow: 0 0 15px rgba(52, 211, 153, 0.4); }
+  to { box-shadow: 0 0 30px rgba(52, 211, 153, 0.8); }
+}
+
+.andar-bahar-container .zone-has-bet {
+  border-width: 2px;
+}
+
+/* Zone Header */
+.andar-bahar-container .ab-zone-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding-bottom: 4px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  margin-bottom: 4px;
+}
+
+.andar-bahar-container .ab-zone-title {
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 1px;
+}
+
+.andar-bahar-container .text-andar {
+  color: #60a5fa;
+  text-shadow: 0 0 10px rgba(96, 165, 250, 0.6);
+}
+
+.andar-bahar-container .text-bahar {
+  color: #fb923c;
+  text-shadow: 0 0 10px rgba(251, 146, 60, 0.6);
+}
+
+.andar-bahar-container .ab-zone-payout {
+  font-size: 10px;
+  font-weight: 900;
+  color: #ffd700;
+  background: rgba(0, 0, 0, 0.5);
+  padding: 1px 6px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 215, 0, 0.3);
+}
+
+.andar-bahar-container .ab-card-counter {
+  font-size: 9.5px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+/* Dealt Cards Tray */
+.andar-bahar-container .ab-cards-tray {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 100%;
+  flex: 1;
+  overflow-y: auto;
+  padding: 2px;
+}
+
+.andar-bahar-container .ab-card-deal-anim {
+  animation: ab-deal-drop 0.28s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+@keyframes ab-deal-drop {
+  0% { transform: scale(0.5) translateY(-14px); opacity: 0; }
+  100% { transform: scale(1) translateY(0); opacity: 1; }
+}
+
+.andar-bahar-container .ab-card-slot-placeholder {
+  height: 54px;
+  width: 80%;
+  border: 1.5px dashed rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: auto;
+}
+
+.andar-bahar-container .ab-slot-text {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  color: rgba(255, 255, 255, 0.3);
+}
+
+/* Placed Chip Badge on Table */
+.andar-bahar-container .ab-placed-chip-badge {
+  position: absolute;
+  bottom: 6px;
+  padding: 2.5px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 900;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.6);
+  animation: ab-chip-pop 0.2s ease-out;
+}
+
+@keyframes ab-chip-pop {
+  0% { transform: scale(0.6); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.andar-bahar-container .chip-glow-blue {
+  background: linear-gradient(135deg, #1d4ed8, #1e3a8a);
+  border: 1.5px solid #60a5fa;
+  color: #ffffff;
+  box-shadow: 0 0 12px rgba(96, 165, 250, 0.7);
+}
+
+.andar-bahar-container .chip-glow-orange {
+  background: linear-gradient(135deg, #c2410c, #7c2d12);
+  border: 1.5px solid #fb923c;
+  color: #ffffff;
+  box-shadow: 0 0 12px rgba(251, 146, 60, 0.7);
+}
+
+/* =========================================================
+   4. JOKER / OPEN CARD (CENTER PEDESTAL)
+   ========================================================= */
+.andar-bahar-container .ab-center-pedestal {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+}
+
+.andar-bahar-container .ab-pedestal-rim {
+  background: rgba(0, 0, 0, 0.5);
+  border: 2px solid rgba(255, 215, 0, 0.45);
+  border-radius: 14px;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.6), inset 0 0 12px rgba(255, 215, 0, 0.15);
+  width: 100%;
+}
+
+.andar-bahar-container .ab-pedestal-tag {
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 1px;
+  color: #ffd700;
+  text-transform: uppercase;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+}
+
+.andar-bahar-container .ab-pedestal-card-holder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 60px;
+}
+
+.andar-bahar-container .ab-open-card-reveal {
+  animation: ab-card-flip 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes ab-card-flip {
+  0% { transform: scale(0.5) rotateY(90deg); opacity: 0; }
+  100% { transform: scale(1) rotateY(0); opacity: 1; }
+}
+
+.andar-bahar-container .ab-target-badge {
+  font-size: 9.5px;
+  font-weight: 800;
+  background: rgba(0, 0, 0, 0.7);
+  padding: 2px 8px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 215, 0, 0.35);
+  color: #ffd700;
+  text-align: center;
+}
+
+.andar-bahar-container .ab-target-placeholder {
+  font-size: 8.5px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.4);
+  letter-spacing: 0.5px;
+}
+
+/* =========================================================
+   5. PLAYING CARDS
+   ========================================================= */
 .andar-bahar-container .card {
-  width: 42px;
-  height: 58px;
-  background: #fff;
-  color: #111;
+  width: 40px;
+  height: 56px;
+  background: #ffffff;
+  color: #111111;
   border-radius: 5px;
   display: flex;
   flex-direction: column;
@@ -425,40 +652,278 @@
   justify-content: space-between;
   padding: 3px 2px;
   font-weight: 900;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.45);
-  border: 1px solid rgba(0,0,0,0.15);
-  animation: ab-card-pop 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-}
-
-@keyframes ab-card-pop {
-  0% { transform: scale(0.6) translateY(-10px); opacity: 0; }
-  100% { transform: scale(1) translateY(0); opacity: 1; }
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(0, 0, 0, 0.2);
 }
 
 .andar-bahar-container .card.red {
-  color: #d11a1a;
+  color: #dc2626;
 }
 
 .andar-bahar-container .card .r {
-  font-size: 14px;
+  font-size: 13px;
   line-height: 1;
 }
 
 .andar-bahar-container .card .s {
-  font-size: 14px;
+  font-size: 13px;
   line-height: 1;
 }
 
 .andar-bahar-container .card-back {
-  width: 42px;
-  height: 58px;
+  width: 40px;
+  height: 56px;
   border-radius: 5px;
   background: repeating-linear-gradient(45deg, #8a1717 0 4px, #4d0b0b 4px 8px);
-  border: 2px solid #fff;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+  border: 2px solid #ffffff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
 }
 
-/* ---- On-Screen Result Announcement Overlay -------------------- */
+.andar-bahar-container .card-back.calc-pulse {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px dashed #ffd700;
+  box-shadow: 0 0 16px rgba(255, 215, 0, 0.4);
+  animation: ab-pulse-glow 0.8s infinite alternate;
+}
+
+@keyframes ab-pulse-glow {
+  from { box-shadow: 0 0 8px rgba(255, 215, 0, 0.3); }
+  to { box-shadow: 0 0 20px rgba(255, 215, 0, 0.7); }
+}
+
+/* =========================================================
+   6. BOTTOM BETTING CONTROL CONSOLE
+   ========================================================= */
+.andar-bahar-container .ab-bottom-console {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px max(var(--safe-right), 12px) max(var(--safe-bottom), 4px) max(var(--safe-left), 12px);
+  min-height: calc(48px + var(--safe-bottom));
+  background: rgba(10, 3, 22, 0.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-top: 1px solid rgba(255, 215, 0, 0.22);
+  z-index: 25;
+  gap: 10px;
+}
+
+/* Chip Tray */
+.andar-bahar-container .ab-chip-tray {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.andar-bahar-container .ab-tray-label {
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 1.5px;
+  color: #ffd700;
+}
+
+.andar-bahar-container .ab-chips-list {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.andar-bahar-container .ab-chip-token {
+  width: 33px;
+  height: 33px;
+  border-radius: 50%;
+  border: 2px dashed #ffffff;
+  padding: 0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.6);
+  transition: all 0.15s ease;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.andar-bahar-container .ab-chip-token:hover:not(:disabled) {
+  transform: translateY(-2px) scale(1.05);
+}
+
+.andar-bahar-container .ab-chip-token:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.andar-bahar-container .chip-50 {
+  background: radial-gradient(circle, #22c55e 60%, #15803d 100%);
+  color: #ffffff;
+}
+
+.andar-bahar-container .chip-100 {
+  background: radial-gradient(circle, #06b6d4 60%, #0891b2 100%);
+  color: #ffffff;
+}
+
+.andar-bahar-container .chip-500 {
+  background: radial-gradient(circle, #8b5cf6 60%, #6d28d9 100%);
+  color: #ffffff;
+}
+
+.andar-bahar-container .chip-1000 {
+  background: radial-gradient(circle, #f97316 60%, #c2410c 100%);
+  color: #ffffff;
+}
+
+.andar-bahar-container .chip-5000 {
+  background: radial-gradient(circle, #ef4444 60%, #b91c1c 100%);
+  color: #ffffff;
+}
+
+.andar-bahar-container .chip-selected {
+  box-shadow: 0 0 0 2.5px #ffd700, 0 0 14px #ffd700 !important;
+  transform: translateY(-4px) scale(1.12);
+}
+
+.andar-bahar-container .ab-chip-label {
+  font-size: 9.5px;
+  font-weight: 900;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+}
+
+/* Stepper */
+.andar-bahar-container .ab-stake-stepper {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  padding: 2px 6px;
+}
+
+.andar-bahar-container .ab-stepper-btn {
+  background: rgba(255, 255, 255, 0.12);
+  border: none;
+  color: #ffffff;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.andar-bahar-container .ab-stepper-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.andar-bahar-container .ab-stepper-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.andar-bahar-container .ab-stepper-val {
+  min-width: 44px;
+  text-align: center;
+  font-size: 11.5px;
+  font-weight: 900;
+  color: #ffd700;
+}
+
+/* Action Betting Pads */
+.andar-bahar-container .ab-action-pads {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.andar-bahar-container .ab-pad-btn {
+  border: none;
+  border-radius: 10px;
+  padding: 6px 18px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  min-width: 105px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.andar-bahar-container .ab-pad-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  filter: brightness(1.1);
+}
+
+.andar-bahar-container .ab-pad-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.andar-bahar-container .pad-andar {
+  background: linear-gradient(180deg, #3b82f6 0%, #1d4ed8 100%);
+  border: 1.5px solid #60a5fa;
+  color: #ffffff;
+}
+
+.andar-bahar-container .pad-bahar {
+  background: linear-gradient(180deg, #f97316 0%, #c2410c 100%);
+  border: 1.5px solid #fb923c;
+  color: #ffffff;
+}
+
+.andar-bahar-container .pad-locked {
+  outline: 2.5px solid #ffd700;
+  box-shadow: 0 0 16px rgba(255, 215, 0, 0.7);
+  transform: scale(1.03);
+}
+
+.andar-bahar-container .ab-pad-title {
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 0.5px;
+  line-height: 1;
+}
+
+.andar-bahar-container .ab-pad-sub {
+  font-size: 9px;
+  font-weight: 700;
+  opacity: 0.9;
+  margin-top: 2px;
+}
+
+/* =========================================================
+   7. FLOATING ERROR TOAST & RESULT ANNOUNCEMENT
+   ========================================================= */
+.andar-bahar-container .ab-floating-error-toast {
+  position: absolute;
+  top: 50px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(185, 28, 28, 0.92);
+  border: 1px solid #f87171;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 6px 16px;
+  border-radius: 20px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.6);
+  z-index: 60;
+  animation: ab-toast-in 0.25s ease-out;
+}
+
+@keyframes ab-toast-in {
+  from { transform: translate(-50%, -10px); opacity: 0; }
+  to { transform: translate(-50%, 0); opacity: 1; }
+}
+
 .andar-bahar-container .ab-result-banner {
   position: absolute;
   top: 45%;
@@ -469,7 +934,7 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 16px 32px;
+  padding: 14px 28px;
   border-radius: 20px;
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
@@ -482,14 +947,8 @@
 }
 
 @keyframes ab-result-pop {
-  0% {
-    opacity: 0;
-    transform: translate(-50%, -50%) scale(0.6);
-  }
-  100% {
-    opacity: 1;
-    transform: translate(-50%, -50%) scale(1);
-  }
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.6); }
+  100% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
 }
 
 .andar-bahar-container .ab-result-banner.win {
@@ -511,7 +970,7 @@
 }
 
 .andar-bahar-container .ab-result-banner-badge {
-  font-size: 11px;
+  font-size: 10.5px;
   font-weight: 900;
   letter-spacing: 2px;
   text-transform: uppercase;
@@ -524,7 +983,7 @@
 }
 
 .andar-bahar-container .ab-result-banner-title {
-  font-size: 26px;
+  font-size: 24px;
   font-weight: 900;
   letter-spacing: 1.5px;
   color: #ffffff;
@@ -533,7 +992,7 @@
 }
 
 .andar-bahar-container .ab-result-banner-amount {
-  font-size: 28px;
+  font-size: 26px;
   font-weight: 900;
   font-family: monospace;
   margin-top: 4px;
@@ -549,624 +1008,198 @@
 }
 
 .andar-bahar-container .ab-result-banner-sub {
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 700;
   color: rgba(255, 255, 255, 0.92);
-  margin-top: 6px;
+  margin-top: 5px;
   text-shadow: 0 1px 4px rgba(0, 0, 0, 0.7);
 }
 
-/* Result Banner */
-.andar-bahar-container .result {
-  margin-top: 8px;
-  font-size: 14px;
-  font-weight: 800;
-  color: #fff;
-  min-height: 22px;
-  text-shadow: 0 2px 4px rgba(0,0,0,0.6);
+/* =========================================================
+   8. HISTORY DRAWER & MODALS
+   ========================================================= */
+.andar-bahar-container .history-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(3px);
+  z-index: 70;
+  cursor: pointer;
 }
 
-.andar-bahar-container .result.win {
-  color: var(--win);
-  font-size: 16px;
-  animation: ab-bounce 0.4s ease;
-}
-
-.andar-bahar-container .result.lose {
-  color: var(--lose);
-}
-
-.andar-bahar-container .calc-banner {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  color: #ffd21a;
-  font-weight: 800;
-  letter-spacing: 0.5px;
-  text-shadow: 0 0 10px rgba(255, 210, 26, 0.4);
-}
-
-.andar-bahar-container .calc-spinner {
-  display: inline-block;
-  animation: ab-spin 1.4s linear infinite;
-  font-size: 14px;
-}
-
-@keyframes ab-spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-
-.andar-bahar-container .card-back.calc-pulse {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px dashed rgba(255, 210, 26, 0.7);
-  box-shadow: 0 0 16px rgba(255, 210, 26, 0.35);
-  animation: ab-pulse 0.8s infinite alternate;
-}
-
-@keyframes ab-bounce {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.15); }
-}
-
-/* ---- History Sidebar / Drawer -------------------------------------------- */
-.andar-bahar-container .history-sidebar {
-  grid-area: history;
-  background: rgba(4, 16, 10, 0.7);
-  border-left: 1px solid rgba(255,255,255,0.08);
+.andar-bahar-container .history-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(340px, 85vw);
+  background: #0c1a12;
+  border-left: 1.5px solid rgba(244, 208, 104, 0.45);
+  box-shadow: -8px 0 35px rgba(0, 0, 0, 0.85);
+  transform: translateX(100%);
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  z-index: 75;
   display: flex;
   flex-direction: column;
-  padding: 8px;
-  overflow: hidden;
+}
+
+.andar-bahar-container .history-drawer.open {
+  transform: translateX(0);
+}
+
+.andar-bahar-container .history-drawer .history-sidebar {
+  display: flex !important;
+  width: 100%;
   height: 100%;
+  border-left: none;
+  background: transparent;
+  padding: 12px;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .andar-bahar-container .history-title-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 8px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding-bottom: 8px;
 }
 
 .andar-bahar-container .history-title {
-  font-weight: 800;
-  font-size: 12px;
-  color: var(--gold);
-  text-transform: uppercase;
+  font-size: 14px;
+  font-weight: 900;
+  color: #ffd700;
   letter-spacing: 0.5px;
+}
+
+.andar-bahar-container .history-close {
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  color: #ffffff;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background 0.15s ease;
+}
+
+.andar-bahar-container .history-close:hover {
+  background: rgba(255, 255, 255, 0.25);
 }
 
 .andar-bahar-container .history-table {
   display: flex;
   flex-direction: column;
-  overflow-y: auto;
   flex: 1;
+  overflow: hidden;
   font-size: 11px;
 }
 
 .andar-bahar-container .history-row {
   display: grid;
-  grid-template-columns: 24px 44px 1fr 48px 52px;
-  gap: 4px;
+  grid-template-columns: 28px 1fr 1fr 40px 40px;
   align-items: center;
-  padding: 5px 4px;
-  border-bottom: 1px solid rgba(255,255,255,0.05);
+  padding: 6px 4px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .andar-bahar-container .history-head {
-  font-weight: 800;
-  font-size: 9px;
-  color: rgba(255,255,255,0.5);
-  text-transform: uppercase;
+  font-weight: 900;
+  color: #ffd700;
+  border-bottom: 1px solid rgba(244, 208, 104, 0.3);
 }
 
-.andar-bahar-container .history-row.win {
-  color: var(--win);
-}
-
-.andar-bahar-container .history-row.lose {
-  color: rgba(255,255,255,0.7);
+.andar-bahar-container .history-body {
+  overflow-y: auto;
+  flex: 1;
 }
 
 .andar-bahar-container .history-result.andar {
-  color: #709eff;
+  color: #60a5fa;
+  font-weight: 900;
 }
 
 .andar-bahar-container .history-result.bahar {
-  color: #ff8566;
+  color: #fb923c;
+  font-weight: 900;
 }
 
 .andar-bahar-container .history-empty {
+  color: rgba(255, 255, 255, 0.5);
+  font-style: italic;
+  padding: 16px 0;
   text-align: center;
-  color: rgba(255,255,255,0.4);
-  font-size: 11px;
-  margin-top: 20px;
 }
 
-/* ---- Footer & Betting Controls -------------------------------------------- */
-.andar-bahar-container .app-footer {
-  grid-area: footer;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 6px max(var(--safe-right), 16px) max(var(--safe-bottom), 6px) max(var(--safe-left), 16px);
-  background: rgba(4, 16, 10, 0.95);
-  border-top: 1px solid rgba(244, 208, 104, 0.25);
-  z-index: 10;
-}
-
-.andar-bahar-container .bet-row {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.andar-bahar-container .chip-group,
-.andar-bahar-container .stake-group {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.andar-bahar-container .group-label {
-  font-size: 10px;
-  font-weight: 700;
-  color: rgba(255,255,255,0.6);
-  text-transform: uppercase;
-}
-
-.andar-bahar-container .chip-select-wrap {
-  position: relative;
-}
-
-.andar-bahar-container .chip-select {
-  border: 1px solid rgba(244, 208, 104, 0.5);
-  border-radius: 999px;
-  padding: 6px 14px;
-  font-weight: 800;
-  font-size: 13px;
-  color: #111;
-  background: linear-gradient(180deg, #ffe9a8, var(--gold-2));
-  box-shadow: 0 2px 6px rgba(0,0,0,0.35);
-  cursor: pointer;
-}
-
-.andar-bahar-container .chip-menu-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 39;
-}
-
-.andar-bahar-container .chip-menu {
-  position: absolute;
-  bottom: calc(100% + 6px);
-  left: 0;
-  z-index: 40;
-  min-width: 96px;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  padding: 6px;
-  background: rgba(10,12,16,0.96);
-  border: 1px solid rgba(244, 208, 104, 0.4);
-  border-radius: 10px;
-  box-shadow: 0 10px 26px rgba(0,0,0,0.55);
-}
-
-.andar-bahar-container .chip-menu-item {
-  text-align: left;
-  background: none;
-  border: none;
-  color: #fff;
-  font-weight: 700;
-  font-size: 12px;
-  padding: 6px 10px;
-  border-radius: 6px;
-  cursor: pointer;
-}
-
-.andar-bahar-container .chip-menu-item.active,
-.andar-bahar-container .chip-menu-item:hover {
-  background: rgba(244, 208, 104, 0.2);
-  color: var(--gold);
-}
-
-.andar-bahar-container .bet-stepper {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  background: rgba(0,0,0,0.35);
-  border: 1px solid rgba(255,255,255,0.15);
-  border-radius: 8px;
-  padding: 3px 6px;
-}
-
-.andar-bahar-container .bet-stepper button {
-  background: rgba(255,255,255,0.1);
-  border: none;
-  color: #fff;
-  width: 22px;
-  height: 22px;
-  border-radius: 6px;
-  font-weight: 800;
-  font-size: 14px;
-  cursor: pointer;
-}
-
-.andar-bahar-container .bet-stepper button:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
-.andar-bahar-container .bet-stepper span {
-  min-width: 48px;
-  text-align: center;
-  font-weight: 800;
-  font-size: 12px;
-}
-
-.andar-bahar-container .bet {
-  border: none;
-  border-radius: 10px;
-  padding: 8px 22px;
-  font-weight: 900;
-  font-size: 14px;
-  color: #fff;
-  letter-spacing: 0.5px;
-  box-shadow: 0 4px 10px rgba(0,0,0,0.4);
-  cursor: pointer;
-  transition: all 0.15s ease;
-  min-width: 110px;
-}
-
-.andar-bahar-container .bet:hover:not(:disabled) {
-  filter: brightness(1.1);
-  transform: translateY(-1px);
-}
-
-.andar-bahar-container .bet.andar {
-  background: linear-gradient(180deg, #4a83ff, var(--andar));
-}
-
-.andar-bahar-container .bet.bahar {
-  background: linear-gradient(180deg, #ff855f, var(--bahar));
-}
-
-.andar-bahar-container .bet:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
-.andar-bahar-container .bet.selected {
-  outline: 2px solid #ffd21a;
-  box-shadow: 0 0 16px rgba(255, 210, 26, 0.7);
-  transform: scale(1.05);
-}
-
-.andar-bahar-container .bet small {
-  display: block;
-  font-weight: 600;
-  font-size: 9px;
-  opacity: 0.85;
-}
-
-.andar-bahar-container .confirm-bet {
-  border: none;
-  border-radius: 10px;
-  padding: 8px 20px;
-  font-weight: 900;
-  font-size: 13px;
-  color: #062712;
-  background: linear-gradient(180deg, #8bf7a8, #2fbf5f);
-  box-shadow: 0 4px 10px rgba(0,0,0,0.4);
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.andar-bahar-container .confirm-bet:hover:not(:disabled) {
-  filter: brightness(1.1);
-  transform: scale(1.03);
-}
-
-.andar-bahar-container .confirm-bet:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
-.andar-bahar-container .hint {
-  text-align: center;
-  font-size: 10px;
-  color: rgba(255,255,255,0.6);
-  margin: 0;
-}
-
-.andar-bahar-container .progress-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.andar-bahar-container .progress-strip {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex: 1;
-  overflow-x: auto;
-}
-
-.andar-bahar-container .progress-step-wrap {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.andar-bahar-container .progress-step {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 3px 8px;
-  border-radius: 6px;
-  opacity: 0.5;
-}
-
-.andar-bahar-container .progress-step.active {
-  opacity: 1;
-  background: rgba(244, 208, 104, 0.15);
-  border: 1px solid rgba(244, 208, 104, 0.4);
-}
-
-.andar-bahar-container .progress-step.done {
-  opacity: 0.8;
-}
-
-.andar-bahar-container .progress-icon {
-  font-size: 14px;
-}
-
-.andar-bahar-container .progress-text {
-  display: flex;
-  flex-direction: column;
-  line-height: 1.1;
-}
-
-.andar-bahar-container .progress-label {
-  font-size: 10px;
-  font-weight: 800;
-  white-space: nowrap;
-}
-
-.andar-bahar-container .progress-sub {
-  font-size: 8px;
-  color: rgba(255,255,255,0.5);
-  white-space: nowrap;
-}
-
-.andar-bahar-container .progress-arrow {
-  color: rgba(255,255,255,0.3);
-  font-size: 10px;
-}
-
-.andar-bahar-container .action.new-round {
-  border: none;
-  border-radius: 8px;
-  padding: 6px 14px;
-  font-weight: 900;
-  font-size: 12px;
-  background: linear-gradient(180deg, #8bf7a8, #2fbf5f);
-  color: #062712;
-  cursor: pointer;
-}
-
-.andar-bahar-container .action.new-round:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
-.andar-bahar-container .action.secondary {
-  background: rgba(255,255,255,0.1);
-  color: #fff;
-  border: 1px solid rgba(255,255,255,0.2);
-  border-radius: 8px;
-  padding: 6px 12px;
-  font-size: 11px;
-  cursor: pointer;
-}
-
-/* ---- Popups & Dialogs ----------------------------------------------------- */
+/* Exit Confirmation Dialog */
 .andar-bahar-container .popup-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0,0,0,0.7);
+  background: rgba(0, 0, 0, 0.75);
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 60;
+  z-index: 80;
+  backdrop-filter: blur(3px);
 }
 
 .andar-bahar-container .popup-card {
-  background: #0d281a;
-  border: 1px solid rgba(244, 208, 104, 0.4);
-  border-radius: 14px;
-  padding: 16px;
-  max-width: min(480px, 90vw);
-  max-height: 85vh;
-  overflow-y: auto;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.7);
+  background: #150921;
+  border: 1.5px solid rgba(255, 215, 0, 0.45);
+  border-radius: 16px;
+  padding: 20px;
+  width: min(320px, 90vw);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.8);
+  text-align: center;
 }
 
 .andar-bahar-container .popup-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+  font-size: 16px;
+  font-weight: 900;
+  color: #ffd700;
   margin-bottom: 10px;
-  font-weight: 800;
-  color: var(--gold);
-  gap: 10px;
-}
-
-.andar-bahar-container .rules-list {
-  margin: 0;
-  padding-left: 18px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.andar-bahar-container .rules-list li {
-  font-size: 12.5px;
-  line-height: 1.45;
-  color: rgba(255,255,255,0.85);
-}
-
-/* ---- Settings & Lobby Overlays -------------------------------------------- */
-.andar-bahar-container .settings,
-.andar-bahar-container .lobby {
-  grid-column: 1 / -1;
-  grid-row: 1 / -1;
-  align-self: center;
-  justify-self: center;
-  width: min(640px, 94%);
-  max-height: 92vh;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  padding: 16px;
-  background: rgba(6, 24, 16, 0.95);
-  border: 1px solid rgba(244, 208, 104, 0.35);
-  border-radius: 16px;
-  box-shadow: 0 15px 40px rgba(0,0,0,0.8);
-  z-index: 25;
-}
-
-.andar-bahar-container .topbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.andar-bahar-container .field label {
-  display: block;
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--gold);
-  margin-bottom: 6px;
-}
-
-.andar-bahar-container .field input {
-  width: 100%;
-  padding: 10px 12px;
-  border-radius: 8px;
-  border: 1px solid rgba(255,255,255,0.2);
-  background: rgba(0,0,0,0.4);
-  color: #fff;
-  font-size: 14px;
 }
 
 .andar-bahar-container .row {
   display: flex;
-  gap: 8px;
+  gap: 10px;
 }
 
 .andar-bahar-container .action {
   border: none;
-  border-radius: 10px;
-  padding: 10px 16px;
-  font-weight: 900;
-  font-size: 14px;
-  background: linear-gradient(180deg, #ffe9a8, var(--gold-2));
-  color: #111;
-  cursor: pointer;
-}
-
-.andar-bahar-container .badge {
-  font-size: 11px;
-  padding: 4px 10px;
-  border-radius: 999px;
-  font-weight: 700;
-}
-
-.andar-bahar-container .badge.on {
-  background: rgba(123, 245, 155, 0.15);
-  color: #7bf59b;
-  border: 1px solid rgba(123, 245, 155, 0.4);
-}
-
-.andar-bahar-container .badge.off {
-  background: rgba(255, 138, 122, 0.12);
-  color: #ff8a7a;
-  border: 1px solid rgba(255, 138, 122, 0.4);
-}
-
-.andar-bahar-container .lobby-top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.andar-bahar-container .lobby-tabs {
-  display: flex;
-  gap: 8px;
-}
-
-.andar-bahar-container .lobby-tab {
-  padding: 8px 16px;
   border-radius: 8px;
-  border: none;
-  font-weight: 800;
-  font-size: 12px;
-  background: rgba(255,255,255,0.08);
-  color: rgba(255,255,255,0.7);
+  padding: 8px 16px;
+  font-weight: 900;
+  font-size: 13px;
+  background: linear-gradient(180deg, #ef4444, #b91c1c);
+  color: #ffffff;
   cursor: pointer;
+  transition: all 0.15s ease;
 }
 
-.andar-bahar-container .lobby-tab.active {
-  background: linear-gradient(180deg, #ffe9a8, var(--gold-2));
-  color: #111;
+.andar-bahar-container .action.secondary {
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  color: #ffffff;
 }
 
-.andar-bahar-container .lobby-table {
-  display: flex;
-  flex-direction: column;
-  border-radius: 10px;
-  overflow: hidden;
+.andar-bahar-container .action:hover {
+  transform: translateY(-1px);
 }
 
-.andar-bahar-container .lobby-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr 0.8fr 1.1fr;
-  gap: 8px;
-  align-items: center;
-  padding: 10px 12px;
-  font-size: 12px;
-  font-weight: 700;
-  background: rgba(244, 208, 104, 0.08);
-  border-top: 1px solid rgba(255,255,255,0.06);
-}
-
-.andar-bahar-container .lobby-row.lobby-head {
-  background: rgba(244, 208, 104, 0.18);
-  font-size: 10px;
-  text-transform: uppercase;
-  color: var(--gold);
-  border-top: none;
-  font-weight: 800;
-}
-
-/* Portrait Phone Rotate Overlay */
+/* Portrait Block Warning */
 .andar-bahar-container .rotate-block {
-  position: fixed;
-  inset: 0;
-  background: #061c12;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  height: 100vh;
   padding: 24px;
   text-align: center;
   z-index: 100;
@@ -1186,159 +1219,128 @@
 .andar-bahar-container .rotate-title {
   font-weight: 900;
   font-size: 18px;
-  color: var(--gold);
+  color: #ffd700;
   margin-bottom: 8px;
 }
 
 .andar-bahar-container .rotate-sub {
   font-size: 13px;
-  color: rgba(255,255,255,0.7);
+  color: rgba(255, 255, 255, 0.7);
 }
 
-/* Responsive adjustments */
-@media (max-width: 1024px) {
-  .andar-bahar-container .app {
-    grid-template-columns: var(--rail-w) 1fr;
-    grid-template-areas:
-      "header header"
-      "rail table"
-      "footer footer";
-  }
-  .andar-bahar-container .app > .history-sidebar {
-    display: none;
-  }
-}
-
-/* History Drawer & Backdrop (Works on all screen sizes & APK) */
-.andar-bahar-container .history-backdrop {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.7);
-  backdrop-filter: blur(2px);
-  z-index: 70;
-  cursor: pointer;
-}
-
-.andar-bahar-container .history-drawer {
-  position: fixed;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  width: min(340px, 85vw);
-  background: #0d281a;
-  border-left: 1px solid rgba(244, 208, 104, 0.4);
-  box-shadow: -8px 0 30px rgba(0, 0, 0, 0.75);
-  transform: translateX(100%);
-  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-  z-index: 75;
-  display: flex;
-  flex-direction: column;
-}
-
-.andar-bahar-container .history-drawer.open {
-  transform: translateX(0);
-}
-
-.andar-bahar-container .history-drawer .history-sidebar {
-  display: flex !important;
-  width: 100%;
-  height: 100%;
-  border-left: none;
-  background: transparent;
-  padding: 12px;
-}
-
-.andar-bahar-container .history-close {
-  background: rgba(255, 255, 255, 0.12);
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  color: #fff;
-  width: 28px;
-  height: 28px;
-  border-radius: 6px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  font-size: 14px;
-  transition: background 0.15s ease;
-}
-
-.andar-bahar-container .history-close:hover {
-  background: rgba(255, 255, 255, 0.25);
-}
-
-/* Compact Landscape scaling for Android mobile screens */
-@media (max-height: 540px) {
-  .andar-bahar-container {
-    --header-h: calc(34px + var(--safe-top));
-    --rail-w: 48px;
-  }
-  .andar-bahar-container .app-header {
+/* =========================================================
+   9. RESPONSIVE OPTIMIZATION (MOBILE LANDSCAPE)
+   ========================================================= */
+@media (max-height: 480px) {
+  .andar-bahar-container .ab-header {
+    height: calc(38px + var(--safe-top));
+    min-height: calc(38px + var(--safe-top));
     padding: var(--safe-top) max(var(--safe-right), 8px) 0 max(var(--safe-left), 8px);
   }
-  .andar-bahar-container .table-wrap {
-    padding: 2px 4px;
-    min-height: 0;
-  }
-  .andar-bahar-container .table-oval {
-    height: 100%;
-    max-height: clamp(140px, 46dvh, 210px);
-    padding: 4px 12px;
-    gap: 6px;
-  }
-  .andar-bahar-container .side-col {
-    padding: 3px 4px;
-  }
-  .andar-bahar-container .side-name {
+
+  .andar-bahar-container .ab-btn-exit {
+    height: 26px;
+    padding: 0 10px;
     font-size: 11px;
-    margin-bottom: 1px;
   }
-  .andar-bahar-container .side-count {
-    font-size: 9px;
-    margin-bottom: 2px;
+
+  .andar-bahar-container .ab-brand-title {
+    font-size: 13px;
   }
-  .andar-bahar-container .pile {
-    max-height: 70px;
-    gap: 2px;
-  }
-  .andar-bahar-container .card {
-    width: 32px;
-    height: 44px;
-    padding: 2px 1px;
-  }
-  .andar-bahar-container .card .r,
-  .andar-bahar-container .card .s {
-    font-size: 10px;
-  }
-  .andar-bahar-container .card-back {
-    width: 32px;
-    height: 44px;
-  }
-  .andar-bahar-container .result {
+
+  .andar-bahar-container .ab-icon-btn {
+    width: 28px;
+    height: 28px;
     font-size: 12px;
-    min-height: 18px;
-    margin-top: 2px;
   }
-  .andar-bahar-container .app-footer {
-    padding: 3px max(var(--safe-right), 8px) max(var(--safe-bottom), 3px) max(var(--safe-left), 8px);
-    gap: 2px;
-  }
-  .andar-bahar-container .chip-select {
-    padding: 4px 10px;
+
+  .andar-bahar-container .ab-wallet-pill {
+    padding: 2.5px 10px;
     font-size: 11.5px;
   }
-  .andar-bahar-container .bet-stepper {
-    padding: 2px 4px;
+
+  .andar-bahar-container .ab-phase-pill {
+    padding: 2.5px 10px;
+    font-size: 10.5px;
   }
-  .andar-bahar-container .bet {
-    padding: 5px 14px;
+
+  .andar-bahar-container .ab-roadmap-bar {
+    padding: 1.5px 8px;
+    margin-bottom: 2px;
+  }
+
+  .andar-bahar-container .ab-bead {
+    width: 16px;
+    height: 16px;
+    font-size: 8.5px;
+  }
+
+  .andar-bahar-container .ab-felt-table {
+    max-height: 215px;
+    padding: 6px 10px;
+    border-radius: 28px;
+    border-width: 4px;
+    gap: 6px;
+    grid-template-columns: 1fr 115px 1fr;
+  }
+
+  .andar-bahar-container .card {
+    width: 33px;
+    height: 46px;
+    padding: 2px 1px;
+  }
+
+  .andar-bahar-container .card .r,
+  .andar-bahar-container .card .s {
+    font-size: 11px;
+  }
+
+  .andar-bahar-container .card-back {
+    width: 33px;
+    height: 46px;
+  }
+
+  .andar-bahar-container .ab-pedestal-card-holder {
+    min-height: 48px;
+  }
+
+  .andar-bahar-container .ab-zone-title {
+    font-size: 11.5px;
+  }
+
+  .andar-bahar-container .ab-bottom-console {
+    min-height: calc(42px + var(--safe-bottom));
+    padding: 3px max(var(--safe-right), 8px) max(var(--safe-bottom), 3px) max(var(--safe-left), 8px);
+    gap: 6px;
+  }
+
+  .andar-bahar-container .ab-chip-token {
+    width: 29px;
+    height: 29px;
+    font-size: 9px;
+  }
+
+  .andar-bahar-container .ab-stepper-btn {
+    width: 20px;
+    height: 20px;
     font-size: 12px;
-    min-width: 85px;
   }
-  .andar-bahar-container .hint {
-    display: none;
+
+  .andar-bahar-container .ab-stepper-val {
+    min-width: 38px;
+    font-size: 10.5px;
   }
-  .andar-bahar-container .progress-row {
-    display: none;
+
+  .andar-bahar-container .ab-pad-btn {
+    padding: 4px 14px;
+    min-width: 90px;
+  }
+
+  .andar-bahar-container .ab-pad-title {
+    font-size: 11.5px;
+  }
+
+  .andar-bahar-container .ab-pad-sub {
+    font-size: 8px;
   }
 }
