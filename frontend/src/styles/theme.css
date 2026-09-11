@@ -225,9 +225,71 @@ body {
 }
 
 /* Custom scrollbar */
-::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: var(--color-dark-900); }
 ::-webkit-scrollbar-thumb { background: var(--color-dark-600); border-radius: 3px; }
+
+/* Universal scrollbar-hide utility for all platforms (WebKit, Blink, Firefox, IE/Edge) */
+.scrollbar-hide,
+.no-scrollbar {
+  -ms-overflow-style: none !important;
+  scrollbar-width: none !important;
+}
+.scrollbar-hide::-webkit-scrollbar,
+.no-scrollbar::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  background: transparent !important;
+  -webkit-appearance: none !important;
+}
+
+/* Hide scrollbars completely inside game containers */
+.dragon-tiger-game,
+.dragon-tiger-game *,
+.andar-bahar-container,
+.andar-bahar-container *,
+.roulette-page,
+.roulette-page *,
+.aviator-game,
+.aviator-game *,
+.teen-patti-table,
+.teen-patti-table *,
+.rummy-page,
+.rummy-page *,
+.poker-page,
+.poker-page *,
+.chicken-road-page,
+.chicken-road-page *,
+.ludo-page,
+.ludo-page * {
+  -ms-overflow-style: none !important;
+  scrollbar-width: none !important;
+}
+
+.dragon-tiger-game::-webkit-scrollbar,
+.dragon-tiger-game *::-webkit-scrollbar,
+.andar-bahar-container::-webkit-scrollbar,
+.andar-bahar-container *::-webkit-scrollbar,
+.roulette-page::-webkit-scrollbar,
+.roulette-page *::-webkit-scrollbar,
+.aviator-game::-webkit-scrollbar,
+.aviator-game *::-webkit-scrollbar,
+.teen-patti-table::-webkit-scrollbar,
+.teen-patti-table *::-webkit-scrollbar,
+.rummy-page::-webkit-scrollbar,
+.rummy-page *::-webkit-scrollbar,
+.poker-page::-webkit-scrollbar,
+.poker-page *::-webkit-scrollbar,
+.chicken-road-page::-webkit-scrollbar,
+.chicken-road-page *::-webkit-scrollbar,
+.ludo-page::-webkit-scrollbar,
+.ludo-page *::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  background: transparent !important;
+}
 
 @keyframes glitter-fall {
   0% { transform: translateY(-10vh) rotate(0deg); opacity: 0; }

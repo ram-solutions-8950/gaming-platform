@@ -1080,7 +1080,10 @@ export function DragonTigerPage() {
 
         {/* ═══════════ HISTORY STRIP ═══════════ */}
         <div className="shrink-0 flex justify-center px-2 py-0.5 sm:py-1 z-20 flex-none my-0.5" style={{ height: 'clamp(26px, 5.5dvh, 42px)' }}>
-          <div className="flex gap-1.5 sm:gap-2 items-center bg-black/80 px-3 sm:px-4 py-0.5 rounded-full border border-yellow-500/30 overflow-hidden max-w-[85%] h-full shadow-[0_4px_16px_rgba(0,0,0,0.6)] backdrop-blur-md">
+          <div
+            className="flex gap-1.5 sm:gap-2 items-center bg-black/80 px-3 sm:px-4 py-0.5 rounded-full border border-yellow-500/30 overflow-x-auto no-scrollbar scrollbar-hide max-w-[85%] h-full shadow-[0_4px_16px_rgba(0,0,0,0.6)] backdrop-blur-md"
+            style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+          >
             {history.slice(0, 10).map((r, idx) => {
               const res = r.result_data?.result as string | undefined;
               const isLatest = idx === 0;
@@ -1200,7 +1203,10 @@ export function DragonTigerPage() {
           </div>
 
           {/* Chip Selector */}
-          <div className="flex-1 flex justify-center items-center gap-1.5 sm:gap-2.5 h-full overflow-x-auto scrollbar-hide">
+          <div
+            className="flex-1 flex justify-center items-center gap-1.5 sm:gap-2.5 h-full overflow-x-auto no-scrollbar scrollbar-hide"
+            style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+          >
             {[1000, 5000, 10000, 50000, 100000, 200000].map((p) => {
               const isChipSelected = amount === p;
               const chipColor =

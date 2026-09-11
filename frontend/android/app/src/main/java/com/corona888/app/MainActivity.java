@@ -30,6 +30,9 @@ public class MainActivity extends BridgeActivity {
         if (getBridge() != null && getBridge().getWebView() != null) {
             WebView webView = getBridge().getWebView();
             webView.setBackgroundColor(Color.BLACK);
+            webView.setHorizontalScrollBarEnabled(false);
+            webView.setVerticalScrollBarEnabled(false);
+            webView.setOverScrollMode(View.OVER_SCROLL_NEVER);
             WebSettings settings = webView.getSettings();
 
             // Lock text zoom to 100% so user device font scaling does not distort game layouts
