@@ -60,11 +60,17 @@ function Reel({ symbols, target, spinToken, reelIndex, pace }: ReelProps) {
     setAnimate(false);
     setStrip(newStrip);
     setOffset(0);
-    const raf = requestAnimationFrame(() => {
-      setAnimate(true);
-      setOffset(blurLen * SYMBOL_HEIGHT);
+    let raf2: number = 0;
+    const raf1 = requestAnimationFrame(() => {
+      raf2 = requestAnimationFrame(() => {
+        setAnimate(true);
+        setOffset(blurLen * SYMBOL_HEIGHT);
+      });
     });
-    return () => cancelAnimationFrame(raf);
+    return () => {
+      cancelAnimationFrame(raf1);
+      cancelAnimationFrame(raf2);
+    };
   }, [spinToken, target, symbols, pace]);
 
   const duration = REEL_STOPS_MS[pace][reelIndex] / 1000;
@@ -112,7 +118,7 @@ const BULB_COUNT_V = 6;
 
 export function SlotReels({ symbols, reels, spinToken, pace = "normal" }: SlotReelsProps) {
   return (
-    <div className="t777-machine-cabinet relative px-4 py-3">
+    <div className={`t777-machine-cabinet ${pace === "turbo" ? "t777-machine-cabinet--turbo" : ""} relative px-4 py-3`}>
       {/* top marquee bulbs */}
       <div className="absolute -top-1.5 left-3 right-3 flex justify-between pointer-events-none z-10">
         {Array.from({ length: BULB_COUNT_H }, (_, i) => (

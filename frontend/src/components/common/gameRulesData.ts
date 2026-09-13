@@ -325,7 +325,7 @@ export const TRIPLE_777_RULES_DATA: {
     {
       title: '⚡ Turbo Mode',
       icon: '⚡',
-      body: 'Toggle TURBO on for ultra-fast 0.4-second spins! Turbo mode accelerates the reels and bypasses routine modal popups so you can enjoy instant, continuous action. Major jackpot and big win celebrations still display fully.',
+      body: 'Toggle TURBO on for ultra-fast 0.5-second spins! Turbo mode accelerates reel rotation by 3× and delivers rapid outcomes for continuous high-speed action. Works seamlessly with both single spins and Auto Spin.',
     },
     {
       title: '🔁 Auto Spin',
@@ -341,8 +341,8 @@ export const TRIPLE_777_RULES_DATA: {
     { name: '🍒 🍒 🍒 (Cherries)', payout: '5x Stake', desc: 'Classic Cherry' },
   ],
   tips: [
-    'Use Turbo mode when you want high-speed spins without popup interruptions.',
-    'Combine Auto + Turbo for rapid-fire automated rounds.',
+    'Toggle Turbo mode ON when you want high-speed 3× spins and rapid rounds.',
+    'Combine Auto + Turbo for rapid-fire automated rounds at 3× speed.',
     'Manage your bankroll by setting steady spin sizes.',
     'Jackpot RTP is certified provably fair.',
   ],

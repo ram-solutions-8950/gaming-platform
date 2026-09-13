@@ -65,9 +65,14 @@ def _authenticate(token: str) -> Optional[uuid.UUID]:
 
 async def _broadcast(msg: dict) -> None:
     """Send a JSON message to all connected clients."""
-    text = json.dumps(msg, default=str)
+    try:
+        text = json.dumps(msg, default=str)
+    except Exception as e:
+        logger.error("Failed to serialize broadcast message: %s", e)
+        return
+
     dead: list[str] = []
-    for cid, (ws, _uid) in _connections.items():
+    for cid, (ws, _uid) in list(_connections.items()):
         try:
             await ws.send_text(text)
         except Exception:
@@ -312,6 +317,7 @@ async def _handle_place_bet(
             "user_id": str(user_id),
             "slot": slot,
             "amount": amount,
+            "auto_cashout": bet.auto_cashout,
         })
     except Exception as e:
         await _send(ws, {"type": "error", "message": str(e), "action_id": action_id})

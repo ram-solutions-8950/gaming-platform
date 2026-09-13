@@ -31,6 +31,13 @@ export const AviatorBetPanel: React.FC<AviatorBetPanelProps> = ({
   const [amountInput, setAmountInput] = useState<string>('10');
   const [autoCashoutEnabled, setAutoCashoutEnabled] = useState<boolean>(false);
   const [autoCashoutInput, setAutoCashoutInput] = useState<string>('2.0');
+  const [isPlacing, setIsPlacing] = useState<boolean>(false);
+
+  React.useEffect(() => {
+    if (myBet || phase !== 'BETTING') {
+      setIsPlacing(false);
+    }
+  }, [myBet, phase]);
 
   const amountRupees = parseInt(amountInput, 10) || 0;
   const amountPaise = Math.round(amountRupees * 100);
@@ -41,7 +48,7 @@ export const AviatorBetPanel: React.FC<AviatorBetPanelProps> = ({
   const isLost = myBet?.status === 'LOST';
 
   const livePayoutRupees = hasActiveBet
-    ? ((myBet.amount * multiplier) / 100).toFixed(2)
+    ? (((myBet?.amount || 0) * multiplier) / 100).toFixed(2)
     : '0.00';
 
   const handleStep = (step: number) => {
@@ -68,22 +75,10 @@ export const AviatorBetPanel: React.FC<AviatorBetPanelProps> = ({
     setAmountInput(String(Math.max(10, current + val)));
   };
 
-  const handleDouble = () => {
-    if (hasActiveBet) return;
-    const current = parseInt(amountInput, 10) || 0;
-    setAmountInput(String(Math.max(10, current * 2)));
-  };
-
-  const handleHalf = () => {
-    if (hasActiveBet) return;
-    const current = parseInt(amountInput, 10) || 0;
-    setAmountInput(String(Math.max(10, Math.floor(current / 2))));
-  };
-
   const handleActionClick = () => {
     if (isBettingPhase) {
-      if (!myBet) {
-        // Place bet
+      if (!myBet && !isPlacing) {
+        setIsPlacing(true);
         const effectiveAmountRupees = Math.max(10, parseInt(amountInput, 10) || 10);
         const effectiveAmountPaise = Math.round(effectiveAmountRupees * 100);
         const effectiveAutoMult = autoCashoutEnabled ? (parseFloat(autoCashoutInput) || 2.0) : null;
@@ -210,42 +205,7 @@ export const AviatorBetPanel: React.FC<AviatorBetPanelProps> = ({
           </div>
 
           <div className="quick-chips-row">
-            <button
-              type="button"
-              disabled={hasActiveBet || !isBettingPhase}
-              onClick={() => handlePresetClick(50)}
-              className="chip-btn chip-inc"
-              title="Add ₹50"
-            >
-              +50
-            </button>
-            <button
-              type="button"
-              disabled={hasActiveBet || !isBettingPhase}
-              onClick={() => handlePresetClick(100)}
-              className="chip-btn chip-inc"
-              title="Add ₹100"
-            >
-              +100
-            </button>
-            <button
-              type="button"
-              disabled={hasActiveBet || !isBettingPhase}
-              onClick={() => handlePresetClick(500)}
-              className="chip-btn chip-inc"
-              title="Add ₹500"
-            >
-              +500
-            </button>
-            <button
-              type="button"
-              disabled={hasActiveBet || !isBettingPhase}
-              onClick={() => handlePresetClick(1000)}
-              className="chip-btn chip-inc"
-              title="Add ₹1,000"
-            >
-              +1K
-            </button>
+            {/* Row 1: Quick Decrease & Minimum Controls */}
             <button
               type="button"
               disabled={hasActiveBet || !isBettingPhase}
@@ -258,20 +218,58 @@ export const AviatorBetPanel: React.FC<AviatorBetPanelProps> = ({
             <button
               type="button"
               disabled={hasActiveBet || !isBettingPhase || amountRupees <= 10}
-              onClick={handleHalf}
-              className="chip-btn chip-action"
-              title="Half bet amount"
+              onClick={() => handlePresetClick(-100)}
+              className="chip-btn chip-dec"
+              title="Decrease by ₹100"
             >
-              ½
+              -100
+            </button>
+            <button
+              type="button"
+              disabled={hasActiveBet || !isBettingPhase || amountRupees <= 10}
+              onClick={() => handlePresetClick(-50)}
+              className="chip-btn chip-dec"
+              title="Decrease by ₹50"
+            >
+              -50
+            </button>
+            <button
+              type="button"
+              disabled={hasActiveBet || !isBettingPhase || amountRupees <= 10}
+              onClick={() => handlePresetClick(-10)}
+              className="chip-btn chip-dec"
+              title="Decrease by ₹10"
+            >
+              -10
+            </button>
+
+            {/* Row 2: Quick Increase & Maximum Controls */}
+            <button
+              type="button"
+              disabled={hasActiveBet || !isBettingPhase}
+              onClick={() => handlePresetClick(10)}
+              className="chip-btn chip-inc"
+              title="Increase by ₹10"
+            >
+              +10
             </button>
             <button
               type="button"
               disabled={hasActiveBet || !isBettingPhase}
-              onClick={handleDouble}
-              className="chip-btn chip-action"
-              title="Double bet amount"
+              onClick={() => handlePresetClick(50)}
+              className="chip-btn chip-inc"
+              title="Increase by ₹50"
             >
-              2×
+              +50
+            </button>
+            <button
+              type="button"
+              disabled={hasActiveBet || !isBettingPhase}
+              onClick={() => handlePresetClick(100)}
+              className="chip-btn chip-inc"
+              title="Increase by ₹100"
+            >
+              +100
             </button>
             <button
               type="button"
@@ -291,11 +289,20 @@ export const AviatorBetPanel: React.FC<AviatorBetPanelProps> = ({
             myBet ? (
               <div className="bet-placed-state">
                 <span className="bet-placed-tag">✓ BET READY</span>
-                <span className="bet-placed-amount">₹{(myBet.amount / 100).toFixed(0)}</span>
+                <span className="bet-placed-amount">₹{((myBet?.amount || 0) / 100).toFixed(0)}</span>
                 <span className="bet-placed-sub">
-                  {myBet.auto_cashout ? `Auto: ${myBet.auto_cashout.toFixed(2)}x` : 'Waiting for takeoff'}
+                  {myBet?.auto_cashout ? `Auto: ${Number(myBet.auto_cashout).toFixed(2)}x` : 'Waiting for takeoff'}
                 </span>
               </div>
+            ) : isPlacing ? (
+              <button
+                type="button"
+                disabled={true}
+                className="aviator-btn-bet opacity-80 cursor-wait"
+              >
+                <span className="btn-main-label animate-pulse">PLACING...</span>
+                <span className="btn-sub-label">₹{amountRupees.toFixed(0)}</span>
+              </button>
             ) : (
               <button
                 type="button"

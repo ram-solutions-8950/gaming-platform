@@ -11,6 +11,13 @@ export const RESULT_POPUP_MS: Record<ResultVariant, number> = {
   loss: 1400,
 };
 
+export const RESULT_POPUP_TURBO_MS: Record<ResultVariant, number> = {
+  win: 1200,
+  bigwin: 1800,
+  jackpot: 2600,
+  loss: 800,
+};
+
 function useCountUp(target: number, durationMs: number) {
   const [value, setValue] = useState(0);
   useEffect(() => {
@@ -35,6 +42,7 @@ interface ResultPopupProps {
   bet: number;
   multiplier: number;
   symbols: [string, string, string];
+  isTurbo?: boolean;
   onClose: () => void;
 }
 
@@ -44,10 +52,11 @@ export function ResultPopup({
   bet,
   multiplier,
   symbols,
+  isTurbo = false,
   onClose,
 }: ResultPopupProps) {
-  const autoCloseMs = RESULT_POPUP_MS[variant];
-  const countedAmount = useCountUp(amount, Math.min(900, autoCloseMs - 300));
+  const autoCloseMs = isTurbo ? RESULT_POPUP_TURBO_MS[variant] : RESULT_POPUP_MS[variant];
+  const countedAmount = useCountUp(amount, Math.min(isTurbo ? 400 : 900, Math.max(200, autoCloseMs - 200)));
 
   const onCloseRef = useRef(onClose);
   useEffect(() => {
@@ -79,6 +88,12 @@ export function ResultPopup({
         onClick={(e) => e.stopPropagation()}
       >
         {!isLoss && <ParticleBurst count={isBig ? 32 : 18} />}
+
+        {isTurbo && (
+          <div className="mb-2 inline-flex items-center gap-1 rounded-full bg-amber-500/20 px-2.5 py-0.5 text-[9px] font-black tracking-wider text-amber-300 border border-amber-500/40">
+            ⚡ TURBO RESULT
+          </div>
+        )}
 
         {isJackpot ? (
           <p className="mb-1 text-2xl tracking-widest text-amber-300 animate-pulse font-black">

@@ -120,6 +120,22 @@ export function AviatorPage() {
     ? roundState.bets.find((b) => b.user_id === currentUserId && b.slot === 2)
     : null;
 
+  // Auto-expand activeSlots if a slot 2 bet exists
+  useEffect(() => {
+    if (mySlot2Bet && activeSlots !== 2) {
+      setActiveSlots(2);
+    }
+  }, [mySlot2Bet, activeSlots]);
+
+  // Optimistically deduct balance on placing bet
+  const handlePlaceBet = useCallback(
+    (slot: 1 | 2, amountPaise: number, autoCashout?: number | null) => {
+      setWalletBalancePaise((prev) => Math.max(0, prev - amountPaise));
+      placeBet(slot, amountPaise, autoCashout);
+    },
+    [placeBet]
+  );
+
   return (
     <div className="aviator-game-wrapper">
       {/* Portrait Reminder on mobile */}
@@ -231,7 +247,7 @@ export function AviatorPage() {
               multiplier={roundState.multiplier}
               myBet={mySlot1Bet}
               walletBalancePaise={walletBalancePaise}
-              onPlaceBet={placeBet}
+              onPlaceBet={handlePlaceBet}
               onCashout={cashout}
               isSingleSlot={activeSlots === 1}
               onAddSlot={() => setActiveSlots(2)}
@@ -244,7 +260,7 @@ export function AviatorPage() {
                 multiplier={roundState.multiplier}
                 myBet={mySlot2Bet}
                 walletBalancePaise={walletBalancePaise}
-                onPlaceBet={placeBet}
+                onPlaceBet={handlePlaceBet}
                 onCashout={cashout}
                 canClose={true}
                 onClose={() => setActiveSlots(1)}

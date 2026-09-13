@@ -49,7 +49,7 @@ export function useAviatorSocket(options: UseAviatorSocketOptions = {}) {
     phase: 'DISCONNECTED',
     nonce: 0,
     server_seed_hash: '',
-    multiplier: 0.1,
+    multiplier: 1.0,
     betting_duration: 10.0,
     bets: [],
   });
@@ -130,7 +130,7 @@ export function useAviatorSocket(options: UseAviatorSocketOptions = {}) {
             server_seed_hash: msg.server_seed_hash || '',
             server_seed: msg.server_seed,
             crash_point: msg.crash_point,
-            multiplier: msg.multiplier || 0.1,
+            multiplier: msg.multiplier || 1.0,
             betting_duration: 10.0,
             flight_started_at: msg.flight_started_at,
             bets: msg.bets || [],
@@ -149,7 +149,7 @@ export function useAviatorSocket(options: UseAviatorSocketOptions = {}) {
             server_seed_hash: msg.server_seed_hash,
             server_seed: null,
             crash_point: null,
-            multiplier: 0.1,
+            multiplier: 1.0,
             betting_duration: msg.betting_duration || 10.0,
             flight_started_at: null,
             bets: [],
@@ -160,7 +160,7 @@ export function useAviatorSocket(options: UseAviatorSocketOptions = {}) {
             ...prev,
             round_id: msg.round_id,
             phase: 'FLYING',
-            multiplier: 0.1,
+            multiplier: 1.0,
             flight_started_at: msg.flight_started_at || msg.timestamp,
           }));
         } else if (type === 'multiplier_update') {
@@ -225,6 +225,27 @@ export function useAviatorSocket(options: UseAviatorSocketOptions = {}) {
           }));
           options.onBalanceUpdateNeeded?.();
         } else if (type === 'bet_accepted') {
+          const currentUserId = user?.id;
+          if (currentUserId) {
+            setRoundState((prev) => {
+              const withoutThisSlot = prev.bets.filter(
+                (b) => !(b.user_id === currentUserId && b.slot === msg.slot)
+              );
+              return {
+                ...prev,
+                bets: [
+                  ...withoutThisSlot,
+                  {
+                    user_id: currentUserId,
+                    slot: msg.slot,
+                    amount: msg.amount,
+                    status: 'ACTIVE',
+                    auto_cashout: msg.auto_cashout ?? null,
+                  },
+                ],
+              };
+            });
+          }
           options.onBetAccepted?.(msg.slot, msg.amount, msg.auto_cashout);
           options.onBalanceUpdateNeeded?.();
         } else if (type === 'cashout_confirmed') {
@@ -235,7 +256,20 @@ export function useAviatorSocket(options: UseAviatorSocketOptions = {}) {
             const exists = prev.bets.some(
               (b) => b.user_id === msg.user_id && b.slot === msg.slot
             );
-            if (exists) return prev;
+            if (exists) {
+              return {
+                ...prev,
+                bets: prev.bets.map((b) =>
+                  b.user_id === msg.user_id && b.slot === msg.slot
+                    ? {
+                        ...b,
+                        amount: msg.amount,
+                        auto_cashout: msg.auto_cashout !== undefined ? msg.auto_cashout : b.auto_cashout,
+                      }
+                    : b
+                ),
+              };
+            }
             return {
               ...prev,
               bets: [
@@ -245,6 +279,7 @@ export function useAviatorSocket(options: UseAviatorSocketOptions = {}) {
                   slot: msg.slot,
                   amount: msg.amount,
                   status: 'ACTIVE',
+                  auto_cashout: msg.auto_cashout ?? null,
                 },
               ],
             };
@@ -335,15 +370,13 @@ export function useAviatorSocket(options: UseAviatorSocketOptions = {}) {
       if (!flightStartTimeRef.current) return;
       const elapsedSec = (Date.now() - flightStartTimeRef.current) / 1000;
       if (elapsedSec >= 0) {
-        const estMult = elapsedSec < 1.0
-          ? (0.1 + 0.9 * elapsedSec)
-          : Math.exp((elapsedSec - 1.0) * 0.1);
+        const estMult = Math.exp(elapsedSec * 0.09);
         setRoundState((prev) => {
           if (prev.phase !== 'FLYING') return prev;
-          // Keep highest or close to estimate
+          // Keep highest or close to estimate, starting at minimum 1.00x
           return {
             ...prev,
-            multiplier: Math.max(prev.multiplier, Math.floor(estMult * 100) / 100),
+            multiplier: Math.max(prev.multiplier, Math.max(1.0, Math.floor(estMult * 100) / 100)),
           };
         });
       }

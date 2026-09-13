@@ -228,6 +228,26 @@ export function RoulettePage() {
     isDraggingRef.current = false;
   };
 
+  // Touch drag handlers for mobile felt navigation
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if ((e.target as HTMLElement).closest('.felt-cell, button')) return;
+    if (!boardRef.current || e.touches.length !== 1) return;
+    isDraggingRef.current = true;
+    startXRef.current = e.touches[0].pageX - boardRef.current.offsetLeft;
+    scrollLeftRef.current = boardRef.current.scrollLeft;
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!isDraggingRef.current || !boardRef.current || e.touches.length !== 1) return;
+    const x = e.touches[0].pageX - boardRef.current.offsetLeft;
+    const walk = (x - startXRef.current) * 1.5;
+    boardRef.current.scrollLeft = scrollLeftRef.current - walk;
+  };
+
+  const handleTouchEnd = () => {
+    isDraggingRef.current = false;
+  };
+
   // Table live chat send handler
   const handleSendMessage = (text: string) => {
     const newMsg: ChatMessage = {
@@ -557,6 +577,9 @@ export function RoulettePage() {
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUpOrLeave}
           onMouseLeave={handleMouseUpOrLeave}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
         >
           {/* Standby Start Betting CTA Overlay */}
           {!hasStartedBetting && totalMyBet === 0 && (
@@ -665,13 +688,14 @@ export function RoulettePage() {
                 </div>
               </div>
 
-              {/* Right Column: 2 TO 1 Bets */}
+              {/* Right Column: 2 TO 1 Column Bets */}
               <div className="felt-column-bets">
                 <div
                   className={`felt-cell felt-2to1-cell ${isWinningTile('column', 'col3') ? 'tile-winning-glow' : ''}`}
                   onClick={() => handlePlaceBet('column', 'col3')}
+                  title="Column 3 Bet: 2 to 1 Payout"
                 >
-                  <span>2 TO 1</span>
+                  <span className="col-payout-text">2:1</span>
                   {betsByTarget['column:col3'] > 0 && (
                     <div className="placed-chip chip-placed-500">{betsByTarget['column:col3']}</div>
                   )}
@@ -679,8 +703,9 @@ export function RoulettePage() {
                 <div
                   className={`felt-cell felt-2to1-cell ${isWinningTile('column', 'col2') ? 'tile-winning-glow' : ''}`}
                   onClick={() => handlePlaceBet('column', 'col2')}
+                  title="Column 2 Bet: 2 to 1 Payout"
                 >
-                  <span>2 TO 1</span>
+                  <span className="col-payout-text">2:1</span>
                   {betsByTarget['column:col2'] > 0 && (
                     <div className="placed-chip chip-placed-500">{betsByTarget['column:col2']}</div>
                   )}
@@ -688,8 +713,9 @@ export function RoulettePage() {
                 <div
                   className={`felt-cell felt-2to1-cell ${isWinningTile('column', 'col1') ? 'tile-winning-glow' : ''}`}
                   onClick={() => handlePlaceBet('column', 'col1')}
+                  title="Column 1 Bet: 2 to 1 Payout"
                 >
-                  <span>2 TO 1</span>
+                  <span className="col-payout-text">2:1</span>
                   {betsByTarget['column:col1'] > 0 && (
                     <div className="placed-chip chip-placed-500">{betsByTarget['column:col1']}</div>
                   )}
@@ -697,96 +723,105 @@ export function RoulettePage() {
               </div>
             </div>
 
-            {/* Bottom Outside Bets Section (Dozens + Outside) - Aligned with the 12 columns */}
+            {/* Bottom Outside Bets Section (Dozens + Outside) - Mathematically aligned with columns 1 to 12 */}
             <div className="roulette-outside-board">
-              {/* Dozen Bets Row: 1ST 12, 2ND 12, 3RD 12 */}
-              <div className="felt-dozens-row">
-                <div
-                  className={`felt-cell felt-dozen-cell ${isWinningTile('dozen', '1st12') ? 'tile-winning-glow' : ''}`}
-                  onClick={() => handlePlaceBet('dozen', '1st12')}
-                >
-                  <span>1ST 12</span>
-                  {betsByTarget['dozen:1st12'] > 0 && (
-                    <div className="placed-chip chip-placed-100">{betsByTarget['dozen:1st12']}</div>
-                  )}
+              {/* Left spacer matching Zero */}
+              <div className="felt-outside-spacer-left" />
+
+              {/* Center outside board content spanning columns 1 to 12 */}
+              <div className="felt-outside-content">
+                {/* Dozen Bets Row: 1ST 12, 2ND 12, 3RD 12 */}
+                <div className="felt-dozens-row">
+                  <div
+                    className={`felt-cell felt-dozen-cell ${isWinningTile('dozen', '1st12') ? 'tile-winning-glow' : ''}`}
+                    onClick={() => handlePlaceBet('dozen', '1st12')}
+                  >
+                    <span>1ST 12</span>
+                    {betsByTarget['dozen:1st12'] > 0 && (
+                      <div className="placed-chip chip-placed-100">{betsByTarget['dozen:1st12']}</div>
+                    )}
+                  </div>
+                  <div
+                    className={`felt-cell felt-dozen-cell ${isWinningTile('dozen', '2nd12') ? 'tile-winning-glow' : ''}`}
+                    onClick={() => handlePlaceBet('dozen', '2nd12')}
+                  >
+                    <span>2ND 12</span>
+                    {betsByTarget['dozen:2nd12'] > 0 && (
+                      <div className="placed-chip chip-placed-100">{betsByTarget['dozen:2nd12']}</div>
+                    )}
+                  </div>
+                  <div
+                    className={`felt-cell felt-dozen-cell ${isWinningTile('dozen', '3rd12') ? 'tile-winning-glow' : ''}`}
+                    onClick={() => handlePlaceBet('dozen', '3rd12')}
+                  >
+                    <span>3RD 12</span>
+                    {betsByTarget['dozen:3rd12'] > 0 && (
+                      <div className="placed-chip chip-placed-100">{betsByTarget['dozen:3rd12']}</div>
+                    )}
+                  </div>
                 </div>
-                <div
-                  className={`felt-cell felt-dozen-cell ${isWinningTile('dozen', '2nd12') ? 'tile-winning-glow' : ''}`}
-                  onClick={() => handlePlaceBet('dozen', '2nd12')}
-                >
-                  <span>2ND 12</span>
-                  {betsByTarget['dozen:2nd12'] > 0 && (
-                    <div className="placed-chip chip-placed-100">{betsByTarget['dozen:2nd12']}</div>
-                  )}
-                </div>
-                <div
-                  className={`felt-cell felt-dozen-cell ${isWinningTile('dozen', '3rd12') ? 'tile-winning-glow' : ''}`}
-                  onClick={() => handlePlaceBet('dozen', '3rd12')}
-                >
-                  <span>3RD 12</span>
-                  {betsByTarget['dozen:3rd12'] > 0 && (
-                    <div className="placed-chip chip-placed-100">{betsByTarget['dozen:3rd12']}</div>
-                  )}
+
+                {/* Outside Bets Row: 1 TO 18, EVEN, RED, BLACK, ODD, 19 TO 36 */}
+                <div className="felt-outside-row">
+                  <div
+                    className={`felt-cell felt-outside-cell ${isWinningTile('even_money', 'low') ? 'tile-winning-glow' : ''}`}
+                    onClick={() => handlePlaceBet('even_money', 'low')}
+                  >
+                    <span>1 TO 18</span>
+                    {betsByTarget['even_money:low'] > 0 && (
+                      <div className="placed-chip chip-placed-50">{betsByTarget['even_money:low']}</div>
+                    )}
+                  </div>
+                  <div
+                    className={`felt-cell felt-outside-cell ${isWinningTile('even_money', 'even') ? 'tile-winning-glow' : ''}`}
+                    onClick={() => handlePlaceBet('even_money', 'even')}
+                  >
+                    <span>EVEN</span>
+                    {betsByTarget['even_money:even'] > 0 && (
+                      <div className="placed-chip chip-placed-50">{betsByTarget['even_money:even']}</div>
+                    )}
+                  </div>
+                  <div
+                    className={`felt-cell felt-outside-cell felt-diamond-red ${isWinningTile('even_money', 'red') ? 'tile-winning-glow' : ''}`}
+                    onClick={() => handlePlaceBet('even_money', 'red')}
+                  >
+                    <div className="red-diamond-symbol" />
+                    {betsByTarget['even_money:red'] > 0 && (
+                      <div className="placed-chip chip-placed-50">{betsByTarget['even_money:red']}</div>
+                    )}
+                  </div>
+                  <div
+                    className={`felt-cell felt-outside-cell felt-diamond-black ${isWinningTile('even_money', 'black') ? 'tile-winning-glow' : ''}`}
+                    onClick={() => handlePlaceBet('even_money', 'black')}
+                  >
+                    <div className="black-diamond-symbol" />
+                    {betsByTarget['even_money:black'] > 0 && (
+                      <div className="placed-chip chip-placed-50">{betsByTarget['even_money:black']}</div>
+                    )}
+                  </div>
+                  <div
+                    className={`felt-cell felt-outside-cell ${isWinningTile('even_money', 'odd') ? 'tile-winning-glow' : ''}`}
+                    onClick={() => handlePlaceBet('even_money', 'odd')}
+                  >
+                    <span>ODD</span>
+                    {betsByTarget['even_money:odd'] > 0 && (
+                      <div className="placed-chip chip-placed-50">{betsByTarget['even_money:odd']}</div>
+                    )}
+                  </div>
+                  <div
+                    className={`felt-cell felt-outside-cell ${isWinningTile('even_money', 'high') ? 'tile-winning-glow' : ''}`}
+                    onClick={() => handlePlaceBet('even_money', 'high')}
+                  >
+                    <span>19 TO 36</span>
+                    {betsByTarget['even_money:high'] > 0 && (
+                      <div className="placed-chip chip-placed-50">{betsByTarget['even_money:high']}</div>
+                    )}
+                  </div>
                 </div>
               </div>
 
-              {/* Outside Bets Row: 1 TO 18, EVEN, RED, BLACK, ODD, 19 TO 36 */}
-              <div className="felt-outside-row">
-                <div
-                  className={`felt-cell felt-outside-cell ${isWinningTile('even_money', 'low') ? 'tile-winning-glow' : ''}`}
-                  onClick={() => handlePlaceBet('even_money', 'low')}
-                >
-                  <span>1 TO 18</span>
-                  {betsByTarget['even_money:low'] > 0 && (
-                    <div className="placed-chip chip-placed-50">{betsByTarget['even_money:low']}</div>
-                  )}
-                </div>
-                <div
-                  className={`felt-cell felt-outside-cell ${isWinningTile('even_money', 'even') ? 'tile-winning-glow' : ''}`}
-                  onClick={() => handlePlaceBet('even_money', 'even')}
-                >
-                  <span>EVEN</span>
-                  {betsByTarget['even_money:even'] > 0 && (
-                    <div className="placed-chip chip-placed-50">{betsByTarget['even_money:even']}</div>
-                  )}
-                </div>
-                <div
-                  className={`felt-cell felt-outside-cell felt-diamond-red ${isWinningTile('even_money', 'red') ? 'tile-winning-glow' : ''}`}
-                  onClick={() => handlePlaceBet('even_money', 'red')}
-                >
-                  <div className="red-diamond-symbol" />
-                  {betsByTarget['even_money:red'] > 0 && (
-                    <div className="placed-chip chip-placed-50">{betsByTarget['even_money:red']}</div>
-                  )}
-                </div>
-                <div
-                  className={`felt-cell felt-outside-cell felt-diamond-black ${isWinningTile('even_money', 'black') ? 'tile-winning-glow' : ''}`}
-                  onClick={() => handlePlaceBet('even_money', 'black')}
-                >
-                  <div className="black-diamond-symbol" />
-                  {betsByTarget['even_money:black'] > 0 && (
-                    <div className="placed-chip chip-placed-50">{betsByTarget['even_money:black']}</div>
-                  )}
-                </div>
-                <div
-                  className={`felt-cell felt-outside-cell ${isWinningTile('even_money', 'odd') ? 'tile-winning-glow' : ''}`}
-                  onClick={() => handlePlaceBet('even_money', 'odd')}
-                >
-                  <span>ODD</span>
-                  {betsByTarget['even_money:odd'] > 0 && (
-                    <div className="placed-chip chip-placed-50">{betsByTarget['even_money:odd']}</div>
-                  )}
-                </div>
-                <div
-                  className={`felt-cell felt-outside-cell ${isWinningTile('even_money', 'high') ? 'tile-winning-glow' : ''}`}
-                  onClick={() => handlePlaceBet('even_money', 'high')}
-                >
-                  <span>19 TO 36</span>
-                  {betsByTarget['even_money:high'] > 0 && (
-                    <div className="placed-chip chip-placed-50">{betsByTarget['even_money:high']}</div>
-                  )}
-                </div>
-              </div>
+              {/* Right spacer matching 2:1 column */}
+              <div className="felt-outside-spacer-right" />
             </div>
 
             {/* ── Overlay: Start Betting Banner ── */}

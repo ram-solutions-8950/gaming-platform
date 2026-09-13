@@ -65,18 +65,25 @@ export const AviatorPlayers: React.FC<AviatorPlayersProps> = ({
                 <span className="text-right">Cash Out</span>
               </div>
               {bets.map((b, i) => {
-                const isMe = b.user_id === currentUserId;
+                const isMe = Boolean(currentUserId && b.user_id && b.user_id === currentUserId);
                 const isCashed = b.status === 'CASHED_OUT';
+                const userDisplay = isMe
+                  ? 'You'
+                  : b.user_id
+                  ? `Player_${b.user_id.substring(0, 4)}`
+                  : `Player_${i + 1}`;
+                const amountVal = typeof b.amount === 'number' ? b.amount : 0;
+                const payoutVal = typeof b.payout === 'number' ? b.payout : 0;
                 return (
                   <div
-                    key={`${b.user_id}-${b.slot}-${i}`}
+                    key={`${b.user_id || 'anon'}-${b.slot || 1}-${i}`}
                     className={`player-row ${isMe ? 'my-row' : ''} ${isCashed ? 'cashed-row' : ''}`}
                   >
                     <span className="user-id">
-                      {isMe ? 'You' : `Player_${b.user_id.substring(0, 4)}`}
+                      {userDisplay}
                     </span>
                     <span className="bet-val">
-                      {b.amount > 0 ? `₹${(b.amount / 100).toFixed(0)}` : '—'}
+                      {amountVal > 0 ? `₹${(amountVal / 100).toFixed(0)}` : '—'}
                     </span>
                     <span className="mult-val font-mono">
                       {b.cashout_multiplier ? (
@@ -86,9 +93,9 @@ export const AviatorPlayers: React.FC<AviatorPlayersProps> = ({
                       )}
                     </span>
                     <span className="payout-val text-right">
-                      {b.payout && b.payout > 0 ? (
+                      {payoutVal > 0 ? (
                         <span className="text-emerald-400 font-bold">
-                          ₹{(b.payout / 100).toFixed(0)}
+                          ₹{(payoutVal / 100).toFixed(0)}
                         </span>
                       ) : (
                         '—'

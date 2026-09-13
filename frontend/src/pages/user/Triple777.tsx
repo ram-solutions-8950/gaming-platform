@@ -83,10 +83,14 @@ export function Triple777Page() {
       const next = !prev;
       turboRef.current = next;
       if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-      setToastMessage(next ? '⚡ TURBO ON: Spins 3× faster, results shown instantly!' : '⚡ TURBO OFF: Normal spin speed restored');
+      setToastMessage(
+        next
+          ? '⚡ TURBO MODE ACTIVATED: Spins are now 3× faster! Press SPIN or AUTO to play.'
+          : '⚡ TURBO MODE DEACTIVATED: Normal spin speed restored'
+      );
       toastTimerRef.current = setTimeout(() => {
         setToastMessage(null);
-      }, 2200);
+      }, 2600);
       return next;
     });
   }, []);
@@ -311,14 +315,8 @@ export function Triple777Page() {
             }, nextSpinDelay);
           }
         } else {
-          // Manual spin: In turbo mode, skip routine modal popups for instant continuous play
-          if (isTurbo) {
-            if (response.tier === 'jackpot' || response.tier === 'bigwin') {
-              setShowResultPopup(true);
-            }
-          } else {
-            setShowResultPopup(true);
-          }
+          // Manual spin: Display outcome popup with turbo-adapted snappy timing
+          setShowResultPopup(true);
         }
       }, revealDelay);
     } catch (err: any) {
@@ -471,8 +469,9 @@ export function Triple777Page() {
         <main className="t777-stage relative">
           {/* Floating Toast Notification */}
           {toastMessage && (
-            <div className="t777-floating-toast">
-              {toastMessage}
+            <div className="t777-floating-toast" role="status" aria-live="polite">
+              <Zap size={14} className="fill-amber-300 text-amber-200 shrink-0 animate-pulse" />
+              <span>{toastMessage}</span>
             </div>
           )}
 
@@ -484,9 +483,9 @@ export function Triple777Page() {
 
           {/* Turbo Mode Active Badge */}
           {turbo && (
-            <div className="t777-turbo-badge">
-              <Zap size={12} className="fill-amber-300 text-amber-200 animate-pulse" />
-              <span>⚡ TURBO: Ultra-Fast Spins Active</span>
+            <div className="t777-turbo-badge" title="Turbo Mode active: 3× faster reel spins">
+              <Zap size={13} className="fill-amber-300 text-amber-100 animate-pulse shrink-0" />
+              <span>⚡ TURBO: 3× Spin Speed Active</span>
             </div>
           )}
 
@@ -575,21 +574,28 @@ export function Triple777Page() {
 
           {/* Row 2: Turbo + Auto + Large Spin Button */}
           <div className="t777-actions-row">
-            {/* Turbo Toggle */}
+            {/* Turbo Mode Toggle Switch */}
             <button
               type="button"
               onClick={handleToggleTurbo}
               className={`t777-toggle-btn t777-toggle-btn--turbo ${
                 turbo ? 't777-toggle-btn--active t777-toggle-btn--turbo-active' : ''
               }`}
-              title="Turbo Mode: Ultra-Fast Spins with Instant Results"
+              title={
+                turbo
+                  ? 'Turbo Mode: ON (Click to switch to normal speed)'
+                  : 'Turbo Mode: OFF (Click to switch to 3× fast speed)'
+              }
+              aria-label={turbo ? 'Turbo Mode ON' : 'Turbo Mode OFF'}
+              aria-pressed={turbo}
             >
               <Zap size={16} className={turbo ? 'fill-amber-300 text-amber-100 animate-pulse' : 'text-slate-400'} />
-              <div className="flex flex-col items-center leading-none">
-                <span className="text-[10px] font-black">TURBO</span>
-                <span className={`text-[8px] font-extrabold ${turbo ? 'text-amber-100' : 'text-slate-400'}`}>
-                  {turbo ? '⚡ ULTRA' : 'OFF'}
-                </span>
+              <div className="flex flex-col items-center leading-tight">
+                <span className="text-[10px] font-black tracking-wide">TURBO</span>
+                <div className={`t777-switch-badge ${turbo ? 't777-switch-badge--on' : 't777-switch-badge--off'}`}>
+                  <span className="t777-switch-dot" />
+                  <span>{turbo ? 'ON (3×)' : 'OFF'}</span>
+                </div>
               </div>
             </button>
 
@@ -600,36 +606,58 @@ export function Triple777Page() {
               className={`t777-toggle-btn t777-toggle-btn--auto ${
                 autoSpinsLeft !== null ? 't777-toggle-btn--active' : ''
               }`}
-              title={autoSpinsLeft !== null ? 'Click to Stop Auto Spin' : 'Auto Spin: 10 Consecutive Rounds'}
+              title={
+                autoSpinsLeft !== null
+                  ? 'Click to Stop Auto Spin'
+                  : turbo
+                  ? 'Auto Spin: 10 Fast Turbo Rounds'
+                  : 'Auto Spin: 10 Consecutive Rounds'
+              }
+              aria-label={autoSpinsLeft !== null ? 'Stop Auto Spin' : 'Start Auto Spin'}
             >
               <RotateCcw
                 size={15}
                 className={autoSpinsLeft !== null ? 'animate-spin text-white' : 'text-slate-400'}
               />
-              <div className="flex flex-col items-center leading-none">
-                <span className="text-[10px] font-black">
+              <div className="flex flex-col items-center leading-tight">
+                <span className="text-[10px] font-black tracking-wide">
                   {autoSpinsLeft !== null ? 'STOP' : 'AUTO'}
                 </span>
-                <span className={`text-[8px] font-bold ${autoSpinsLeft !== null ? 'text-red-100' : 'text-slate-400'}`}>
-                  {autoSpinsLeft !== null ? `${autoSpinsLeft} LEFT` : '10 SPINS'}
+                <span
+                  className={`text-[8px] font-extrabold ${
+                    autoSpinsLeft !== null
+                      ? 'text-red-100'
+                      : turbo
+                      ? 'text-amber-200'
+                      : 'text-slate-400'
+                  }`}
+                >
+                  {autoSpinsLeft !== null ? `${autoSpinsLeft} LEFT` : turbo ? '⚡ 10 FAST' : '10 SPINS'}
                 </span>
               </div>
             </button>
 
-            {/* Large Glossy Green SPIN Button (With Turbo indicator when active) */}
+            {/* Large Glossy Green / Amber Turbo SPIN Button */}
             <button
               type="button"
               disabled={spinning || autoSpinsLeft !== null}
               onClick={() => handleSpin(stake, turbo)}
               className={`t777-spin-btn ${turbo ? 't777-spin-btn--turbo' : ''}`}
-              aria-label="Spin Slot Machine"
+              aria-label={turbo ? `Turbo Spin ₹${stake}` : `Spin ₹${stake}`}
             >
-              {turbo ? <Zap size={20} className="fill-amber-400 text-amber-200" /> : <Play size={20} fill="#052e16" />}
-              <span>
-                {spinning
-                  ? (turbo ? '⚡ FAST SPINNING...' : 'SPINNING...')
-                  : (turbo ? `⚡ TURBO SPIN ₹${stake}` : `SPIN ₹${stake}`)}
-              </span>
+              {turbo ? <Zap size={20} className="fill-amber-300 text-amber-100 animate-pulse" /> : <Play size={20} fill="#052e16" />}
+              <div className="flex flex-col items-center leading-none">
+                <span>
+                  {spinning
+                    ? (turbo ? '⚡ FAST SPINNING...' : 'SPINNING...')
+                    : (turbo ? `⚡ TURBO SPIN ₹${stake}` : `SPIN ₹${stake}`)}
+                </span>
+                {turbo && !spinning && (
+                  <span className="text-[8.5px] font-black tracking-widest text-amber-200 mt-0.5">
+                    3× ULTRA FAST
+                  </span>
+                )}
+              </div>
             </button>
           </div>
         </footer>
@@ -642,6 +670,7 @@ export function Triple777Page() {
             bet={lastOutcome.stake}
             multiplier={lastOutcome.result.multiplier}
             symbols={lastOutcome.result.reels}
+            isTurbo={turbo}
             onClose={handleCloseResultPopup}
           />
         )}

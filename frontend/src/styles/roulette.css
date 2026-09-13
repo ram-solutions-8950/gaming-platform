@@ -495,13 +495,7 @@
   touch-action: pan-x;
   scrollbar-width: thin;
   scrollbar-color: rgba(234, 179, 8, 0.4) transparent;
-  padding: 0 4px;
-}
-
-@media (min-width: 860px) {
-  .roulette-board-container {
-    justify-content: center;
-  }
+  padding: 0 16px;
 }
 
 .roulette-felt-table {
@@ -509,8 +503,8 @@
   flex-direction: column;
   align-items: center;
   width: 100%;
-  min-width: 560px;
-  max-width: 800px;
+  min-width: 580px;
+  max-width: 820px;
   height: auto;
   max-height: 260px;
   position: relative;
@@ -519,12 +513,14 @@
   padding: 0;
   border: none;
   box-shadow: none;
+  margin: auto;
+  flex-shrink: 0;
 }
 
 /* Top Numbers Section: Zero + 36 Numbers + 2-to-1 Column */
 .roulette-numbers-board {
   display: grid;
-  grid-template-columns: 44px 1fr 40px;
+  grid-template-columns: 44px 1fr 48px;
   gap: 1.5px;
   background: rgba(255, 255, 255, 0.45);
   padding: 2px;
@@ -532,12 +528,13 @@
   border: 2px solid rgba(255, 255, 255, 0.75);
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
   width: 100%;
+  box-sizing: border-box;
 }
 
 /* Bottom Outside Bets Section: Dozens + Outside bets aligned under the 12 number columns */
 .roulette-outside-board {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: 44px 1fr 48px;
   gap: 1.5px;
   background: rgba(255, 255, 255, 0.45);
   padding: 2px;
@@ -546,8 +543,23 @@
   border-top: none;
   border-radius: 0 0 8px 8px;
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
-  width: calc(100% - 84px);
-  margin-left: 4px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.felt-outside-spacer-left {
+  background: transparent;
+}
+
+.felt-outside-spacer-right {
+  background: transparent;
+}
+
+.felt-outside-content {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5px;
+  width: 100%;
 }
 
 /* Start Betting Standby Overlay */
@@ -686,12 +698,22 @@
 .felt-2to1-cell {
   flex: 1;
   background: #064e3b;
-  font-size: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 2px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 0 4px 4px 0;
+  position: relative;
+}
+
+.col-payout-text {
+  font-size: 11px;
   font-weight: 900;
-  color: rgba(255, 255, 255, 0.9);
-  writing-mode: vertical-rl;
-  text-orientation: upright;
-  letter-spacing: -2px;
+  color: #ffd700;
+  letter-spacing: 0.5px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+  white-space: nowrap;
 }
 
 /* Dozens Row (1ST 12, 2ND 12, 3RD 12) */
@@ -895,7 +917,7 @@
   align-items: center;
   justify-content: space-between;
   min-height: calc(42px + var(--safe-bottom));
-  padding: 3px max(var(--safe-right), 8px) max(var(--safe-bottom), 3px) max(var(--safe-left), 8px);
+  padding: 3px max(var(--safe-right), 12px) max(var(--safe-bottom), 3px) max(var(--safe-left), 12px);
   background: rgba(3, 30, 20, 0.9);
   backdrop-filter: blur(8px);
   border-top: 1px solid rgba(255, 255, 255, 0.15);
@@ -1167,64 +1189,92 @@
 /* ═══════════════════════════════════════════════════════════════
    7. RESPONSIVE ADAPTATIONS (PORTRAIT & MOBILE LANDSCAPE)
    ═══════════════════════════════════════════════════════════════ */
-@media (max-width: 820px) {
+@media (max-width: 860px) {
   .roulette-bottom-bar {
-    flex-wrap: wrap;
-    justify-content: center;
+    flex-wrap: nowrap;
+    justify-content: space-between;
     gap: 4px;
-    height: auto;
-    min-height: auto;
-    padding: 4px max(var(--safe-right), 6px) max(var(--safe-bottom), 4px) max(var(--safe-left), 6px);
+    padding: 2px max(var(--safe-right), 10px) max(var(--safe-bottom), 2px) max(var(--safe-left), 10px);
   }
   .roulette-chips-selector {
     gap: 3px;
+    flex-shrink: 0;
   }
   .roulette-chip-btn {
-    width: 26px;
-    height: 26px;
+    width: 25px;
+    height: 25px;
   }
   .chip-inner-circle {
-    width: 17px;
-    height: 17px;
+    width: 16px;
+    height: 16px;
   }
   .chip-val-text {
     font-size: 7.5px;
   }
   .roulette-action-btn {
-    padding: 3px 5px;
-    font-size: 8.5px;
+    padding: 2.5px 5px;
+    font-size: 8px;
     gap: 2px;
   }
   .btn-icon {
-    font-size: 9px;
+    font-size: 8.5px;
   }
   .roulette-status-panel {
-    gap: 6px;
+    gap: 4px;
   }
   .roulette-metric-total,
   .roulette-metric-mybet {
-    font-size: 9.5px;
+    font-size: 9px;
   }
   .roulette-countdown-pill {
-    font-size: 9.5px;
-    padding: 2px 6px;
+    font-size: 9px;
+    padding: 2px 5px;
   }
   .roulette-user-profile {
-    min-width: 65px;
+    min-width: 60px;
     gap: 4px;
   }
   .roulette-user-avatar-wrap {
-    width: 26px;
-    height: 26px;
+    width: 24px;
+    height: 24px;
   }
   .roulette-user-balance-pill {
-    font-size: 9.5px;
+    font-size: 9px;
   }
   .roulette-controls-group {
-    flex-shrink: 1;
+    gap: 3px;
+    flex-shrink: 0;
   }
-  .roulette-chips-selector {
-    flex-shrink: 1;
+}
+
+@media (max-width: 700px) {
+  .roulette-bottom-bar {
+    gap: 3px;
+    padding: 2px max(var(--safe-right), 8px) max(var(--safe-bottom), 2px) max(var(--safe-left), 8px);
+  }
+  .roulette-user-info-text {
+    display: none;
+  }
+  .roulette-status-panel .metric-label {
+    display: none;
+  }
+  .roulette-chip-btn {
+    width: 23px;
+    height: 23px;
+  }
+  .chip-inner-circle {
+    width: 14px;
+    height: 14px;
+  }
+  .chip-val-text {
+    font-size: 7px;
+  }
+  .roulette-action-btn {
+    padding: 2px 4px;
+    font-size: 7.5px;
+  }
+  .roulette-controls-group {
+    flex-shrink: 0;
   }
 }
 
