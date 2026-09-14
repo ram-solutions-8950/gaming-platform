@@ -73,15 +73,21 @@ function TurnRing({ seconds, total, size }: { seconds: number; total: number; si
 }
 
 function ResultOverlay({
-  state, meId, table, onContinue, onBackToLobby, onPlayAgain, playAgainBusy,
+  state,
+  meId,
+  table,
+  onContinue,
+  onBackToLobby,
+  onPlayAgain,
+  playAgainBusy,
 }: {
   state: TableState;
   meId: string | null;
   table: RummyTableOut | null;
   onContinue: () => void;
   onBackToLobby: () => void;
-  onPlayAgain: () => void;
-  playAgainBusy: boolean;
+  onPlayAgain?: () => void;
+  playAgainBusy?: boolean;
 }) {
   const isPool = state.pool_limit != null;
   const isGameOver = state.phase === "game_over";
@@ -102,45 +108,49 @@ function ResultOverlay({
   const myLossRupees = (myLossPaise / 100).toFixed(2);
 
   return (
-    <div className="fixed inset-0 z-[90] bg-black/90 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 overflow-y-auto select-none">
-      <div className="w-full max-w-sm max-h-[96vh] bg-gradient-to-b from-[#1d0d33] via-[#120824] to-[#0a0316] border-2 border-amber-500/50 rounded-2xl shadow-[0_0_50px_rgba(0,0,0,0.9)] p-3 sm:p-4 flex flex-col items-center justify-center gap-1.5 text-center my-auto overflow-y-auto">
-        <p className="font-display text-base sm:text-lg text-gold-400 font-extrabold tracking-wide">
-          {isGameOver
-            ? isPool
-              ? iWon ? "🏆 POOL WINNER" : "🏁 POOL OVER"
-              : iWon ? "🏆 GAME WINNER" : "🏁 GAME OVER"
-            : iWasEliminatedThisDeal
-              ? "🚫 YOU'RE OUT"
-              : iWon
-                ? "🏆 YOU WIN"
-                : winner
-                  ? `🏆 ${winner.name} wins the deal`
-                  : "Deal over"}
-        </p>
+    <div className="fixed inset-0 z-[90] bg-black/90 backdrop-blur-md flex overflow-y-auto p-2 sm:p-4 select-none">
+      <div className="m-auto w-full max-w-sm max-h-[94dvh] bg-gradient-to-b from-[#1d0d33] via-[#120824] to-[#0a0316] border-2 border-amber-500/50 rounded-2xl shadow-[0_0_50px_rgba(0,0,0,0.9)] p-2.5 sm:p-4 flex flex-col items-center text-center overflow-hidden">
+        {/* Header: Title & Bet/Win */}
+        <div className="shrink-0 flex flex-col items-center gap-1 w-full">
+          <p className="font-display text-sm sm:text-base md:text-lg text-gold-400 font-extrabold tracking-wide">
+            {isGameOver
+              ? isPool
+                ? iWon ? "🏆 POOL WINNER" : "🏁 POOL OVER"
+                : iWon ? "🏆 GAME WINNER" : "🏁 GAME OVER"
+              : iWasEliminatedThisDeal
+                ? "🚫 YOU'RE OUT"
+                : iWon
+                  ? "🏆 YOU WIN"
+                  : winner
+                    ? `🏆 ${winner.name} wins the deal`
+                    : "Deal over"}
+          </p>
 
-        {/* Explicit Bet & Win Display */}
-        {entryFeePaise > 0 && (
-          <div className="flex items-center justify-center gap-2.5 bg-black/80 border border-amber-500/40 rounded-xl px-3.5 py-1 text-xs font-bold my-0.5">
-            <span className="text-slate-300">
-              Bet: <span className="text-amber-300">₹{entryFeeRupees.toFixed(2)}</span>
-            </span>
-            <span className="text-slate-600">•</span>
-            <span className={iWon ? "text-emerald-400 font-black" : "text-rose-400 font-black"}>
-              {iWon ? `Won: +₹${totalPoolRupees}` : `Lost: -₹${myLossRupees}`}
-            </span>
-          </div>
-        )}
+          {/* Explicit Bet & Win Display */}
+          {entryFeePaise > 0 && (
+            <div className="flex items-center justify-center gap-2 bg-black/80 border border-amber-500/40 rounded-xl px-2.5 sm:px-3.5 py-0.5 sm:py-1 text-[11px] sm:text-xs font-bold">
+              <span className="text-slate-300">
+                Bet: <span className="text-amber-300">₹{entryFeeRupees.toFixed(2)}</span>
+              </span>
+              <span className="text-slate-600">•</span>
+              <span className={iWon ? "text-emerald-400 font-black" : "text-rose-400 font-black"}>
+                {iWon ? `Won: +₹${totalPoolRupees}` : `Lost: -₹${myLossRupees}`}
+              </span>
+            </div>
+          )}
+        </div>
 
-        <div className="w-full max-w-[17rem] space-y-1 my-1">
+        {/* Scrollable Player List */}
+        <div className="w-full max-w-[18rem] flex-1 min-h-0 overflow-y-auto space-y-1 my-1.5 px-0.5">
           {state.players.map((p) => {
             const pLossRupees = ((Math.min(p.deal_points * pointValuePaise, entryFeePaise)) / 100).toFixed(2);
             return (
-              <div key={p.id} className="flex justify-between items-center text-[11px] bg-ink-900/80 rounded px-2.5 py-1">
-                <span className={p.id === meId ? "text-gold-300 font-bold" : "text-slate-200 font-medium"}>
+              <div key={p.id} className="flex justify-between items-center text-[10px] sm:text-[11px] bg-ink-900/80 rounded px-2 sm:px-2.5 py-1">
+                <span className={p.id === meId ? "text-gold-300 font-bold truncate max-w-[90px] sm:max-w-[120px]" : "text-slate-200 font-medium truncate max-w-[90px] sm:max-w-[120px]"}>
                   {p.name}
                   {isPool && p.eliminated && <span className="ml-1 text-[8px] text-red-400 uppercase">out</span>}
                 </span>
-                <span className="flex items-center gap-1.5 font-mono">
+                <span className="flex items-center gap-1 sm:gap-1.5 font-mono shrink-0 ml-1">
                   <span className={p.id === state.winner_id ? "text-emerald-400 font-bold" : "text-rose-400 font-bold"}>
                     {p.id === state.winner_id
                       ? (entryFeePaise > 0 ? `+₹${totalPoolRupees}` : `+${pool}`)
@@ -159,37 +169,58 @@ function ResultOverlay({
             );
           })}
         </div>
-        <p className="text-[8px] text-slate-500 font-mono hidden sm:block">Table: {state.table_id.slice(0, 8)}</p>
-        {isGameOver ? (
-          <div className="flex flex-wrap gap-2 mt-1 w-full max-w-[17rem] justify-center">
+
+        {/* Action Footer - Fixed at bottom, never cut off on smaller screens */}
+        <div className="shrink-0 w-full max-w-[18rem] pt-1 mt-auto">
+          <p className="text-[8px] text-slate-500 font-mono hidden sm:block mb-1">Table: {state.table_id.slice(0, 8)}</p>
+          {isGameOver ? (
+            <div className="flex items-center gap-2 w-full justify-center">
+              <button
+                type="button"
+                className="flex-1 min-w-0 py-2 sm:py-2.5 px-2.5 sm:px-3.5 bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 hover:brightness-110 active:scale-95 text-slate-950 font-black text-[11px] sm:text-xs rounded-xl shadow-lg border border-amber-300 flex items-center justify-center gap-1.5 transition-all cursor-pointer uppercase tracking-wider shrink-0 disabled:opacity-50"
+                disabled={playAgainBusy}
+                onClick={onPlayAgain}
+                title="Play Again"
+              >
+                <span className="text-xs sm:text-sm leading-none shrink-0" aria-hidden="true">🔁</span>
+                <span className="truncate">{playAgainBusy ? "Starting…" : "Play Again"}</span>
+              </button>
+              <button
+                type="button"
+                className="py-2 sm:py-2.5 px-2.5 sm:px-3 bg-slate-800/90 hover:bg-slate-700 active:scale-95 text-slate-200 font-bold text-[11px] sm:text-xs rounded-xl border border-slate-700 shadow-md flex items-center justify-center gap-1 transition-all cursor-pointer uppercase tracking-wider shrink-0 whitespace-nowrap"
+                onClick={onBackToLobby}
+                title="Back to Lobby"
+              >
+                <span className="hidden sm:inline">Back to </span><span>Lobby</span>
+              </button>
+            </div>
+          ) : (
             <button
               type="button"
-              className="flex-1 py-2 px-3 bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 text-slate-950 font-black text-xs rounded-xl shadow-lg border border-amber-300 hover:brightness-110 active:scale-95 transition-all cursor-pointer whitespace-nowrap"
-              disabled={playAgainBusy}
-              onClick={onPlayAgain}
+              className="btn-gold rounded-full px-6 py-2 text-xs cursor-pointer font-bold shadow-md hover:brightness-110 active:scale-95 transition-all"
+              onClick={onContinue}
             >
-              {playAgainBusy ? "Creating…" : "🔁 New Game"}
+              Continue
             </button>
-            <button
-              type="button"
-              className="py-2 px-3 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs rounded-xl border border-slate-700 active:scale-95 transition-all cursor-pointer whitespace-nowrap"
-              onClick={onBackToLobby}
-            >
-              Back to Lobby
-            </button>
-          </div>
-        ) : (
-          <button type="button" className="btn-gold rounded-full px-5 py-1.5 text-xs mt-1 cursor-pointer font-bold shadow-md" onClick={onContinue}>
-            Continue
-          </button>
-        )}
+          )}
+        </div>
       </div>
     </div>
   );
 }
 
 
-export default function GameTable({ onBack, onExit, customTableId }: { onBack?: () => void; onExit?: () => void; customTableId?: string } = {}) {
+export default function GameTable({
+  onBack,
+  onExit,
+  customTableId,
+  onPlayAgain,
+}: {
+  onBack?: () => void;
+  onExit?: () => void;
+  customTableId?: string;
+  onPlayAgain?: (newTableId: string) => void;
+} = {}) {
   const { tableId: paramTableId } = useParams();
   const tableId = customTableId || paramTableId || "";
   const token = authStorage.getAccessToken() || "";
@@ -224,6 +255,36 @@ export default function GameTable({ onBack, onExit, customTableId }: { onBack?: 
       onBack();
     } else {
       navigate("/games/rummy");
+    }
+  }
+
+  async function handlePlayAgain() {
+    if (!table) {
+      handleBackToLobby();
+      return;
+    }
+    setPlayAgainBusy(true);
+    try {
+      const fresh = await RummyApi.createTable({
+        name: table.name,
+        mode: table.mode,
+        max_players: table.max_players,
+        num_deals: table.num_deals,
+        entry_fee_paise: table.entry_fee_paise,
+        pool_limit: table.pool_limit,
+        turn_seconds: table.turn_seconds,
+        starting_chips: table.starting_chips,
+      });
+      if (onPlayAgain) {
+        onPlayAgain(fresh.id);
+      } else {
+        navigate(`/games/rummy?tableId=${fresh.id}`);
+      }
+    } catch (err) {
+      console.error("Play again failed:", err);
+      handleBackToLobby();
+    } finally {
+      setPlayAgainBusy(false);
     }
   }
 
@@ -369,12 +430,6 @@ export default function GameTable({ onBack, onExit, customTableId }: { onBack?: 
     setChatMessages((prev) => [...prev, newMsg]);
     setChatInput('');
   };
-
-
-  async function handlePlayAgain() {
-    setPlayAgainBusy(true);
-    navigate('/games/rummy');
-  }
 
   useEffect(() => {
     if (tableId) {
@@ -864,7 +919,15 @@ export default function GameTable({ onBack, onExit, customTableId }: { onBack?: 
           )}
 
           {state && (state.phase === "deal_over" || state.phase === "game_over") && !resultDismissed && (
-            <ResultOverlay state={state} meId={me?.id ?? null} table={table} onContinue={() => setResultDismissed(true)} onBackToLobby={handleBackToLobby} onPlayAgain={handlePlayAgain} playAgainBusy={playAgainBusy} />
+            <ResultOverlay
+              state={state}
+              meId={me?.id ?? null}
+              table={table}
+              onContinue={() => setResultDismissed(true)}
+              onBackToLobby={handleBackToLobby}
+              onPlayAgain={handlePlayAgain}
+              playAgainBusy={playAgainBusy}
+            />
           )}
         </div>
       </main>

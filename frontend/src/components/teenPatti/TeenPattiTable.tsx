@@ -44,8 +44,16 @@ export const TeenPattiTable: React.FC<TeenPattiTableProps> = ({
     sideShow,
     respondSideShow,
     startHand,
+    leaveTable,
     errorMessage,
   } = useTeenPattiSocket({ tableId });
+
+  const handleLeave = useCallback(() => {
+    try {
+      leaveTable();
+    } catch (e) {}
+    onLeaveTable();
+  }, [leaveTable, onLeaveTable]);
 
   // Audio effects & phase change reactions
   const lastPhaseRef = useRef<string>('');
@@ -135,7 +143,7 @@ export const TeenPattiTable: React.FC<TeenPattiTableProps> = ({
         {/* Left: Lobby Exit + Live Status */}
         <div className="flex items-center gap-2 shrink-0">
           <button
-            onClick={onLeaveTable}
+            onClick={handleLeave}
             className="tp-header-btn"
           >
             ← Lobby
@@ -234,7 +242,7 @@ export const TeenPattiTable: React.FC<TeenPattiTableProps> = ({
           seats={gameState.seats}
           potAmount={gameState.pot}
           currentUserId={currentUserId}
-          onLeaveTable={onLeaveTable}
+          onLeaveTable={handleLeave}
           onNextHand={startHand}
           onDismiss={() => setShowdownDismissed(true)}
         />

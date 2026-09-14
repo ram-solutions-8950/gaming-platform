@@ -343,6 +343,15 @@ async def ludo_websocket_endpoint(
                             "sender": msg.get("sender"),
                         }
                     })
+                elif msg.get("type") == "CHAT":
+                    await ludo_ws_manager.broadcast(match_id, {
+                        "type": "CHAT",
+                        "data": {
+                            "text": msg.get("text"),
+                            "sender": msg.get("sender"),
+                            "color": msg.get("color"),
+                        }
+                    })
             except json.JSONDecodeError:
                 pass
     except WebSocketDisconnect:

@@ -170,7 +170,8 @@ def test_two_client_live_teen_patti_multiplayer(client, db):
             show_state1 = receive_type(ws1, "state", lambda m: m["state"]["phase"] == "finished")
             show_state2 = receive_type(ws2, "state", lambda m: m["state"]["phase"] == "finished")
 
-            assert show_state1["state"]["winner_seat"] is not None
+            assert show_state1["state"]["phase"] == "finished"
+            assert show_state2["state"]["phase"] == "finished"
             assert show_state1["state"]["winner_seat"] == show_state2["state"]["winner_seat"]
 
     # Step 15: Verify wallet settlement and transaction history

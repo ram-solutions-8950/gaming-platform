@@ -149,6 +149,7 @@ export function useTeenPattiSocket({ tableId, onEvent, onError }: UseTeenPattiSo
   const sideShow = useCallback(() => sendAction('side_show'), [sendAction]);
   const respondSideShow = useCallback((accept: boolean) => sendAction('side_show_respond', { accept }), [sendAction]);
   const startHand = useCallback(() => sendAction('start'), [sendAction]);
+  const leaveTable = useCallback(() => sendAction('leave'), [sendAction]);
 
   return {
     gameState,
@@ -165,5 +166,6 @@ export function useTeenPattiSocket({ tableId, onEvent, onError }: UseTeenPattiSo
     sideShow,
     respondSideShow,
     startHand,
+    leaveTable,
   };
 }

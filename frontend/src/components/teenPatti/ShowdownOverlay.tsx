@@ -32,6 +32,7 @@ export const ShowdownOverlay: React.FC<ShowdownOverlayProps> = ({
   const myBet = mySeat?.total_bet || 0;
 
   useEffect(() => {
+    if (seats.length < 2) return;
     const timer = setInterval(() => {
       setCountdown((prev) => {
         if (prev <= 1) {
@@ -44,7 +45,7 @@ export const ShowdownOverlay: React.FC<ShowdownOverlayProps> = ({
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [onNextHand]);
+  }, [onNextHand, seats.length]);
 
   return (
     <div className="tp-modal-overlay animate-fade-in" style={{ zIndex: 120 }}>
@@ -134,9 +135,15 @@ export const ShowdownOverlay: React.FC<ShowdownOverlayProps> = ({
         )}
 
         {/* Countdown Indicator */}
-        <div style={{ color: '#fbbf24', fontSize: '0.8rem', fontWeight: 700, margin: '8px 0 16px' }}>
-          ⏱ Next hand dealing automatically in {countdown}s...
-        </div>
+        {seats.length >= 2 ? (
+          <div style={{ color: '#fbbf24', fontSize: '0.8rem', fontWeight: 700, margin: '8px 0 16px' }}>
+            ⏱ Next hand dealing automatically in {countdown}s...
+          </div>
+        ) : (
+          <div style={{ color: '#94a3b8', fontSize: '0.8rem', fontWeight: 600, margin: '8px 0 16px' }}>
+            ⏳ Opponent left the table. Waiting for a new opponent to join...
+          </div>
+        )}
 
         {/* Action Buttons: Leave Table or Deal Now */}
         <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginTop: 4 }}>
@@ -164,7 +171,7 @@ export const ShowdownOverlay: React.FC<ShowdownOverlayProps> = ({
             </button>
           )}
 
-          {onNextHand && (
+          {onNextHand && seats.length >= 2 && (
             <button
               type="button"
               onClick={onNextHand}

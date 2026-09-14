@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ArrowLeft } from 'lucide-react';
+import type { LudoTokenStyle } from '../../types/ludo';
 
 interface Props {
   userBalance: number; // in paise
@@ -10,6 +11,8 @@ interface Props {
   searchRemainingSeconds: number;
   onCancelMatchmaking: () => void;
   onExit?: () => void;
+  tokenStyle?: LudoTokenStyle;
+  onOpenTokenSelector?: () => void;
 }
 
 interface Tier {
@@ -34,6 +37,8 @@ export const LudoLobby: React.FC<Props> = ({
   searchRemainingSeconds,
   onCancelMatchmaking,
   onExit,
+  tokenStyle,
+  onOpenTokenSelector,
 }) => {
   const [playerCount, setPlayerCount] = useState<2 | 4>(2);
   const [selectedTier, setSelectedTier] = useState<Tier>(TIERS[0]);
@@ -105,6 +110,34 @@ export const LudoLobby: React.FC<Props> = ({
             <span className="ludo-match-sub text-[11px] text-emerald-400/90 font-semibold">4-Way Royal Battle</span>
           </button>
         </div>
+      </div>
+
+      {/* Token Style Customization Card */}
+      <div className="flex items-center justify-between p-3.5 rounded-2xl bg-gradient-to-r from-purple-950/40 via-slate-900 to-indigo-950/40 border border-purple-500/30">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-slate-800 border border-purple-400/40 flex items-center justify-center text-xl shadow-inner">
+            {tokenStyle === 'KNIGHT_HELM' ? '⚔️' : tokenStyle === 'ARCADE_DIAMOND' ? '💎' : '👑'}
+          </div>
+          <div>
+            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Custom Token Skin</span>
+            <span className="text-xs font-black text-amber-300">
+              {tokenStyle === 'KNIGHT_HELM'
+                ? 'Knight Helm ⚔️'
+                : tokenStyle === 'ARCADE_DIAMOND'
+                ? 'Arcade Gem 💎'
+                : 'Royal Crown 👑'}
+            </span>
+          </div>
+        </div>
+        {onOpenTokenSelector && (
+          <button
+            type="button"
+            onClick={onOpenTokenSelector}
+            className="px-3 py-1.5 bg-gradient-to-r from-amber-500/20 to-yellow-500/20 hover:from-amber-500/30 hover:to-yellow-500/30 border border-amber-500/40 text-amber-300 text-xs font-bold rounded-xl active:scale-95 transition cursor-pointer"
+          >
+            Change ✨
+          </button>
+        )}
       </div>
 
       {/* Tier Selector */}

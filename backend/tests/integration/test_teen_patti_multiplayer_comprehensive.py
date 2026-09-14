@@ -468,3 +468,64 @@ def test_server_authoritative_game_state(client, db, test_users):
             assert hand.phase == Phase.PLAYING
             assert s1["pot"] == hand.pot == 2000
             assert s1["current_stake"] == hand.current_stake == 1000
+
+
+# 19. BUG-038: Gold Royale quick-join waits for second player (no auto-start, no automatic win)
+def test_gold_royale_quick_join_waits_for_second_player(client, db, test_users):
+    tokens = _get_user_tokens(client, test_users)
+    res = client.post(
+        "/api/v1/teen-patti/tables/quick-join",
+        json={"boot_amount": 1000, "mode": "real"},
+        headers={"Authorization": f"Bearer {tokens[0]}"}
+    )
+    assert res.status_code == 200
+    table_id = res.json()["id"]
+
+    with client.websocket_connect(f"/api/v1/ws/teen-patti/{table_id}?token={tokens[0]}") as ws1:
+        s1 = _recv_state(ws1)
+        assert len(s1["seats"]) == 1
+        assert s1["phase"] == "waiting"
+        assert s1["winner_seat"] is None
+
+        # Verify it stays in waiting phase
+        ws1.send_json({"action": "sync"})
+        s1_sync = _recv_state(ws1)
+        assert len(s1_sync["seats"]) == 1
+        assert s1_sync["phase"] == "waiting"
+        assert s1_sync["winner_seat"] is None
+
+
+# 20. BUG-038 Reopen: Player exits during match ends match, remaining player receives win, no further rounds start
+def test_player_exits_during_match_ends_match_and_stops_new_rounds(client, db, test_users):
+    tokens = _get_user_tokens(client, test_users)
+    table_id = _create_test_table(client, tokens[0], max_players=2)
+
+    with client.websocket_connect(f"/api/v1/ws/teen-patti/{table_id}?token={tokens[0]}") as ws1:
+        _recv_state(ws1)
+        with client.websocket_connect(f"/api/v1/ws/teen-patti/{table_id}?token={tokens[1]}") as ws2:
+            _recv_state(ws2)
+            _recv_state(ws1)
+
+            # Start hand
+            ws1.send_json({"action": "start", "action_id": "exit-test-start"})
+            s1 = _recv_state(ws1)
+            _recv_state(ws2)
+            assert s1["phase"] == "playing"
+            assert s1["pot"] == 2000
+
+            # Player 2 exits the match while it's in progress
+            ws2.send_json({"action": "leave"})
+
+        # Remaining player (ws1) receives updated state
+        # The hand must be finished/reset to waiting, opponent is gone, only 1 player remains
+        s1_after = _recv_state(ws1)
+        assert len(s1_after["seats"]) == 1
+        assert s1_after["seats"][0]["id"] == str(test_users[0].id)
+        assert s1_after["phase"] == "waiting"
+
+        # Table stays waiting with 1 player - no new hand starts
+        ws1.send_json({"action": "sync"})
+        s1_check = _recv_state(ws1)
+        assert len(s1_check["seats"]) == 1
+        assert s1_check["phase"] == "waiting"
+

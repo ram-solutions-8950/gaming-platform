@@ -39,7 +39,7 @@ export function RummyPage() {
   const { tableId: routeTableId } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
   const queryTableId = searchParams.get("tableId");
-  const effectiveTableId = routeTableId || queryTableId || null;
+  const effectiveTableId = queryTableId || routeTableId || null;
   const [activeTableId, setActiveTableId] = useState<string | null>(effectiveTableId);
   const [balance, setBalance] = useState<number>(0);
   const [openTables, setOpenTables] = useState<RummyTableOut[]>([]);
@@ -58,8 +58,8 @@ export function RummyPage() {
 
   // Sync activeTableId with route and URL query params
   useEffect(() => {
-    setActiveTableId(routeTableId || queryTableId || null);
-  }, [routeTableId, queryTableId]);
+    setActiveTableId(queryTableId || routeTableId || null);
+  }, [queryTableId, routeTableId]);
 
   // Fetch real balance from /wallet
   const fetchBalance = async () => {
@@ -182,9 +182,25 @@ export function RummyPage() {
     navigate("/dashboard", { replace: true });
   };
 
+  const handlePlayAgain = (newTableId: string) => {
+    matchmaking.reset();
+    setSearchParams({ tableId: newTableId }, { replace: true });
+    setActiveTableId(newTableId);
+    navigate(`/games/rummy?tableId=${newTableId}`, { replace: true });
+    fetchBalance();
+  };
+
   // If inside a game table, render GameTable
   if (activeTableId) {
-    return <GameTable customTableId={activeTableId} onBack={handleLeaveTable} onExit={handleExitDashboard} />;
+    return (
+      <GameTable
+        key={activeTableId}
+        customTableId={activeTableId}
+        onBack={handleLeaveTable}
+        onExit={handleExitDashboard}
+        onPlayAgain={handlePlayAgain}
+      />
+    );
   }
 
   return (

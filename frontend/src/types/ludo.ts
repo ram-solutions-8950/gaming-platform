@@ -1,4 +1,5 @@
 export type LudoColor = 'RED' | 'GREEN' | 'YELLOW' | 'BLUE';
+export type LudoTokenStyle = 'ROYAL_CROWN' | 'KNIGHT_HELM' | 'ARCADE_DIAMOND';
 
 export type LudoMatchStatus = 'WAITING' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
 

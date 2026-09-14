@@ -56,6 +56,10 @@ class TeenPattiConnectionManager:
                 await self.disconnect(table_id, user_id)
 
 
+    def is_connected(self, table_id: str, user_id: str) -> bool:
+        return user_id in self._tables.get(table_id, {})
+
+
 manager = TeenPattiConnectionManager()
 
 router = APIRouter()
@@ -65,11 +69,18 @@ _turn_timers: Dict[str, asyncio.Task] = {}
 _bot_timers: Dict[str, asyncio.Task] = {}
 _start_timers: Dict[str, asyncio.Task] = {}
 _bot_join_timers: Dict[str, asyncio.Task] = {}
+_disconnect_timers: Dict[Tuple[str, str], asyncio.Task] = {}
 _pending_side_show: Dict[str, Dict[str, str]] = {}
 _processed_actions: Dict[str, set] = defaultdict(set)
 _rng_per_table: Dict[str, random.Random] = {}
 _hand_number: Dict[str, int] = defaultdict(lambda: 1)
 _table_locks: Dict[str, asyncio.Lock] = {}
+
+
+def _cancel_disconnect_timer(key: Tuple[str, str]) -> None:
+    task = _disconnect_timers.pop(key, None)
+    if task and not task.done():
+        task.cancel()
 
 
 def _get_table_lock(table_id: str) -> asyncio.Lock:
@@ -235,6 +246,9 @@ async def _turn_timeout(table_id: str, expected_user: str, seconds: int) -> None
         return
     curr_seat = hand.seats[hand.current_turn]
     if curr_seat.id == expected_user:
+        if not manager.is_connected(table_id, expected_user):
+            await _handle_player_leave(table_id, expected_user)
+            return
         try:
             hand.pack(expected_user)
         except GameError:
@@ -245,19 +259,9 @@ async def _turn_timeout(table_id: str, expected_user: str, seconds: int) -> None
 _MIN_PLAYERS_TO_START = 2
 
 def _schedule_bot_fill(table_id: str) -> None:
-    """Schedules bots to fill up to the minimum player count for virtual practice tables.
-    In real-money 2-player multiplayer tables, bots are never injected so real players
-    wait for real opponents."""
-    _, mode = _load_config(table_id)
-    if mode == "real":
-        return
-    hand = teen_patti_manager.get(table_id)
-    if hand is None or hand.phase != Phase.WAITING:
-        return
-    if len(hand.seats) >= _MIN_PLAYERS_TO_START:
-        return
-    _cancel(_bot_join_timers, table_id)
-    _bot_join_timers[table_id] = asyncio.create_task(_bot_fill_task(table_id))
+    """Teen Patti is strictly a 2-player multiplayer game.
+    Bots are never injected; players wait for real opponents (BUG-038)."""
+    return
 
 
 async def _bot_fill_task(table_id: str) -> None:
@@ -500,11 +504,24 @@ async def _schedule_next_hand(table_id: str) -> None:
     async with lock:
         hand = teen_patti_manager.get(table_id)
         if hand is not None and hand.phase == Phase.FINISHED:
-            hand.reset_for_next_hand()
+            for s in list(hand.seats):
+                if not _is_bot(s.id) and not manager.is_connected(table_id, s.id):
+                    hand.remove_seat(s.id)
             seated_players = [s for s in hand.seats if s.id is not None]
             if len(seated_players) >= 2:
+                hand.reset_for_next_hand()
                 await _start_hand(table_id)
             else:
+                hand.reset_for_next_hand()
+                with _get_db_session() as db:
+                    try:
+                        tid = uuid.UUID(str(table_id))
+                        tbl = db.query(TeenPattiTable).filter(TeenPattiTable.id == tid).first()
+                        if tbl:
+                            tbl.status = TeenPattiTableStatus.OPEN
+                            db.commit()
+                    except Exception:
+                        pass
                 await manager.broadcast(table_id, {
                     "type": "event",
                     "event": "next_hand_ready",
@@ -534,6 +551,67 @@ async def _after_action(table_id: str) -> None:
     elif hand.phase == Phase.PLAYING and table_id not in _pending_side_show:
         _arm_turn_timer(table_id)
         _maybe_trigger_bot_turn(table_id)
+
+
+async def _handle_player_leave(table_id: str, user_id: str) -> None:
+    hand = teen_patti_manager.get(table_id)
+    if hand is None:
+        return
+
+    seat_idx = hand._seat_index(user_id)
+    if seat_idx is None:
+        return
+
+    # 1. If currently playing and this player is in the hand, pack them to forfeit
+    if hand.phase == Phase.PLAYING and hand.seats[seat_idx].is_in_hand:
+        try:
+            hand.pack(user_id)
+        except GameError:
+            pass
+
+    # 2. If forfeit ended the hand, settle and broadcast hand_over
+    if hand.phase == Phase.FINISHED:
+        _cancel(_turn_timers, table_id)
+        _cancel(_bot_timers, table_id)
+        _cancel(_start_timers, table_id)
+        _settle_hand(table_id, hand)
+        await manager.broadcast(table_id, {
+            "type": "event",
+            "event": "hand_over",
+            "winner_seat": hand.winner_seat,
+            "reason": "Opponent left the match",
+        })
+        _hand_number[table_id] += 1
+
+    # 3. Cancel all pending timers on this table
+    _cancel(_turn_timers, table_id)
+    _cancel(_bot_timers, table_id)
+    _cancel(_start_timers, table_id)
+    _cancel(_bot_join_timers, table_id)
+    _cancel_disconnect_timer((table_id, user_id))
+    _pending_side_show.pop(table_id, None)
+
+    # 4. Remove the departing player's seat
+    hand.remove_seat(user_id)
+
+    # 5. When fewer than 2 players remain, the match cannot continue.
+    # Reset table to WAITING phase so no further automatic hands or bets run.
+    seated = [s for s in hand.seats if s.id is not None]
+    if len(seated) < 2:
+        hand.reset_for_next_hand()
+        with _get_db_session() as db:
+            try:
+                tid = uuid.UUID(str(table_id))
+                tbl = db.query(TeenPattiTable).filter(TeenPattiTable.id == tid).first()
+                if tbl:
+                    tbl.status = TeenPattiTableStatus.OPEN
+                    db.commit()
+            except Exception:
+                pass
+
+    # 6. Broadcast left event and updated table state
+    await manager.broadcast(table_id, {"type": "event", "event": "left", "seat": user_id})
+    await _broadcast_state(table_id)
 
 
 @router.websocket("/ws/teen-patti/{table_id}")
@@ -601,6 +679,7 @@ async def teen_patti_socket(websocket: WebSocket, table_id: str) -> None:
             # forever for another real player.
             _schedule_bot_fill(table_id)
 
+        _cancel_disconnect_timer((table_id, user_id))
         await manager.connect(table_id, user_id, websocket)
         await manager.send_to_user(table_id, user_id, {"type": "event", "event": "joined"})
         await _broadcast_state(table_id)
@@ -625,15 +704,29 @@ async def teen_patti_socket(websocket: WebSocket, table_id: str) -> None:
                 await _handle_action(table_id, user_id, msg)
     except WebSocketDisconnect:
         await manager.disconnect(table_id, user_id)
-        async with lock:
-            h = teen_patti_manager.get(table_id)
-            if h and h.phase in (Phase.WAITING, Phase.FINISHED):
-                h.remove_seat(user_id)
-                await _broadcast_state(table_id)
-        await manager.broadcast(table_id, {"type": "event", "event": "left", "seat": user_id})
+        key = (table_id, user_id)
+        _cancel_disconnect_timer(key)
+        h = teen_patti_manager.get(table_id)
+        if h and h.phase == Phase.PLAYING:
+            async def _disconnect_grace(t_id=table_id, u_id=user_id):
+                try:
+                    await asyncio.sleep(1.5)
+                    if not manager.is_connected(t_id, u_id):
+                        t_lock = _get_table_lock(t_id)
+                        async with t_lock:
+                            await _handle_player_leave(t_id, u_id)
+                except asyncio.CancelledError:
+                    pass
+            _disconnect_timers[key] = asyncio.create_task(_disconnect_grace())
+        else:
+            async with lock:
+                await _handle_player_leave(table_id, user_id)
     except Exception as exc:
         await manager.send_to_user(table_id, user_id, {"type": "error", "message": str(exc)})
         await manager.disconnect(table_id, user_id)
+        _cancel_disconnect_timer((table_id, user_id))
+        async with lock:
+            await _handle_player_leave(table_id, user_id)
 
 
 async def _handle_action(table_id: str, user_id: str, msg: dict) -> None:
@@ -667,10 +760,9 @@ async def _handle_action(table_id: str, user_id: str, msg: dict) -> None:
                 await _start_hand(table_id)
             return
         elif action == "leave":
-            hand.remove_seat(user_id)
+            _cancel_disconnect_timer((table_id, user_id))
             await manager.disconnect(table_id, user_id)
-            await manager.broadcast(table_id, {"type": "event", "event": "left", "seat": user_id})
-            await _broadcast_state(table_id)
+            await _handle_player_leave(table_id, user_id)
             return
         elif action == "sync":
             await _broadcast_state(table_id)

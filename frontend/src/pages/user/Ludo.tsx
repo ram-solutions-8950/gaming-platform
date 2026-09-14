@@ -3,24 +3,33 @@ import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
 import { walletService } from '../../services/wallet';
 import { ludoService } from '../../services/ludo';
-import type { LudoMatchState } from '../../types/ludo';
-import { LudoBoard } from '../../components/ludo/LudoBoard';
+import type { LudoMatchState, LudoTokenStyle, LudoColor } from '../../types/ludo';
+import { LudoBoard, type ActiveMoveAnimation } from '../../components/ludo/LudoBoard';
 import { LudoDice } from '../../components/ludo/LudoDice';
 import { LudoPlayerPanel } from '../../components/ludo/LudoPlayerPanel';
 import { LudoLobby } from '../../components/ludo/LudoLobby';
 import { LudoWinnerModal } from '../../components/ludo/LudoWinnerModal';
+import { LudoTokenSelectorModal } from '../../components/ludo/LudoTokenSelectorModal';
 import { GameRulesModal } from '../../components/common/GameRulesModal';
 import { LUDO_RULES_DATA } from '../../components/common/gameRulesData';
 import { soundManager } from '../../services/soundManager';
 import { authStorage } from '../../services/authStorage';
 import { getWebSocketUrl } from '../../utils/ws';
 import { lockLandscape } from '../../utils/nativeOrientation';
-import { ArrowLeft, HelpCircle } from 'lucide-react';
+import { ArrowLeft, HelpCircle, MessageSquare } from 'lucide-react';
 import '../../styles/ludo.css';
 
 interface FloatingReaction {
   id: string;
   emoji: string;
+  leftPercent: number;
+}
+
+interface QuickChatBubble {
+  id: string;
+  sender: string;
+  text: string;
+  color: LudoColor;
   leftPercent: number;
 }
 
@@ -52,6 +61,31 @@ export const Ludo: React.FC = () => {
   const [diceDisplayValue, setDiceDisplayValue] = useState<number | null>(null);
   const [diceStatusNotice, setDiceStatusNotice] = useState<string | null>(null);
 
+  // Custom 3D Token Style & Selector Modal
+  const [tokenStyle, setTokenStyle] = useState<LudoTokenStyle>(() => {
+    try {
+      const saved = localStorage.getItem('ludo_token_style');
+      if (saved === 'KNIGHT_HELM' || saved === 'ARCADE_DIAMOND' || saved === 'ROYAL_CROWN') {
+        return saved;
+      }
+    } catch {}
+    return 'ROYAL_CROWN';
+  });
+  const [showTokenSelectorModal, setShowTokenSelectorModal] = useState<boolean>(false);
+  const [showQuickChatMenu, setShowQuickChatMenu] = useState<boolean>(false);
+  const [chatBubbles, setChatBubbles] = useState<QuickChatBubble[]>([]);
+
+  // Step-by-step Move Animation Pipeline
+  const [activeMove, setActiveMove] = useState<ActiveMoveAnimation | null>(null);
+  const pendingMatchStateRef = useRef<LudoMatchState | null>(null);
+
+  const handleSelectTokenStyle = (newStyle: LudoTokenStyle) => {
+    setTokenStyle(newStyle);
+    try {
+      localStorage.setItem('ludo_token_style', newStyle);
+    } catch {}
+  };
+
   // Floating reactions & celebration banners
   const [reactions, setReactions] = useState<FloatingReaction[]>([]);
   const [banner, setBanner] = useState<CelebrationBanner | null>(null);
@@ -69,6 +103,32 @@ export const Ludo: React.FC = () => {
     },
     []
   );
+
+  const handleMoveAnimationEnd = useCallback(() => {
+    const finalState = pendingMatchStateRef.current;
+    if (finalState) {
+      setMatchState(finalState);
+      setTimerSeconds(finalState.remaining_timer_seconds ?? 10);
+      setDiceDisplayValue(finalState.last_dice_roll);
+      pendingMatchStateRef.current = null;
+    }
+    if (activeMove?.isCapture) {
+      triggerBanner(
+        'KNOCKOUT! 💥',
+        'Opponent knocked back to base! Bonus roll granted!',
+        '⚔️',
+        'CAPTURE'
+      );
+    } else if (activeMove?.isHome) {
+      triggerBanner(
+        'HOME RUN! TOKEN SCORED! 🌟',
+        'Pawn safely arrived at Home Triangle!',
+        '🏆',
+        'HOME'
+      );
+    }
+    setActiveMove(null);
+  }, [activeMove, triggerBanner]);
 
   const addReaction = useCallback((emoji: string) => {
     const id = `${Date.now()}_${Math.random()}`;
@@ -96,6 +156,39 @@ export const Ludo: React.FC = () => {
       }
     },
     [addReaction, user?.username]
+  );
+
+  const addChatBubble = useCallback((sender: string, text: string, color: LudoColor) => {
+    const id = `${Date.now()}_${Math.random()}`;
+    const leftPercent = 20 + Math.random() * 55;
+    setChatBubbles((prev) => [...prev.slice(-8), { id, sender, text, color, leftPercent }]);
+    soundManager.play('reveal_tick');
+    setTimeout(() => {
+      setChatBubbles((prev) => prev.filter((b) => b.id !== id));
+    }, 2400);
+  }, []);
+
+  const sendQuickChat = useCallback(
+    (text: string) => {
+      if (!user) return;
+      const myP = matchState?.players.find((p) => p.user_id === user?.id);
+      const myColor = myP?.color || 'RED';
+      addChatBubble(user.username || 'You', text, myColor);
+      setShowQuickChatMenu(false);
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+        try {
+          wsRef.current.send(
+            JSON.stringify({
+              type: 'CHAT',
+              text,
+              sender: user?.username || 'Player',
+              color: myColor,
+            })
+          );
+        } catch {}
+      }
+    },
+    [user, matchState?.players, addChatBubble]
   );
 
   const rollCycleTimerRef = useRef<any>(null);
@@ -311,27 +404,53 @@ export const Ludo: React.FC = () => {
             transitionDelayTimerRef.current = null;
           }
           setDiceStatusNotice(null);
-          setMatchState(msg.state);
-          setTimerSeconds(msg.state.remaining_timer_seconds ?? 10);
-          setDiceDisplayValue(msg.state.last_dice_roll);
-          if (msg.data?.captured) {
-            soundManager.play('loss');
-            triggerBanner(
-              'TOKEN CAPTURED! 💥',
-              'Opponent eliminated back to yard! Bonus roll granted!',
-              '⚔️',
-              'CAPTURE'
-            );
-          } else if (msg.data?.is_home) {
-            soundManager.play('cashout');
-            triggerBanner(
-              'HOME RUN! TOKEN SCORED! 🌟',
-              'Pawn safely arrived at Home Triangle!',
-              '🏆',
-              'HOME'
-            );
+
+          const moveData = msg.data;
+          const targetState = msg.state as LudoMatchState;
+          const movingColor = matchState?.current_turn_color || targetState.current_turn_color;
+          const movingPlayer = matchState?.players.find((p) => p.color === movingColor);
+          const oldToken = movingPlayer?.tokens.find((t) => t.token_index === moveData?.token_index);
+          const fromPos = oldToken ? oldToken.position : -1;
+          const toPos = moveData?.new_position ?? (oldToken ? oldToken.position : 0);
+          const isCapture = Boolean(moveData?.captured);
+          const isHome = Boolean(moveData?.is_home);
+
+          if (fromPos !== toPos) {
+            pendingMatchStateRef.current = targetState;
+            setActiveMove({
+              id: Math.random().toString(),
+              playerColor: movingColor || 'RED',
+              playerId: movingPlayer?.id || '',
+              tokenIndex: moveData?.token_index ?? 0,
+              fromPosition: fromPos,
+              toPosition: toPos,
+              isCapture,
+              capturedToken: moveData?.captured,
+              isHome,
+            });
+          } else {
+            // Immediate sync if no coordinate progression
+            setMatchState(targetState);
+            setTimerSeconds(targetState.remaining_timer_seconds ?? 10);
+            setDiceDisplayValue(targetState.last_dice_roll);
+            if (moveData?.captured) {
+              triggerBanner(
+                'KNOCKOUT! 💥',
+                'Opponent knocked back to base! Bonus roll granted!',
+                '⚔️',
+                'CAPTURE'
+              );
+            } else if (moveData?.is_home) {
+              triggerBanner(
+                'HOME RUN! TOKEN SCORED! 🌟',
+                'Pawn safely arrived at Home Triangle!',
+                '🏆',
+                'HOME'
+              );
+            }
           }
-          if (msg.data?.game_over) {
+
+          if (moveData?.game_over) {
             soundManager.play('win_clap');
             refreshWallet();
           }
@@ -346,6 +465,14 @@ export const Ludo: React.FC = () => {
             transitionDelayTimerRef.current = null;
           }
           setDiceStatusNotice(null);
+
+          // Flush any pending move animation state immediately
+          if (pendingMatchStateRef.current) {
+            setMatchState(pendingMatchStateRef.current);
+            pendingMatchStateRef.current = null;
+          }
+          setActiveMove(null);
+
           if (msg.state) {
             setMatchState(msg.state);
             setTimerSeconds(msg.state.remaining_timer_seconds ?? 10);
@@ -356,6 +483,12 @@ export const Ludo: React.FC = () => {
             refreshWallet();
           }
         } else if (msg.type === 'PLAYER_FORFEITED' && msg.state) {
+          if (pendingMatchStateRef.current) {
+            setMatchState(pendingMatchStateRef.current);
+            pendingMatchStateRef.current = null;
+          }
+          setActiveMove(null);
+
           setMatchState(msg.state);
           setTimerSeconds(msg.state.remaining_timer_seconds ?? 10);
           if (msg.data?.game_over) {
@@ -365,6 +498,10 @@ export const Ludo: React.FC = () => {
         } else if (msg.type === 'REACTION' && msg.data?.emoji) {
           if (msg.data.sender !== user?.username) {
             addReaction(msg.data.emoji);
+          }
+        } else if (msg.type === 'CHAT' && msg.data?.text) {
+          if (msg.data.sender !== user?.username) {
+            addChatBubble(msg.data.sender || 'Player', msg.data.text, msg.data.color || 'YELLOW');
           }
         }
       } catch (e) {
@@ -554,6 +691,10 @@ export const Ludo: React.FC = () => {
     if (bannerTimerRef.current) clearTimeout(bannerTimerRef.current);
     setBanner(null);
     setReactions([]);
+    setActiveMove(null);
+    pendingMatchStateRef.current = null;
+    setChatBubbles([]);
+    setShowQuickChatMenu(false);
 
     setMatchState(null);
     matchTransitionRef.current = null;
@@ -567,6 +708,10 @@ export const Ludo: React.FC = () => {
     if (bannerTimerRef.current) clearTimeout(bannerTimerRef.current);
     setBanner(null);
     setReactions([]);
+    setActiveMove(null);
+    pendingMatchStateRef.current = null;
+    setChatBubbles([]);
+    setShowQuickChatMenu(false);
     setMatchState(null);
     matchTransitionRef.current = null;
     refreshWallet();
@@ -695,6 +840,8 @@ export const Ludo: React.FC = () => {
             searchRemainingSeconds={searchRemainingSeconds}
             onCancelMatchmaking={handleCancelMatchmaking}
             onExit={handleExitLobby}
+            tokenStyle={tokenStyle}
+            onOpenTokenSelector={() => setShowTokenSelectorModal(true)}
           />
         </div>
       )}
@@ -733,6 +880,17 @@ export const Ludo: React.FC = () => {
             </div>
 
             <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setShowTokenSelectorModal(true)}
+                className="flex items-center gap-1 px-2.5 py-1 bg-gradient-to-r from-purple-900/60 to-indigo-900/60 hover:brightness-110 border border-purple-400/50 text-purple-200 rounded-lg text-xs font-bold transition active:scale-95 cursor-pointer shadow-sm"
+                aria-label="Customize Tokens"
+                title="Change Token Style"
+              >
+                <span>✨</span>
+                <span className="hidden sm:inline">Tokens</span>
+              </button>
+
               <button
                 type="button"
                 onClick={() => setShowRulesModal(true)}
@@ -804,14 +962,31 @@ export const Ludo: React.FC = () => {
                 legalTokenIndices={legalTokenIndices}
                 onTokenClick={handleMoveToken}
                 isMyTurn={isMyTurn}
+                tokenStyle={tokenStyle}
+                diceValue={diceDisplayValue ?? matchState.last_dice_roll}
+                activeMove={activeMove}
+                onMoveAnimationEnd={handleMoveAnimationEnd}
               />
 
-              {/* Interactive Quick Reaction Bar */}
-              <div className="mt-1 sm:mt-1.5 flex items-center justify-center gap-1 sm:gap-2 px-2.5 sm:px-3 py-1 bg-slate-900/90 backdrop-blur-md rounded-full border border-slate-700/70 shadow-lg shrink-0 z-20">
-                <span className="text-[10px] text-amber-400 font-bold uppercase tracking-wider hidden sm:inline mr-1">
-                  React:
+              {/* Interactive Quick Reaction & Taunt Bar */}
+              <div className="mt-1 sm:mt-1.5 flex items-center justify-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1 bg-slate-900/90 backdrop-blur-md rounded-full border border-slate-700/70 shadow-lg shrink-0 z-20">
+                <span className="text-[10px] text-amber-400 font-bold uppercase tracking-wider hidden sm:inline mr-0.5">
+                  Chat:
                 </span>
-                {['😂', '🔥', '👑', '🎲', '😎', '👏'].map((emoji) => (
+                <button
+                  type="button"
+                  onClick={() => setShowQuickChatMenu((prev) => !prev)}
+                  className={`w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center rounded-full border transition cursor-pointer select-none ${
+                    showQuickChatMenu
+                      ? 'bg-amber-500 text-slate-950 border-amber-300 shadow-md'
+                      : 'bg-slate-800 hover:bg-slate-700 text-amber-300 border-slate-700/50'
+                  }`}
+                  title="Quick Chat Phrases"
+                  aria-label="Quick Chat"
+                >
+                  <MessageSquare size={13} />
+                </button>
+                {['😂', '🔥', '👑', '🎲', '💥', '😎', '👏'].map((emoji) => (
                   <button
                     key={emoji}
                     type="button"
@@ -824,6 +999,30 @@ export const Ludo: React.FC = () => {
                   </button>
                 ))}
               </div>
+
+              {/* Quick Chat Popup Menu */}
+              {showQuickChatMenu && (
+                <div className="absolute bottom-11 sm:bottom-12 z-30 flex flex-wrap items-center justify-center gap-1.5 p-2 bg-slate-900/95 backdrop-blur-xl border border-amber-500/40 rounded-2xl shadow-2xl max-w-xs sm:max-w-sm animate-fade-in">
+                  {[
+                    '🍀 Good luck!',
+                    '👏 Well played!',
+                    '😅 Oops!',
+                    '🎯 Almost!',
+                    '🔥 Bring it!',
+                    '⏱️ Hurry up!',
+                    '⚡ Nice move!',
+                  ].map((phrase) => (
+                    <button
+                      key={phrase}
+                      type="button"
+                      onClick={() => sendQuickChat(phrase)}
+                      className="px-2.5 py-1 rounded-xl bg-slate-800 hover:bg-slate-700 active:scale-95 text-xs font-bold text-slate-200 border border-slate-700/60 hover:border-amber-500/50 hover:text-amber-300 transition cursor-pointer whitespace-nowrap"
+                    >
+                      {phrase}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Right Column: Top-Right (GREEN) & Bottom-Right (YELLOW) */}
@@ -975,6 +1174,35 @@ export const Ludo: React.FC = () => {
           </div>
         ))}
       </div>
+
+      {/* Floating Quick Chat Bubbles Overlay */}
+      <div className="fixed inset-0 pointer-events-none z-[65] overflow-hidden">
+        {chatBubbles.map((b) => (
+          <div
+            key={b.id}
+            className="absolute bottom-28 animate-chat-bubble select-none"
+            style={{ left: `${b.leftPercent}%` }}
+          >
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-2xl bg-slate-900/95 border-2 border-amber-400 text-white shadow-[0_8px_25px_rgba(0,0,0,0.85)] max-w-xs backdrop-blur-md">
+              <span className="text-[10px] font-black text-amber-400 truncate max-w-[80px]">
+                {b.sender}:
+              </span>
+              <span className="text-xs font-extrabold text-slate-100 whitespace-nowrap">
+                {b.text}
+              </span>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Token Style Selector Modal */}
+      {showTokenSelectorModal && (
+        <LudoTokenSelectorModal
+          currentStyle={tokenStyle}
+          onSelectStyle={handleSelectTokenStyle}
+          onClose={() => setShowTokenSelectorModal(false)}
+        />
+      )}
     </div>
   );
 };

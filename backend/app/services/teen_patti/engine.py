@@ -117,6 +117,21 @@ class TeenPattiHand:
             if active:
                 self._finish_hand(winner_idx=active[0], reason="All other players left")
 
+        # Adjust indices if seats shifted
+        if self.winner_seat is not None:
+            if self.winner_seat == idx:
+                self.winner_seat = None
+            elif self.winner_seat > idx:
+                self.winner_seat -= 1
+        if len(self.seats) > 0:
+            if self.current_turn >= len(self.seats):
+                self.current_turn = max(0, len(self.seats) - 1)
+            if self.dealer_seat >= len(self.seats):
+                self.dealer_seat = max(0, len(self.seats) - 1)
+        else:
+            self.current_turn = 0
+            self.dealer_seat = 0
+
     def start_hand(self, client_seed: str = "default", nonce: int = 0) -> None:
         if len(self.seats) < 2:
             raise GameError("need at least 2 players to start")

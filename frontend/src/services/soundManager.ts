@@ -26,15 +26,28 @@ export type SoundEvent =
   | "dragon_wins"
   | "tiger_wins"
   // Table / Dice events
-  | "dice_roll";
+  | "dice_roll"
+  // Ludo specific events (oscillator-based, zero latency)
+  | "ludo_step"
+  | "ludo_land"
+  | "ludo_capture"
+  | "ludo_safe"
+  | "ludo_home"
+  | "ludo_six";
 
-// Triple777 events that use Web Audio oscillators instead of Howler files
+// Triple777 & Ludo events that use Web Audio oscillators instead of Howler files
 const OSCILLATOR_EVENTS = new Set<SoundEvent>([
   "reel_spin",
   "reel_stop",
   "small_win",
   "big_win",
   "777_win",
+  "ludo_step",
+  "ludo_land",
+  "ludo_capture",
+  "ludo_safe",
+  "ludo_home",
+  "ludo_six",
 ]);
 
 // Common casino sounds – mapped to local MP3 assets
@@ -198,6 +211,81 @@ class CentralSoundManager {
           osc.connect(gain).connect(ctx.destination);
           osc.start(now + i * 0.09);
           osc.stop(now + i * 0.09 + 0.35);
+        });
+      } else if (key === "ludo_step") {
+        // Crisp percussive wooden/ceramic hop tap (540Hz -> 280Hz, 0.045s)
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(540, now);
+        osc.frequency.exponentialRampToValueAtTime(280, now + 0.045);
+        gain.gain.setValueAtTime(0.14 * this._volume, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.045);
+        osc.connect(gain).connect(ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.045);
+      } else if (key === "ludo_land") {
+        // Solid landing snap with resonant thud (240Hz -> 85Hz, 0.08s)
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = "triangle";
+        osc.frequency.setValueAtTime(240, now);
+        osc.frequency.exponentialRampToValueAtTime(85, now + 0.08);
+        gain.gain.setValueAtTime(0.18 * this._volume, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+        osc.connect(gain).connect(ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.08);
+      } else if (key === "ludo_capture") {
+        // Punchy dramatic impact knock (sawtooth + pitch smash)
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = "sawtooth";
+        osc.frequency.setValueAtTime(360, now);
+        osc.frequency.exponentialRampToValueAtTime(55, now + 0.22);
+        gain.gain.setValueAtTime(0.22 * this._volume, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
+        osc.connect(gain).connect(ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.22);
+      } else if (key === "ludo_safe") {
+        // Shimmering twin crystal shield chime
+        [880, 1320].forEach((freq, i) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = "sine";
+          osc.frequency.setValueAtTime(freq, now + i * 0.03);
+          gain.gain.setValueAtTime(0.12 * this._volume, now + i * 0.03);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.03 + 0.22);
+          osc.connect(gain).connect(ctx.destination);
+          osc.start(now + i * 0.03);
+          osc.stop(now + i * 0.03 + 0.22);
+        });
+      } else if (key === "ludo_home") {
+        // Glorious triumphant fanfare arpeggio [C5, E5, G5, C6]
+        [523.25, 659.25, 783.99, 1046.5].forEach((freq, i) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = "triangle";
+          osc.frequency.setValueAtTime(freq, now + i * 0.07);
+          gain.gain.setValueAtTime(0.15 * this._volume, now + i * 0.07);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.07 + 0.28);
+          osc.connect(gain).connect(ctx.destination);
+          osc.start(now + i * 0.07);
+          osc.stop(now + i * 0.07 + 0.28);
+        });
+      } else if (key === "ludo_six") {
+        // High energy lucky 6 celebration ding
+        [987.77, 1318.51, 1567.98].forEach((freq, i) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = "sine";
+          osc.frequency.setValueAtTime(freq, now + i * 0.06);
+          gain.gain.setValueAtTime(0.13 * this._volume, now + i * 0.06);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.06 + 0.25);
+          osc.connect(gain).connect(ctx.destination);
+          osc.start(now + i * 0.06);
+          osc.stop(now + i * 0.06 + 0.25);
         });
       }
     } catch {

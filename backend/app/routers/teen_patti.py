@@ -303,7 +303,9 @@ def quick_join_table(
         for t in open_tables:
             live = teen_patti_manager.get(str(t.id))
             count = len(live.seats) if live else 0
-            if count == 0 and (live is None or live.phase == Phase.WAITING):
+            if count == 0:
+                if live and live.phase != Phase.WAITING:
+                    live.reset_for_next_hand()
                 cfg = GameConfig(
                     boot_amount=t.boot_amount,
                     max_players=t.max_players,
