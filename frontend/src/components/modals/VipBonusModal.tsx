@@ -56,12 +56,12 @@ export const VipBonusModal: React.FC<Props> = ({ onClose, onWalletRefresh, onDep
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-black/80 backdrop-blur-sm animate-fade-in select-none"
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 pb-[calc(var(--bottom-nav-height,56px)+var(--safe-bottom,0px)+12px)] bg-black/80 backdrop-blur-sm animate-fade-in select-none"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="relative w-full max-w-lg bg-gradient-to-b from-[#2e0854] via-[#1a0335] to-[#0e011f] rounded-2xl border-2 border-amber-400/80 shadow-[0_0_40px_rgba(245,158,11,0.35)] overflow-hidden text-white flex flex-col max-h-[calc(100dvh-var(--safe-top)-var(--safe-bottom)-24px)]">
+      <div className="relative w-full max-w-lg bg-gradient-to-b from-[#2e0854] via-[#1a0335] to-[#0e011f] rounded-2xl border-2 border-amber-400/80 shadow-[0_0_40px_rgba(245,158,11,0.35)] overflow-hidden text-white flex flex-col max-h-[calc(100dvh-var(--bottom-nav-height,56px)-var(--safe-top,0px)-var(--safe-bottom,0px)-24px)]">
         {/* Header */}
         <div className="relative bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-600 px-6 py-3 flex items-center justify-between shadow-md">
           <div className="flex items-center gap-2">

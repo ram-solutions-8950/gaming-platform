@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-export type RewardModalType = '7days' | 'lucky_spin' | 'bonus' | 'jackpot' | 'vip' | 'service' | null;
+export type RewardModalType = '7days' | 'lucky_spin' | 'bonus' | 'jackpot' | 'vip' | 'service' | 'refer' | null;
 
 interface RewardStoreState {
   activeModal: RewardModalType;
@@ -13,3 +13,4 @@ export const useRewardStore = create<RewardStoreState>((set) => ({
   openModal: (modal) => set({ activeModal: modal }),
   closeModal: () => set({ activeModal: null }),
 }));
+

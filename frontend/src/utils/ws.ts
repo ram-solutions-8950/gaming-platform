@@ -2,16 +2,14 @@
  * WebSocket URL Resolution Helper
  */
 
+import { isNativePlatform } from './platform';
+
 export function getWebSocketUrl(path: string, token?: string): string {
   const cleanPath = path.replace(/^\/+/, '');
   const configuredWsUrl = import.meta.env.VITE_WS_URL?.trim();
   const configuredApiUrl = import.meta.env.VITE_API_URL?.trim();
 
-  const isCapacitor =
-    typeof (window as any).Capacitor !== 'undefined' ||
-    (typeof window !== 'undefined' &&
-      (window.location.protocol === 'capacitor:' ||
-        window.location.protocol === 'ionic:'));
+  const isCapacitor = isNativePlatform();
 
   let wsBase = '';
   if (configuredWsUrl) {

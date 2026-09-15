@@ -9,7 +9,6 @@ import type { CatalogGame } from '../../types';
 import '../../styles/lobby.css';
 import '../../styles/startup-promotions.css';
 import { FreeRewardPopup } from '../../components/modals/FreeRewardPopup';
-import { ReferWinPopup } from '../../components/modals/ReferWinPopup';
 import { useRewardStore } from '../../store/rewardStore';
 import { setNativeLandscape } from '../../utils/nativeOrientation';
 
@@ -81,7 +80,7 @@ export function DashboardPage() {
   const navigate = useNavigate();
   const [catalogGames, setCatalogGames] = useState<CatalogGame[]>([]);
   const [activeCategory, setActiveCategory] = useState('ALL');
-  const [activePopup, setActivePopup] = useState<'free' | 'refer' | null>(null);
+  const [activePopup, setActivePopup] = useState<'free' | null>(null);
 
   useEffect(() => {
     setNativeLandscape().catch(() => {});
@@ -101,7 +100,7 @@ export function DashboardPage() {
 
   useEffect(() => {
     const handleOpenRefer = () => {
-      setActivePopup('refer');
+      useRewardStore.getState().openModal('refer');
     };
     const handleOpenFree = () => {
       setActivePopup('free');
@@ -115,13 +114,6 @@ export function DashboardPage() {
   }, []);
 
   const handleCloseFree = () => {
-    setActivePopup(null);
-    setTimeout(() => {
-      setActivePopup('refer');
-    }, 220);
-  };
-
-  const handleCloseRefer = () => {
     setActivePopup(null);
   };
 
@@ -244,7 +236,6 @@ export function DashboardPage() {
       </div>
 
       {activePopup === 'free' && <FreeRewardPopup onClose={handleCloseFree} />}
-      {activePopup === 'refer' && <ReferWinPopup onClose={handleCloseRefer} />}
     </div>
   );
 }

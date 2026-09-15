@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import {
   Coins,
@@ -498,13 +499,17 @@ export function ChickenRoadPage() {
             </div>
           )}
 
-          {/* Exit Confirmation Modal */}
-          {showExitConfirm && (
-            <div className="cr-overlay-backdrop">
-              <div className="cr-arcade-modal">
-                <div className="cr-modal-badge">🚪</div>
-                <h2 className="cr-modal-heading">Exit Game?</h2>
-                <p className="text-xs text-gray-300 m-0">
+          {/* Exit Confirmation Modal (BUG-009: Cancel keeps user in game, Leave exits to dashboard) */}
+          {showExitConfirm && createPortal(
+            <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/85 backdrop-blur-sm p-4 animate-fade-in select-none">
+              <div className="relative flex flex-col items-center gap-3 p-5 sm:p-6 bg-gradient-to-b from-slate-900 via-slate-950 to-slate-900 border border-amber-500/40 rounded-2xl shadow-2xl max-w-sm w-full text-center">
+                <div className="w-12 h-12 rounded-full bg-red-500/20 border border-red-500/50 flex items-center justify-center text-2xl">
+                  🚪
+                </div>
+                <h2 className="text-lg font-black text-white uppercase tracking-wider">
+                  Exit Game?
+                </h2>
+                <p className="text-xs text-slate-300 m-0">
                   {gameState === 'ACTIVE'
                     ? 'An active round is currently in progress. Leaving now will forfeit your current round.'
                     : 'Are you sure you want to exit the game?'}
@@ -513,7 +518,7 @@ export function ChickenRoadPage() {
                   <button
                     type="button"
                     onClick={() => setShowExitConfirm(false)}
-                    className="flex-1 py-2 px-4 rounded-xl bg-gray-700 hover:bg-gray-600 text-white font-bold text-sm transition"
+                    className="flex-1 py-2.5 px-4 rounded-xl bg-slate-700 hover:bg-slate-600 text-white font-bold text-sm transition active:scale-95 cursor-pointer shadow"
                   >
                     Cancel
                   </button>
@@ -524,13 +529,14 @@ export function ChickenRoadPage() {
                       lockLandscape().catch(() => {});
                       navigate('/dashboard');
                     }}
-                    className="flex-1 py-2 px-4 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold text-sm transition"
+                    className="flex-1 py-2.5 px-4 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold text-sm transition active:scale-95 cursor-pointer shadow"
                   >
-                    Leave Game
+                    Leave
                   </button>
                 </div>
               </div>
-            </div>
+            </div>,
+            document.body
           )}
 
           {/* How to Play Modal */}

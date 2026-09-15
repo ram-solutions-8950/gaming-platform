@@ -161,7 +161,7 @@ class SoundManager {
 
 const sounds = new SoundManager();
 
-export const RoadCrossingGame: React.FC<RoadCrossingGameProps> = ({
+const RoadCrossingGameComponent: React.FC<RoadCrossingGameProps> = ({
   gameState,
   multipliers,
   currentLane,
@@ -173,6 +173,7 @@ export const RoadCrossingGame: React.FC<RoadCrossingGameProps> = ({
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const containerRectRef = useRef<{ width: number; height: number }>({ width: 844, height: 270 });
 
   const callbacksRef = useRef({ onLaneCross, onCollision, onFinish });
   useEffect(() => {
@@ -233,7 +234,7 @@ export const RoadCrossingGame: React.FC<RoadCrossingGameProps> = ({
   // Keep chicken position synced without overriding player input during ACTIVE game
   useEffect(() => {
     const s = stateRef.current;
-    if (gameState === 'READY' || currentLane === 0) {
+    if (gameState === 'READY') {
       // Start zone — place chicken in the middle of the start pad
       s.chicken.x = 65;
       s.chicken.vx = 0;
@@ -473,6 +474,9 @@ export const RoadCrossingGame: React.FC<RoadCrossingGameProps> = ({
     const updateCanvasSize = () => {
       if (!containerRef.current || !canvas) return;
       const rect = containerRef.current.getBoundingClientRect();
+      if (rect.width > 0 && rect.height > 0) {
+        containerRectRef.current = { width: rect.width, height: rect.height };
+      }
       const dpr = window.devicePixelRatio || 1;
       const targetW = Math.round(rect.width * dpr);
       const targetH = Math.round(rect.height * dpr);
@@ -480,8 +484,10 @@ export const RoadCrossingGame: React.FC<RoadCrossingGameProps> = ({
         canvas.width = targetW;
         canvas.height = targetH;
       }
-      canvas.style.width = `${rect.width}px`;
-      canvas.style.height = `${rect.height}px`;
+      const styleW = `${rect.width}px`;
+      const styleH = `${rect.height}px`;
+      if (canvas.style.width !== styleW) canvas.style.width = styleW;
+      if (canvas.style.height !== styleH) canvas.style.height = styleH;
     };
 
     updateCanvasSize();
@@ -553,7 +559,7 @@ export const RoadCrossingGame: React.FC<RoadCrossingGameProps> = ({
       s.lastFrameTime = time;
 
       const dpr = window.devicePixelRatio || 1;
-      const rect = containerRef.current?.getBoundingClientRect() || { width: 844, height: 270 };
+      const rect = containerRectRef.current;
       const viewScale = rect.height > 0 ? rect.height / WORLD_HEIGHT : 1;
       // Guard: skip frame if canvas has no size yet
       if (rect.width <= 0 || rect.height <= 0) {
@@ -715,6 +721,10 @@ export const RoadCrossingGame: React.FC<RoadCrossingGameProps> = ({
         }
       }
 
+      // 0. Paint complete canvas with solid grass color before world transforms (prevents black compositor flicker)
+      ctx.fillStyle = '#1E641D';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
       // ──────────────────────────────────────────
       // 3. DRAWING & RENDERING (Horizontal Road Arcade)
       // ──────────────────────────────────────────
@@ -726,9 +736,9 @@ export const RoadCrossingGame: React.FC<RoadCrossingGameProps> = ({
       const shakeY = s.screenShake ? (Math.random() - 0.5) * s.screenShake : 0;
       ctx.translate(-s.cameraX + shakeX, shakeY);
 
-      // 1. Top and Bottom Roadside Grass Shoulders (#1E641D base)
+      // 1. Top and Bottom Roadside Grass Shoulders (#1E641D base) - extend generously beyond world margins
       ctx.fillStyle = '#1E641D';
-      ctx.fillRect(0, 0, s.worldWidth, WORLD_HEIGHT);
+      ctx.fillRect(-viewWidthInWorld - 200, 0, s.worldWidth + viewWidthInWorld * 2 + 400, WORLD_HEIGHT);
 
       // Subtle grass lawn stripes on top and bottom
       ctx.fillStyle = '#287A25';
@@ -1195,3 +1205,6 @@ export const RoadCrossingGame: React.FC<RoadCrossingGameProps> = ({
     </div>
   );
 };
+
+export const RoadCrossingGame = React.memo(RoadCrossingGameComponent);
+export default RoadCrossingGame;

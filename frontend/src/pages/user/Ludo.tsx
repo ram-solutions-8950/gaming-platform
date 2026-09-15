@@ -852,20 +852,22 @@ export const Ludo: React.FC = () => {
           {/* Header Bar with Total Balance & Contextual Back Button */}
           <div className="ludo-game-header w-full flex items-center justify-between px-3 py-1.5 bg-slate-900/90 backdrop-blur-md rounded-xl border border-slate-800 shadow-md shrink-0">
             <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={matchState.status === 'COMPLETED' ? handleReturnToLobby : () => setShowExitConfirm(true)}
-                className="flex items-center gap-1.5 px-3 py-1 bg-slate-800 hover:bg-slate-700 active:scale-95 border border-slate-700 rounded-lg text-slate-200 text-xs font-bold transition shadow-sm cursor-pointer shrink-0"
-                aria-label={matchState.status === 'COMPLETED' ? 'Back to Lobby' : 'Exit Game'}
-              >
-                <ArrowLeft size={14} />
-                <span>{matchState.status === 'COMPLETED' ? 'Back' : 'Exit'}</span>
-              </button>
-              <div className="shrink-0 whitespace-nowrap">
-                <h1 className="text-xs sm:text-sm font-black text-amber-400 leading-tight whitespace-nowrap">
+              {matchState.status !== 'COMPLETED' && (
+                <button
+                  type="button"
+                  onClick={() => setShowExitConfirm(true)}
+                  className="flex items-center gap-1.5 px-3 py-1 bg-slate-800 hover:bg-slate-700 active:scale-95 border border-slate-700 rounded-lg text-slate-200 text-xs font-bold transition shadow-sm cursor-pointer shrink-0"
+                  aria-label="Exit Game"
+                >
+                  <ArrowLeft size={14} />
+                  <span>Exit</span>
+                </button>
+              )}
+              <div className="shrink-0 whitespace-nowrap flex flex-col justify-center overflow-visible">
+                <h1 className="text-xs sm:text-sm font-black text-amber-400 leading-snug whitespace-nowrap overflow-visible">
                   LUDO {matchState.players.length}P
                 </h1>
-                <span className="text-[10px] text-slate-400 whitespace-nowrap">
+                <span className="text-[10px] text-slate-400 whitespace-nowrap leading-tight">
                   Prize: ₹{(matchState.prize_pool / 100).toFixed(0)} • Entry: ₹{(matchState.entry_fee / 100).toFixed(0)}
                 </span>
               </div>

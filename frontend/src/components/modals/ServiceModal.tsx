@@ -44,12 +44,12 @@ export const ServiceModal: React.FC<Props> = ({ onClose }) => {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-black/85 backdrop-blur-sm animate-fade-in select-none"
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 pb-[calc(var(--bottom-nav-height,56px)+var(--safe-bottom,0px)+12px)] bg-black/85 backdrop-blur-sm animate-fade-in select-none"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="relative w-full max-w-lg bg-gradient-to-b from-[#240642] via-[#15032b] to-[#0a0117] rounded-2xl border-2 border-purple-400/70 shadow-[0_0_50px_rgba(168,85,247,0.35)] overflow-hidden text-white flex flex-col max-h-[calc(100dvh-var(--safe-top)-var(--safe-bottom)-24px)]">
+      <div className="relative w-full max-w-lg bg-gradient-to-b from-[#240642] via-[#15032b] to-[#0a0117] rounded-2xl border-2 border-purple-400/70 shadow-[0_0_50px_rgba(168,85,247,0.35)] overflow-hidden text-white flex flex-col max-h-[calc(100dvh-var(--bottom-nav-height,56px)-var(--safe-top,0px)-var(--safe-bottom,0px)-24px)]">
         {/* Header */}
         <div className="relative bg-gradient-to-r from-purple-700 via-brand-600 to-indigo-700 px-5 py-3.5 flex items-center justify-between shadow-md">
           <div className="flex items-center gap-3">

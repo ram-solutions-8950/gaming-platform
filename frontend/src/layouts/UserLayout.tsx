@@ -15,6 +15,7 @@ import { BonusModal } from '../components/modals/BonusModal';
 import { JackpotModal } from '../components/modals/JackpotModal';
 import { VipBonusModal } from '../components/modals/VipBonusModal';
 import { ServiceModal } from '../components/modals/ServiceModal';
+import { ReferWinPopup } from '../components/modals/ReferWinPopup';
 
 const navItems = [
   { to: '/dashboard', label: 'Dashboard', icon: '📊' },
@@ -72,9 +73,10 @@ export function UserLayout() {
             <NavLink
               key={item.to}
               to={item.to}
+              onClick={() => closeModal()}
               className={({ isActive }) =>
                 `flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 ${
-                  isActive ? 'bg-gradient-to-r from-brand-500/20 to-transparent text-brand-400 border-l-2 border-brand-500' : 'text-gray-400 hover:bg-dark-800 hover:text-gray-100'
+                  isActive && !activeModal ? 'bg-gradient-to-r from-brand-500/20 to-transparent text-brand-400 border-l-2 border-brand-500' : 'text-gray-400 hover:bg-dark-800 hover:text-gray-100'
                 }`
               }
             >
@@ -82,35 +84,47 @@ export function UserLayout() {
               {item.label}
             </NavLink>
           ))}
-          <NavLink to="/deposit" className={({ isActive }) => `flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 ${isActive ? 'bg-gradient-to-r from-brand-500/20 to-transparent text-brand-400 border-l-2 border-brand-500' : 'text-gray-400 hover:bg-dark-800 hover:text-gray-100'}`}>
+          <NavLink to="/deposit" onClick={() => closeModal()} className={({ isActive }) => `flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 ${isActive && !activeModal ? 'bg-gradient-to-r from-brand-500/20 to-transparent text-brand-400 border-l-2 border-brand-500' : 'text-gray-400 hover:bg-dark-800 hover:text-gray-100'}`}>
             <span className="text-lg">📥</span> Deposit
           </NavLink>
-          <NavLink to="/withdrawal" className={({ isActive }) => `flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 ${isActive ? 'bg-gradient-to-r from-brand-500/20 to-transparent text-brand-400 border-l-2 border-brand-500' : 'text-gray-400 hover:bg-dark-800 hover:text-gray-100'}`}>
+          <NavLink to="/withdrawal" onClick={() => closeModal()} className={({ isActive }) => `flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 ${isActive && !activeModal ? 'bg-gradient-to-r from-brand-500/20 to-transparent text-brand-400 border-l-2 border-brand-500' : 'text-gray-400 hover:bg-dark-800 hover:text-gray-100'}`}>
             <span className="text-lg">📤</span> Withdrawal
           </NavLink>
-          <NavLink to="/transactions" className={({ isActive }) => `flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 ${isActive ? 'bg-gradient-to-r from-brand-500/20 to-transparent text-brand-400 border-l-2 border-brand-500' : 'text-gray-400 hover:bg-dark-800 hover:text-gray-100'}`}>
+          <NavLink to="/transactions" onClick={() => closeModal()} className={({ isActive }) => `flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 ${isActive && !activeModal ? 'bg-gradient-to-r from-brand-500/20 to-transparent text-brand-400 border-l-2 border-brand-500' : 'text-gray-400 hover:bg-dark-800 hover:text-gray-100'}`}>
             <span className="text-lg">💸</span> Transactions
           </NavLink>
           <button
             type="button"
-            onClick={() => {
-              if (window.location.pathname !== '/dashboard') {
-                navigate('/dashboard');
-                setTimeout(() => window.dispatchEvent(new CustomEvent('open-refer-popup')), 100);
-              } else {
-                window.dispatchEvent(new CustomEvent('open-refer-popup'));
-              }
-            }}
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-gray-400 hover:bg-dark-800 hover:text-gold-400 transition-all duration-200"
+            onClick={() => (activeModal === 'refer' ? closeModal() : openModal('refer'))}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 ${
+              activeModal === 'refer'
+                ? 'bg-gradient-to-r from-brand-500/20 to-transparent text-gold-400 border-l-2 border-gold-500'
+                : 'text-gray-400 hover:bg-dark-800 hover:text-gold-400'
+            }`}
           >
             <span className="text-lg">🎁</span> Refer & Earn
           </button>
           <button
             type="button"
-            onClick={() => openModal('service')}
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-gray-400 hover:bg-dark-800 hover:text-purple-300 transition-all duration-200"
+            onClick={() => (activeModal === 'vip' ? closeModal() : openModal('vip'))}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 ${
+              activeModal === 'vip'
+                ? 'bg-gradient-to-r from-brand-500/20 to-transparent text-gold-400 border-l-2 border-gold-500'
+                : 'text-gray-400 hover:bg-dark-800 hover:text-gold-400'
+            }`}
           >
-            <span className="text-lg">🎧</span> 24/7 Support
+            <span className="text-lg">👑</span> VIP Bonus
+          </button>
+          <button
+            type="button"
+            onClick={() => (activeModal === 'service' ? closeModal() : openModal('service'))}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 ${
+              activeModal === 'service'
+                ? 'bg-gradient-to-r from-brand-500/20 to-transparent text-brand-400 border-l-2 border-brand-500'
+                : 'text-gray-400 hover:bg-dark-800 hover:text-purple-300'
+            }`}
+          >
+            <span className="text-lg">🎧</span> Services
           </button>
         </nav>
 
@@ -137,7 +151,7 @@ export function UserLayout() {
       </aside>
 
       {/* ─── MOBILE SHELL & MAIN CONTENT ─── */}
-      <div className={`flex-1 min-w-0 min-h-0 flex flex-col overflow-x-hidden z-10 relative h-dvh max-h-dvh ${isLudo ? 'is-ludo-page' : ''}`}>
+      <div className={`flex-1 min-w-0 min-h-0 flex flex-col overflow-x-hidden relative h-dvh max-h-dvh ${isLudo ? 'is-ludo-page' : ''}`}>
         {/* Mobile Header */}
         <div className="2xl:hidden shrink-0 z-30">
           <LobbyHeader user={user} wallet={wallet} />
@@ -158,7 +172,7 @@ export function UserLayout() {
         </main>
 
         {/* Mobile Bottom Navigation */}
-        <div className="2xl:hidden shrink-0 z-40 relative">
+        <div className="2xl:hidden shrink-0 z-[60] relative">
           <LobbyBottomNav />
         </div>
       </div>
@@ -205,6 +219,11 @@ export function UserLayout() {
       )}
       {activeModal === 'service' && (
         <ServiceModal
+          onClose={closeModal}
+        />
+      )}
+      {activeModal === 'refer' && (
+        <ReferWinPopup
           onClose={closeModal}
         />
       )}

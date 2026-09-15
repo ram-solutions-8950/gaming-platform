@@ -75,47 +75,68 @@ export const LobbyBottomNav: React.FC = () => {
   const activeModal = useRewardStore((s) => s.activeModal);
 
   const isItemActive = (item: NavItem) => {
+    // 1. If any modal is active, only that modal tab is highlighted
+    if (activeModal) {
+      if (item.label === 'REFER & EARN') return activeModal === 'refer';
+      if (item.label === 'VIP BONUS') return activeModal === 'vip';
+      if (item.label === 'Services' || item.label === 'Service') return activeModal === 'service';
+      if (item.label === 'Jackpot') return activeModal === 'jackpot';
+      return false;
+    }
+
+    // 2. If no modal is active, routed items are active according to URL path
     if (item.to) {
       if (item.to === '/dashboard') {
         return location.pathname === '/dashboard' || location.pathname === '/';
       }
       return location.pathname.startsWith(item.to);
     }
-    if (item.label === 'VIP BONUS') return activeModal === 'vip';
-    if (item.label === 'Services' || item.label === 'Service') return activeModal === 'service';
-    if (item.label === 'Jackpot') return activeModal === 'jackpot';
+
     return false;
   };
 
   const handleAction = (item: NavItem) => {
     if (item.to) {
+      useRewardStore.getState().closeModal();
       navigate(item.to);
       return;
     }
 
     switch (item.label) {
       case 'REFER & EARN':
-        if (window.location.pathname !== '/dashboard') {
+        if (location.pathname !== '/dashboard') {
           navigate('/dashboard');
-          setTimeout(() => {
-            window.dispatchEvent(new CustomEvent('open-refer-popup'));
-          }, 100);
+        }
+        if (activeModal === 'refer') {
+          useRewardStore.getState().closeModal();
         } else {
-          window.dispatchEvent(new CustomEvent('open-refer-popup'));
+          useRewardStore.getState().openModal('refer');
         }
         break;
 
       case 'VIP BONUS':
-        useRewardStore.getState().openModal('vip');
+        if (activeModal === 'vip') {
+          useRewardStore.getState().closeModal();
+        } else {
+          useRewardStore.getState().openModal('vip');
+        }
         break;
 
       case 'Services':
       case 'Service':
-        useRewardStore.getState().openModal('service');
+        if (activeModal === 'service') {
+          useRewardStore.getState().closeModal();
+        } else {
+          useRewardStore.getState().openModal('service');
+        }
         break;
 
       case 'Jackpot':
-        useRewardStore.getState().openModal('jackpot');
+        if (activeModal === 'jackpot') {
+          useRewardStore.getState().closeModal();
+        } else {
+          useRewardStore.getState().openModal('jackpot');
+        }
         break;
 
       default:
@@ -135,17 +156,16 @@ export const LobbyBottomNav: React.FC = () => {
               <NavLink
                 key={item.label}
                 to={item.to}
-                className={({ isActive }) =>
-                  [
-                    'client-nav-item',
-                    item.className || '',
-                    (isActive || active)
-                      ? 'client-nav-item--active'
-                      : '',
-                  ]
-                    .filter(Boolean)
-                    .join(' ')
-                }
+                onClick={() => {
+                  useRewardStore.getState().closeModal();
+                }}
+                className={[
+                  'client-nav-item',
+                  item.className || '',
+                  active ? 'client-nav-item--active' : '',
+                ]
+                  .filter(Boolean)
+                  .join(' ')}
                 aria-label={item.label}
               >
                 <span className="client-nav-icon">
@@ -156,7 +176,7 @@ export const LobbyBottomNav: React.FC = () => {
                   {item.label}
                 </span>
 
-                {(active) && <span className="client-nav-indicator" />}
+                {active && <span className="client-nav-indicator" />}
               </NavLink>
             );
           }

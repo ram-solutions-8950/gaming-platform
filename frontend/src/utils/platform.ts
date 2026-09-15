@@ -6,14 +6,40 @@ import { Capacitor } from '@capacitor/core';
  */
 export const isNativePlatform = (): boolean => {
   if (typeof window === 'undefined') return false;
+
+  // 1. Official Capacitor API check for native runtime (returns true ONLY in Android/iOS native containers)
   try {
-    if (Capacitor.isNativePlatform()) return true;
-    const platform = Capacitor.getPlatform();
-    if (platform === 'android' || platform === 'ios') return true;
+    if (typeof Capacitor !== 'undefined') {
+      if (typeof Capacitor.isNativePlatform === 'function' && Capacitor.isNativePlatform()) {
+        return true;
+      }
+      if (typeof Capacitor.getPlatform === 'function') {
+        const platform = Capacitor.getPlatform();
+        if (platform === 'android' || platform === 'ios') {
+          return true;
+        }
+      }
+    }
   } catch {}
-  if (typeof (window as any).Capacitor !== 'undefined') return true;
-  if (window.location.protocol === 'capacitor:' || window.location.protocol === 'ionic:') return true;
+
+  // 2. Direct native Android WebView bridge injected by MainActivity
+  if (
+    typeof (window as any).AndroidOrientation !== 'undefined' ||
+    typeof (window as any).AndroidAuth !== 'undefined'
+  ) {
+    return true;
+  }
+
+  // 3. Custom Capacitor or Cordova native container URL schemes
+  if (window.location.protocol === 'capacitor:' || window.location.protocol === 'ionic:') {
+    return true;
+  }
+
+  // 4. Native custom user agent marker if configured
   const ua = (typeof navigator !== 'undefined' && navigator.userAgent) || '';
-  if (ua.includes('Corona888-App') || ua.includes('Capacitor')) return true;
+  if (ua.includes('Corona888-App')) {
+    return true;
+  }
+
   return false;
 };
