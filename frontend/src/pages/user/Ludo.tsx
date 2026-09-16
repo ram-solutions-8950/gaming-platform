@@ -849,65 +849,65 @@ export const Ludo: React.FC = () => {
       {/* 2. ACTIVE MATCH VIEW (Centered Board + 4 Corners + Dynamic Dice Placement) */}
       {matchState && (
         <div className="ludo-active-match w-full max-w-7xl h-full flex flex-col gap-1 sm:gap-2 items-center justify-between overflow-hidden">
-          {/* Header Bar with Total Balance & Contextual Back Button */}
-          <div className="ludo-game-header w-full flex items-center justify-between px-3 py-1.5 bg-slate-900/90 backdrop-blur-md rounded-xl border border-slate-800 shadow-md shrink-0">
-            <div className="flex items-center gap-3">
+          {/* Header Bar with Total Balance & Contextual Back Button (BUG-003) */}
+          <div className="ludo-game-header w-full flex items-center justify-between gap-1.5 sm:gap-3 px-2 sm:px-3 py-1 sm:py-1.5 bg-slate-900/95 backdrop-blur-md rounded-xl border border-slate-800 shadow-md shrink-0">
+            <div className="flex items-center gap-2 sm:gap-3 shrink-0">
               {matchState.status !== 'COMPLETED' && (
                 <button
                   type="button"
                   onClick={() => setShowExitConfirm(true)}
-                  className="flex items-center gap-1.5 px-3 py-1 bg-slate-800 hover:bg-slate-700 active:scale-95 border border-slate-700 rounded-lg text-slate-200 text-xs font-bold transition shadow-sm cursor-pointer shrink-0"
+                  className="flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1 bg-slate-800 hover:bg-slate-700 active:scale-95 border border-slate-700 rounded-lg text-slate-200 text-xs font-bold transition shadow-sm cursor-pointer shrink-0"
                   aria-label="Exit Game"
                 >
                   <ArrowLeft size={14} />
                   <span>Exit</span>
                 </button>
               )}
-              <div className="shrink-0 whitespace-nowrap flex flex-col justify-center overflow-visible">
-                <h1 className="text-xs sm:text-sm font-black text-amber-400 leading-snug whitespace-nowrap overflow-visible">
+              <div className="shrink-0 flex flex-col justify-center min-w-[70px]">
+                <h1 className="text-xs sm:text-sm font-black text-amber-400 leading-snug whitespace-nowrap">
                   LUDO {matchState.players.length}P
                 </h1>
-                <span className="text-[10px] text-slate-400 whitespace-nowrap leading-tight">
+                <span className="text-[9px] sm:text-[10px] text-slate-400 whitespace-nowrap leading-tight hidden xs:inline">
                   Prize: ₹{(matchState.prize_pool / 100).toFixed(0)} • Entry: ₹{(matchState.entry_fee / 100).toFixed(0)}
                 </span>
               </div>
             </div>
 
             {/* Total Balance Pill */}
-            <div className="flex items-center gap-1.5 px-2.5 sm:px-3.5 py-1 bg-slate-950/80 rounded-full border border-amber-500/40 shadow-inner">
-              <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Total Balance:</span>
-              <span className="text-xs sm:text-sm font-black text-amber-400">
+            <div className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3.5 py-1 bg-slate-950/80 rounded-full border border-amber-500/40 shadow-inner shrink-0">
+              <span className="text-[9px] sm:text-[10px] text-slate-400 font-semibold uppercase tracking-wider hidden sm:inline">Total:</span>
+              <span className="text-xs sm:text-sm font-black text-amber-400 whitespace-nowrap">
                 ₹{(walletBalance / 100).toFixed(2)}
               </span>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
               <button
                 type="button"
                 onClick={() => setShowTokenSelectorModal(true)}
-                className="flex items-center gap-1 px-2.5 py-1 bg-gradient-to-r from-purple-900/60 to-indigo-900/60 hover:brightness-110 border border-purple-400/50 text-purple-200 rounded-lg text-xs font-bold transition active:scale-95 cursor-pointer shadow-sm"
+                className="flex items-center gap-1 px-2 sm:px-2.5 py-1 bg-gradient-to-r from-purple-900/60 to-indigo-900/60 hover:brightness-110 border border-purple-400/50 text-purple-200 rounded-lg text-xs font-bold transition active:scale-95 cursor-pointer shadow-sm"
                 aria-label="Customize Tokens"
                 title="Change Token Style"
               >
                 <span>✨</span>
-                <span className="hidden sm:inline">Tokens</span>
+                <span className="hidden md:inline">Tokens</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => setShowRulesModal(true)}
-                className="flex items-center gap-1 px-2.5 py-1 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-300 rounded-lg text-xs font-bold transition active:scale-95 cursor-pointer"
+                className="flex items-center gap-1 px-2 sm:px-2.5 py-1 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-300 rounded-lg text-xs font-bold transition active:scale-95 cursor-pointer"
                 aria-label="View Rules"
               >
                 <HelpCircle size={14} />
-                <span>Rules</span>
+                <span className="hidden md:inline">Rules</span>
               </button>
 
               {matchState.status === 'IN_PROGRESS' && (
                 <button
                   type="button"
                   onClick={() => setShowExitConfirm(true)}
-                  className="text-xs font-bold px-3 py-1 bg-red-950/80 hover:bg-red-900 border border-red-500/40 text-red-300 rounded-lg transition active:scale-95 cursor-pointer"
+                  className="text-xs font-bold px-2 sm:px-3 py-1 bg-red-950/80 hover:bg-red-900 border border-red-500/40 text-red-300 rounded-lg transition active:scale-95 cursor-pointer"
                 >
                   Forfeit
                 </button>
@@ -956,8 +956,8 @@ export const Ludo: React.FC = () => {
               </div>
             </div>
 
-            {/* Center Stage: Ludo Board (Centered Horizontally & Vertically) + Quick Reactions */}
-            <div className="ludo-board-center-stage flex-1 flex flex-col items-center justify-center h-full max-h-full overflow-hidden p-1 relative">
+            {/* Center Stage: Ludo Board (Centered Horizontally & Vertically) + Quick Reactions (BUG-002) */}
+            <div className="ludo-board-center-stage flex-1 min-h-0 flex flex-col items-center justify-center h-full max-h-full overflow-hidden p-0.5 sm:p-1 relative">
               <LudoBoard
                 players={matchState.players}
                 currentTurnColor={matchState.current_turn_color}
@@ -970,15 +970,15 @@ export const Ludo: React.FC = () => {
                 onMoveAnimationEnd={handleMoveAnimationEnd}
               />
 
-              {/* Interactive Quick Reaction & Taunt Bar */}
-              <div className="mt-1 sm:mt-1.5 flex items-center justify-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1 bg-slate-900/90 backdrop-blur-md rounded-full border border-slate-700/70 shadow-lg shrink-0 z-20">
+              {/* Interactive Quick Reaction & Taunt Bar (BUG-002: Responsive scroll / compact layout) */}
+              <div className="mt-1 sm:mt-1.5 max-w-[95vw] sm:max-w-none overflow-x-auto no-scrollbar flex items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1 bg-slate-900/95 backdrop-blur-md rounded-full border border-slate-700/70 shadow-lg shrink-0 z-20">
                 <span className="text-[10px] text-amber-400 font-bold uppercase tracking-wider hidden sm:inline mr-0.5">
                   Chat:
                 </span>
                 <button
                   type="button"
                   onClick={() => setShowQuickChatMenu((prev) => !prev)}
-                  className={`w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center rounded-full border transition cursor-pointer select-none ${
+                  className={`w-6 h-6 sm:w-8 sm:h-8 shrink-0 flex items-center justify-center rounded-full border transition cursor-pointer select-none ${
                     showQuickChatMenu
                       ? 'bg-amber-500 text-slate-950 border-amber-300 shadow-md'
                       : 'bg-slate-800 hover:bg-slate-700 text-amber-300 border-slate-700/50'
@@ -993,7 +993,7 @@ export const Ludo: React.FC = () => {
                     key={emoji}
                     type="button"
                     onClick={() => sendReaction(emoji)}
-                    className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center rounded-full bg-slate-800 hover:bg-slate-700 active:scale-125 hover:scale-110 text-base sm:text-lg transition-transform cursor-pointer select-none shadow-sm border border-slate-700/50"
+                    className="w-6 h-6 sm:w-8 sm:h-8 shrink-0 flex items-center justify-center rounded-full bg-slate-800 hover:bg-slate-700 active:scale-125 hover:scale-110 text-sm sm:text-lg transition-transform cursor-pointer select-none shadow-sm border border-slate-700/50"
                     title={`Send ${emoji}`}
                     aria-label={`Reaction ${emoji}`}
                   >

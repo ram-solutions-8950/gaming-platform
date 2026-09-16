@@ -1191,35 +1191,35 @@ export default function GameTable({
       {/* Table Chat Modal */}
       {chatModalOpen && (
         <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/85 backdrop-blur-md p-4 animate-fade-in select-none"
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/85 backdrop-blur-md p-2 sm:p-4 animate-fade-in select-none"
           onClick={() => setChatModalOpen(false)}
         >
           <div
-            className="w-full max-w-md bg-gradient-to-b from-[#1c0836] via-[#120324] to-[#0a0117] border-2 border-amber-500/50 rounded-3xl p-5 shadow-2xl text-white flex flex-col h-[420px]"
+            className="w-full max-w-md max-h-[92vh] bg-gradient-to-b from-[#1c0836] via-[#120324] to-[#0a0117] border-2 border-amber-500/50 rounded-2xl sm:rounded-3xl p-3 sm:p-5 shadow-2xl text-white flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between border-b border-white/10 pb-3 mb-2">
+            <div className="flex items-center justify-between border-b border-white/10 pb-2 mb-2 shrink-0">
               <div className="flex items-center gap-2">
-                <MessageCircle size={18} className="text-amber-400" />
-                <h3 className="font-display font-black text-base text-amber-300 tracking-wide uppercase">Table Chat</h3>
+                <MessageCircle size={16} className="text-amber-400" />
+                <h3 className="font-display font-black text-sm sm:text-base text-amber-300 tracking-wide uppercase">Table Chat</h3>
               </div>
               <button
                 type="button"
                 onClick={() => setChatModalOpen(false)}
-                className="w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white flex items-center justify-center text-sm font-bold transition cursor-pointer"
+                className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white flex items-center justify-center text-xs sm:text-sm font-bold transition cursor-pointer"
               >
                 ✕
               </button>
             </div>
 
             {/* Quick Messages */}
-            <div className="flex flex-wrap gap-1.5 mb-3">
+            <div className="flex flex-wrap gap-1 sm:gap-1.5 mb-2 shrink-0 max-h-[60px] overflow-y-auto">
               {["Good luck! 🍀", "Well played! 👏", "Nice hand! 🔥", "Hurry up! ⏳", "GG! 🏆", "Thanks! 😊"].map((msg) => (
                 <button
                   key={msg}
                   type="button"
                   onClick={() => sendChatMessage(msg)}
-                  className="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-slate-200 text-[11px] font-semibold transition active:scale-95 cursor-pointer"
+                  className="px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-lg bg-white/10 hover:bg-white/20 text-slate-200 text-[10px] sm:text-[11px] font-semibold transition active:scale-95 cursor-pointer whitespace-nowrap"
                 >
                   {msg}
                 </button>
@@ -1227,14 +1227,18 @@ export default function GameTable({
             </div>
 
             {/* Chat Messages List */}
-            <div className="flex-1 overflow-y-auto space-y-2 pr-1 mb-3 bg-black/30 p-2.5 rounded-xl border border-white/5">
-              {chatMessages.map((m) => (
-                <div key={m.id} className="text-xs">
-                  <span className="font-bold text-amber-300 mr-1.5">{m.sender}:</span>
-                  <span className="text-slate-200">{m.text}</span>
-                  <span className="text-[9px] text-slate-500 ml-2">{m.time}</span>
-                </div>
-              ))}
+            <div className="flex-1 min-h-[90px] max-h-[170px] sm:max-h-[220px] overflow-y-auto space-y-1.5 sm:space-y-2 pr-1 mb-2 sm:mb-3 bg-black/30 p-2 sm:p-2.5 rounded-xl border border-white/5">
+              {chatMessages.length === 0 ? (
+                <div className="text-center text-slate-500 text-xs py-4">No messages yet. Say hi! 👋</div>
+              ) : (
+                chatMessages.map((m) => (
+                  <div key={m.id} className="text-xs break-words">
+                    <span className="font-bold text-amber-300 mr-1.5">{m.sender}:</span>
+                    <span className="text-slate-200">{m.text}</span>
+                    <span className="text-[9px] text-slate-500 ml-2">{m.time}</span>
+                  </div>
+                ))
+              )}
             </div>
 
             {/* Chat Input */}
@@ -1243,7 +1247,7 @@ export default function GameTable({
                 e.preventDefault();
                 sendChatMessage();
               }}
-              className="flex gap-2"
+              className="flex gap-2 shrink-0"
             >
               <input
                 type="text"
@@ -1251,12 +1255,12 @@ export default function GameTable({
                 onChange={(e) => setChatInput(e.target.value)}
                 placeholder="Type a message..."
                 maxLength={80}
-                className="flex-1 px-3 py-2 bg-slate-900 border border-white/10 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500/50"
+                className="flex-1 px-3 py-1.5 sm:py-2 bg-slate-900 border border-white/10 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500/50"
               />
               <button
                 type="submit"
                 disabled={!chatInput.trim()}
-                className="px-3.5 py-2 bg-gradient-to-r from-amber-500 to-yellow-400 disabled:opacity-50 text-slate-950 font-bold text-xs rounded-xl flex items-center gap-1 transition active:scale-95 cursor-pointer"
+                className="px-3 sm:px-3.5 py-1.5 sm:py-2 bg-gradient-to-r from-amber-500 to-yellow-400 disabled:opacity-50 text-slate-950 font-bold text-xs rounded-xl flex items-center gap-1 transition active:scale-95 cursor-pointer shrink-0"
               >
                 <Send size={13} />
                 <span>Send</span>

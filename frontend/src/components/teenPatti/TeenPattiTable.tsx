@@ -8,7 +8,7 @@ import { soundManager } from '../../services/soundManager';
 import { walletService } from '../../services/wallet';
 import { GameRulesModal } from '../common/GameRulesModal';
 import { TEEN_PATTI_RULES_DATA } from '../common/gameRulesData';
-import { HelpCircle, Crown } from 'lucide-react';
+import { HelpCircle, Crown, LogOut } from 'lucide-react';
 import './TeenPattiTable.css';
 
 interface TeenPattiTableProps {
@@ -23,6 +23,7 @@ export const TeenPattiTable: React.FC<TeenPattiTableProps> = ({
   const [walletBalance, setWalletBalance] = useState<number | null>(null);
   const [showRules, setShowRules] = useState<boolean>(false);
   const [showdownDismissed, setShowdownDismissed] = useState<boolean>(false);
+  const [showLobbyConfirm, setShowLobbyConfirm] = useState<boolean>(false);
 
   const refreshWallet = useCallback(() => {
     walletService.getWallet().then((w) => setWalletBalance(w.balance || 0)).catch(() => {});
@@ -54,6 +55,16 @@ export const TeenPattiTable: React.FC<TeenPattiTableProps> = ({
     } catch (e) {}
     onLeaveTable();
   }, [leaveTable, onLeaveTable]);
+
+  const handleDealHandNow = useCallback(() => {
+    setShowdownDismissed(true);
+    startHand();
+  }, [startHand]);
+
+  const handleLeaveImmediately = useCallback(() => {
+    setShowdownDismissed(true);
+    handleLeave();
+  }, [handleLeave]);
 
   // Audio effects & phase change reactions
   const lastPhaseRef = useRef<string>('');
@@ -143,7 +154,7 @@ export const TeenPattiTable: React.FC<TeenPattiTableProps> = ({
         {/* Left: Lobby Exit + Live Status */}
         <div className="flex items-center gap-2 shrink-0">
           <button
-            onClick={handleLeave}
+            onClick={() => setShowLobbyConfirm(true)}
             className="tp-header-btn"
           >
             ← Lobby
@@ -242,8 +253,8 @@ export const TeenPattiTable: React.FC<TeenPattiTableProps> = ({
           seats={gameState.seats}
           potAmount={gameState.pot}
           currentUserId={currentUserId}
-          onLeaveTable={handleLeave}
-          onNextHand={startHand}
+          onLeaveTable={handleLeaveImmediately}
+          onNextHand={handleDealHandNow}
           onDismiss={() => setShowdownDismissed(true)}
         />
       )}
@@ -258,6 +269,40 @@ export const TeenPattiTable: React.FC<TeenPattiTableProps> = ({
           tips={TEEN_PATTI_RULES_DATA.tips}
           onClose={() => setShowRules(false)}
         />
+      )}
+
+      {/* Lobby Exit Confirmation Modal (BUG-016) */}
+      {showLobbyConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
+          <div className="w-full max-w-sm rounded-2xl bg-gradient-to-b from-slate-900 via-slate-950 to-slate-900 border border-amber-500/40 p-6 shadow-2xl text-center">
+            <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400">
+              <LogOut size={24} />
+            </div>
+            <h3 className="text-lg font-bold text-white mb-2">Exit to Lobby?</h3>
+            <p className="text-sm text-slate-300 mb-6">
+              Are you sure you want to leave this table and return to the Teen Patti lobby?
+            </p>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setShowLobbyConfirm(false)}
+                className="flex-1 py-2.5 px-4 rounded-xl font-semibold text-slate-300 bg-slate-800 hover:bg-slate-700 active:scale-95 transition border border-slate-700 cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowLobbyConfirm(false);
+                  handleLeaveImmediately();
+                }}
+                className="flex-1 py-2.5 px-4 rounded-xl font-bold text-white bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 active:scale-95 shadow-lg shadow-red-900/30 transition cursor-pointer"
+              >
+                Exit
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

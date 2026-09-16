@@ -628,10 +628,11 @@ const RoadCrossingGameComponent: React.FC<RoadCrossingGameProps> = ({
         // Clamp inside world boundaries
         s.chicken.x = Math.max(35, Math.min(s.worldWidth - 40, s.chicken.x));
 
-        // Lane crossing detection as chicken advances to the right
+        // Lane crossing detection as chicken advances to the right (BUG-004)
+        // Checkpoint marker for lane L is at START_ZONE_WIDTH + (L - 0.5) * LANE_WIDTH
         const distFromStart = s.chicken.x - START_ZONE_WIDTH;
-        if (distFromStart > 0) {
-          const currentCrossedLane = Math.floor(distFromStart / LANE_WIDTH) + 1;
+        if (distFromStart >= LANE_WIDTH * 0.5) {
+          const currentCrossedLane = Math.floor((distFromStart + LANE_WIDTH * 0.5) / LANE_WIDTH);
           if (currentCrossedLane > s.highestLaneCrossed && currentCrossedLane <= s.totalLanes) {
             s.highestLaneCrossed = currentCrossedLane;
             sounds.playLaneCross();
@@ -654,23 +655,23 @@ const RoadCrossingGameComponent: React.FC<RoadCrossingGameProps> = ({
         }
 
         // ──────────────────────────────────────────
-        // 2. FORGIVING COLLISION DETECTION
-        // Only active when chicken is on the road surface (NOT in start or finish safe zones)
+        // 2. ACCURATE VEHICLE COLLISION DETECTION (BUG-004)
+        // Active when chicken is on the road surface across active traffic lanes
         // ──────────────────────────────────────────
         if (!inStartSafeZone && !inFinishSafeZone && !s.chicken.isWon && !s.chicken.isHit) {
           const chickenBox = {
-            left: s.chicken.x - 10,
-            right: s.chicken.x + 10,
-            top: s.chicken.y - 10,
-            bottom: s.chicken.y + 10,
+            left: s.chicken.x - 12,
+            right: s.chicken.x + 12,
+            top: s.chicken.y - 12,
+            bottom: s.chicken.y + 12,
           };
 
           for (const v of s.vehicles) {
             const vBox = {
-              left: v.x - v.width / 2 + 6,
-              right: v.x + v.width / 2 - 6,
-              top: v.y - v.height / 2 + 10,
-              bottom: v.y + v.height / 2 - 10,
+              left: v.x - v.width / 2 - 4,
+              right: v.x + v.width / 2 + 4,
+              top: v.y - v.height / 2 + 6,
+              bottom: v.y + v.height / 2 - 6,
             };
 
             // AABB Box intersection

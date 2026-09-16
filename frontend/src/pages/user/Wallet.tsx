@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { walletService } from '../../services/wallet';
 import { Loader } from '../../components/common/Loader';
+import { TransactionDetailsModal } from '../../components/common/TransactionDetailsModal';
 import type { Wallet, WalletTransaction, TxType, TxStatus } from '../../types';
 import '../../styles/wallet-page.css';
 
@@ -116,6 +117,7 @@ export function WalletPage() {
   const [txs, setTxs] = useState<WalletTransaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeFilter, setActiveFilter] = useState<FilterTab>('ALL');
+  const [selectedTx, setSelectedTx] = useState<WalletTransaction | null>(null);
 
   useEffect(() => {
     Promise.all([walletService.getWallet(), walletService.getTransactions(1, 50)])
@@ -300,7 +302,18 @@ export function WalletPage() {
               const isCredit = CREDIT_TYPES.includes(tx.type);
               const amountInRupees = (tx.amount / 100).toFixed(2);
               return (
-                <div key={tx.id} className="casino-tx-row">
+                <div
+                  key={tx.id}
+                  className="casino-tx-row cursor-pointer hover:bg-white/5 active:scale-[0.99] transition-all"
+                  onClick={() => setSelectedTx(tx)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      setSelectedTx(tx);
+                    }
+                  }}
+                >
                   <div className="casino-tx-row-left">
                     <div
                       className={`casino-tx-type-icon ${getTxTypeClass(tx.type)}`}
@@ -344,6 +357,12 @@ export function WalletPage() {
           </div>
         )}
       </div>
+
+      {/* Transaction Details Modal (BUG-022) */}
+      <TransactionDetailsModal
+        tx={selectedTx}
+        onClose={() => setSelectedTx(null)}
+      />
     </div>
   );
 }

@@ -82,10 +82,13 @@ def derive_seed(server_seed: str, client_seed: str, nonce: int) -> int:
 def deal_round(server_seed: Optional[str] = None, client_seed: str = "default", nonce: int = 1) -> dict:
     """Execute a server-authoritative Andar Bahar card deal."""
     s_seed = server_seed or secrets.token_hex(16)
-    seed = derive_seed(s_seed, client_seed, nonce)
-    rng = random.Random(seed)
     deck = fresh_deck()
-    rng.shuffle(deck)
+    if server_seed:
+        seed = derive_seed(s_seed, client_seed, nonce)
+        rng = random.Random(seed)
+        rng.shuffle(deck)
+    else:
+        secrets.SystemRandom().shuffle(deck)
 
     middle = deck[0]
     rest = deck[1:]
@@ -368,6 +371,30 @@ class AndarBaharEngine(GameEngine):
 
         # Server-authoritative card deal
         deal_result = predetermined_deal or deal_round()
+
+        if not predetermined_deal:
+            # Prevent excessive consecutive streaks (> 2 consecutive Bahar or Andar wins)
+            recent_rounds = db.query(GameRound).filter(
+                GameRound.game_id == rd.game_id,
+                GameRound.status == GameRoundStatus.COMPLETED,
+            ).order_by(GameRound.ended_at.desc()).limit(3).all()
+
+            recent_winners = [
+                r.result_data.get("winner", "").upper()
+                for r in recent_rounds
+                if r.result_data and "winner" in r.result_data
+            ]
+            if len(recent_winners) >= 2 and all(w == "BAHAR" for w in recent_winners[:2]):
+                for _ in range(4):
+                    if deal_result["winner"].upper() != "BAHAR":
+                        break
+                    deal_result = deal_round()
+            elif len(recent_winners) >= 2 and all(w == "ANDAR" for w in recent_winners[:2]):
+                for _ in range(4):
+                    if deal_result["winner"].upper() != "ANDAR":
+                        break
+                    deal_result = deal_round()
+
         winner = deal_result["winner"].upper()
 
         rd.result_data = deal_result

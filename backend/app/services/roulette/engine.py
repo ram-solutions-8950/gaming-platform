@@ -271,51 +271,11 @@ class RouletteEngine:
 
     def _pick_winning_number(self, rnd: RouletteRound) -> Tuple[int, str]:
         """
-        Picks the winning European Roulette pocket (0-36).
-        Implements anti-streak balancing to prevent repetitive consecutive wins
-        on outside bets (e.g. Red streaks, Black streaks) and preserves realistic
-        European house edge.
+        Picks the winning European Roulette pocket (0-36) using cryptographically secure
+        uniform random selection, completely fair with no streak manipulation.
         """
-        # Count consecutive identical color outcomes at the tail of history
-        consecutive_red = 0
-        for h in reversed(self.history):
-            if h.get("color") == "red":
-                consecutive_red += 1
-            else:
-                break
-
-        consecutive_black = 0
-        for h in reversed(self.history):
-            if h.get("color") == "black":
-                consecutive_black += 1
-            else:
-                break
-
-        # Check if active player(s) placed bets on red or black
-        has_red_bet = any(
-            b.bet_type == "even_money" and str(b.target).lower() in ("red", "r")
-            for b in rnd.bets
-        )
-        has_black_bet = any(
-            b.bet_type == "even_money" and str(b.target).lower() in ("black", "b")
-            for b in rnd.bets
-        )
-
         all_pockets = list(range(37))
-        black_and_zero = sorted(list(BLACK_NUMBERS)) + [0]
-        red_and_zero = sorted(list(RED_NUMBERS)) + [0]
-
-        # If red streak >= 3, or streak >= 2 and player bet on red, break streak
-        if consecutive_red >= 3 or (consecutive_red >= 2 and has_red_bet):
-            weights = [3 if n in BLACK_NUMBERS else 1 for n in black_and_zero]
-            winning_number = secrets.SystemRandom().choices(black_and_zero, weights=weights, k=1)[0]
-        # If black streak >= 3, or streak >= 2 and player bet on black, break streak
-        elif consecutive_black >= 3 or (consecutive_black >= 2 and has_black_bet):
-            weights = [3 if n in RED_NUMBERS else 1 for n in red_and_zero]
-            winning_number = secrets.SystemRandom().choices(red_and_zero, weights=weights, k=1)[0]
-        else:
-            # Standard fair cryptographic European wheel selection (0-36)
-            winning_number = secrets.SystemRandom().choice(all_pockets)
+        winning_number = secrets.SystemRandom().choice(all_pockets)
 
         if winning_number == 0:
             winning_color = "green"

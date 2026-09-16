@@ -1394,10 +1394,11 @@ export const LudoBoard: React.FC<Props> = ({
             }
 
             const isLegal = isTurn && isMyTurn && legalTokenIndices.includes(token.token_index);
+            const isHighlighted = isLegal && diceValue === 6;
             const isHovered = hoveredTokenIndex === token.token_index;
             const hopOffset = isThisTokenWalking && animatedTokenState ? animatedTokenState.hopY : 0;
             const cx = rawCx;
-            const cy = isLegal ? rawCy - 12 + hopOffset : rawCy + hopOffset;
+            const cy = isHighlighted ? rawCy - 12 + hopOffset : rawCy + hopOffset;
 
             return (
               <g
@@ -1424,8 +1425,8 @@ export const LudoBoard: React.FC<Props> = ({
                   touchAction: 'manipulation',
                 }}
               >
-                {/* Active Turn Ground Halo & Pulse Rings */}
-                {isLegal && !isThisTokenWalking && (
+                {/* Active Turn Ground Halo & Pulse Rings (Only when rolling a 6) */}
+                {isHighlighted && !isThisTokenWalking && (
                   <g>
                     {/* Multi-layered Pulsing Golden Beacon Aura */}
                     <ellipse
@@ -1488,7 +1489,7 @@ export const LudoBoard: React.FC<Props> = ({
                 {/* 3D Luxury Custom Token */}
                 <g
                   className={isLegal && !isThisTokenWalking ? 'ludo-movable-pawn' : ''}
-                  filter={isLegal ? 'url(#goldLegalGlow)' : 'url(#pawnDropShadow)'}
+                  filter={isHighlighted ? 'url(#goldLegalGlow)' : 'url(#pawnDropShadow)'}
                   opacity={isMyTurn && isTurn && !isLegal && legalTokenIndices.length > 0 ? 0.45 : 1}
                   style={{
                     transform: isHovered && isLegal ? 'scale(1.12)' : 'scale(1)',
@@ -1506,7 +1507,7 @@ export const LudoBoard: React.FC<Props> = ({
                   />
 
                   {/* Render chosen token style */}
-                  {renderPawnGraphic(tokenStyle, cx, cy, colorKey, Boolean(isLegal))}
+                  {renderPawnGraphic(tokenStyle, cx, cy, colorKey, Boolean(isHighlighted))}
                 </g>
 
                 {/* Enlarged touch area for mobile click comfort */}

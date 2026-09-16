@@ -211,11 +211,15 @@ function App() {
   }, [setLoading, setUser]);
 
   const isDownloadPath = typeof window !== 'undefined' && window.location.pathname.toLowerCase().includes('download');
+  const isAdminPath = typeof window !== 'undefined' && window.location.pathname.toLowerCase().startsWith('/admin');
 
   useEffect(() => {
-    if (isDownloadPath) return;
+    if (isDownloadPath || isAdminPath) return;
 
     const handleFirstInteraction = () => {
+      const path = typeof window !== 'undefined' ? window.location.pathname.toLowerCase() : '';
+      if (path.startsWith('/admin') || path.includes('download')) return;
+
       soundManager.init();
       document.removeEventListener('click', handleFirstInteraction);
       document.removeEventListener('keydown', handleFirstInteraction);
@@ -227,13 +231,13 @@ function App() {
       document.removeEventListener('click', handleFirstInteraction);
       document.removeEventListener('keydown', handleFirstInteraction);
     };
-  }, [isDownloadPath]);
+  }, [isDownloadPath, isAdminPath]);
 
   useEffect(() => {
-    if (!user || isDownloadPath) {
-      soundManager.stopMusic();
+    if (!user || isDownloadPath || isAdminPath) {
+      soundManager.stopAll();
     }
-  }, [user, isDownloadPath]);
+  }, [user, isDownloadPath, isAdminPath]);
 
   return (
     <>

@@ -117,7 +117,15 @@ export function PokerPage() {
     lastBetRef.current = myCurrentBet;
   }, [tableState, currentUserId]);
 
+  // Always clear previous game result and session state when activeTableId changes (BUG-021)
+  useEffect(() => {
+    setShowResultModal(false);
+    setWinnersSummary([]);
+  }, [activeTableId]);
+
   const handleSelectTable = async (tableId: string, buyInAmount: number) => {
+    setShowResultModal(false);
+    setWinnersSummary([]);
     try {
       await pokerService.joinTable(tableId, buyInAmount);
       setActiveTableId(tableId);
@@ -130,6 +138,8 @@ export function PokerPage() {
   };
 
   const handleCreateTable = async (isPractice: boolean) => {
+    setShowResultModal(false);
+    setWinnersSummary([]);
     try {
       const newTable = await pokerService.createTable({
         name: isPractice ? "Practice Hold'em" : "Cash Hold'em Table",
@@ -148,6 +158,8 @@ export function PokerPage() {
   };
 
   const handleLeaveTable = async () => {
+    setShowResultModal(false);
+    setWinnersSummary([]);
     if (activeTableId) {
       try {
         await pokerService.leaveTable(activeTableId);
@@ -157,16 +169,6 @@ export function PokerPage() {
     navigate('/games/poker');
     refreshWallet();
     loadTables();
-  };
-
-  const handleExitToDashboard = async () => {
-    if (activeTableId) {
-      try {
-        await pokerService.leaveTable(activeTableId);
-      } catch (e) {}
-    }
-    setActiveTableId(null);
-    navigate('/dashboard');
   };
 
   return (
@@ -203,7 +205,6 @@ export function PokerPage() {
           walletBalancePaise={walletBalancePaise}
           onSendAction={sendAction}
           onLeaveTable={handleLeaveTable}
-          onExit={handleExitToDashboard}
           onStartHand={startHand}
           onOpenRules={() => setShowRulesModal(true)}
         />

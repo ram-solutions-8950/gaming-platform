@@ -164,10 +164,15 @@ def spin(
                 tier = "bigwin"
             else:
                 tier = "win"
-        elif reels[0] == reels[1]:
-            # 2 of a kind payline match (left-to-right near-miss / consolation win)
+        elif reels[0] == reels[1] or reels[1] == reels[2] or reels[0] == reels[2]:
+            # 2 of a kind payline match (left pair, right pair, or split pair)
             won = True
-            win_symbol = reels[0]
+            if reels[0] == reels[1]:
+                win_symbol = reels[0]
+            elif reels[1] == reels[2]:
+                win_symbol = reels[1]
+            else:
+                win_symbol = reels[0]
             multiplier = float(PAYTABLE_2_MATCH_MULTIPLIER)
             tier = "win"
 

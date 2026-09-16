@@ -82,6 +82,12 @@ export function RummyPage() {
     }
   };
 
+  const handleRefreshTables = async () => {
+    setIsRefreshingTables(true);
+    await fetchTables();
+    setTimeout(() => setIsRefreshingTables(false), 500);
+  };
+
   useEffect(() => {
     setNativeLandscape().catch(() => {});
     fetchBalance();
@@ -401,10 +407,13 @@ export function RummyPage() {
                 <h2 className="text-base font-bold text-slate-200">Open Public Tables</h2>
               </div>
               <button
-                onClick={fetchTables}
-                className="text-xs text-slate-400 hover:text-amber-300 flex items-center gap-1 transition-colors"
+                type="button"
+                onClick={handleRefreshTables}
+                disabled={isRefreshingTables}
+                className="text-xs text-amber-400 hover:text-amber-300 active:scale-95 flex items-center gap-1.5 font-bold transition-all px-2.5 py-1 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 rounded-lg cursor-pointer disabled:opacity-50"
               >
-                <RotateCcw size={12} /> Refresh
+                <RotateCcw size={13} className={isRefreshingTables ? "animate-spin text-amber-400" : "text-amber-400"} />
+                <span>{isRefreshingTables ? "Refreshing..." : "Refresh"}</span>
               </button>
             </div>
 
@@ -458,22 +467,6 @@ export function RummyPage() {
                 </table>
               </div>
             )}
-
-            {/* Bottom Refresh Button for Open Public Tables */}
-            <div className="mt-4 pt-3 border-t border-white/5 flex items-center justify-center">
-              <button
-                type="button"
-                onClick={async () => {
-                  setIsRefreshingTables(true);
-                  await fetchTables();
-                  setTimeout(() => setIsRefreshingTables(false), 500);
-                }}
-                className="px-4 py-2 bg-slate-800/80 hover:bg-slate-700 active:scale-95 text-amber-300 font-bold text-xs rounded-xl border border-amber-500/30 flex items-center gap-2 transition shadow-sm cursor-pointer"
-              >
-                <RotateCcw size={14} className={isRefreshingTables ? "animate-spin" : ""} />
-                <span>Refresh Public Tables</span>
-              </button>
-            </div>
           </div>
         </div>
       </div>

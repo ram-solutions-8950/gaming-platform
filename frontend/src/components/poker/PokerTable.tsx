@@ -1,4 +1,3 @@
-import { ArrowLeft } from 'lucide-react';
 import { PlayerSeat } from './PlayerSeat';
 import { CommunityCards } from './CommunityCards';
 import { PotDisplay } from './PotDisplay';
@@ -12,7 +11,6 @@ interface PokerTableProps {
   walletBalancePaise?: number;
   onSendAction: (action: string, amount?: number) => void;
   onLeaveTable: () => void;
-  onExit: () => void;
   onStartHand: () => void;
   onOpenRules: () => void;
 }
@@ -24,7 +22,6 @@ export function PokerTable({
   walletBalancePaise = 0,
   onSendAction,
   onLeaveTable,
-  onExit,
   onStartHand,
   onOpenRules,
 }: PokerTableProps) {
@@ -53,14 +50,6 @@ export function PokerTable({
       {/* Top Header Bar */}
       <header className="poker-header">
         <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={onExit}
-            className="flex items-center gap-1 px-2 py-1 bg-gray-800 hover:bg-gray-700 text-gray-200 text-xs font-bold rounded border border-gray-700 transition"
-          >
-            <ArrowLeft size={14} />
-            Exit
-          </button>
           <span className="text-xl">♠️</span>
           <span className="font-extrabold text-white text-lg tracking-wide">POKER</span>
           <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-400 text-xs font-bold rounded">

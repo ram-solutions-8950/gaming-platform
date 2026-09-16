@@ -60,6 +60,8 @@ export function Triple777Page() {
   const [historyItems, setHistoryItems] = useState<api.HistoryItem[]>([]);
   const [historyLoading, setHistoryLoading] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [showExitConfirm, setShowExitConfirm] = useState<boolean>(false);
+  const [autoSummary, setAutoSummary] = useState<{ totalWon: number; totalSpins: number } | null>(null);
 
   const symbols = config?.symbols ?? ['7', 'BAR', 'CHERRY', 'LEMON', 'BELL', 'STAR', 'COIN'];
 
@@ -68,6 +70,8 @@ export function Triple777Page() {
   // Auto-spin & Turbo mode runtime state references
   const autoSpinActiveRef = useRef<boolean>(false);
   const autoSpinsRemainingRef = useRef<number>(0);
+  const autoSpinTotalWonRef = useRef<number>(0);
+  const autoSpinSpinsCountRef = useRef<number>(0);
   const autoSpinTimerRef = useRef<any>(null);
   const toastTimerRef = useRef<any>(null);
   const turboRef = useRef<boolean>(false);
@@ -135,7 +139,13 @@ export function Triple777Page() {
     }
   };
 
-  const handleExitToLobby = () => {
+  const handleExitClick = () => {
+    if (spinning) return;
+    setShowExitConfirm(true);
+  };
+
+  const handleConfirmExit = () => {
+    setShowExitConfirm(false);
     restoreLandscapeLock();
     navigate('/dashboard');
   };
@@ -291,6 +301,8 @@ export function Triple777Page() {
 
         // Auto-spin sequencing
         if (autoSpinActiveRef.current) {
+          autoSpinTotalWonRef.current += (response.won ? response.payout : 0);
+          autoSpinSpinsCountRef.current += 1;
           const remaining = autoSpinsRemainingRef.current - 1;
           autoSpinsRemainingRef.current = remaining;
           setAutoSpinsLeft(remaining > 0 ? remaining : null);
@@ -301,7 +313,12 @@ export function Triple777Page() {
           }
 
           if (remaining <= 0 || response.balance < currentStake) {
+            const completedWon = autoSpinTotalWonRef.current;
+            const completedCount = autoSpinSpinsCountRef.current;
             stopAutoSpin();
+            if (completedCount > 0) {
+              setAutoSummary({ totalWon: completedWon, totalSpins: completedCount });
+            }
             if (response.balance < currentStake && remaining > 0) {
               setErrorMessage('Auto spin stopped: Insufficient balance.');
             }
@@ -342,6 +359,9 @@ export function Triple777Page() {
         setErrorMessage('Insufficient balance for auto spin.');
         return;
       }
+      autoSpinTotalWonRef.current = 0;
+      autoSpinSpinsCountRef.current = 0;
+      setAutoSummary(null);
       autoSpinActiveRef.current = true;
       autoSpinsRemainingRef.current = AUTO_SPIN_COUNT;
       setAutoSpinsLeft(AUTO_SPIN_COUNT);
@@ -400,7 +420,7 @@ export function Triple777Page() {
 
           <button
             type="button"
-            onClick={handleExitToLobby}
+            onClick={handleExitClick}
             className="mt-3 px-4 py-1.5 bg-white/10 hover:bg-white/20 text-white rounded-lg text-xs font-bold border border-white/20 transition flex items-center gap-1.5 cursor-pointer"
           >
             <ArrowLeft size={14} /> Exit to Lobby
@@ -415,7 +435,7 @@ export function Triple777Page() {
           <button
             type="button"
             disabled={spinning}
-            onClick={handleExitToLobby}
+            onClick={handleExitClick}
             className="t777-header-back-btn"
             aria-label="Back to Dashboard"
           >
@@ -699,6 +719,69 @@ export function Triple777Page() {
             tips={TRIPLE_777_RULES_DATA.tips}
             onClose={() => setShowRules(false)}
           />
+        )}
+
+        {/* ── Exit Confirmation Modal (BUG-009) ── */}
+        {showExitConfirm && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
+            <div className="w-full max-w-sm rounded-2xl bg-gradient-to-b from-slate-900 via-slate-950 to-slate-900 border border-amber-500/40 p-6 shadow-2xl text-center">
+              <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400">
+                <ArrowLeft size={24} />
+              </div>
+              <h3 className="text-lg font-bold text-white mb-2">Leave Game?</h3>
+              <p className="text-sm text-slate-300 mb-6">
+                Are you sure you want to exit Triple 777 and return to the dashboard?
+              </p>
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowExitConfirm(false)}
+                  className="flex-1 py-2.5 px-4 rounded-xl font-semibold text-slate-300 bg-slate-800 hover:bg-slate-700 active:scale-95 transition border border-slate-700 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmExit}
+                  className="flex-1 py-2.5 px-4 rounded-xl font-bold text-white bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 active:scale-95 shadow-lg shadow-red-900/30 transition cursor-pointer"
+                >
+                  Leave
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── Auto Spin Summary Modal (BUG-006) ── */}
+        {autoSummary && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
+            <div className="w-full max-w-sm rounded-2xl bg-gradient-to-b from-slate-900 via-indigo-950 to-slate-900 border border-amber-400/50 p-6 shadow-2xl text-center">
+              <div className="w-14 h-14 mx-auto mb-3 rounded-full bg-amber-500/20 border border-amber-400/50 flex items-center justify-center text-2xl animate-bounce">
+                🏆
+              </div>
+              <h3 className="text-xl font-black text-amber-400 mb-1 tracking-wide">
+                AUTO SPINS COMPLETE
+              </h3>
+              <p className="text-xs text-slate-300 mb-4">
+                All {autoSummary.totalSpins} auto spins finished!
+              </p>
+              <div className="bg-white/5 border border-white/10 rounded-xl p-4 mb-5">
+                <div className="text-xs uppercase tracking-wider text-slate-400 font-semibold mb-1">
+                  Total Won
+                </div>
+                <div className={`text-2xl font-black ${autoSummary.totalWon > 0 ? 'text-emerald-400' : 'text-slate-300'}`}>
+                  ₹{autoSummary.totalWon.toFixed(2)}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAutoSummary(null)}
+                className="w-full py-2.5 px-4 rounded-xl font-bold text-slate-950 bg-gradient-to-r from-amber-400 to-yellow-400 hover:from-amber-300 hover:to-yellow-300 active:scale-95 shadow-lg shadow-amber-500/25 transition cursor-pointer"
+              >
+                Continue Playing
+              </button>
+            </div>
+          </div>
         )}
       </div>
     </>

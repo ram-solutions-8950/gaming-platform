@@ -564,10 +564,12 @@ async def _handle_player_leave(table_id: str, user_id: str) -> None:
 
     # 1. If currently playing and this player is in the hand, pack them to forfeit
     if hand.phase == Phase.PLAYING and hand.seats[seat_idx].is_in_hand:
-        try:
-            hand.pack(user_id)
-        except GameError:
-            pass
+        hand.seats[seat_idx].status = PlayerStatus.PACKED
+        active_remaining = [i for i, s in enumerate(hand.seats) if i != seat_idx and s.is_in_hand]
+        if len(active_remaining) == 1:
+            hand._finish_hand(winner_idx=active_remaining[0], reason="Opponent left the match")
+        elif seat_idx == hand.current_turn:
+            hand._advance_turn()
 
     # 2. If forfeit ended the hand, settle and broadcast hand_over
     if hand.phase == Phase.FINISHED:
@@ -595,10 +597,12 @@ async def _handle_player_leave(table_id: str, user_id: str) -> None:
     hand.remove_seat(user_id)
 
     # 5. When fewer than 2 players remain, the match cannot continue.
-    # Reset table to WAITING phase so no further automatic hands or bets run.
+    # Reset table to WAITING phase so no further automatic hands or bets run, and clear stale winners.
     seated = [s for s in hand.seats if s.id is not None]
     if len(seated) < 2:
         hand.reset_for_next_hand()
+        hand.winner_seat = None
+        hand.reason = None
         with _get_db_session() as db:
             try:
                 tid = uuid.UUID(str(table_id))

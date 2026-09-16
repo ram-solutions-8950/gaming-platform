@@ -43,12 +43,12 @@ export function PokerResult({ winners, currentUserId, myBetPaise, onClose }: Pok
           </div>
         )}
 
-        <div className="space-y-4 max-h-80 overflow-y-auto">
+        <div className="space-y-3 max-h-80 overflow-y-auto no-scrollbar" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
           {winners.map((w, idx) => (
             <div key={idx} className="bg-gray-800/80 p-3 rounded-lg border border-amber-500/30">
               <div className="flex justify-between items-center mb-2">
-                <span className="font-bold text-white text-base">{w.username}</span>
-                <span className="font-extrabold text-emerald-400 text-lg">+₹{(w.amount / 100).toFixed(2)}</span>
+                <span className="font-bold text-white text-base truncate mr-2">{w.username}</span>
+                <span className="font-extrabold text-emerald-400 text-lg shrink-0">+₹{(w.amount / 100).toFixed(2)}</span>
               </div>
               <p className="text-xs text-amber-300 mb-2 font-medium">{w.hand_description}</p>
               {w.best_five && w.best_five.length > 0 && (

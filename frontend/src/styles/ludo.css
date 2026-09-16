@@ -155,7 +155,6 @@
 }
 
 .ludo-movable-pawn {
-  animation: tokenHop3D 0.85s cubic-bezier(0.28, 0.84, 0.42, 1) infinite;
   transform-box: fill-box;
   transform-origin: center bottom;
 }

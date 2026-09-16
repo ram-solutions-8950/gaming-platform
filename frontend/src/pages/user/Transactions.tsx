@@ -9,11 +9,11 @@ import {
   Receipt,
   Copy,
   Check,
-  X,
   Coins,
   Sparkles,
 } from 'lucide-react';
 import { walletService } from '../../services/wallet';
+import { TransactionDetailsModal } from '../../components/common/TransactionDetailsModal';
 import type { WalletTransaction, TxType, TxStatus } from '../../types';
 import '../../styles/transactions-page.css';
 
@@ -388,113 +388,11 @@ export function TransactionsPage() {
         )}
       </div>
 
-      {/* Transaction Details Modal */}
-      {selectedTx && (
-        <div
-          className="casino-tx-modal-overlay"
-          onClick={() => setSelectedTx(null)}
-          role="dialog"
-          aria-modal="true"
-        >
-          <div
-            className="casino-tx-modal-card"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="casino-tx-modal-header">
-              <h3 className="casino-tx-modal-title">Transaction Details</h3>
-              <button
-                type="button"
-                className="casino-tx-modal-close-btn"
-                onClick={() => setSelectedTx(null)}
-                aria-label="Close"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            {/* Hero Amount */}
-            <div className="casino-tx-modal-amount-hero">
-              <span className="text-xs font-semibold uppercase tracking-wider text-purple-300">
-                {formatTxTitle(selectedTx)}
-              </span>
-              <span
-                className={`casino-tx-modal-amount ${
-                  CREDIT_TYPES.includes(selectedTx.type)
-                    ? 'text-emerald-400'
-                    : 'text-rose-400'
-                }`}
-              >
-                {CREDIT_TYPES.includes(selectedTx.type) ? '+' : '-'}₹
-                {formatAmount(selectedTx.amount)}
-              </span>
-            </div>
-
-            {/* Detail Rows */}
-            <div className="casino-tx-modal-rows">
-              <div className="casino-tx-modal-row">
-                <span className="casino-tx-modal-row-label">Status</span>
-                <span className={`casino-status-pill ${getStatusPillClass(selectedTx.status)}`}>
-                  {selectedTx.status}
-                </span>
-              </div>
-
-              <div className="casino-tx-modal-row">
-                <span className="casino-tx-modal-row-label">Date & Time</span>
-                <span className="casino-tx-modal-row-val font-sans text-xs">
-                  {formatTxDate(selectedTx.created_at)}
-                </span>
-              </div>
-
-              <div className="casino-tx-modal-row">
-                <span className="casino-tx-modal-row-label">Type</span>
-                <span className="casino-tx-modal-row-val font-sans text-xs">
-                  {selectedTx.type}
-                </span>
-              </div>
-
-              {selectedTx.reference_id && (
-                <div className="casino-tx-modal-row">
-                  <span className="casino-tx-modal-row-label">Reference ID</span>
-                  <div className="flex items-center gap-1.5">
-                    <span className="casino-tx-modal-row-val text-[11px] select-all">
-                      {selectedTx.reference_id}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={(e) => handleCopyRef(e, selectedTx.reference_id!)}
-                      className="p-1 hover:text-gold-300 text-gold-400"
-                      title="Copy Reference ID"
-                    >
-                      {copiedId === selectedTx.reference_id ? (
-                        <Check size={13} className="text-green-400" />
-                      ) : (
-                        <Copy size={13} />
-                      )}
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {selectedTx.balance_after !== undefined && (
-                <div className="casino-tx-modal-row">
-                  <span className="casino-tx-modal-row-label">Balance After</span>
-                  <span className="casino-tx-modal-row-val text-white">
-                    ₹{formatAmount(selectedTx.balance_after)}
-                  </span>
-                </div>
-              )}
-            </div>
-
-            <button
-              type="button"
-              className="casino-tx-modal-close-action-btn"
-              onClick={() => setSelectedTx(null)}
-            >
-              Close
-            </button>
-          </div>
-        </div>
-      )}
+      {/* Transaction Details Modal (BUG-022) */}
+      <TransactionDetailsModal
+        tx={selectedTx}
+        onClose={() => setSelectedTx(null)}
+      />
     </div>
   );
 }

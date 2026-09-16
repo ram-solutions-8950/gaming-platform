@@ -1,7 +1,9 @@
+import { useEffect } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { authService } from '../services/auth';
 import { CasinoLogo } from '../components/common/CasinoLogo';
+import { soundManager } from '../services/soundManager';
 
 const adminNav = [
   { to: '/admin/dashboard', label: 'Dashboard', icon: '📊' },
@@ -18,6 +20,11 @@ const adminNav = [
 export function AdminLayout() {
   const { user, setUser } = useAuthStore();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    // Explicit guarantee: stop all sounds and background music in admin panel
+    soundManager.stopAll();
+  }, []);
 
   const handleLogout = async () => {
     await authService.logout();
