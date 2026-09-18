@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useNavigate, Link } from 'react-router-dom';
-import { useState } from 'react';
 import { Eye, EyeOff, Mail, Lock } from 'lucide-react';
 import { authService } from '../../services/auth';
 import { useAuthStore } from '../../store/authStore';
@@ -77,7 +76,6 @@ export function LoginPage() {
     <div
       className="auth-page-wrapper"
       style={{
-        backgroundImage: `linear-gradient(rgba(3, 6, 16, 0.15), rgba(3, 6, 16, 0.32)), url(${splashBg})`,
         backgroundImage: `linear-gradient(rgba(3, 6, 16, 0.40), rgba(3, 6, 16, 0.65)), url(${splashBg})`,
       }}
     >
@@ -86,8 +84,6 @@ export function LoginPage() {
       <div className="casino-login-card">
         {/* Logo & Subtitle */}
         <div className="casino-login-header">
-          <h2 className="casino-login-title">WELCOME BACK</h2>
-          <p className="casino-login-subtitle">Login to continue your winning journey</p>
           <h2 className="casino-login-title">{isAdminRoute ? 'ADMIN PORTAL' : 'WELCOME BACK'}</h2>
           <p className="casino-login-subtitle">
             {isAdminRoute ? 'Secure Super Admin Authentication' : 'Enter your credentials to continue'}

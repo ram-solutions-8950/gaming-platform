@@ -1,4 +1,3 @@
-import { useEffect, useState } from 'react';
 import { useEffect, useState, useCallback } from 'react';
 import { Card } from '../../components/common/Card';
 import { Badge } from '../../components/common/Badge';
@@ -30,7 +29,6 @@ function getStatusDisplay(status: WithdrawalStatus) {
   }
 }
 
-function getStatusBadgeVariant(status: WithdrawalStatus) {
 function getStatusBadgeVariant(status: WithdrawalStatus): 'success' | 'danger' | 'warn' | 'info' | 'default' {
   switch (status) {
     case 'COMPLETED':
@@ -45,7 +43,6 @@ function getStatusBadgeVariant(status: WithdrawalStatus): 'success' | 'danger' |
       return 'danger';
     case 'PENDING':
     default:
-      return 'info';
       return 'warn';
   }
 }
@@ -247,7 +244,6 @@ export function AdminWithdrawalsPage() {
 
   // Action modal state (Approve / Reject / Processing / Complete / Fail)
   const [actionId, setActionId] = useState<string | null>(null);
-  const [actionType, setActionType] = useState<'approve' | 'processing' | 'complete' | 'reject' | 'fail' | null>(null);
   const [actionType, setActionType] = useState<
     'approve' | 'processing' | 'complete' | 'reject' | 'fail' | null
   >(null);
@@ -255,13 +251,11 @@ export function AdminWithdrawalsPage() {
   const [errorMsg, setErrorMsg] = useState<string>('');
   const [processingAction, setProcessingAction] = useState(false);
 
-  const fetchWithdrawals = async () => {
   // Copy feedback state
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const fetchWithdrawals = useCallback(async () => {
     try {
-      const r = await api.get('/admin/withdrawals?page_size=50');
       const params: Record<string, unknown> = {
         page,
         page_size: pageSize,
@@ -279,15 +273,12 @@ export function AdminWithdrawalsPage() {
       setLoading(false);
       setRefreshing(false);
     }
-  };
   }, [page, pageSize, search, statusFilter, dateFilter]);
 
   useEffect(() => {
     fetchWithdrawals();
-  }, []);
   }, [fetchWithdrawals]);
 
-  const openActionModal = (id: string, type: 'approve' | 'processing' | 'complete' | 'reject' | 'fail') => {
   const handleRefresh = () => {
     setRefreshing(true);
     fetchWithdrawals();
@@ -337,12 +328,10 @@ export function AdminWithdrawalsPage() {
     }
   };
 
-  if (loading) return <Loader />;
   const totalPages = Math.max(1, Math.ceil(totalWithdrawals / pageSize));
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-extrabold text-white">Withdrawals Management</h1>
       {/* Header with Refresh button (BUG-043) */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
@@ -403,7 +392,6 @@ export function AdminWithdrawalsPage() {
           </select>
         </div>
 
-        {/* Date Filter (BUG-044) */}
         {/* Date Filter */}
         <div className="sm:col-span-3 relative">
           <Calendar className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
@@ -425,25 +413,6 @@ export function AdminWithdrawalsPage() {
 
       {/* Withdrawals Table - 8 Required Columns (BUG-040) */}
       <Card>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-gray-400 border-b border-dark-700 text-left">
-                <th className="pb-3">User</th>
-                <th className="pb-3">Amount</th>
-                <th className="pb-3">Method</th>
-                <th className="pb-3">Destination</th>
-                <th className="pb-3">Status</th>
-                <th className="pb-3">Requested Date</th>
-                <th className="pb-3 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {withdrawals.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="py-8 text-center text-gray-500">
-                    No withdrawal requests found.
-                  </td>
         {loading ? (
           <div className="flex justify-center py-16">
             <Loader size="lg" />
@@ -470,11 +439,6 @@ export function AdminWithdrawalsPage() {
                   {/* Column 8: Action (View / Approve / Reject) */}
                   <th className="py-3 px-3 text-right">Action</th>
                 </tr>
-              ) : (
-                withdrawals.map((w) => (
-                  <tr key={w.id} className="border-b border-dark-800 hover:bg-dark-800/50 transition-colors">
-                    <td className="py-3 text-xs text-gray-400 font-mono" title={w.user_id}>
-                      {w.user_id.slice(0, 8)}…
               </thead>
               <tbody className="divide-y divide-dark-800">
                 {withdrawals.length === 0 ? (
@@ -482,76 +446,7 @@ export function AdminWithdrawalsPage() {
                     <td colSpan={8} className="py-8 text-center text-gray-500">
                       No withdrawal requests found matching your search.
                     </td>
-                    <td className="py-3 font-bold text-gray-100">₹{(w.amount / 100).toFixed(2)}</td>
-                    <td className="py-3 text-gray-300 capitalize">{w.method ?? '—'}</td>
-                    <td className="py-3 text-gray-400 text-xs font-mono max-w-xs truncate" title={w.destination ?? ''}>
-                      {w.destination ?? '—'}
-                    </td>
-                    <td className="py-3">
-                      <Badge label={getStatusDisplay(w.status)} variant={getStatusBadgeVariant(w.status)} />
-                    </td>
-                    <td className="py-3 text-gray-400 text-xs">{new Date(w.created_at).toLocaleString()}</td>
-                    <td className="py-3 text-right">
-                      <div className="flex items-center justify-end space-x-2">
-                        {w.status === 'PENDING' && (
-                          <>
-                            <button
-                              onClick={() => openActionModal(w.id, 'approve')}
-                              className="px-2.5 py-1 text-xs font-semibold rounded bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600/40 border border-emerald-500/30 transition-colors cursor-pointer"
-                            >
-                              Approve
-                            </button>
-                            <button
-                              onClick={() => openActionModal(w.id, 'reject')}
-                              className="px-2.5 py-1 text-xs font-semibold rounded bg-red-600/20 text-red-400 hover:bg-red-600/40 border border-red-500/30 transition-colors cursor-pointer"
-                            >
-                              Reject
-                            </button>
-                          </>
-                        )}
-                        {w.status === 'APPROVED' && (
-                          <>
-                            <button
-                              onClick={() => openActionModal(w.id, 'processing')}
-                              className="px-2.5 py-1 text-xs font-semibold rounded bg-amber-600/20 text-amber-400 hover:bg-amber-600/40 border border-amber-500/30 transition-colors cursor-pointer"
-                            >
-                              Payment Initiated
-                            </button>
-                            <button
-                              onClick={() => openActionModal(w.id, 'reject')}
-                              className="px-2.5 py-1 text-xs font-semibold rounded bg-red-600/20 text-red-400 hover:bg-red-600/40 border border-red-500/30 transition-colors cursor-pointer"
-                            >
-                              Reject
-                            </button>
-                          </>
-                        )}
-                        {w.status === 'PROCESSING' && (
-                          <>
-                            <button
-                              onClick={() => openActionModal(w.id, 'complete')}
-                              className="px-2.5 py-1 text-xs font-semibold rounded bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600/40 border border-emerald-500/30 transition-colors cursor-pointer"
-                            >
-                              Complete
-                            </button>
-                            <button
-                              onClick={() => openActionModal(w.id, 'fail')}
-                              className="px-2.5 py-1 text-xs font-semibold rounded bg-red-600/20 text-red-400 hover:bg-red-600/40 border border-red-500/30 transition-colors cursor-pointer"
-                            >
-                              Fail
-                            </button>
-                          </>
-                        )}
-                        {(w.status === 'COMPLETED' || w.status === 'REJECTED' || w.status === 'FAILED' || w.status === 'CANCELLED') && (
-                          <span className="text-xs text-gray-500 italic">No actions</span>
-                        )}
-                      </div>
-                    </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
                 ) : (
                   withdrawals.map((w) => (
                     <tr key={w.id} className="hover:bg-dark-800/50 transition-colors">
@@ -739,7 +634,6 @@ export function AdminWithdrawalsPage() {
         )}
       </Card>
 
-      {/* Confirmation Modal */}
       {/* View Details Modal */}
       {viewWithdrawal && (
         <WithdrawalDetailsModal
@@ -752,15 +646,12 @@ export function AdminWithdrawalsPage() {
 
       {/* Confirmation Action Modal */}
       {actionId && actionType && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <div className="bg-dark-900 border border-dark-700 rounded-xl p-6 max-w-md w-full space-y-4">
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-[100] animate-fadeIn">
           <div className="bg-dark-900 border border-dark-700 rounded-2xl p-6 max-w-md w-full space-y-4 shadow-2xl">
             <h3 className="text-xl font-bold text-white capitalize">
               Confirm Action: {actionType === 'processing' ? 'Payment Initiated' : actionType}
             </h3>
             <p className="text-sm text-gray-300">
-              Are you sure you want to transition this withdrawal to <span className="font-semibold text-white uppercase">{actionType === 'processing' ? 'PROCESSING (Payment Initiated)' : actionType}</span>?
               Are you sure you want to transition this withdrawal request to{' '}
               <span className="font-semibold text-white uppercase">
                 {actionType === 'processing' ? 'PROCESSING (Payment Initiated)' : actionType}
@@ -770,15 +661,12 @@ export function AdminWithdrawalsPage() {
 
             {(actionType === 'reject' || actionType === 'fail') && (
               <div>
-                <label className="block text-xs font-medium text-gray-400 mb-1">Reason (Optional)</label>
                 <label className="block text-xs font-medium text-gray-400 mb-1">
                   Reason for rejection / failure (Optional)
                 </label>
                 <textarea
                   value={reason}
                   onChange={(e) => setReason(e.target.value)}
-                  className="w-full bg-dark-800 border border-dark-700 rounded p-2 text-sm text-white focus:outline-hidden focus:border-brand-500"
-                  placeholder="Enter reason for rejection or failure..."
                   className="w-full bg-dark-800 border border-dark-700 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-primary-500 placeholder-gray-500 resize-none"
                   placeholder="e.g. Invalid bank account IFSC, suspicious activity..."
                   rows={3}
@@ -787,7 +675,6 @@ export function AdminWithdrawalsPage() {
             )}
 
             {errorMsg && (
-              <p className="text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded p-2">{errorMsg}</p>
               <p className="text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded-xl p-3">
                 {errorMsg}
               </p>
@@ -798,7 +685,6 @@ export function AdminWithdrawalsPage() {
                 type="button"
                 onClick={closeModal}
                 disabled={processingAction}
-                className="px-4 py-2 text-sm font-semibold rounded bg-dark-800 text-gray-300 hover:bg-dark-700 transition-colors"
                 className="px-4 py-2 text-sm font-semibold rounded-xl bg-dark-800 text-gray-300 hover:bg-dark-700 border border-dark-600 transition"
               >
                 Cancel
@@ -807,11 +693,9 @@ export function AdminWithdrawalsPage() {
                 type="button"
                 onClick={handleConfirmAction}
                 disabled={processingAction}
-                className={`px-4 py-2 text-sm font-semibold rounded text-white transition-colors cursor-pointer ${
                 className={`px-4 py-2 text-sm font-semibold rounded-xl text-white transition cursor-pointer ${
                   actionType === 'reject' || actionType === 'fail'
                     ? 'bg-red-600 hover:bg-red-500'
-                    : 'bg-brand-600 hover:bg-brand-500'
                     : 'bg-emerald-600 hover:bg-emerald-500'
                 }`}
               >

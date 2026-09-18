@@ -1,4 +1,3 @@
-import { useEffect, useRef, useState } from 'react';
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { Card } from '../../components/common/Card';
 import { Badge } from '../../components/common/Badge';
@@ -79,15 +78,14 @@ function Toast({ toast, onDismiss }: { toast: ToastState; onDismiss: () => void 
 /* ─── Wallet Adjustment Modal ─── */
 interface AdjustModalProps {
   user: User;
-  currentBalancePaisa: number | null;
+  currentBalancePaisa?: number | null;
   onClose: () => void;
   onSuccess: (tx: WalletTransaction) => void;
 }
 
 function WalletAdjustModal({ user, currentBalancePaisa, onClose, onSuccess }: AdjustModalProps) {
-function WalletAdjustModal({ user, onClose, onSuccess }: AdjustModalProps) {
-  const [currentBalance, setCurrentBalance] = useState<number | null>(user.wallet_balance ?? null);
-  const [loadingBalance, setLoadingBalance] = useState<boolean>(user.wallet_balance === undefined);
+  const [currentBalance, setCurrentBalance] = useState<number | null>(currentBalancePaisa ?? user.wallet_balance ?? null);
+  const [loadingBalance, setLoadingBalance] = useState<boolean>(currentBalancePaisa === undefined && user.wallet_balance === undefined);
   const [mode, setMode] = useState<'add' | 'deduct'>('add');
   const [amountRupees, setAmountRupees] = useState('');
   const [reason, setReason] = useState('');
@@ -95,11 +93,10 @@ function WalletAdjustModal({ user, onClose, onSuccess }: AdjustModalProps) {
   const [reasonError, setReasonError] = useState('');
   const [apiError, setApiError] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const submitRef = useRef(false); // guard against double-click race
   const submitRef = useRef(false);
   const firstInputRef = useRef<HTMLInputElement>(null);
 
-  // Fetch freshest user balance on modal open
+  // Fetch freshest user balance on modal open (BUG-022)
   useEffect(() => {
     let mounted = true;
     api
@@ -128,7 +125,6 @@ function WalletAdjustModal({ user, onClose, onSuccess }: AdjustModalProps) {
 
   // Close on Escape
   useEffect(() => {
-    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
     };
@@ -138,7 +134,6 @@ function WalletAdjustModal({ user, onClose, onSuccess }: AdjustModalProps) {
 
   const parsedAmount = parseFloat(amountRupees);
   const amountPaisa = !isNaN(parsedAmount) && parsedAmount > 0 ? rupeesToPaisa(parsedAmount) : 0;
-  const currentPaisa = currentBalancePaisa ?? 0;
   const currentPaisa = currentBalance ?? 0;
   const expectedPaisa = mode === 'add' ? currentPaisa + amountPaisa : currentPaisa - amountPaisa;
   const showPreview = amountPaisa > 0;
@@ -171,7 +166,6 @@ function WalletAdjustModal({ user, onClose, onSuccess }: AdjustModalProps) {
   };
 
   const handleSubmit = async () => {
-    if (submitRef.current || submitting) return; // prevent double submission
     if (submitRef.current || submitting) return;
     if (!validate()) return;
 
@@ -208,29 +202,16 @@ function WalletAdjustModal({ user, onClose, onSuccess }: AdjustModalProps) {
   };
 
   return (
-    /* Backdrop */
     /* Backdrop - Prevent closing on outside click (BUG-024) */
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm"
       className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
       role="dialog"
       aria-modal="true"
       aria-labelledby="adj-modal-title"
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
     >
       {/* Panel */}
       <div className="bg-dark-900 border border-dark-700 rounded-2xl w-full max-w-md shadow-2xl flex flex-col max-h-[90dvh] overflow-y-auto">
-
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-dark-700 shrink-0">
-          <h2 id="adj-modal-title" className="text-xl font-bold text-white flex items-center gap-2">
-            <span>💰</span> Adjust Wallet
-          </h2>
         {/* Header with Back button (BUG-021) and Close (X) button */}
-        {/* Header with Back button and Close (X) button */}
         <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-dark-700 shrink-0">
           <div className="flex items-center gap-3">
             <button
@@ -248,35 +229,28 @@ function WalletAdjustModal({ user, onClose, onSuccess }: AdjustModalProps) {
           </div>
           <button
             onClick={onClose}
-            className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-white hover:bg-dark-700 transition-colors cursor-pointer text-xl leading-none"
             className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-white hover:bg-dark-700 transition-colors cursor-pointer"
             aria-label="Close modal"
           >
-            ×
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Body */}
         <div className="px-6 py-5 space-y-5">
-
           {/* User info */}
           <div className="bg-dark-800 rounded-xl px-4 py-3 border border-dark-700">
             <p className="text-xs text-gray-400 font-medium uppercase tracking-wider mb-1">User</p>
             <p className="text-base font-bold text-gray-100">{user.name}</p>
-            <p className="text-xs text-gray-500">{user.email} &bull; @{user.username}</p>
             <p className="text-xs text-gray-500">
               {user.email} &bull; @{user.username}
             </p>
             <p className="text-[11px] font-mono text-gray-400 mt-1">ID: {user.id}</p>
           </div>
 
-          {/* Current balance */}
           {/* Current balance (BUG-022) */}
           <div className="bg-dark-800 rounded-xl px-4 py-3 border border-dark-700">
             <p className="text-xs text-gray-400 font-medium uppercase tracking-wider mb-1">Current Balance</p>
-            {currentBalancePaisa !== null ? (
-              <p className="text-2xl font-extrabold text-gold-400">{fmtRupees(currentBalancePaisa)}</p>
             {loadingBalance ? (
               <div className="py-1">
                 <Loader size="sm" />
@@ -296,9 +270,6 @@ function WalletAdjustModal({ user, onClose, onSuccess }: AdjustModalProps) {
                 type="button"
                 onClick={() => setMode('add')}
                 className={`flex-1 py-2.5 transition-colors cursor-pointer ${
-                  mode === 'add'
-                    ? 'bg-emerald-600 text-white'
-                    : 'bg-dark-800 text-gray-400 hover:text-gray-100'
                   mode === 'add' ? 'bg-emerald-600 text-white' : 'bg-dark-800 text-gray-400 hover:text-gray-100'
                 }`}
                 aria-pressed={mode === 'add'}
@@ -309,9 +280,6 @@ function WalletAdjustModal({ user, onClose, onSuccess }: AdjustModalProps) {
                 type="button"
                 onClick={() => setMode('deduct')}
                 className={`flex-1 py-2.5 transition-colors cursor-pointer ${
-                  mode === 'deduct'
-                    ? 'bg-red-600 text-white'
-                    : 'bg-dark-800 text-gray-400 hover:text-gray-100'
                   mode === 'deduct' ? 'bg-red-600 text-white' : 'bg-dark-800 text-gray-400 hover:text-gray-100'
                 }`}
                 aria-pressed={mode === 'deduct'}
@@ -327,7 +295,6 @@ function WalletAdjustModal({ user, onClose, onSuccess }: AdjustModalProps) {
               Amount (₹)
             </label>
             <div className="relative">
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-sm pointer-events-none">₹</span>
               <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-sm pointer-events-none">
                 ₹
               </span>
@@ -341,18 +308,15 @@ function WalletAdjustModal({ user, onClose, onSuccess }: AdjustModalProps) {
                 placeholder="0.00"
                 value={amountRupees}
                 onChange={(e) => {
-                  // Never allow negative via keyboard
                   const v = e.target.value;
                   if (v === '' || parseFloat(v) >= 0) setAmountRupees(v);
                   setAmountError('');
                 }}
-                onKeyDown={(e) => { if (e.key === '-' || e.key === 'e') e.preventDefault(); }}
                 onKeyDown={(e) => {
                   if (e.key === '-' || e.key === 'e') e.preventDefault();
                 }}
                 disabled={submitting}
                 className={`w-full pl-8 pr-4 py-3 bg-dark-800 border rounded-xl text-gray-100 placeholder-gray-600 text-base font-semibold focus:outline-none transition-colors ${
-                  amountError ? 'border-red-500 focus:border-red-500' : 'border-dark-600 focus:border-brand-500 focus:ring-1 focus:ring-brand-500'
                   amountError
                     ? 'border-red-500 focus:border-red-500'
                     : 'border-dark-600 focus:border-primary-500 focus:ring-1 focus:ring-primary-500'
@@ -371,26 +335,19 @@ function WalletAdjustModal({ user, onClose, onSuccess }: AdjustModalProps) {
               id="adj-reason"
               rows={3}
               placeholder="e.g. Refund for technical issue, promotional credit, correction..."
-              placeholder="e.g. Refund for technical issue, promotional credit, manual deposit..."
               value={reason}
-              onChange={(e) => { setReason(e.target.value); setReasonError(''); }}
               onChange={(e) => {
                 setReason(e.target.value);
                 setReasonError('');
               }}
               disabled={submitting}
               className={`w-full px-4 py-3 bg-dark-800 border rounded-xl text-gray-100 placeholder-gray-600 text-sm resize-none focus:outline-none transition-colors ${
-                reasonError ? 'border-red-500 focus:border-red-500' : 'border-dark-600 focus:border-brand-500 focus:ring-1 focus:ring-brand-500'
                 reasonError
                   ? 'border-red-500 focus:border-red-500'
                   : 'border-dark-600 focus:border-primary-500 focus:ring-1 focus:ring-primary-500'
               } disabled:opacity-50`}
             />
             <div className="flex justify-between mt-1">
-              {reasonError
-                ? <p className="text-xs text-red-400">{reasonError}</p>
-                : <span />
-              }
               {reasonError ? <p className="text-xs text-red-400">{reasonError}</p> : <span />}
               <p className={`text-xs ml-auto ${reason.trim().length < 5 ? 'text-gray-600' : 'text-gray-500'}`}>
                 {reason.trim().length} / min 5
@@ -399,12 +356,6 @@ function WalletAdjustModal({ user, onClose, onSuccess }: AdjustModalProps) {
           </div>
 
           {/* Preview */}
-          {showPreview && currentBalancePaisa !== null && (
-            <div className={`rounded-xl border px-4 py-3 text-sm space-y-1.5 ${
-              mode === 'add'
-                ? 'bg-emerald-900/20 border-emerald-500/30'
-                : 'bg-red-900/20 border-red-500/30'
-            }`}>
           {showPreview && currentBalance !== null && (
             <div
               className={`rounded-xl border px-4 py-3 text-sm space-y-1.5 ${
@@ -414,13 +365,11 @@ function WalletAdjustModal({ user, onClose, onSuccess }: AdjustModalProps) {
               <p className="text-xs font-bold uppercase tracking-wider text-gray-400">Preview</p>
               <div className="flex justify-between">
                 <span className="text-gray-400">Current balance</span>
-                <span className="text-gray-200 font-semibold">{fmtRupees(currentBalancePaisa)}</span>
                 <span className="text-gray-200 font-semibold">{fmtRupees(currentBalance)}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-400">Adjustment</span>
                 <span className={`font-bold ${mode === 'add' ? 'text-emerald-400' : 'text-red-400'}`}>
-                  {mode === 'add' ? '+' : '−'}{fmtRupees(amountPaisa)}
                   {mode === 'add' ? '+' : '−'}
                   {fmtRupees(amountPaisa)}
                 </span>
@@ -444,7 +393,6 @@ function WalletAdjustModal({ user, onClose, onSuccess }: AdjustModalProps) {
 
           {/* API error */}
           {apiError && (
-            <div className="flex items-start gap-2 bg-red-500/10 border border-red-500/25 rounded-xl px-4 py-3" role="alert">
             <div
               className="flex items-start gap-2 bg-red-500/10 border border-red-500/25 rounded-xl px-4 py-3"
               role="alert"
@@ -455,7 +403,6 @@ function WalletAdjustModal({ user, onClose, onSuccess }: AdjustModalProps) {
           )}
         </div>
 
-        {/* Footer */}
         {/* Footer with Cancel and Submit */}
         <div className="px-6 pb-6 pt-2 flex gap-3 shrink-0">
           <button
@@ -471,16 +418,9 @@ function WalletAdjustModal({ user, onClose, onSuccess }: AdjustModalProps) {
             onClick={handleSubmit}
             disabled={submitting}
             className={`flex-1 py-3 text-sm font-bold rounded-xl text-white transition-colors disabled:opacity-50 cursor-pointer ${
-              mode === 'add'
-                ? 'bg-emerald-600 hover:bg-emerald-500'
-                : 'bg-red-600 hover:bg-red-500'
               mode === 'add' ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-red-600 hover:bg-red-500'
             }`}
           >
-            {submitting
-              ? <span className="flex items-center justify-center gap-2"><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin inline-block" />Processing…</span>
-              : `Confirm ${mode === 'add' ? 'Credit' : 'Deduction'}`
-            }
             {submitting ? (
               <span className="flex items-center justify-center gap-2">
                 <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin inline-block" />
@@ -526,10 +466,8 @@ export function AdminUsersPage() {
   const [toast, setToast] = useState<ToastState | null>(null);
   const showToast = (message: string, type: ToastState['type']) => setToast({ message, type });
 
-  const fetchUsers = async () => {
   const fetchUsers = useCallback(async () => {
     try {
-      const r = await api.get('/admin/users?page_size=100');
       const params: Record<string, unknown> = {
         page,
         page_size: pageSize,
@@ -557,21 +495,12 @@ export function AdminUsersPage() {
     setRefreshing(true);
     fetchUsers();
   };
-
-  useEffect(() => { fetchUsers(); }, []);
   const handleCopy = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     navigator.clipboard.writeText(id);
     setCopiedId(id);
     setTimeout(() => setCopiedId(null), 2000);
   };
-
-  const filtered = users.filter(
-    (u) =>
-      u.email.toLowerCase().includes(search.toLowerCase()) ||
-      u.username.toLowerCase().includes(search.toLowerCase()) ||
-      u.name.toLowerCase().includes(search.toLowerCase()),
-  );
 
   const openAdjustModal = (targetUser: User) => {
     setAdjustTarget(targetUser);
@@ -604,7 +533,6 @@ export function AdminUsersPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-extrabold text-white">Users</h1>
       {/* Header with Refresh button (BUG-025) */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
@@ -621,13 +549,6 @@ export function AdminUsersPage() {
         </button>
       </div>
 
-      <div>
-        <input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search by name, email or username"
-          className="w-full max-w-md px-4 py-2.5 bg-dark-800 border border-dark-600 rounded-lg text-gray-100 placeholder-gray-500 focus:outline-none focus:border-brand-500 text-sm"
-        />
       {/* Filters: Search Bar, Role filter, Status filter (BUG-026) */}
       <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
         <div className="sm:col-span-6 relative">
@@ -681,25 +602,6 @@ export function AdminUsersPage() {
 
       {/* Users Table */}
       <Card>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-gray-400 border-b border-dark-700 text-left">
-                <th className="pb-3 font-semibold">User</th>
-                <th className="pb-3 font-semibold">Role</th>
-                <th className="pb-3 font-semibold">Status</th>
-                <th className="pb-3 font-semibold">Joined</th>
-                {isSuperAdmin && (
-                  <th className="pb-3 font-semibold text-right">Actions</th>
-                )}
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.length === 0 ? (
-                <tr>
-                  <td colSpan={isSuperAdmin ? 5 : 4} className="py-8 text-center text-gray-500">
-                    No users found.
-                  </td>
         {loading ? (
           <div className="flex justify-center py-16">
             <Loader size="lg" />
@@ -717,12 +619,6 @@ export function AdminUsersPage() {
                   <th className="py-3 px-3">Joined</th>
                   {isSuperAdmin && <th className="py-3 px-3 text-right">Actions</th>}
                 </tr>
-              ) : (
-                filtered.map((u) => (
-                  <tr key={u.id} className="border-b border-dark-800 hover:bg-dark-800/50 transition-colors">
-                    <td className="py-3">
-                      <p className="font-semibold text-gray-100">{u.name}</p>
-                      <p className="text-xs text-gray-500">{u.email}</p>
               </thead>
               <tbody className="divide-y divide-dark-800">
                 {users.length === 0 ? (
@@ -730,23 +626,6 @@ export function AdminUsersPage() {
                     <td colSpan={isSuperAdmin ? 7 : 6} className="py-8 text-center text-gray-500">
                       No users match your criteria.
                     </td>
-                    <td className="py-3"><Badge label={u.role} variant="info" /></td>
-                    <td className="py-3">
-                      <Badge label={u.status} variant={u.status === 'ACTIVE' ? 'success' : 'danger'} />
-                    </td>
-                    <td className="py-3 text-gray-400">{new Date(u.created_at).toLocaleDateString()}</td>
-                    {isSuperAdmin && (
-                      <td className="py-3 text-right">
-                        <button
-                          id={`adjust-wallet-${u.id}`}
-                          type="button"
-                          onClick={() => openAdjustModal(u)}
-                          disabled={false}
-                          className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-amber-500/15 text-amber-400 hover:bg-amber-500/30 border border-amber-500/30 transition-colors cursor-pointer disabled:opacity-50"
-                          title={`Adjust wallet for ${u.name}`}
-                        >
-                          💰 Adjust Wallet
-                        </button>
                   </tr>
                 ) : (
                   users.map((u) => (
@@ -768,13 +647,6 @@ export function AdminUsersPage() {
                           </button>
                         </div>
                       </td>
-                    )}
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
 
                       {/* User info */}
                       <td className="py-3 px-3">
@@ -895,7 +767,6 @@ export function AdminUsersPage() {
       {toast && (
         <Toast toast={toast} onDismiss={() => setToast(null)} />
       )}
-      {toast && <Toast toast={toast} onDismiss={() => setToast(null)} />}
     </div>
   );
 }

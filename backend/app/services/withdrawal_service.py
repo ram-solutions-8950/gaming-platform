@@ -6,7 +6,6 @@ from decimal import Decimal, ROUND_HALF_UP
 from sqlalchemy.orm import Session
 from ..models.withdrawal import Withdrawal, WithdrawalStatus
 from ..models.wallet import Wallet
-from ..models.transaction import WalletTransactionType
 from ..models.transaction import WalletTransaction, WalletTransactionType, WalletTransactionStatus
 from ..models.fee_configuration import FeeConfiguration
 from ..services.wallet_service import debit_wallet, credit_wallet
@@ -59,7 +58,6 @@ def create_withdrawal(
     tx_metadata = {"method": norm_method, "fee_amount": fee_amount, "net_payout": net_amount}
 
     # Reserve funds immediately using existing debit_wallet (uses row lock & reference uniqueness check)
-    debit_wallet(
     tx = debit_wallet(
         db,
         user_id=user_id,

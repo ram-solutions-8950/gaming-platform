@@ -12,7 +12,6 @@ from typing import Optional, Tuple
 from datetime import datetime, timezone, timedelta
 from decimal import Decimal, ROUND_HALF_UP
 from sqlalchemy.orm import Session
-from sqlalchemy import select, func
 from sqlalchemy import select, func, cast, String, or_
 
 from ..models.game import (
@@ -379,15 +378,10 @@ def get_user_bets(db: Session, user_id: UUID, page: int = 1, page_size: int = 20
 def get_round_bets_summary(db: Session, round_id: UUID) -> dict:
     """Aggregate statistics for a round — used by admin."""
     total_bets = db.query(func.count(GameBet.id)).filter(GameBet.round_id == round_id).scalar() or 0
-    total_amount = db.query(func.coalesce(func.sum(GameBet.amount), 0)).filter(GameBet.round_id == round_id).scalar()
-    return {"total_bets": total_bets, "total_amount": total_amount}
     total_amount = db.query(func.coalesce(func.sum(GameBet.amount), 0)).filter(GameBet.round_id == round_id).scalar() or 0
     return {"total_bets": int(total_bets), "total_amount": int(total_amount)}
 
 
-def get_admin_rounds(db: Session, page: int = 1, page_size: int = 20, game_id: Optional[UUID] = None) -> dict:
-    game = _get_or_create_colour_prediction_game(db) if game_id is None else _get_game_or_raise(db, game_id)
-    query = db.query(GameRound).filter(GameRound.game_id == game.id)
 def get_admin_rounds(
     db: Session,
     page: int = 1,
@@ -410,7 +404,6 @@ def get_admin_rounds(
 
 
 def get_admin_bets(
-    db: Session, round_id: Optional[UUID] = None, page: int = 1, page_size: int = 20, game_id: Optional[UUID] = None
     db: Session,
     round_id: Optional[UUID] = None,
     page: int = 1,
@@ -418,9 +411,6 @@ def get_admin_bets(
     game_id: Optional[UUID] = None,
     search: Optional[str] = None,
 ) -> dict:
-    game = _get_or_create_colour_prediction_game(db) if game_id is None else _get_game_or_raise(db, game_id)
-    query = db.query(GameBet).filter(GameBet.game_id == game.id)
-    if round_id:
     query = db.query(GameBet)
     if round_id is not None:
         query = query.filter(GameBet.round_id == round_id)

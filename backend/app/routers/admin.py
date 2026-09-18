@@ -14,14 +14,11 @@ from ..schemas.referral import ReferralSettingsUpdateIn
 from ..models.user import User, UserRole, UserStatus
 from ..models.deposit import Deposit
 from ..models.withdrawal import Withdrawal
-from ..models.transaction import WalletTransaction
-from ..models.transaction import WalletTransaction, WalletTransactionStatus
 from ..models.transaction import WalletTransaction, WalletTransactionStatus, WalletTransactionType
 from ..models.payment import PaymentConfiguration
 from ..models.game import GameRound, GameBet, GameBetStatus
 from ..models.game_catalog import Game
 from ..services import wallet_service, audit_service, withdrawal_service, reward_service
-from ..models.transaction import WalletTransactionType
 from ..schemas.reward import (
     LuckySpinSegmentUpdateIn,
     DailyRewardSettingsUpdateIn,
@@ -155,7 +152,6 @@ def get_dashboard_analytics(
 
 # -- Users ----------------------------------------------------------------------
 @router.get("/users")
-@limiter.limit("30/minute")
 @limiter.limit("60/minute")
 def list_users(
     request: Request,
@@ -168,10 +164,8 @@ def list_users(
     search: Optional[str] = Query(default=None),
 ):
     query = db.query(User)
-    if status:
     if status and status != "ALL":
         query = query.filter(User.status == status)
-    if role:
     if role and role != "ALL":
         query = query.filter(User.role == role)
     if search and search.strip():
@@ -180,7 +174,6 @@ def list_users(
             (User.name.ilike(term)) | (User.email.ilike(term)) | (User.username.ilike(term)) | (cast(User.id, String).ilike(term))
         )
     total = query.count()
-    items = query.offset((page - 1) * page_size).limit(page_size).all()
     items = query.order_by(User.created_at.desc()).offset((page - 1) * page_size).limit(page_size).all()
     user_items = []
     for u in items:
@@ -189,7 +182,6 @@ def list_users(
         user_items.append(udata)
     return success_response({
         "total": total, "page": page, "page_size": page_size,
-        "items": [UserOut.model_validate(u).model_dump() for u in items],
         "items": user_items,
     })
 
@@ -199,7 +191,6 @@ def get_user(user_id: UUID, admin: User = Depends(require_admin), db: Session = 
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         return error_response("NOT_FOUND", "User not found", status_code=404)
-    return success_response(UserOut.model_validate(user).model_dump())
     data = UserOut.model_validate(user).model_dump()
     data["wallet_balance"] = user.wallet.balance if user.wallet else 0
     return success_response(data)
@@ -236,8 +227,6 @@ def list_all_transactions(
     search: Optional[str] = Query(default=None),
     status: Optional[str] = Query(default=None),
 ):
-    total = db.query(WalletTransaction).count()
-    items = db.query(WalletTransaction).order_by(WalletTransaction.created_at.desc()).offset((page-1)*page_size).limit(page_size).all()
     query = db.query(WalletTransaction)
     if status and status != "ALL":
         query = query.filter(WalletTransaction.status == status)
@@ -272,16 +261,12 @@ def list_all_transactions(
         out_items.append(td)
     return success_response({
         "total": total, "page": page, "page_size": page_size,
-        "items": [WalletTransactionOut.model_validate(t).model_dump() for t in items],
         "items": out_items,
     })
 
 
 # -- Deposits -------------------------------------------------------------------
 @router.get("/deposits")
-def list_all_deposits(admin: User = Depends(require_admin), db: Session = Depends(get_db), page: int = 1, page_size: int = 20):
-    total = db.query(Deposit).count()
-    items = db.query(Deposit).order_by(Deposit.created_at.desc()).offset((page-1)*page_size).limit(page_size).all()
 def list_all_deposits(
     admin: User = Depends(require_admin),
     db: Session = Depends(get_db),
@@ -316,7 +301,6 @@ def list_all_deposits(
         out_items.append(dd)
     return success_response({
         "total": total, "page": page, "page_size": page_size,
-        "items": [DepositOut.model_validate(d).model_dump() for d in items],
         "items": out_items,
     })
 
@@ -333,7 +317,6 @@ def list_all_withdrawals(
     date_filter: Optional[str] = Query(default=None),
 ):
     query = db.query(Withdrawal)
-    if status:
     if status and status != "ALL":
         query = query.filter(Withdrawal.status == status)
     if date_filter and date_filter != "ALL":
@@ -372,7 +355,6 @@ def list_all_withdrawals(
         "total": total,
         "page": page,
         "page_size": page_size,
-        "items": [WithdrawalOut.model_validate(w).model_dump() for w in items],
         "items": out_items,
     })
 
@@ -720,14 +702,12 @@ def wallet_adjustment(
         if amount >= 0:
             tx = wallet_service.credit_wallet(
                 db, user_id, abs(amount), WalletTransactionType.ADJUSTMENT,
-                reference_type="admin_adjustment", reference_id=f"adj_{admin.id}_{user_id}_{amount}",
                 reference_type="admin_adjustment", reference_id=adj_ref,
                 metadata={"reason": reason, "admin_id": str(admin.id)},
             )
         else:
             tx = wallet_service.debit_wallet(
                 db, user_id, abs(amount), WalletTransactionType.ADJUSTMENT,
-                reference_type="admin_adjustment", reference_id=f"adj_{admin.id}_{user_id}_{amount}",
                 reference_type="admin_adjustment", reference_id=adj_ref,
                 metadata={"reason": reason, "admin_id": str(admin.id)},
             )
@@ -737,7 +717,6 @@ def wallet_adjustment(
             metadata={"amount": amount, "reason": reason, "tx_id": str(tx.id)},
         )
         db.commit()
-        return success_response(WalletTransactionOut.model_validate(tx).model_dump())
         res_data = WalletTransactionOut.model_validate(tx).model_dump()
         res_data["balance_after"] = tx.balance_after
         return success_response(res_data)

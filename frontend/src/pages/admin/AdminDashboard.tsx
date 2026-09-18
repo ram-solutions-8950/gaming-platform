@@ -1,5 +1,3 @@
-import { useEffect, useState } from 'react';
-import { Card } from '../../components/common/Card';
 import { useEffect, useState, useCallback } from 'react';
 import { Loader } from '../../components/common/Loader';
 import {
@@ -16,7 +14,6 @@ import {
 } from 'lucide-react';
 import api from '../../services/api';
 
-interface Stats { users: number; deposits: number; withdrawals: number; transactions: number; }
 interface Stats {
   users: number;
   deposits: number;
@@ -74,13 +71,6 @@ export function AdminDashboardPage() {
   const [activeMetric, setActiveMetric] = useState<'volume' | 'bets' | 'players' | 'rounds'>('volume');
   const [hoveredPoint, setHoveredPoint] = useState<TimeSeriesPoint | null>(null);
 
-  useEffect(() => {
-    Promise.all([
-      api.get('/admin/users?page_size=1').catch(() => ({ data: { data: { total: 0 } } })),
-      api.get('/admin/deposits?page_size=1').catch(() => ({ data: { data: { total: 0 } } })),
-      api.get('/admin/withdrawals?page_size=1').catch(() => ({ data: { data: { total: 0 } } })),
-      api.get('/admin/transactions?page_size=1').catch(() => ({ data: { data: { total: 0 } } })),
-    ]).then(([u, d, w, t]) => {
   const fetchDashboardData = useCallback(async (showRefreshingState = false) => {
     if (showRefreshingState) setRefreshing(true);
     try {
@@ -98,8 +88,6 @@ export function AdminDashboardPage() {
         withdrawals: w.data.data?.total ?? 0,
         transactions: t.data.data?.total ?? 0,
       });
-    }).finally(() => setLoading(false));
-  }, []);
 
       if (a.data.data) {
         setAnalytics(a.data.data);
@@ -119,10 +107,6 @@ export function AdminDashboardPage() {
   if (loading) return <Loader />;
 
   const statCards = [
-    { label: 'Total Users', value: stats?.users, icon: '?', color: 'text-brand-400' },
-    { label: 'Total Deposits', value: stats?.deposits, icon: '?', color: 'text-success' },
-    { label: 'Total Withdrawals', value: stats?.withdrawals, icon: '?', color: 'text-warn' },
-    { label: 'Total Transactions', value: stats?.transactions, icon: '?', color: 'text-gold-400' },
     {
       label: 'Total Users',
       value: stats?.users ?? 0,
@@ -209,9 +193,6 @@ export function AdminDashboardPage() {
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-3xl font-extrabold text-white">Admin Dashboard</h1>
-        <p className="text-gray-400 mt-1">Platform overview</p>
       {/* Header with Title and Refresh Button */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -229,9 +210,6 @@ export function AdminDashboardPage() {
           <span>{refreshing ? 'Refreshing...' : 'Refresh Data'}</span>
         </button>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {statCards.map(s => (
-          <Card key={s.label}>
 
       {/* Summary Stat Cards with Proper Icons (Bug-002) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
@@ -242,18 +220,14 @@ export function AdminDashboardPage() {
           >
             <div className="flex items-start justify-between">
               <div>
-                <p className="text-sm text-gray-400">{s.label}</p>
-                <p className="text-4xl font-extrabold mt-2 text-white">{s.value}</p>
                 <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">{s.label}</span>
                 <p className="text-3xl font-black mt-2 text-white">{s.value.toLocaleString()}</p>
                 <span className="text-[11px] text-gray-400 mt-1 block">{s.badge}</span>
               </div>
-              <span className="text-3xl">{s.icon}</span>
               <div className="p-2.5 rounded-xl bg-dark-900/60 border border-white/5 shadow-inner">
                 {s.icon}
               </div>
             </div>
-          </Card>
           </div>
         ))}
       </div>

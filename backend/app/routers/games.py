@@ -1,3 +1,5 @@
+
+
 from uuid import UUID as _UUID
 from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, Depends, Query, WebSocket, WebSocketDisconnect
@@ -227,7 +229,6 @@ def admin_list_rounds(
     status: str | None = Query(default=None),
     search: str | None = Query(default=None),
 ):
-    result = game_service.get_admin_rounds(db, page=page, page_size=page_size, game_id=game_id)
     result = game_service.get_admin_rounds(
         db, page=page, page_size=page_size, game_id=game_id, status=status, search=search
     )
@@ -258,8 +259,6 @@ def admin_list_bets(
     search: str | None = Query(default=None),
 ):
     rid = _UUID(round_id) if round_id else None
-    result = game_service.get_admin_bets(db, round_id=rid, page=page, page_size=page_size, game_id=game_id)
-    items = [GameBetOut.model_validate(b).model_dump() for b in result["items"]]
     result = game_service.get_admin_bets(
         db, round_id=rid, page=page, page_size=page_size, game_id=game_id, search=search
     )

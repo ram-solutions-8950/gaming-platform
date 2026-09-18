@@ -40,7 +40,6 @@ export function UserLayout() {
 
   useEffect(() => {
     refreshWallet();
-  }, []);
     const onFocus = () => refreshWallet();
     window.addEventListener('focus', onFocus);
     window.addEventListener('wallet-update', onFocus);
