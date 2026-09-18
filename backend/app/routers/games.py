@@ -224,14 +224,20 @@ def admin_list_rounds(
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
     game_id: _UUID | None = Query(default=None),
+    status: str | None = Query(default=None),
+    search: str | None = Query(default=None),
 ):
     result = game_service.get_admin_rounds(db, page=page, page_size=page_size, game_id=game_id)
+    result = game_service.get_admin_rounds(
+        db, page=page, page_size=page_size, game_id=game_id, status=status, search=search
+    )
     items = []
     for r in result["items"]:
         rd = GameRoundOut.model_validate(r).model_dump()
         summary = game_service.get_round_bets_summary(db, r.id)
         rd["total_bets"] = summary["total_bets"]
         rd["total_amount"] = summary["total_amount"]
+        rd["game_name"] = r.game.name if r.game else "Colour Prediction"
         items.append(rd)
     return success_response({
         "total": result["total"],
@@ -249,10 +255,20 @@ def admin_list_bets(
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
     game_id: _UUID | None = Query(default=None),
+    search: str | None = Query(default=None),
 ):
     rid = _UUID(round_id) if round_id else None
     result = game_service.get_admin_bets(db, round_id=rid, page=page, page_size=page_size, game_id=game_id)
     items = [GameBetOut.model_validate(b).model_dump() for b in result["items"]]
+    result = game_service.get_admin_bets(
+        db, round_id=rid, page=page, page_size=page_size, game_id=game_id, search=search
+    )
+    items = []
+    for b in result["items"]:
+        bd = GameBetOut.model_validate(b).model_dump()
+        bd["game_name"] = b.game.name if b.game else "Colour Prediction"
+        bd["user_name"] = (b.user.full_name or b.user.username) if b.user else "Unknown"
+        items.append(bd)
     return success_response({
         "total": result["total"],
         "page": result["page"],

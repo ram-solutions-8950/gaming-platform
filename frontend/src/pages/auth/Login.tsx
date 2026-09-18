@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useNavigate, Link } from 'react-router-dom';
 import { useState } from 'react';
@@ -6,6 +7,7 @@ import { authService } from '../../services/auth';
 import { useAuthStore } from '../../store/authStore';
 import { GlitterRain } from '../../components/common/GlitterRain';
 import { isNativePlatform } from '../../utils/platform';
+import { soundManager } from '../../services/soundManager';
 import splashBg from '../../assets/corona888-logo.webp';
 import '../../styles/login-page.css';
 
@@ -15,6 +17,7 @@ interface FormData {
 }
 
 export function LoginPage() {
+  const isAdminRoute = typeof window !== 'undefined' && window.location.pathname.toLowerCase().includes('admin');
   const savedEmail = typeof window !== 'undefined' ? localStorage.getItem('saved_email') || '' : '';
   const [rememberMe, setRememberMe] = useState<boolean>(true);
   const { register, handleSubmit, formState: { errors } } = useForm<FormData>({
@@ -28,6 +31,11 @@ export function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const navigate = useNavigate();
   const { setUser } = useAuthStore();
+
+  useEffect(() => {
+    // Strictly stop all sound playback on login page (Bug-001)
+    soundManager.stopAll();
+  }, []);
 
   const onSubmit = async (data: FormData) => {
     setLoading(true);
@@ -70,6 +78,7 @@ export function LoginPage() {
       className="auth-page-wrapper"
       style={{
         backgroundImage: `linear-gradient(rgba(3, 6, 16, 0.15), rgba(3, 6, 16, 0.32)), url(${splashBg})`,
+        backgroundImage: `linear-gradient(rgba(3, 6, 16, 0.40), rgba(3, 6, 16, 0.65)), url(${splashBg})`,
       }}
     >
       <GlitterRain />
@@ -79,6 +88,10 @@ export function LoginPage() {
         <div className="casino-login-header">
           <h2 className="casino-login-title">WELCOME BACK</h2>
           <p className="casino-login-subtitle">Login to continue your winning journey</p>
+          <h2 className="casino-login-title">{isAdminRoute ? 'ADMIN PORTAL' : 'WELCOME BACK'}</h2>
+          <p className="casino-login-subtitle">
+            {isAdminRoute ? 'Secure Super Admin Authentication' : 'Enter your credentials to continue'}
+          </p>
         </div>
 
         {/* Login Form */}

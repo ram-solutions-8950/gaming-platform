@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from ..models.withdrawal import Withdrawal, WithdrawalStatus
 from ..models.wallet import Wallet
 from ..models.transaction import WalletTransactionType
+from ..models.transaction import WalletTransaction, WalletTransactionType, WalletTransactionStatus
 from ..models.fee_configuration import FeeConfiguration
 from ..services.wallet_service import debit_wallet, credit_wallet
 from ..utils.logging import get_logger
@@ -59,6 +60,7 @@ def create_withdrawal(
 
     # Reserve funds immediately using existing debit_wallet (uses row lock & reference uniqueness check)
     debit_wallet(
+    tx = debit_wallet(
         db,
         user_id=user_id,
         amount=amount,
@@ -67,6 +69,8 @@ def create_withdrawal(
         reference_id=str(withdrawal_id),
         metadata=tx_metadata,
     )
+    # Status is PENDING until approval by admin (BUG-034)
+    tx.status = WalletTransactionStatus.PENDING
 
     withdrawal = Withdrawal(
         id=withdrawal_id,
@@ -98,6 +102,15 @@ def approve_withdrawal(db: Session, withdrawal_id: UUID, admin_id: UUID) -> With
     withdrawal.status = WithdrawalStatus.APPROVED
     withdrawal.processed_by = admin_id
     withdrawal.processed_at = datetime.now(timezone.utc)
+
+    # Update ledger transaction to COMPLETED upon approval (BUG-034)
+    tx = db.query(WalletTransaction).filter(
+        WalletTransaction.reference_type == "withdrawal",
+        WalletTransaction.reference_id == str(withdrawal_id),
+    ).first()
+    if tx:
+        tx.status = WalletTransactionStatus.COMPLETED
+
     db.commit()
     db.refresh(withdrawal)
     logger.info("Approved withdrawal id=%s by admin=%s", withdrawal_id, admin_id)
@@ -130,6 +143,15 @@ def complete_withdrawal(db: Session, withdrawal_id: UUID, admin_id: UUID) -> Wit
     withdrawal.status = WithdrawalStatus.COMPLETED
     withdrawal.processed_by = admin_id
     withdrawal.processed_at = datetime.now(timezone.utc)
+
+    # Ensure transaction is marked COMPLETED
+    tx = db.query(WalletTransaction).filter(
+        WalletTransaction.reference_type == "withdrawal",
+        WalletTransaction.reference_id == str(withdrawal_id),
+    ).first()
+    if tx:
+        tx.status = WalletTransactionStatus.COMPLETED
+
     db.commit()
     db.refresh(withdrawal)
     logger.info("Completed withdrawal id=%s by admin=%s", withdrawal_id, admin_id)
@@ -151,6 +173,14 @@ def reject_withdrawal(db: Session, withdrawal_id: UUID, admin_id: UUID, reason: 
         meta = dict(withdrawal.metadata_ or {})
         meta["rejection_reason"] = reason
         withdrawal.metadata_ = meta
+
+    # Mark original withdrawal transaction as FAILED / REVERSED
+    orig_tx = db.query(WalletTransaction).filter(
+        WalletTransaction.reference_type == "withdrawal",
+        WalletTransaction.reference_id == str(withdrawal.id),
+    ).first()
+    if orig_tx:
+        orig_tx.status = WalletTransactionStatus.FAILED
 
     # Idempotent wallet refund
     credit_wallet(
@@ -184,6 +214,14 @@ def fail_withdrawal(db: Session, withdrawal_id: UUID, admin_id: UUID, reason: Op
         meta = dict(withdrawal.metadata_ or {})
         meta["failure_reason"] = reason
         withdrawal.metadata_ = meta
+
+    # Mark original withdrawal transaction as FAILED
+    orig_tx = db.query(WalletTransaction).filter(
+        WalletTransaction.reference_type == "withdrawal",
+        WalletTransaction.reference_id == str(withdrawal.id),
+    ).first()
+    if orig_tx:
+        orig_tx.status = WalletTransactionStatus.FAILED
 
     # Idempotent wallet refund
     credit_wallet(

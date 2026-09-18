@@ -28,6 +28,8 @@ class GameBetOut(BaseModel):
     status: str
     created_at: datetime
     settled_at: Optional[datetime] = None
+    game_name: Optional[str] = None
+    user_name: Optional[str] = None
 
     model_config = {"from_attributes": True}
 
@@ -42,6 +44,7 @@ class GameRoundOut(BaseModel):
     started_at: datetime
     betting_closes_at: datetime
     ended_at: Optional[datetime] = None
+    game_name: Optional[str] = None
 
     model_config = {"from_attributes": True}
 

@@ -15,6 +15,7 @@ export interface User {
   created_at: string;
   last_login_at: string | null;
   avatar_url?: string | null;
+  wallet_balance?: number;
 }
 
 export interface Wallet {
@@ -68,6 +69,9 @@ export interface Withdrawal {
   created_at: string;
   updated_at: string | null;
   processed_at: string | null;
+  user_name?: string;
+  payment_method?: string;
+  metadata?: Record<string, any> | null;
 }
 
 // ── Game types ─────────────────────────────────────────────────────
@@ -85,6 +89,7 @@ export interface GameRound {
   started_at: string;
   betting_closes_at: string;
   ended_at: string | null;
+  game_name?: string;
 }
 
 export interface GameBet {
@@ -102,6 +107,8 @@ export interface GameBet {
   status: GameBetStatus;
   created_at: string;
   settled_at: string | null;
+  game_name?: string;
+  user_name?: string;
 }
 
 export interface PublicBet {

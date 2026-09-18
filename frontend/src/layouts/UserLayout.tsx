@@ -41,6 +41,16 @@ export function UserLayout() {
   useEffect(() => {
     refreshWallet();
   }, []);
+    const onFocus = () => refreshWallet();
+    window.addEventListener('focus', onFocus);
+    window.addEventListener('wallet-update', onFocus);
+    const interval = setInterval(refreshWallet, 10000);
+    return () => {
+      window.removeEventListener('focus', onFocus);
+      window.removeEventListener('wallet-update', onFocus);
+      clearInterval(interval);
+    };
+  }, [location.pathname]);
 
   const handleLogout = async () => {
     await authService.logout();

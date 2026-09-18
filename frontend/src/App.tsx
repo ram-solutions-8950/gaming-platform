@@ -212,13 +212,19 @@ function App() {
 
   const isDownloadPath = typeof window !== 'undefined' && window.location.pathname.toLowerCase().includes('download');
   const isAdminPath = typeof window !== 'undefined' && window.location.pathname.toLowerCase().startsWith('/admin');
+  const isAuthPath = typeof window !== 'undefined' && (window.location.pathname.toLowerCase().includes('login') || window.location.pathname.toLowerCase().includes('signup'));
 
   useEffect(() => {
     if (isDownloadPath || isAdminPath) return;
+    if (isDownloadPath || isAdminPath || isAuthPath) {
+      soundManager.stopAll();
+      return;
+    }
 
     const handleFirstInteraction = () => {
       const path = typeof window !== 'undefined' ? window.location.pathname.toLowerCase() : '';
       if (path.startsWith('/admin') || path.includes('download')) return;
+      if (path.startsWith('/admin') || path.includes('download') || path.includes('login') || path.includes('signup')) return;
 
       soundManager.init();
       document.removeEventListener('click', handleFirstInteraction);
@@ -232,12 +238,15 @@ function App() {
       document.removeEventListener('keydown', handleFirstInteraction);
     };
   }, [isDownloadPath, isAdminPath]);
+  }, [isDownloadPath, isAdminPath, isAuthPath]);
 
   useEffect(() => {
     if (!user || isDownloadPath || isAdminPath) {
+    if (!user || isDownloadPath || isAdminPath || isAuthPath) {
       soundManager.stopAll();
     }
   }, [user, isDownloadPath, isAdminPath]);
+  }, [user, isDownloadPath, isAdminPath, isAuthPath]);
 
   return (
     <>
@@ -258,6 +267,7 @@ function App() {
         <Route element={<PublicLayout />}>
           <Route element={<AuthLayout />}>
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/admin/login" element={<LoginPage />} />
             <Route path="/signup" element={<SignupPage />} />
           </Route>
         </Route>

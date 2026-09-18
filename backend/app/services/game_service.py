@@ -13,11 +13,13 @@ from datetime import datetime, timezone, timedelta
 from decimal import Decimal, ROUND_HALF_UP
 from sqlalchemy.orm import Session
 from sqlalchemy import select, func
+from sqlalchemy import select, func, cast, String, or_
 
 from ..models.game import (
     GameRound, GameRoundStatus, GameColor, GamePrediction, GameBetStatus, GameBet,
 )
 from ..models.game_catalog import Game, GameStatus
+from ..models.user import User
 from ..models.fee_configuration import FeeConfiguration
 from ..models.transaction import WalletTransactionType
 from ..services.wallet_service import debit_wallet, credit_wallet
@@ -379,11 +381,29 @@ def get_round_bets_summary(db: Session, round_id: UUID) -> dict:
     total_bets = db.query(func.count(GameBet.id)).filter(GameBet.round_id == round_id).scalar() or 0
     total_amount = db.query(func.coalesce(func.sum(GameBet.amount), 0)).filter(GameBet.round_id == round_id).scalar()
     return {"total_bets": total_bets, "total_amount": total_amount}
+    total_amount = db.query(func.coalesce(func.sum(GameBet.amount), 0)).filter(GameBet.round_id == round_id).scalar() or 0
+    return {"total_bets": int(total_bets), "total_amount": int(total_amount)}
 
 
 def get_admin_rounds(db: Session, page: int = 1, page_size: int = 20, game_id: Optional[UUID] = None) -> dict:
     game = _get_or_create_colour_prediction_game(db) if game_id is None else _get_game_or_raise(db, game_id)
     query = db.query(GameRound).filter(GameRound.game_id == game.id)
+def get_admin_rounds(
+    db: Session,
+    page: int = 1,
+    page_size: int = 20,
+    game_id: Optional[UUID] = None,
+    status: Optional[str] = None,
+    search: Optional[str] = None,
+) -> dict:
+    query = db.query(GameRound)
+    if game_id is not None:
+        query = query.filter(GameRound.game_id == game_id)
+    if status:
+        query = query.filter(GameRound.status == status)
+    if search:
+        s = f"%{search.strip().lower()}%"
+        query = query.filter(cast(GameRound.id, String).ilike(s))
     total = query.count()
     items = query.order_by(GameRound.started_at.desc()).offset((page - 1) * page_size).limit(page_size).all()
     return {"total": total, "page": page, "page_size": page_size, "items": items}
@@ -391,11 +411,31 @@ def get_admin_rounds(db: Session, page: int = 1, page_size: int = 20, game_id: O
 
 def get_admin_bets(
     db: Session, round_id: Optional[UUID] = None, page: int = 1, page_size: int = 20, game_id: Optional[UUID] = None
+    db: Session,
+    round_id: Optional[UUID] = None,
+    page: int = 1,
+    page_size: int = 20,
+    game_id: Optional[UUID] = None,
+    search: Optional[str] = None,
 ) -> dict:
     game = _get_or_create_colour_prediction_game(db) if game_id is None else _get_game_or_raise(db, game_id)
     query = db.query(GameBet).filter(GameBet.game_id == game.id)
     if round_id:
+    query = db.query(GameBet)
+    if round_id is not None:
         query = query.filter(GameBet.round_id == round_id)
+    elif game_id is not None:
+        query = query.filter(GameBet.game_id == game_id)
+    if search:
+        s = f"%{search.strip().lower()}%"
+        query = query.join(GameBet.user).filter(
+            or_(
+                cast(GameBet.id, String).ilike(s),
+                cast(GameBet.round_id, String).ilike(s),
+                User.username.ilike(s),
+                User.full_name.ilike(s),
+            )
+        )
     total = query.count()
     items = query.order_by(GameBet.created_at.desc()).offset((page - 1) * page_size).limit(page_size).all()
     return {"total": total, "page": page, "page_size": page_size, "items": items}

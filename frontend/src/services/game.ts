@@ -36,12 +36,21 @@ export const gameService = {
   // Admin
   async getAdminRounds(page = 1, page_size = 20): Promise<PaginatedResult<GameRoundAdmin>> {
     const res = await api.get('/admin/games/rounds', { params: { page, page_size } });
+  async getAdminRounds(page = 1, page_size = 20, game_id?: string, status?: string, search?: string): Promise<PaginatedResult<GameRoundAdmin>> {
+    const params: Record<string, unknown> = { page, page_size };
+    if (game_id) params.game_id = game_id;
+    if (status) params.status = status;
+    if (search) params.search = search;
+    const res = await api.get('/admin/games/rounds', { params });
     return res.data.data;
   },
 
   async getAdminBets(round_id?: string, page = 1, page_size = 20): Promise<PaginatedResult<GameBet>> {
+  async getAdminBets(round_id?: string, page = 1, page_size = 20, game_id?: string, search?: string): Promise<PaginatedResult<GameBet>> {
     const params: Record<string, unknown> = { page, page_size };
     if (round_id) params.round_id = round_id;
+    if (game_id) params.game_id = game_id;
+    if (search) params.search = search;
     const res = await api.get('/admin/games/bets', { params });
     return res.data.data;
   },

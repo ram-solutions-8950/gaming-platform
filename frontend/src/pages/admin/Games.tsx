@@ -1,6 +1,8 @@
+
 import { useEffect, useState } from 'react';
 import { Card } from '../../components/common/Card';
 import { Loader } from '../../components/common/Loader';
+import { RefreshCw, ArrowLeft } from 'lucide-react';
 import { gameService } from '../../services/game';
 import type { CatalogGame } from '../../types';
 
@@ -123,12 +125,24 @@ export function AdminGamesPage() {
           <h1 className="text-3xl font-extrabold text-white">Game Catalog</h1>
           <p className="text-gray-400 mt-1">Manage platform games and availability.</p>
         </div>
-        <button
-          onClick={() => openModal()}
-          className="bg-brand-600 hover:bg-brand-500 text-white font-bold py-2 px-4 rounded-lg transition-colors cursor-pointer"
-        >
-          + Add Game
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => fetchGames()}
+            disabled={loading}
+            className="flex items-center gap-2 bg-dark-800 hover:bg-dark-700 text-gray-200 font-semibold py-2 px-4 rounded-lg border border-dark-600 transition-colors cursor-pointer disabled:opacity-50"
+            title="Refresh Game Catalog"
+          >
+            <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
+            <span>Refresh</span>
+          </button>
+          <button
+            onClick={() => openModal()}
+            className="bg-brand-600 hover:bg-brand-500 text-white font-bold py-2 px-4 rounded-lg transition-colors cursor-pointer"
+          >
+            + Add Game
+          </button>
+        </div>
       </div>
 
       <Card>
@@ -198,9 +212,30 @@ export function AdminGamesPage() {
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-dark-950/80 backdrop-blur-sm">
           <div className="bg-dark-900 border border-dark-700 rounded-xl w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl p-6">
-            <h2 className="text-xl font-bold text-white mb-4">
-              {editingGame ? 'Edit Game' : 'Add New Game'}
-            </h2>
+            <div className="flex items-center justify-between mb-4 border-b border-dark-700 pb-3">
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={closeModal}
+                  className="flex items-center gap-1.5 text-xs font-semibold text-gray-300 hover:text-white bg-dark-800 hover:bg-dark-700 px-3 py-1.5 rounded-lg border border-dark-600 transition-colors cursor-pointer"
+                  title="Back to Game Catalog"
+                >
+                  <ArrowLeft size={15} />
+                  <span>Back</span>
+                </button>
+                <h2 className="text-xl font-bold text-white">
+                  {editingGame ? 'Edit Game' : 'Add New Game'}
+                </h2>
+              </div>
+              <button
+                type="button"
+                onClick={closeModal}
+                className="text-gray-400 hover:text-white text-xl leading-none px-2 py-1 rounded hover:bg-dark-800"
+                aria-label="Close"
+              >
+                &times;
+              </button>
+            </div>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-400 mb-1">Name</label>
@@ -277,21 +312,31 @@ export function AdminGamesPage() {
 
               {errorMsg && <p className="text-sm text-red-500">{errorMsg}</p>}
 
-              <div className="flex justify-end gap-3 pt-4">
+              <div className="flex justify-between items-center pt-4 border-t border-dark-700">
                 <button
                   type="button"
                   onClick={closeModal}
-                  className="px-4 py-2 text-gray-400 hover:text-white transition-colors"
+                  className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-gray-300 bg-dark-800 hover:bg-dark-700 rounded-lg border border-dark-600 transition-colors cursor-pointer"
                 >
-                  Cancel
+                  <ArrowLeft size={16} />
+                  <span>Back</span>
                 </button>
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="bg-brand-600 hover:bg-brand-500 text-white px-6 py-2 rounded-lg font-bold transition-colors disabled:opacity-50"
-                >
-                  {submitting ? 'Saving...' : 'Save'}
-                </button>
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={closeModal}
+                    className="px-4 py-2 text-gray-400 hover:text-white transition-colors cursor-pointer text-sm"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={submitting}
+                    className="bg-brand-600 hover:bg-brand-500 text-white px-6 py-2 rounded-lg font-bold transition-colors disabled:opacity-50 cursor-pointer text-sm"
+                  >
+                    {submitting ? 'Saving...' : 'Save'}
+                  </button>
+                </div>
               </div>
             </form>
           </div>

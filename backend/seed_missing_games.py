@@ -4,6 +4,18 @@ from app.models.game_catalog import Game, GameStatus
 
 GAMES = [
     {
+        "name": "Roulette",
+        "slug": "roulette",
+        "game_type": "TABLE",
+        "description": "European Roulette live table game.",
+        "min_bet": 100,
+        "max_bet": 5000000,
+        "config": {
+            "round_duration_seconds": 27,
+            "betting_duration_seconds": 15,
+        },
+    },
+    {
         "name": "Triple 777 Classic",
         "slug": "triple-777",
         "game_type": "SLOT",
@@ -23,6 +35,17 @@ GAMES = [
         "max_bet": 50000,
         "config": {
             "difficulties": ["EASY", "MEDIUM", "HARD"],
+        },
+    },
+    {
+        "name": "Ludo Classic",
+        "slug": "ludo",
+        "game_type": "BOARD",
+        "description": "Multiplayer 2-4 player Ludo board game.",
+        "min_bet": 1000,
+        "max_bet": 500000,
+        "config": {
+            "board_style": "standard",
         },
     },
 ]

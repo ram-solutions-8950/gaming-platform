@@ -69,8 +69,11 @@ const HOWLER_SOUND_MAP: Partial<Record<SoundEvent, string>> = {
 };
 
 function isInAdminPanel(): boolean {
+function isAudioDisabledPage(): boolean {
   if (typeof window === "undefined") return false;
   return window.location.pathname.toLowerCase().startsWith("/admin");
+  const path = window.location.pathname.toLowerCase();
+  return path.startsWith("/admin") || path === "/login" || path === "/signup" || path.includes("/login") || path.includes("/signup");
 }
 
 class CentralSoundManager {
@@ -362,6 +365,7 @@ class CentralSoundManager {
 
     // Only resume music if user had it playing, is not muted, and not in admin panel
     if (!this._muted && this._wasMusicPlayingBeforePause && !isInAdminPanel()) {
+    if (!this._muted && this._wasMusicPlayingBeforePause && !isAudioDisabledPage()) {
       this.startMusic();
     }
     this._wasMusicPlayingBeforePause = false;
@@ -370,6 +374,7 @@ class CentralSoundManager {
   /** Start or resume background music */
   startMusic() {
     if (this._muted || isInAdminPanel()) return;
+    if (this._muted || isAudioDisabledPage()) return;
 
     // If app is currently in background, DO NOT start playing now — queue for return
     if (!this._isAppInForeground) {
@@ -401,6 +406,7 @@ class CentralSoundManager {
   /** Call once after first user interaction to unlock audio on mobile and start background music */
   init() {
     if (!this._isAppInForeground || isInAdminPanel()) return;
+    if (!this._isAppInForeground || isAudioDisabledPage()) return;
 
     // Resume Howler's internal AudioContext
     try {
@@ -425,6 +431,7 @@ class CentralSoundManager {
 
   play(event: SoundEvent) {
     if (this._muted || !this._isAppInForeground || isInAdminPanel()) return;
+    if (this._muted || !this._isAppInForeground || isAudioDisabledPage()) return;
 
     if (OSCILLATOR_EVENTS.has(event)) {
       this.playOscillator(event);

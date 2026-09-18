@@ -1,7 +1,9 @@
 from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.orm import Session
 from uuid import UUID
+import uuid
 from typing import Optional
+from datetime import datetime, timezone, timedelta
 from ..dependencies.database import get_db
 from ..schemas.user import UserOut, AdminUserStatusUpdateIn
 from ..schemas.deposit import DepositOut
@@ -13,7 +15,10 @@ from ..models.user import User, UserRole, UserStatus
 from ..models.deposit import Deposit
 from ..models.withdrawal import Withdrawal
 from ..models.transaction import WalletTransaction
+from ..models.transaction import WalletTransaction, WalletTransactionStatus
 from ..models.payment import PaymentConfiguration
+from ..models.game import GameRound, GameBet, GameBetStatus
+from ..models.game_catalog import Game
 from ..services import wallet_service, audit_service, withdrawal_service, reward_service
 from ..models.transaction import WalletTransactionType
 from ..schemas.reward import (
@@ -32,9 +37,125 @@ from ..middleware.rate_limiter import limiter
 router = APIRouter(prefix="/admin", tags=["Admin"])
 
 
+# -- Dashboard Analytics --------------------------------------------------------
+@router.get("/dashboard/analytics")
+def get_dashboard_analytics(
+    request: Request,
+    period: str = Query(default="weekly"),
+    game_slug: Optional[str] = Query(default=None),
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    days = 7 if period == "weekly" else 30
+    now = datetime.now(timezone.utc)
+    start_date = now - timedelta(days=days)
+
+    all_games = db.query(Game).all()
+    selected_game = None
+    if game_slug and game_slug != "all":
+        selected_game = db.query(Game).filter(Game.slug == game_slug).first()
+
+    series = []
+    for d in range(days):
+        day_date = (now - timedelta(days=days - 1 - d)).date()
+        day_str = day_date.strftime("%Y-%m-%d")
+        series.append({
+            "date": day_str,
+            "label": day_date.strftime("%d %b") if days <= 7 else day_date.strftime("%d/%m"),
+            "total_bets": 0,
+            "total_volume": 0,
+            "total_wins": 0,
+            "total_rounds": 0,
+            "active_players": set(),
+        })
+    series_map = {item["date"]: item for item in series}
+
+    bets_query = db.query(GameBet).filter(GameBet.created_at >= start_date)
+    if selected_game:
+        bets_query = bets_query.filter(GameBet.game_id == selected_game.id)
+    bets = bets_query.all()
+
+    for b in bets:
+        b_date = b.created_at.date().strftime("%Y-%m-%d")
+        if b_date in series_map:
+            series_map[b_date]["total_bets"] += 1
+            series_map[b_date]["total_volume"] += (b.amount or 0)
+            if b.status == GameBetStatus.WON:
+                series_map[b_date]["total_wins"] += (b.net_win_amount or b.gross_win_amount or 0)
+            series_map[b_date]["active_players"].add(str(b.user_id))
+
+    rounds_query = db.query(GameRound).filter(GameRound.started_at >= start_date)
+    if selected_game:
+        rounds_query = rounds_query.filter(GameRound.game_id == selected_game.id)
+    rounds = rounds_query.all()
+
+    for r in rounds:
+        r_date = r.started_at.date().strftime("%Y-%m-%d")
+        if r_date in series_map:
+            series_map[r_date]["total_rounds"] += 1
+
+    formatted_series = []
+    for s in series:
+        formatted_series.append({
+            "date": s["date"],
+            "label": s["label"],
+            "total_bets": s["total_bets"],
+            "total_volume": s["total_volume"],
+            "total_volume_inr": round(s["total_volume"] / 100, 2),
+            "total_wins": s["total_wins"],
+            "total_wins_inr": round(s["total_wins"] / 100, 2),
+            "total_rounds": s["total_rounds"],
+            "active_players": len(s["active_players"]),
+        })
+
+    game_comparison = []
+    for g in all_games:
+        g_bets = db.query(GameBet).filter(GameBet.game_id == g.id, GameBet.created_at >= start_date).all()
+        g_rounds_count = db.query(GameRound).filter(GameRound.game_id == g.id, GameRound.started_at >= start_date).count()
+        g_vol = sum(b.amount for b in g_bets)
+        g_wins = sum(b.net_win_amount or 0 for b in g_bets if b.status == GameBetStatus.WON)
+        g_players = len({str(b.user_id) for b in g_bets})
+        game_comparison.append({
+            "game_id": str(g.id),
+            "name": g.name,
+            "slug": g.slug,
+            "total_rounds": g_rounds_count,
+            "total_bets": len(g_bets),
+            "total_volume": g_vol,
+            "total_volume_inr": round(g_vol / 100, 2),
+            "total_wins_inr": round(g_wins / 100, 2),
+            "active_players": g_players,
+        })
+
+    total_bets_all = sum(s["total_bets"] for s in formatted_series)
+    total_volume_all = sum(s["total_volume"] for s in formatted_series)
+    total_wins_all = sum(s["total_wins"] for s in formatted_series)
+    total_rounds_all = sum(s["total_rounds"] for s in formatted_series)
+    all_active_players = set()
+    for b in bets:
+        all_active_players.add(str(b.user_id))
+
+    return success_response({
+        "period": period,
+        "days": days,
+        "selected_game": game_slug or "all",
+        "time_series": formatted_series,
+        "game_comparison": game_comparison,
+        "summary": {
+            "total_games_played": total_rounds_all,
+            "total_bets": total_bets_all,
+            "total_volume_inr": round(total_volume_all / 100, 2),
+            "total_wins_inr": round(total_wins_all / 100, 2),
+            "active_players": len(all_active_players),
+        },
+        "available_games": [{"name": g.name, "slug": g.slug} for g in all_games],
+    })
+
+
 # -- Users ----------------------------------------------------------------------
 @router.get("/users")
 @limiter.limit("30/minute")
+@limiter.limit("60/minute")
 def list_users(
     request: Request,
     admin: User = Depends(require_admin),
@@ -43,17 +164,32 @@ def list_users(
     page_size: int = Query(default=20, ge=1, le=100),
     status: Optional[str] = Query(default=None),
     role: Optional[str] = Query(default=None),
+    search: Optional[str] = Query(default=None),
 ):
     query = db.query(User)
     if status:
+    if status and status != "ALL":
         query = query.filter(User.status == status)
     if role:
+    if role and role != "ALL":
         query = query.filter(User.role == role)
+    if search and search.strip():
+        term = f"%{search.strip()}%"
+        query = query.filter(
+            (User.name.ilike(term)) | (User.email.ilike(term)) | (User.username.ilike(term)) | (cast(User.id, String).ilike(term))
+        )
     total = query.count()
     items = query.offset((page - 1) * page_size).limit(page_size).all()
+    items = query.order_by(User.created_at.desc()).offset((page - 1) * page_size).limit(page_size).all()
+    user_items = []
+    for u in items:
+        udata = UserOut.model_validate(u).model_dump()
+        udata["wallet_balance"] = u.wallet.balance if u.wallet else 0
+        user_items.append(udata)
     return success_response({
         "total": total, "page": page, "page_size": page_size,
         "items": [UserOut.model_validate(u).model_dump() for u in items],
+        "items": user_items,
     })
 
 
@@ -63,6 +199,9 @@ def get_user(user_id: UUID, admin: User = Depends(require_admin), db: Session = 
     if not user:
         return error_response("NOT_FOUND", "User not found", status_code=404)
     return success_response(UserOut.model_validate(user).model_dump())
+    data = UserOut.model_validate(user).model_dump()
+    data["wallet_balance"] = user.wallet.balance if user.wallet else 0
+    return success_response(data)
 
 
 @router.patch("/users/{user_id}/status")
@@ -93,12 +232,47 @@ def list_all_transactions(
     db: Session = Depends(get_db),
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
+    search: Optional[str] = Query(default=None),
+    status: Optional[str] = Query(default=None),
 ):
     total = db.query(WalletTransaction).count()
     items = db.query(WalletTransaction).order_by(WalletTransaction.created_at.desc()).offset((page-1)*page_size).limit(page_size).all()
+    query = db.query(WalletTransaction)
+    if status and status != "ALL":
+        query = query.filter(WalletTransaction.status == status)
+    if search and search.strip():
+        term = search.strip()
+        try:
+            tx_uuid = UUID(term)
+            query = query.filter(WalletTransaction.id == tx_uuid)
+        except ValueError:
+            query = query.join(User, WalletTransaction.user_id == User.id).filter(
+                (User.name.ilike(f"%{term}%")) |
+                (User.username.ilike(f"%{term}%")) |
+                (WalletTransaction.reference_id.ilike(f"%{term}%")) |
+                (cast(WalletTransaction.id, String).ilike(f"%{term}%"))
+            )
+    total = query.count()
+    items = query.order_by(WalletTransaction.created_at.desc()).offset((page - 1) * page_size).limit(page_size).all()
+    out_items = []
+    for t in items:
+        td = WalletTransactionOut.model_validate(t).model_dump()
+        user_obj = db.query(User).filter(User.id == t.user_id).first()
+        td["user_name"] = user_obj.name if user_obj else "Unknown"
+        td["user_email"] = user_obj.email if user_obj else ""
+        method = "—"
+        if t.metadata_ and isinstance(t.metadata_, dict):
+            method = t.metadata_.get("method") or t.metadata_.get("payment_method") or "—"
+        if method == "—" and t.reference_type:
+            method = t.reference_type.replace("_", " ").title()
+        td["payment_method"] = method
+        if t.type == WalletTransactionType.ADJUSTMENT:
+            td["adjustment_direction"] = "add" if t.balance_after >= t.balance_before else "deduct"
+        out_items.append(td)
     return success_response({
         "total": total, "page": page, "page_size": page_size,
         "items": [WalletTransactionOut.model_validate(t).model_dump() for t in items],
+        "items": out_items,
     })
 
 
@@ -107,9 +281,42 @@ def list_all_transactions(
 def list_all_deposits(admin: User = Depends(require_admin), db: Session = Depends(get_db), page: int = 1, page_size: int = 20):
     total = db.query(Deposit).count()
     items = db.query(Deposit).order_by(Deposit.created_at.desc()).offset((page-1)*page_size).limit(page_size).all()
+def list_all_deposits(
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, ge=1, le=100),
+    search: Optional[str] = Query(default=None),
+    status: Optional[str] = Query(default=None),
+):
+    query = db.query(Deposit)
+    if status and status != "ALL":
+        query = query.filter(Deposit.status == status)
+    if search and search.strip():
+        term = search.strip()
+        try:
+            dep_uuid = UUID(term)
+            query = query.filter(Deposit.id == dep_uuid)
+        except ValueError:
+            query = query.join(User, Deposit.user_id == User.id).filter(
+                (User.name.ilike(f"%{term}%")) |
+                (User.username.ilike(f"%{term}%")) |
+                (Deposit.provider_order_id.ilike(f"%{term}%")) |
+                (cast(Deposit.id, String).ilike(f"%{term}%"))
+            )
+    total = query.count()
+    items = query.order_by(Deposit.created_at.desc()).offset((page - 1) * page_size).limit(page_size).all()
+    out_items = []
+    for d in items:
+        dd = DepositOut.model_validate(d).model_dump()
+        user_obj = db.query(User).filter(User.id == d.user_id).first()
+        dd["user_name"] = user_obj.name if user_obj else "Unknown"
+        dd["payment_method"] = (d.provider or "UPI").upper()
+        out_items.append(dd)
     return success_response({
         "total": total, "page": page, "page_size": page_size,
         "items": [DepositOut.model_validate(d).model_dump() for d in items],
+        "items": out_items,
     })
 
 
@@ -120,18 +327,52 @@ def list_all_withdrawals(
     db: Session = Depends(get_db),
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
+    search: Optional[str] = Query(default=None),
     status: Optional[str] = Query(default=None),
+    date_filter: Optional[str] = Query(default=None),
 ):
     query = db.query(Withdrawal)
     if status:
+    if status and status != "ALL":
         query = query.filter(Withdrawal.status == status)
+    if date_filter and date_filter != "ALL":
+        now = datetime.now(timezone.utc)
+        if date_filter == "TODAY":
+            start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+            query = query.filter(Withdrawal.created_at >= start)
+        elif date_filter == "WEEK":
+            start = now - timedelta(days=7)
+            query = query.filter(Withdrawal.created_at >= start)
+        elif date_filter == "MONTH":
+            start = now - timedelta(days=30)
+            query = query.filter(Withdrawal.created_at >= start)
+    if search and search.strip():
+        term = search.strip()
+        try:
+            w_uuid = UUID(term)
+            query = query.filter(Withdrawal.id == w_uuid)
+        except ValueError:
+            query = query.join(User, Withdrawal.user_id == User.id).filter(
+                (User.name.ilike(f"%{term}%")) |
+                (User.username.ilike(f"%{term}%")) |
+                (Withdrawal.destination.ilike(f"%{term}%")) |
+                (cast(Withdrawal.id, String).ilike(f"%{term}%"))
+            )
     total = query.count()
     items = query.order_by(Withdrawal.created_at.desc()).offset((page - 1) * page_size).limit(page_size).all()
+    out_items = []
+    for w in items:
+        wd = WithdrawalOut.model_validate(w).model_dump()
+        user_obj = db.query(User).filter(User.id == w.user_id).first()
+        wd["user_name"] = user_obj.name if user_obj else "Unknown"
+        wd["payment_method"] = (w.method or "Bank").upper()
+        out_items.append(wd)
     return success_response({
         "total": total,
         "page": page,
         "page_size": page_size,
         "items": [WithdrawalOut.model_validate(w).model_dump() for w in items],
+        "items": out_items,
     })
 
 
@@ -474,16 +715,19 @@ def wallet_adjustment(
     if not reason or len(reason.strip()) < 5:
         return error_response("INVALID_REASON", "Reason must be at least 5 characters")
     try:
+        adj_ref = f"adj_{admin.id}_{user_id}_{uuid.uuid4()}"
         if amount >= 0:
             tx = wallet_service.credit_wallet(
                 db, user_id, abs(amount), WalletTransactionType.ADJUSTMENT,
                 reference_type="admin_adjustment", reference_id=f"adj_{admin.id}_{user_id}_{amount}",
+                reference_type="admin_adjustment", reference_id=adj_ref,
                 metadata={"reason": reason, "admin_id": str(admin.id)},
             )
         else:
             tx = wallet_service.debit_wallet(
                 db, user_id, abs(amount), WalletTransactionType.ADJUSTMENT,
                 reference_type="admin_adjustment", reference_id=f"adj_{admin.id}_{user_id}_{amount}",
+                reference_type="admin_adjustment", reference_id=adj_ref,
                 metadata={"reason": reason, "admin_id": str(admin.id)},
             )
         audit_service.log_action(
@@ -493,6 +737,9 @@ def wallet_adjustment(
         )
         db.commit()
         return success_response(WalletTransactionOut.model_validate(tx).model_dump())
+        res_data = WalletTransactionOut.model_validate(tx).model_dump()
+        res_data["balance_after"] = tx.balance_after
+        return success_response(res_data)
     except ValueError as e:
         return error_response("ADJUSTMENT_ERROR", str(e))
 

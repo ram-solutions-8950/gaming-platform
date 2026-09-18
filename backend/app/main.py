@@ -49,6 +49,20 @@ async def lifespan(app: FastAPI):
                     cfg["betting_duration_seconds"] = 15
                     dt.config = cfg
                     db.commit()
+            roulette_game = db.query(Game).filter(Game.slug == "roulette").first()
+            if not roulette_game:
+                from .models.game_catalog import GameStatus
+                db.add(Game(
+                    name="Roulette",
+                    slug="roulette",
+                    game_type="TABLE",
+                    description="European Roulette live table game.",
+                    status=GameStatus.ACTIVE,
+                    min_bet=100,
+                    max_bet=5000000,
+                    config={"round_duration_seconds": 27, "betting_duration_seconds": 15},
+                ))
+                db.commit()
     except Exception as e:
         pass
     start_engine(broadcast_fn=game_ws_manager.broadcast)
