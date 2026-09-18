@@ -2,6 +2,11 @@ import React from 'react';
 
 interface CardProps { children: React.ReactNode; className?: string; title?: string; }
 interface CardProps { children: React.ReactNode; className?: string; title?: React.ReactNode; }
+interface CardProps {
+  children: React.ReactNode;
+  className?: string;
+  title?: React.ReactNode;
+}
 
 export function Card({ children, className = '', title }: CardProps) {
   return (

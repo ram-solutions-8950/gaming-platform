@@ -217,6 +217,9 @@ function WalletAdjustModal({ user, onClose, onSuccess }: AdjustModalProps) {
       aria-modal="true"
       aria-labelledby="adj-modal-title"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
     >
       {/* Panel */}
       <div className="bg-dark-900 border border-dark-700 rounded-2xl w-full max-w-md shadow-2xl flex flex-col max-h-[90dvh] overflow-y-auto">
@@ -227,6 +230,7 @@ function WalletAdjustModal({ user, onClose, onSuccess }: AdjustModalProps) {
             <span>💰</span> Adjust Wallet
           </h2>
         {/* Header with Back button (BUG-021) and Close (X) button */}
+        {/* Header with Back button and Close (X) button */}
         <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-dark-700 shrink-0">
           <div className="flex items-center gap-3">
             <button

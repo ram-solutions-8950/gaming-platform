@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useEffect, useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { Card } from '../../components/common/Card';
 import { Loader } from '../../components/common/Loader';
 import { gameService } from '../../services/game';
@@ -321,6 +322,8 @@ export function AdminGameControlPage() {
                           key={r.id}
                           className={`cursor-pointer hover:bg-dark-800/60 transition ${
                             selectedRound === r.id ? 'bg-primary-950/30 border-l-2 border-primary-500' : ''
+                          className={`cursor-pointer transition-colors ${
+                            selectedRound === r.id ? 'bg-primary-950/40 border-l-2 border-primary-500' : 'hover:bg-dark-800/50'
                           }`}
                           onClick={() => {
                             setSelectedRound(r.id);
@@ -329,6 +332,7 @@ export function AdminGameControlPage() {
                           }}
                         >
                           <td className="py-3 px-2">
+                          <td className="py-3 px-2 whitespace-nowrap">
                             <div className="flex items-center gap-1.5 font-mono text-xs text-gray-300">
                               <span title={r.id}>{r.id.slice(0, 8)}...</span>
                               <button
@@ -345,19 +349,23 @@ export function AdminGameControlPage() {
                             </div>
                           </td>
                           <td className="py-3 px-2 font-medium text-gray-200 whitespace-nowrap">
+                          <td className="py-3 px-2 text-xs font-semibold text-white whitespace-nowrap">
                             {r.game_name || 'Colour Prediction'}
                           </td>
                           <td className="py-3 px-2 text-xs text-gray-400 whitespace-nowrap">
                             {formatDateTime(r.started_at)}
                           </td>
                           <td className="py-3 px-2">
+                          <td className="py-3 px-2 whitespace-nowrap">
                             <span
                               className={`px-2 py-0.5 rounded text-xs font-semibold ${
                                 r.status === 'COMPLETED'
                                   ? 'bg-gray-800 text-gray-300 border border-gray-700'
+                                  ? 'bg-gray-800 text-gray-300'
                                   : r.status === 'BETTING'
                                   ? 'bg-green-900/50 text-green-400 border border-green-700/50'
                                   : 'bg-yellow-900/50 text-yellow-400 border border-yellow-700/50'
+                                  : 'bg-blue-900/50 text-blue-400 border border-blue-700/50'
                               }`}
                             >
                               {r.status}
@@ -368,6 +376,8 @@ export function AdminGameControlPage() {
                             {r.total_bets ?? 0}
                           </td>
                           <td className="py-3 px-2 text-right font-semibold text-primary-400 whitespace-nowrap">
+                          <td className="py-3 px-2 text-right text-xs text-gray-300 whitespace-nowrap">{r.total_bets}</td>
+                          <td className="py-3 px-2 text-right text-xs font-semibold text-white whitespace-nowrap">
                             ₹{paiseToRupees(r.total_amount)}
                           </td>
                         </tr>
@@ -376,6 +386,7 @@ export function AdminGameControlPage() {
                       <tr>
                         <td colSpan={7} className="py-8 text-center text-gray-500">
                           No rounds match your search or filter.
+                          No game rounds found matching your filter.
                         </td>
                         <td className="py-2 px-2">
                            <span className={`px-2 py-0.5 rounded text-xs font-semibold ${

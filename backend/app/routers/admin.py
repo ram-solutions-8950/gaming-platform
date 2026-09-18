@@ -16,6 +16,7 @@ from ..models.deposit import Deposit
 from ..models.withdrawal import Withdrawal
 from ..models.transaction import WalletTransaction
 from ..models.transaction import WalletTransaction, WalletTransactionStatus
+from ..models.transaction import WalletTransaction, WalletTransactionStatus, WalletTransactionType
 from ..models.payment import PaymentConfiguration
 from ..models.game import GameRound, GameBet, GameBetStatus
 from ..models.game_catalog import Game

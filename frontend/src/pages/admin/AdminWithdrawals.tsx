@@ -399,10 +399,12 @@ export function AdminWithdrawalsPage() {
             <option value="COMPLETED">COMPLETED</option>
             <option value="REJECTED">REJECTED</option>
             <option value="FAILED">FAILED</option>
+            <option value="CANCELLED">CANCELLED</option>
           </select>
         </div>
 
         {/* Date Filter (BUG-044) */}
+        {/* Date Filter */}
         <div className="sm:col-span-3 relative">
           <Calendar className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
           <select
