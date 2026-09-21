@@ -207,3 +207,22 @@ def test_server_ignores_manipulated_client_payloads(client, auth_user, db: Sessi
     db.refresh(wallet)
     # Wallet credit must match the server-computed won_amount (in paise)
     assert wallet.balance == 495000 + int(round(co_data["won_amount"] * 100))
+
+
+def test_cashout_with_lane_index_ensures_proper_multiplier(client, auth_user, db: Session):
+    """Test that cashing out directly with lane_index (e.g. 1 in MEDIUM mode) awards the correct 1.03x payout."""
+    headers, user, wallet = auth_user
+
+    # Start game on MEDIUM (lane 1 = 1.03x)
+    res = client.post("/api/v1/games/chicken-road/start", json={"bet_amount": 10, "difficulty": "MEDIUM"}, headers=headers)
+    assert res.status_code == 200
+    round_id = res.json()["data"]["round_id"]
+
+    # Direct cashout with lane_index = 1 (even if cross-lane call was racing or pending)
+    res_co = client.post("/api/v1/games/chicken-road/cashout", json={"round_id": round_id, "lane_index": 1}, headers=headers)
+    assert res_co.status_code == 200
+    data = res_co.json()["data"]
+    assert data["status"] == "CASHED_OUT"
+    assert data["multiplier"] == 1.03
+    assert data["won_amount"] >= 10.00
+

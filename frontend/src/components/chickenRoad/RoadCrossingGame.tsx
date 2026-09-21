@@ -176,6 +176,7 @@ const RoadCrossingGameComponent: React.FC<RoadCrossingGameProps> = ({
   const containerRectRef = useRef<{ width: number; height: number }>({ width: 844, height: 270 });
 
   const callbacksRef = useRef({ onLaneCross, onCollision, onFinish });
+  callbacksRef.current = { onLaneCross, onCollision, onFinish };
   useEffect(() => {
     callbacksRef.current = { onLaneCross, onCollision, onFinish };
   }, [onLaneCross, onCollision, onFinish]);
@@ -631,8 +632,11 @@ const RoadCrossingGameComponent: React.FC<RoadCrossingGameProps> = ({
         // Lane crossing detection as chicken advances to the right (BUG-004)
         // Checkpoint marker for lane L is at START_ZONE_WIDTH + (L - 0.5) * LANE_WIDTH
         const distFromStart = s.chicken.x - START_ZONE_WIDTH;
-        if (distFromStart >= LANE_WIDTH * 0.5) {
-          const currentCrossedLane = Math.floor((distFromStart + LANE_WIDTH * 0.5) / LANE_WIDTH);
+        if (distFromStart >= LANE_WIDTH * 0.3) {
+          const currentCrossedLane = Math.min(
+            s.totalLanes,
+            Math.floor((distFromStart + LANE_WIDTH * 0.7) / LANE_WIDTH)
+          );
           if (currentCrossedLane > s.highestLaneCrossed && currentCrossedLane <= s.totalLanes) {
             s.highestLaneCrossed = currentCrossedLane;
             sounds.playLaneCross();

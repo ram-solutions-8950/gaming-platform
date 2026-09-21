@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -56,6 +56,11 @@ export function ChickenRoadPage() {
   // Mobile steering button state
   const [externalSteer, setExternalSteer] = useState<'left' | 'right' | null>(null);
 
+  // Synchronous refs to prevent race conditions and closure staleness
+  const activeRoundIdRef = useRef<string | null>(null);
+  const currentLaneRef = useRef<number>(0);
+  const crossLanePromiseRef = useRef<Promise<any> | null>(null);
+
   // Sync state on load
   const syncState = useCallback(async () => {
     try {
@@ -77,6 +82,8 @@ export function ChickenRoadPage() {
         }
 
         if (gameStateData.status === 'ACTIVE' && gameStateData.round_id) {
+          activeRoundIdRef.current = gameStateData.round_id;
+          currentLaneRef.current = gameStateData.current_lane || 0;
           setActiveRoundId(gameStateData.round_id);
           setGameState('ACTIVE');
           setCurrentLane(gameStateData.current_lane || 0);
@@ -89,6 +96,8 @@ export function ChickenRoadPage() {
             setBetAmount(gameStateData.bet_amount);
           }
         } else {
+          activeRoundIdRef.current = null;
+          currentLaneRef.current = 0;
           setGameState('READY');
           setActiveRoundId(null);
         }
@@ -177,6 +186,9 @@ export function ChickenRoadPage() {
     try {
       const res = await chickenRoadService.startGame(betAmount, difficulty);
       soundManager.play('bet_coin');
+      activeRoundIdRef.current = res.round_id;
+      currentLaneRef.current = 0;
+      crossLanePromiseRef.current = null;
       setActiveRoundId(res.round_id);
       setGameState('ACTIVE');
       setCurrentLane(0);
@@ -198,42 +210,60 @@ export function ChickenRoadPage() {
 
   // Safe lane crossed callback from canvas
   const handleLaneCross = useCallback(async (laneIndex: number) => {
-    if (!activeRoundId || gameState !== 'ACTIVE') return;
+    const roundId = activeRoundIdRef.current;
+    if (!roundId) return;
+
+    // Optimistically update local UI immediately so multiplier & cashout are instant
+    currentLaneRef.current = Math.max(currentLaneRef.current, laneIndex);
+    setCurrentLane(currentLaneRef.current);
+    const mult = multipliers[laneIndex - 1] || 1.0;
+    setCurrentMultiplier(mult);
+    if (laneIndex < multipliers.length) {
+      setNextMultiplier(multipliers[laneIndex]);
+    }
+    soundManager.play('reveal_tick');
 
     try {
-      const res = await chickenRoadService.crossLane(activeRoundId, laneIndex);
-      soundManager.play('reveal_tick');
-      setCurrentLane(res.current_lane);
-      setCurrentMultiplier(res.current_multiplier);
-      setNextMultiplier(res.next_multiplier);
-
+      const p = chickenRoadService.crossLane(roundId, laneIndex);
+      crossLanePromiseRef.current = p;
+      const res = await p;
+      if (res && res.round_id === activeRoundIdRef.current) {
+        currentLaneRef.current = Math.max(currentLaneRef.current, res.current_lane);
+        setCurrentLane(currentLaneRef.current);
+        setCurrentMultiplier(res.current_multiplier);
+        setNextMultiplier(res.next_multiplier);
+      }
     } catch (err) {
       console.error('Failed to register lane cross:', err);
     }
-  }, [activeRoundId, gameState]);
+  }, [multipliers]);
 
   // Collision callback from canvas
   const handleCollision = useCallback(async (laneIndex: number) => {
-    if (!activeRoundId || gameState !== 'ACTIVE') return;
+    const roundId = activeRoundIdRef.current || activeRoundId;
+    if (!roundId) return;
 
     setGameState('LOST');
     setLossLane(laneIndex);
     soundManager.play('loss');
+    activeRoundIdRef.current = null;
+    setActiveRoundId(null);
+    crossLanePromiseRef.current = null;
 
     try {
-      await chickenRoadService.reportCollision(activeRoundId, laneIndex);
-      setActiveRoundId(null);
+      await chickenRoadService.reportCollision(roundId, laneIndex);
     } catch (err) {
       console.error('Failed to report collision:', err);
     }
-  }, [activeRoundId, gameState]);
+  }, [activeRoundId]);
 
   // Finish safe line reached callback from canvas
   const handleFinish = useCallback(async () => {
-    if (!activeRoundId || gameState !== 'ACTIVE') return;
+    const roundId = activeRoundIdRef.current || activeRoundId;
+    if (!roundId) return;
 
     try {
-      const res = await chickenRoadService.finishGame(activeRoundId);
+      const res = await chickenRoadService.finishGame(roundId);
       soundManager.play('win_clap');
       setGameState('WON');
       setWinAmount(res.won_amount);
@@ -241,18 +271,28 @@ export function ChickenRoadPage() {
       if (res.wallet_balance !== undefined) {
         setBalance(res.wallet_balance);
       }
+      activeRoundIdRef.current = null;
       setActiveRoundId(null);
+      crossLanePromiseRef.current = null;
     } catch (err) {
       console.error('Failed to complete finish:', err);
     }
-  }, [activeRoundId, gameState]);
+  }, [activeRoundId]);
 
   // Cashout mid-game callback
   const handleCashout = async () => {
-    if (!activeRoundId || gameState !== 'ACTIVE' || isActionLoading) return;
+    const roundId = activeRoundIdRef.current || activeRoundId;
+    if (!roundId || gameState !== 'ACTIVE' || isActionLoading) return;
     setIsActionLoading(true);
     try {
-      const res = await chickenRoadService.cashout(activeRoundId);
+      // If a crossLane request is currently in-flight, await it first
+      if (crossLanePromiseRef.current) {
+        try {
+          await crossLanePromiseRef.current;
+        } catch {}
+      }
+      const targetLane = Math.max(currentLaneRef.current, currentLane);
+      const res = await chickenRoadService.cashout(roundId, targetLane > 0 ? targetLane : undefined);
       soundManager.play('win_clap');
       setGameState('WON');
       setWinAmount(res.won_amount);
@@ -260,7 +300,9 @@ export function ChickenRoadPage() {
       if (res.wallet_balance !== undefined) {
         setBalance(res.wallet_balance);
       }
+      activeRoundIdRef.current = null;
       setActiveRoundId(null);
+      crossLanePromiseRef.current = null;
     } catch (err: any) {
       const msg = err.response?.data?.detail || err.message || 'Failed to cash out';
       setErrorMessage(msg);
@@ -271,6 +313,9 @@ export function ChickenRoadPage() {
 
   // Play again
   const handlePlayAgain = () => {
+    activeRoundIdRef.current = null;
+    currentLaneRef.current = 0;
+    crossLanePromiseRef.current = null;
     setGameState('READY');
     setActiveRoundId(null);
     setCurrentLane(0);
@@ -442,7 +487,7 @@ export function ChickenRoadPage() {
                   <div className="cr-modal-stat">
                     <span className="cr-modal-stat-label">Points Earned</span>
                     <span className="cr-modal-stat-val text-amber-400">
-                      {currentLane * 100} Pts
+                      {Math.max(currentLane, currentLaneRef.current) * 100} Pts
                     </span>
                   </div>
                 </div>
@@ -660,7 +705,7 @@ export function ChickenRoadPage() {
               <span className="cr-btn-label">
                 {isActionLoading
                   ? 'CASHING OUT...'
-                  : `CASH OUT ₹${(betAmount * (currentLane > 0 ? currentMultiplier : 1.0)).toFixed(2)} (${(currentLane > 0 ? currentMultiplier : 1.0).toFixed(2)}x)`}
+                  : `CASH OUT ₹${(betAmount * (Math.max(currentLane, currentLaneRef.current) > 0 ? currentMultiplier : 1.0)).toFixed(2)} (${(Math.max(currentLane, currentLaneRef.current) > 0 ? currentMultiplier : 1.0).toFixed(2)}x)`}
               </span>
             </button>
           ) : (

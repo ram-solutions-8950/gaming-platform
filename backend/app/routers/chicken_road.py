@@ -67,6 +67,7 @@ class CollisionIn(BaseModel):
 
 class CashoutIn(BaseModel):
     round_id: str
+    lane_index: Optional[int] = Field(None, ge=1, le=20, description="Optional crossed lane index to ensure accurate settlement")
 
 
 @router.get("/state")
@@ -320,6 +321,9 @@ def cashout_game(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Cannot cash out round with status {rnd.status}.",
             )
+
+        if data.lane_index is not None and 1 <= data.lane_index <= rnd.total_lanes:
+            rnd.current_lane = max(rnd.current_lane, data.lane_index)
 
         if rnd.current_lane == 0:
             # At start sidewalk, refund/cashout 1.00x

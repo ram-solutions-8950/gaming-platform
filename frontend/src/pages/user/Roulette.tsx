@@ -57,13 +57,11 @@ export function RoulettePage() {
   const [previousRoundBets, setPreviousRoundBets] = useState<LocalBet[]>([]);
 
   // Overlays & Phase transitions
-  const [showStartBettingBanner, setShowStartBettingBanner] = useState<boolean>(false);
   const [showStopBettingBanner, setShowStopBettingBanner] = useState<boolean>(false);
   const [showRanking, setShowRanking] = useState<boolean>(false);
   const [showTrends, setShowTrends] = useState<boolean>(false);
   const [showChat, setShowChat] = useState<boolean>(false);
   const [showRules, setShowRules] = useState<boolean>(false);
-  const [hasStartedBetting, setHasStartedBetting] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // Chat messages for live table chatter
@@ -109,15 +107,10 @@ export function RoulettePage() {
       if (prevPhase !== currentPhase) {
         if (currentPhase === 'BETTING') {
           // New round started!
-          setShowStartBettingBanner(true);
-          setTimeout(() => setShowStartBettingBanner(false), 2000);
           soundManager.play('betting_start');
           // Clear local bets for the new round
           setLocalBets([]);
           setBetHistoryStack([]);
-          if (totalMyBet === 0) {
-            setHasStartedBetting(false);
-          }
         } else if (currentPhase === 'STOP_BETTING') {
           setShowStopBettingBanner(true);
           setTimeout(() => setShowStopBettingBanner(false), 2000);
@@ -162,6 +155,29 @@ export function RoulettePage() {
     };
   }, []);
 
+  // Dynamic viewport-height fallback for Android landscape fitting
+  useEffect(() => {
+    const root = document.documentElement;
+    const setAppHeight = () => {
+      const vh = window.visualViewport?.height || window.innerHeight;
+      root.style.setProperty('--roulette-app-height', `${vh}px`);
+    };
+    setAppHeight();
+    const settleTimer = window.setTimeout(setAppHeight, 300);
+
+    window.addEventListener('resize', setAppHeight);
+    window.addEventListener('orientationchange', setAppHeight);
+    window.visualViewport?.addEventListener('resize', setAppHeight);
+
+    return () => {
+      window.clearTimeout(settleTimer);
+      window.removeEventListener('resize', setAppHeight);
+      window.removeEventListener('orientationchange', setAppHeight);
+      window.visualViewport?.removeEventListener('resize', setAppHeight);
+      root.style.removeProperty('--roulette-app-height');
+    };
+  }, []);
+
   // Compute aggregated bets per target key
   const betsByTarget = useMemo(() => {
     const map: Record<string, number> = {};
@@ -195,17 +211,6 @@ export function RoulettePage() {
     return serverState?.my_bets?.reduce((sum, b) => sum + (b.win_inr || 0), 0) || 0;
   }, [serverState?.my_bets]);
 
-  // Explicit Start Betting handler
-  const handleStartBetting = () => {
-    soundManager.play('betting_start');
-    setHasStartedBetting(true);
-    if (serverState?.phase === 'BETTING') {
-      setToastMessage('Betting is open! Tap any tile on the table to place chips.');
-    } else {
-      setToastMessage(`Betting opens in ${serverState?.seconds_left || 5}s for next spin!`);
-    }
-    setTimeout(() => setToastMessage(null), 2500);
-  };
 
   // Drag-to-scroll handlers for mobile/desktop felt navigation
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -264,10 +269,6 @@ export function RoulettePage() {
 
   // Handle placing bet on table
   const handlePlaceBet = async (bet_type: string, target: string) => {
-    if (!hasStartedBetting) {
-      setHasStartedBetting(true);
-    }
-
     if (!serverState || serverState.phase !== 'BETTING') {
       setToastMessage('Betting is closed for this round!');
       setTimeout(() => setToastMessage(null), 1500);
@@ -502,7 +503,7 @@ export function RoulettePage() {
 
           {/* Horizontal Number History Pills */}
           <div className="roulette-history-track">
-            {serverState?.history?.slice(-16).map((item, idx, arr) => {
+            {serverState?.history?.slice(-10).map((item, idx, arr) => {
               const isLatest = idx === arr.length - 1;
               return (
                 <div
@@ -581,25 +582,9 @@ export function RoulettePage() {
           onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
         >
-          {/* Standby Start Betting CTA Overlay */}
-          {!hasStartedBetting && totalMyBet === 0 && (
-            <div className="roulette-start-betting-overlay">
-              <button
-                type="button"
-                className="roulette-start-betting-cta-btn"
-                onClick={handleStartBetting}
-                aria-label="Start Betting"
-              >
-                <span className="text-xl">🎲</span>
-                <span>START BETTING</span>
-              </button>
-              <div className="cta-subtitle">Click to join round and place your chips</div>
-            </div>
-          )}
-
-          {/* European Roulette Wheel Animation Overlay - visible when user is in the round */}
+          {/* European Roulette Wheel Animation Overlay - visible when wheel spins/results */}
           <RouletteWheel
-            phase={hasStartedBetting || totalMyBet > 0 ? (serverState?.phase || 'BETTING') : 'BETTING'}
+            phase={serverState?.phase || 'BETTING'}
             winningNumber={serverState?.winning_number ?? null}
             winningColor={serverState?.winning_color ?? null}
             secondsLeft={serverState?.seconds_left ?? 0}
@@ -824,12 +809,6 @@ export function RoulettePage() {
               <div className="felt-outside-spacer-right" />
             </div>
 
-            {/* ── Overlay: Start Betting Banner ── */}
-            {showStartBettingBanner && (
-              <div className="roulette-phase-banner banner-start-betting">
-                <div className="banner-text-3d">Start Betting</div>
-              </div>
-            )}
 
             {/* ── Overlay: Stop Betting Banner ── */}
             {showStopBettingBanner && (
@@ -894,16 +873,16 @@ export function RoulettePage() {
           </div>
 
           <div className="roulette-countdown-pill">
-            {!hasStartedBetting && totalMyBet === 0 ? (
-              <span>READY TO PLAY</span>
-            ) : serverState?.phase === 'BETTING' ? (
+            {serverState?.phase === 'BETTING' ? (
               <span>Betting stop in...{serverState.seconds_left}s</span>
             ) : serverState?.phase === 'STOP_BETTING' ? (
               <span>BETTING CLOSED</span>
             ) : serverState?.phase === 'SPINNING' ? (
               <span>SPINNING... {String(serverState?.seconds_left || 0).padStart(2, '0')}s</span>
-            ) : (
+            ) : serverState?.phase === 'RESULT' ? (
               <span>Winning Number: {serverState?.winning_number}</span>
+            ) : (
+              <span>READY TO PLAY</span>
             )}
           </div>
 

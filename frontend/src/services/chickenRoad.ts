@@ -94,8 +94,8 @@ export const chickenRoadService = {
     return res.data.data;
   },
 
-  async cashout(round_id: string): Promise<CashoutResponse> {
-    const res = await api.post('/games/chicken-road/cashout', { round_id });
+  async cashout(round_id: string, lane_index?: number): Promise<CashoutResponse> {
+    const res = await api.post('/games/chicken-road/cashout', { round_id, lane_index });
     return res.data.data;
   },
 };
