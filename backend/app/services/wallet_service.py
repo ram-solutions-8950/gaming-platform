@@ -107,6 +107,14 @@ def debit_wallet(
     db.add(tx)
     db.flush()
     logger.info(f"DEBIT user={user_id} amount={amount} ref={reference_type}/{reference_id}")
+
+    # Every game stake counts towards the user's deposit play-through requirement.
+    # Hooking it here means all games contribute automatically, win or lose.
+    if tx_type == WalletTransactionType.GAME_ENTRY:
+        from .wager_service import record_wager
+        game_slug = (metadata or {}).get("game") or reference_type
+        record_wager(db, user_id, amount, str(game_slug))
+
     return tx
 
 

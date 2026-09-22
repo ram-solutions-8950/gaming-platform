@@ -1,7 +1,7 @@
 import uuid
 import enum
 from datetime import datetime, timezone
-from sqlalchemy import Column, BigInteger, String, DateTime, Enum as SAEnum, Boolean, ForeignKey, UniqueConstraint
+from sqlalchemy import Column, BigInteger, String, DateTime, Enum as SAEnum, Boolean, ForeignKey, UniqueConstraint, Numeric
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from ..database import Base
@@ -18,8 +18,11 @@ class ReferralSettings(Base):
     __tablename__ = "referral_settings"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    reward_amount = Column(BigInteger, nullable=False, default=10000)  # paisa (e.g. 10000 = Rs 100)
+    reward_amount = Column(BigInteger, nullable=False, default=10000)  # paisa (e.g. 10000 = Rs 100) — used for FLAT mode
     is_active = Column(Boolean, nullable=False, default=True)
+    reward_type = Column(String(20), nullable=False, default="PERCENTAGE")  # "FLAT" or "PERCENTAGE"
+    reward_percentage = Column(Numeric(5, 2), nullable=False, default=10.00)  # 10% of first deposit
+    min_deposit_amount = Column(BigInteger, nullable=False, default=10000)  # ₹100 in paise
     updated_by = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime(timezone=True), onupdate=lambda: datetime.now(timezone.utc), default=lambda: datetime.now(timezone.utc))

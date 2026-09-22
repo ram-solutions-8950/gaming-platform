@@ -11,7 +11,7 @@ from typing import Any, Dict, List, Optional
 from ..rummy.errors import GameError, GameStateError, InvalidAction, NotYourTurn
 from .bot_strategy import Action, decide_action, decide_see, decide_side_show_response
 from .cards import Card, derive_seed, fresh_deck, new_server_seed, shuffled_deck
-from .hand_rank import HandCategory, category_of, evaluate_hand
+from .hand_rank import HandCategory, SequenceRules, category_of, evaluate_hand
 
 
 class Phase(str, Enum):
@@ -30,6 +30,10 @@ class PlayerStatus(str, Enum):
     SHOW_LOSER = "show_loser"
 
 
+TIE_RULE_SPLIT = "SPLIT"    # equal hands share the pot
+TIE_RULE_HOUSE = "HOUSE"    # equal hands both lose their stake to the house
+
+
 @dataclass
 class GameConfig:
     boot_amount: int = 10
@@ -38,6 +42,15 @@ class GameConfig:
     max_blind_rounds: int = 4
     pot_limit: Optional[int] = None
     max_stake: Optional[int] = None
+    # How a showdown between identical hands is settled. This platform sends
+    # tied stakes to the house; TIE_RULE_SPLIT shares the pot instead.
+    tie_rule: str = TIE_RULE_HOUSE
+    # Chance that a hand is flagged for a house sweep, where a showdown
+    # between two High Card hands is taken by the house instead of a player.
+    # Off by default: the published rules pay the stronger hand.
+    house_sweep_probability: float = 0.0
+    # Which ace runs are legal, and where A-2-3 sits among them.
+    sequence_rules: SequenceRules = field(default_factory=SequenceRules)
 
 
 @dataclass
@@ -77,6 +90,8 @@ class TeenPattiHand:
         self.is_settled: bool = False
         self.win_streak: Dict[str, int] = {}
         self.double_loss_round: bool = False
+        self.winner_seats: List[int] = []
+        self.pot_limit_reached: bool = False
 
     @property
     def is_full(self) -> bool:
@@ -144,16 +159,21 @@ class TeenPattiHand:
         self.current_stake = self.config.boot_amount
         self.phase = Phase.PLAYING
         self.winner_seat = None
+        self.winner_seats = []
         self.reason = None
         self.is_settled = False
+        self.pot_limit_reached = False
 
         deck = shuffled_deck(self.rng)
         cards_per_seat = []
         for _ in self.seats:
             cards_per_seat.append([deck.pop(), deck.pop(), deck.pop()])
 
-        # Occasional house sweep / double loss round (~7% chance when neither hand ranks above High Card)
-        self.double_loss_round = (self.rng.random() < 0.07)
+        # Optional house sweep, only when the table opts in (default: never).
+        self.double_loss_round = (
+            self.config.house_sweep_probability > 0
+            and self.rng.random() < self.config.house_sweep_probability
+        )
 
         for i, s in enumerate(self.seats):
             s.cards = cards_per_seat[i]
@@ -178,6 +198,10 @@ class TeenPattiHand:
         if not self.seats[idx].is_in_hand:
             raise InvalidAction("player is not active in this hand")
         return idx
+
+    def _rank(self, cards: List[Card]):
+        """Evaluate a hand under this table's sequence ruleset."""
+        return evaluate_hand(cards, self.config.sequence_rules)
 
     def _seat_index(self, user_id: str) -> Optional[int]:
         for i, s in enumerate(self.seats):
@@ -229,6 +253,15 @@ class TeenPattiHand:
         multiplier = 2 if s.seen else 1
         bet_amount = self.current_stake * multiplier
 
+        # A pot-limit table caps the chaal at whatever the pot can still take,
+        # and the hand goes straight to a compulsory show once it is reached.
+        pot_capped = False
+        if self.config.pot_limit is not None:
+            headroom = max(0, self.config.pot_limit - self.pot)
+            if bet_amount >= headroom:
+                bet_amount = headroom
+                pot_capped = True
+
         if not s.seen:
             s.blind_count += 1
 
@@ -242,7 +275,11 @@ class TeenPattiHand:
             "amount": bet_amount,
             "seen": s.seen,
             "pot": self.pot,
+            "pot_limit_reached": pot_capped,
         }
+
+        if pot_capped:
+            self.pot_limit_reached = True
 
         self._advance_turn()
         return self.last_action
@@ -279,21 +316,54 @@ class TeenPattiHand:
         self.pot += show_cost
 
         other_idx = [i for i in active if i != idx][0]
-        rank_caller = evaluate_hand(s.cards)
-        rank_other = evaluate_hand(self.seats[other_idx].cards)
+        rank_caller = self._rank(s.cards)
+        rank_other = self._rank(self.seats[other_idx].cards)
 
         is_tie = (rank_caller == rank_other)
-        # Settle showdown ties or occasional random house sweeps (when neither hand ranks above High Card)
-        if is_tie or (getattr(self, "double_loss_round", False) and rank_caller.category <= HandCategory.HIGH_CARD and rank_other.category <= HandCategory.HIGH_CARD):
+        house_sweep = (
+            self.double_loss_round
+            and not is_tie
+            and rank_caller.category == HandCategory.HIGH_CARD
+            and rank_other.category == HandCategory.HIGH_CARD
+        )
+
+        # Equal hands split the pot by default; a table may instead send it to
+        # the house. A house sweep (opt-in, off by default) always does.
+        if is_tie and self.config.tie_rule == TIE_RULE_SPLIT:
+            for i in active:
+                self.seats[i].show_cards = True
+                self.seats[i].status = PlayerStatus.SHOW_WINNER
+            self.phase = Phase.SHOWDOWN
+            self._finish_hand(
+                winner_idx=None,
+                reason=f"Showdown Tie: Pot split on {category_of(s.cards, self.config.sequence_rules)}",
+                winner_seats=list(active),
+            )
+            return {
+                "winner_seat": None,
+                "winner_seats": list(active),
+                "loser_seat": None,
+                "split": True,
+                "pot": self.pot,
+                "reason": self.reason,
+            }
+
+        if is_tie or house_sweep:
             for i in active:
                 self.seats[i].show_cards = True
                 self.seats[i].status = PlayerStatus.SHOW_LOSER
             self.phase = Phase.SHOWDOWN
-            tie_reason = "Showdown Tie: Equal hands — both players lost stakes to House" if is_tie else "House Takes Pot: Both players lost stakes"
+            tie_reason = (
+                "Showdown Tie: Equal hands — both players lost stakes to House"
+                if is_tie
+                else "House Takes Pot: Both players lost stakes"
+            )
             self._finish_hand(winner_idx=None, reason=tie_reason)
             return {
                 "winner_seat": None,
+                "winner_seats": [],
                 "loser_seat": None,
+                "split": False,
                 "pot": self.pot,
                 "reason": self.reason,
             }
@@ -309,7 +379,7 @@ class TeenPattiHand:
         self.seats[loser_idx].status = PlayerStatus.SHOW_LOSER
 
         self.phase = Phase.SHOWDOWN
-        self._finish_hand(winner_idx=winner_idx, reason=f"Showdown: {category_of(self.seats[winner_idx].cards)}")
+        self._finish_hand(winner_idx=winner_idx, reason=f"Showdown: {category_of(self.seats[winner_idx].cards, self.config.sequence_rules)}")
         return {
             "winner_seat": winner_idx,
             "loser_seat": loser_idx,
@@ -351,8 +421,8 @@ class TeenPattiHand:
             return {"accepted": False, "target_seat": target_idx}
 
         # Compare hands privately between requester and target
-        r_req = evaluate_hand(s.cards)
-        r_tgt = evaluate_hand(target.cards)
+        r_req = self._rank(s.cards)
+        r_tgt = self._rank(target.cards)
 
         if r_req > r_tgt:
             loser_idx = target_idx
@@ -382,9 +452,22 @@ class TeenPattiHand:
     def _advance_turn(self) -> None:
         self.current_turn = self._next_active_seat(self.current_turn)
 
-    def _finish_hand(self, winner_idx: Optional[int], reason: str) -> None:
+    def _finish_hand(
+        self,
+        winner_idx: Optional[int],
+        reason: str,
+        winner_seats: Optional[List[int]] = None,
+    ) -> None:
         self.phase = Phase.FINISHED
         self.winner_seat = winner_idx
+        # winner_seats carries split pots; a single winner fills it too so the
+        # settlement layer only has to read one field.
+        if winner_seats is not None:
+            self.winner_seats = list(winner_seats)
+        elif winner_idx is not None:
+            self.winner_seats = [winner_idx]
+        else:
+            self.winner_seats = []
         self.reason = reason
         self.dealer_seat = (self.dealer_seat + 1) % max(1, len(self.seats))
         if winner_idx is not None and 0 <= winner_idx < len(self.seats):

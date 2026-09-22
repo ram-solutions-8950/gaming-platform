@@ -10,6 +10,10 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = "development"
     CORS_ORIGINS: List[str] = ["http://localhost:5173", "https://5d61-183-82-187-74.ngrok-free.app", "http://localhost", "https://localhost", "capacitor://localhost"]
     DATABASE_URL: str = "postgresql://postgres@localhost:5432/gaming_db"
+    FRONTEND_URL: str = "http://localhost:5173"
+    # Apply pending Alembic migrations automatically on startup.
+    # Disable to gate schema changes behind a manual deploy step.
+    AUTO_MIGRATE: bool = True
     REDIS_URL: str = "redis://localhost:6379/0"
 
     JWT_SECRET: str = "change-me-in-production"

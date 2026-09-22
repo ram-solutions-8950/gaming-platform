@@ -2,11 +2,12 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from typing import List
+from ..config import settings as settings_config
 from ..dependencies.database import get_db
 from ..schemas.referral import ReferralStatsOut, ReferralHistoryOut
 from ..models.user import User
 from ..models.referral import Referral, ReferralStatus
-from ..services.referral_service import get_referral_settings
+from ..services.referral_service import get_referral_settings, serialize_referral_settings
 from ..security.permissions import require_user
 from ..utils.responses import success_response
 
@@ -50,10 +51,16 @@ def get_user_referral_stats(
         db.commit()
         db.refresh(current_user)
 
+    cfg = serialize_referral_settings(settings)
+
     return success_response({
         "referral_code": current_user.referral_code,
-        "referral_link": f"http://localhost:5173/signup?ref={current_user.referral_code}",
-        "reward_amount": float(settings.reward_amount) / 100.0,
+        "referral_link": f"{settings_config.FRONTEND_URL.rstrip('/')}/signup?ref={current_user.referral_code}",
+        "reward_type": cfg["reward_type"],
+        "reward_amount": cfg["reward_amount"],
+        "reward_percentage": cfg["reward_percentage"],
+        "min_deposit": cfg["min_deposit"],
+        "is_active": cfg["is_active"],
         "successful_referrals": successful_referrals,
         "total_earnings": total_earnings,
         "pending_referrals": pending_referrals

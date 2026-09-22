@@ -26,6 +26,15 @@ def create_withdrawal(
     if amount <= 0:
         raise ValueError("Withdrawal amount must be strictly positive")
 
+    # Deposits must be played through in full before any withdrawal is allowed.
+    from .wager_service import get_remaining_wager
+    remaining_wager = get_remaining_wager(db, user_id)
+    if remaining_wager > 0:
+        raise ValueError(
+            "Wager requirement not fulfilled. You must play through your deposited amount "
+            f"before withdrawing. Remaining: ₹{remaining_wager / 100:.2f}"
+        )
+
     norm_method = (method or "").strip().lower()
     if norm_method not in {"upi", "bank"}:
         raise ValueError("Withdrawal method must be 'upi' or 'bank'")

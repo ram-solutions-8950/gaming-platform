@@ -18,6 +18,7 @@ import {
   Coins,
   X,
 } from 'lucide-react';
+import { getApiErrorMessage } from '../../utils/apiError';
 
 
 /* ─── helpers ─── */
@@ -179,11 +180,7 @@ function WalletAdjustModal({ user, currentBalancePaisa, onClose, onSuccess }: Ad
       const tx = await walletService.adjustUserWallet(user.id, finalAmountPaisa, reason.trim());
       onSuccess(tx);
     } catch (err: any) {
-      const msg: string =
-        err.response?.data?.message ||
-        err.response?.data?.error?.message ||
-        err.response?.data?.detail ||
-        'Wallet adjustment failed. Please try again.';
+      const msg: string = getApiErrorMessage(err, 'Wallet adjustment failed. Please try again.');
 
       // Friendly messages — do not expose internals
       if (err.response?.status === 403) {

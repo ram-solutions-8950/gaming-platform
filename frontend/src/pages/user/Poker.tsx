@@ -10,6 +10,7 @@ import { RulesModal } from '../../components/poker/RulesModal';
 import { soundManager } from '../../services/soundManager';
 import { setNativeLandscape } from '../../utils/nativeOrientation';
 import '../../styles/poker.css';
+import { getApiErrorMessage } from '../../utils/apiError';
 
 export function PokerPage() {
   const { tableId: paramTableId } = useParams<{ tableId?: string }>();
@@ -132,7 +133,7 @@ export function PokerPage() {
       navigate(`/games/poker/${tableId}`);
       refreshWallet();
     } catch (e: any) {
-      setActionErrorMessage(e.response?.data?.detail || 'Failed to join table');
+      setActionErrorMessage(getApiErrorMessage(e, 'Failed to join table'));
       setTimeout(() => setActionErrorMessage(null), 3000);
     }
   };
@@ -152,7 +153,7 @@ export function PokerPage() {
       await handleSelectTable(newTable.id, newTable.min_buy_in);
       loadTables();
     } catch (e: any) {
-      setActionErrorMessage(e.response?.data?.detail || 'Failed to create table');
+      setActionErrorMessage(getApiErrorMessage(e, 'Failed to create table'));
       setTimeout(() => setActionErrorMessage(null), 3000);
     }
   };

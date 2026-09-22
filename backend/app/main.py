@@ -22,6 +22,12 @@ async def lifespan(app: FastAPI):
     try:
         from .database import engine, SessionLocal
         from .models.reward import Base
+
+        # Migrations first: create_all would otherwise create a table that a
+        # pending migration also creates, making the migration fail.
+        from .migrations_runner import run_migrations
+        run_migrations()
+
         Base.metadata.create_all(bind=engine)
         from .services.reward_service import seed_default_reward_configs
         with SessionLocal() as db:
@@ -32,6 +38,17 @@ async def lifespan(app: FastAPI):
             except Exception:
                 db.rollback()
             seed_default_reward_configs(db)
+
+            # Make sure the singleton settings rows exist so the admin panel
+            # can edit them immediately. Both are seeded with neutral defaults:
+            # commission stays at 0% until an operator sets a rate.
+            from .models.fee_configuration import FeeConfiguration
+            if db.query(FeeConfiguration).first() is None:
+                db.add(FeeConfiguration())
+                db.commit()
+            from .services.referral_service import get_referral_settings
+            get_referral_settings(db)
+
             from .models.game_catalog import Game
             ab = db.query(Game).filter(Game.slug == "andar-bahar").first()
             if ab:

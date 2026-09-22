@@ -16,6 +16,7 @@ from .teen_patti import TeenPattiTable, TeenPattiHandHistory, TeenPattiTableMode
 from .aviator import AviatorRound, AviatorBet, AviatorRoundStatus, AviatorBetStatus
 from .poker import PokerTable, PokerHand, PokerPlayer, PokerAction
 from .referral import Referral, ReferralSettings, ReferralStatus
+from .wager import WagerRequirement
 from .reward import (
     DailyRewardConfig,
     DailyRewardSettings,
@@ -48,6 +49,7 @@ __all__ = [
     "AviatorRound", "AviatorBet", "AviatorRoundStatus", "AviatorBetStatus",
     "PokerTable", "PokerHand", "PokerPlayer", "PokerAction",
     "Referral", "ReferralSettings", "ReferralStatus",
+    "WagerRequirement",
     "DailyRewardConfig", "DailyRewardSettings", "UserRewardProfile", "UserDailyRewardClaim",
     "LuckySpinSegmentConfig", "UserLuckySpinLog", "BonusConfig", "UserBonusClaim",
     "JackpotConfig", "VipBonusConfig",

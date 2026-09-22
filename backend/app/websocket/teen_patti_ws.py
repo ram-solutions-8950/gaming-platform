@@ -428,8 +428,21 @@ def _settle_hand(table_id: str, hand: TeenPattiHand) -> None:
                 except ValueError:
                     continue
 
-                won_this = (hand.winner_seat is not None and i == hand.winner_seat)
-                payout = hand.pot if won_this else 0
+                # winner_seats holds one index normally and several on a split
+                # pot, so both settle through the same path.
+                winners = getattr(hand, "winner_seats", None)
+                if not winners:
+                    winners = [hand.winner_seat] if hand.winner_seat is not None else []
+                won_this = i in winners
+                if won_this and winners:
+                    share = hand.pot // len(winners)
+                    # Give any indivisible remainder to the first winner so the
+                    # pot is always paid out in full.
+                    if i == winners[0]:
+                        share += hand.pot - share * len(winners)
+                    payout = share
+                else:
+                    payout = 0
 
                 # Debit net stakes contributed by this user
                 if is_real and s.total_bet > 0:
@@ -450,7 +463,7 @@ def _settle_hand(table_id: str, hand: TeenPattiHand) -> None:
                         original_bet=s.total_bet,
                         gross_profit=gross_profit,
                         reference_type="TEEN_PATTI_PAYOUT",
-                        reference_id=f"tp_payout_{hand_key}",
+                        reference_id=f"tp_payout_{hand_key}_{s.id}",
                         game_slug="teen-patti",
                         metadata={"hand_key": hand_key, "pot": hand.pot},
                     )

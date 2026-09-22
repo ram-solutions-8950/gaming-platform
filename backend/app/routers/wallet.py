@@ -43,3 +43,14 @@ def get_wallet_transactions(
         "page_size": result["page_size"],
         "items": items,
     })
+
+
+@router.get("/wager-status")
+def get_wager_status_endpoint(
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    """Check the user's wager requirement status. Must be fulfilled before withdrawal."""
+    from ..services.wager_service import get_wager_status
+    status = get_wager_status(db, current_user.id)
+    return success_response(status)

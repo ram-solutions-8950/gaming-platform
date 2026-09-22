@@ -41,6 +41,19 @@ def auth_user(db: Session):
     return {"Authorization": f"Bearer {token}"}, user, wallet
 
 
+def _cross_all_lanes(client, headers, round_id, total_lanes=10):
+    """Play the round out lane by lane, as the real client does.
+
+    /finish only pays once every lane has actually been crossed.
+    """
+    for lane in range(1, total_lanes + 1):
+        client.post(
+            "/api/v1/games/chicken-road/cross-lane",
+            json={"round_id": round_id, "lane_index": lane},
+            headers=headers,
+        )
+
+
 # ─── 1. READY STATE & STATE SYNC ──────────────────────────────────────────
 
 def test_ready_state_returns_wallet_and_multipliers(client, auth_user):
@@ -121,6 +134,7 @@ def test_double_finish_prevention(client, auth_user, db: Session):
     # Start game
     res = client.post("/api/v1/games/chicken-road/start", json={"bet_amount": 50, "difficulty": "EASY"}, headers=headers)
     round_id = res.json()["data"]["round_id"]
+    _cross_all_lanes(client, headers, round_id)
 
     # First Finish -> Must Succeed
     res_fin1 = client.post("/api/v1/games/chicken-road/finish", json={"round_id": round_id}, headers=headers)

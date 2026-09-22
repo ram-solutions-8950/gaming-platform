@@ -1,14 +1,17 @@
 {
   "name": "frontend",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.0.6",
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "node scripts/version-bump.js && tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "download:sounds": "node scripts/download-sounds.js"
+    "version:bump": "node scripts/version-bump.js",
+    "download:sounds": "node scripts/download-sounds.js",
+    "sync:android": "node scripts/sync-android.js",
+    "build:apk": "npm run build && npm run sync:android && cd android && ./gradlew assembleDebug"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.0",

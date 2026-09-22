@@ -16,6 +16,7 @@ import { GameRulesModal } from '../../components/common/GameRulesModal';
 import { TRIPLE_777_RULES_DATA } from '../../components/common/gameRulesData';
 import { setNativePortrait, setNativeLandscape } from '../../utils/nativeOrientation';
 import '../../styles/triple-777.css';
+import { getApiErrorMessage } from '../../utils/apiError';
 
 const BET_OPTIONS = [10, 20, 50, 100];
 const AUTO_SPIN_COUNT = 10;
@@ -337,7 +338,7 @@ export function Triple777Page() {
         }
       }, revealDelay);
     } catch (err: any) {
-      const msg = err?.response?.data?.detail || err?.message || 'Spin failed';
+      const msg = getApiErrorMessage(err, 'Spin failed');
       setErrorMessage(msg);
       setSpinning(false);
       spinLockRef.current = false;

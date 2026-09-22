@@ -730,12 +730,9 @@ def get_referral_settings_endpoint(
     admin: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
-    from ..services.referral_service import get_referral_settings
+    from ..services.referral_service import get_referral_settings, serialize_referral_settings
     settings = get_referral_settings(db)
-    return success_response({
-        "reward_amount": float(settings.reward_amount) / 100.0,
-        "is_active": settings.is_active
-    })
+    return success_response(serialize_referral_settings(settings))
 
 
 @router.put("/referral/settings")
@@ -744,22 +741,37 @@ def update_referral_settings_endpoint(
     admin: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
-    from ..services.referral_service import get_referral_settings
-    
+    from ..services.referral_service import get_referral_settings, serialize_referral_settings
+
     # Validation
     if data.reward_amount <= 0:
         return error_response("VALIDATION_ERROR", "Reward amount must be positive", status_code=400)
     if data.reward_amount > 10000:
         return error_response("VALIDATION_ERROR", "Reward amount is too large (max ₹10,000)", status_code=400)
+    if data.reward_type is not None and data.reward_type.upper() not in ("FLAT", "PERCENTAGE"):
+        return error_response("VALIDATION_ERROR", "reward_type must be FLAT or PERCENTAGE", status_code=400)
+    if data.reward_percentage is not None and not (0 < data.reward_percentage <= 100):
+        return error_response("VALIDATION_ERROR", "reward_percentage must be between 0 and 100", status_code=400)
+    if data.min_deposit is not None and data.min_deposit < 0:
+        return error_response("VALIDATION_ERROR", "min_deposit cannot be negative", status_code=400)
 
     settings = get_referral_settings(db)
     old_reward = settings.reward_amount
     old_active = settings.is_active
+    old_type = settings.reward_type
+    old_percentage = float(settings.reward_percentage or 0)
+    old_min_deposit = settings.min_deposit_amount
 
     # Convert to paisa
     new_reward_paisa = int(round(data.reward_amount * 100))
     settings.reward_amount = new_reward_paisa
     settings.is_active = data.is_active
+    if data.reward_type is not None:
+        settings.reward_type = data.reward_type.upper()
+    if data.reward_percentage is not None:
+        settings.reward_percentage = data.reward_percentage
+    if data.min_deposit is not None:
+        settings.min_deposit_amount = int(round(data.min_deposit * 100))
     settings.updated_by = admin.id
 
     # Admin Audit Log
@@ -774,15 +786,18 @@ def update_referral_settings_endpoint(
             "new_reward": new_reward_paisa,
             "old_active": old_active,
             "new_active": data.is_active,
+            "old_reward_type": old_type,
+            "new_reward_type": settings.reward_type,
+            "old_reward_percentage": old_percentage,
+            "new_reward_percentage": float(settings.reward_percentage or 0),
+            "old_min_deposit": old_min_deposit,
+            "new_min_deposit": settings.min_deposit_amount,
         }
     )
     db.commit()
     db.refresh(settings)
 
-    return success_response({
-        "reward_amount": float(settings.reward_amount) / 100.0,
-        "is_active": settings.is_active
-    })
+    return success_response(serialize_referral_settings(settings))
 
 
 # -- Rewards & Promotions Management -------------------------------------------
@@ -922,3 +937,106 @@ def admin_update_vip(
         return success_response(updated)
     except ValueError as e:
         return error_response("UPDATE_ERROR", str(e), status_code=400)
+
+
+# --- Per-Game Commission Management ---
+
+# Canonical slugs, matching the game_slug each engine passes to settle_winning_bet.
+KNOWN_GAME_SLUGS = {
+    "dragon-tiger": "Dragon Tiger",
+    "andar-bahar": "Andar Bahar",
+    "colour-prediction": "Colour Prediction",
+    "roulette": "Roulette",
+    "aviator": "Aviator",
+    "chicken_road": "Chicken Road",
+    "triple_777": "Triple 777",
+    "teen-patti": "Teen Patti",
+    "rummy": "Rummy",
+    "poker": "Poker",
+    "ludo": "Ludo",
+}
+
+
+def _commission_payload(cfg) -> dict:
+    overrides = cfg.game_commission_overrides or {}
+    global_pct = float(cfg.winning_fee_percent) if cfg.winning_fee_percent is not None else 0.0
+    return {
+        "global_winning_fee_percent": global_pct,
+        "game_overrides": overrides,
+        "games": [
+            {
+                "slug": slug,
+                "name": name,
+                "commission_percent": float(overrides.get(slug, global_pct)),
+                "is_override": slug in overrides,
+            }
+            for slug, name in KNOWN_GAME_SLUGS.items()
+        ],
+    }
+
+
+@router.get("/fees/game-commissions")
+def get_game_commissions(
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """Per-game commission overrides plus the global default applied to every other game."""
+    from .fees import get_or_create_fee_config
+    cfg = get_or_create_fee_config(db)
+    return success_response(_commission_payload(cfg))
+
+
+@router.put("/fees/game-commissions")
+def update_game_commissions(
+    payload: dict,
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """Update per-game commission overrides.
+
+    Body: {"game_overrides": {"dragon-tiger": 5.0, ...}}
+    A slug omitted from the map falls back to the global winning fee percent.
+    """
+    from .fees import get_or_create_fee_config
+
+    overrides = payload.get("game_overrides", {})
+    if not isinstance(overrides, dict):
+        return error_response("INVALID_INPUT", "game_overrides must be an object", status_code=400)
+
+    cleaned: dict = {}
+    for slug, pct in overrides.items():
+        if slug not in KNOWN_GAME_SLUGS:
+            return error_response(
+                "INVALID_INPUT",
+                f"Unknown game '{slug}'. Valid games: {', '.join(sorted(KNOWN_GAME_SLUGS))}",
+                status_code=400,
+            )
+        try:
+            val = float(pct)
+        except (TypeError, ValueError):
+            return error_response("INVALID_INPUT", f"Invalid commission value for '{slug}'", status_code=400)
+        if val != val or val in (float("inf"), float("-inf")):
+            return error_response("INVALID_INPUT", f"Invalid commission value for '{slug}'", status_code=400)
+        if val < 0 or val > 100:
+            return error_response("INVALID_INPUT", f"Commission for '{slug}' must be between 0 and 100", status_code=400)
+        cleaned[slug] = round(val, 2)
+
+    cfg = get_or_create_fee_config(db)
+    old_overrides = cfg.game_commission_overrides or {}
+
+    # Reassigning (rather than mutating) is what makes SQLAlchemy flush the JSON column.
+    cfg.game_commission_overrides = cleaned
+    cfg.updated_by_id = admin.id
+
+    audit_service.log_action(
+        db,
+        action="GAME_COMMISSION_UPDATED",
+        actor_id=admin.id,
+        entity_type="fee_configuration",
+        entity_id=str(cfg.id),
+        metadata={"old": old_overrides, "new": cleaned},
+    )
+
+    db.commit()
+    db.refresh(cfg)
+    return success_response(_commission_payload(cfg))

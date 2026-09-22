@@ -4,6 +4,10 @@ export interface ReferralStats {
   referral_code: string;
   referral_link: string;
   reward_amount: number;
+  reward_type?: string;
+  reward_percentage?: number;
+  min_deposit?: number;
+  is_active?: boolean;
   successful_referrals: number;
   total_earnings: number;
   pending_referrals: number;
@@ -20,6 +24,9 @@ export interface ReferralHistoryItem {
 export interface ReferralSettings {
   reward_amount: number;
   is_active: boolean;
+  reward_type?: 'FLAT' | 'PERCENTAGE';
+  reward_percentage?: number;
+  min_deposit?: number;
 }
 
 export const referralService = {
@@ -38,11 +45,43 @@ export const referralService = {
     return res.data.data;
   },
 
-  async updateAdminSettings(reward_amount: number, is_active: boolean): Promise<ReferralSettings> {
-    const res = await api.put('/admin/referral/settings', {
-      reward_amount,
-      is_active,
-    });
+  async updateAdminSettings(payload: {
+    reward_amount?: number;
+    is_active?: boolean;
+    reward_type?: 'FLAT' | 'PERCENTAGE';
+    reward_percentage?: number;
+    min_deposit?: number;
+  } | number, is_active?: boolean): Promise<ReferralSettings> {
+    const body = typeof payload === 'number'
+      ? { reward_amount: payload, is_active: is_active ?? true }
+      : payload;
+    const res = await api.put('/admin/referral/settings', body);
     return res.data.data;
   },
 };
+
+/**
+ * Human-readable summary of the active Refer & Win terms.
+ * In PERCENTAGE mode the payout depends on the friend's first deposit, so a
+ * flat rupee figure would misstate it.
+ */
+export function describeReferralReward(stats?: ReferralStats | null): {
+  headline: string;
+  perFriend: string;
+  condition: string;
+  isPercentage: boolean;
+} {
+  const isPercentage = (stats?.reward_type ?? 'PERCENTAGE') === 'PERCENTAGE';
+  const pct = stats?.reward_percentage ?? 10;
+  const minDeposit = stats?.min_deposit ?? 100;
+  const flat = stats?.reward_amount ?? 100;
+
+  return {
+    isPercentage,
+    headline: isPercentage ? `${pct}%` : `₹${flat}`,
+    perFriend: isPercentage
+      ? `${pct}% of their first deposit`
+      : `₹${flat} per friend`,
+    condition: `Minimum first deposit ₹${minDeposit}`,
+  };
+}

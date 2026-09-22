@@ -498,6 +498,11 @@ class RouletteEngine:
                     reference_type="roulette_refund",
                     reference_id=f"roulette_clear_{rnd.round_id}_{uuid4()}"
                 )
+                # Cleared bets are never played, so undo the play-through they
+                # recorded at debit time — otherwise bet-then-clear would farm
+                # the wager requirement for free.
+                from ...services.wager_service import reverse_wager
+                reverse_wager(db, user.id, refund_paise, "roulette")
                 db.commit()
 
             rnd.bets = retained_bets

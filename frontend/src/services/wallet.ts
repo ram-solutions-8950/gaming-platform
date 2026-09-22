@@ -1,6 +1,17 @@
 import api from './api';
 import type { Wallet, WalletTransaction } from '../types';
 
+/** Deposit play-through progress. Withdrawals stay locked until it is met. */
+export interface WagerStatus {
+  total_required_inr: number;
+  total_completed_inr: number;
+  pending_required_inr: number;
+  pending_completed_inr: number;
+  remaining_inr: number;
+  progress_percent: number;
+  is_fulfilled: boolean;
+}
+
 export const walletService = {
   /** Fetch the current user's own wallet. */
   async getWallet(): Promise<Wallet> {
@@ -11,6 +22,12 @@ export const walletService = {
   /** Fetch the current user's own transaction history. */
   async getTransactions(page = 1, page_size = 20) {
     const res = await api.get('/wallet/transactions', { params: { page, page_size } });
+    return res.data.data;
+  },
+
+  /** How much of the user's deposits still has to be played through. */
+  async getWagerStatus(): Promise<WagerStatus> {
+    const res = await api.get('/wallet/wager-status');
     return res.data.data;
   },
 

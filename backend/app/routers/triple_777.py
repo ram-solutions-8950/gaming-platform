@@ -50,6 +50,92 @@ SPIN_LOCK = threading.Lock()
 # In-memory history for quick retrieval per user (in addition to the permanent DB transaction ledger)
 USER_SPIN_HISTORY: Dict[uuid.UUID, List[dict]] = {}
 
+# --- Win-ratio control -------------------------------------------------------
+# House requirement: a player wins roughly 2 spins out of every 10.
+TARGET_WIN_RATIO = 0.20
+# Chance that an allowed win is a 3-of-a-kind rather than a 2-of-a-kind pair.
+THREE_MATCH_SHARE = 0.12
+
+# Lifetime spin/win counters per user, seeded from the ledger on first use so
+# the ratio survives a process restart.
+USER_SPIN_STATS: Dict[uuid.UUID, Dict[str, int]] = {}
+
+
+def _get_user_stats(db: Session, user_id: uuid.UUID) -> Dict[str, int]:
+    """Return {"spins", "wins"} for a user, seeding from the ledger if needed."""
+    stats = USER_SPIN_STATS.get(user_id)
+    if stats is not None:
+        return stats
+
+    spins = db.query(WalletTransaction).filter(
+        WalletTransaction.user_id == user_id,
+        WalletTransaction.reference_type == "TRIPLE_777_ENTRY",
+    ).count()
+    wins = db.query(WalletTransaction).filter(
+        WalletTransaction.user_id == user_id,
+        WalletTransaction.reference_type == "TRIPLE_777_WIN",
+    ).count()
+
+    stats = {"spins": int(spins), "wins": int(wins)}
+    USER_SPIN_STATS[user_id] = stats
+    return stats
+
+
+def _should_win(stats: Dict[str, int]) -> bool:
+    """Decide whether the upcoming spin is allowed to win.
+
+    The player is held to ``TARGET_WIN_RATIO`` (2 wins in 10) over their spin
+    history. ``deficit`` is how many wins they are behind that pace:
+
+    * a full win ahead of pace  -> the spin is forced to lose;
+    * within one win of pace    -> wins at roughly the base rate, so they land
+      at unpredictable positions instead of on a fixed cadence;
+    * a full win behind pace    -> probability climbs towards certainty so the
+      ratio is pulled back up.
+    """
+    spins_after = stats["spins"] + 1
+    deficit = spins_after * TARGET_WIN_RATIO - stats["wins"]
+
+    if deficit <= -1.0:
+        return False
+    if deficit >= 1.0:
+        win_prob = min(1.0, 0.35 + 0.5 * deficit)
+    else:
+        win_prob = max(0.0, TARGET_WIN_RATIO * (1.0 + deficit))
+
+    return random.random() < win_prob
+
+
+def _pick_symbol(pool: List[str]) -> str:
+    """Weighted pick from a subset of SYMBOLS."""
+    weights = [SYMBOL_WEIGHTS[SYMBOLS.index(sym)] for sym in pool]
+    return random.choices(pool, weights=weights, k=1)[0]
+
+
+def _build_reels(should_win: bool) -> List[str]:
+    """Generate a reel outcome that matches the requested win/loss decision."""
+    if not should_win:
+        # Three distinct symbols -> no 3-match and no pair, guaranteed loss.
+        first = _pick_symbol(list(SYMBOLS))
+        pool = [s for s in SYMBOLS if s != first]
+        second = _pick_symbol(pool)
+        pool = [s for s in pool if s != second]
+        third = _pick_symbol(pool)
+        reels = [first, second, third]
+        random.shuffle(reels)
+        return reels
+
+    if random.random() < THREE_MATCH_SHARE:
+        sym = _pick_symbol(list(SYMBOLS))
+        return [sym, sym, sym]
+
+    # Two of a kind: a matching pair plus one different symbol.
+    pair_sym = _pick_symbol(list(SYMBOLS))
+    odd_sym = _pick_symbol([s for s in SYMBOLS if s != pair_sym])
+    reels = [pair_sym, pair_sym, odd_sym]
+    random.shuffle(reels)
+    return reels
+
 
 class SpinIn(BaseModel):
     stake: float = Field(..., ge=10, le=100, description="Bet amount in INR (10, 20, 50, 100)")
@@ -69,6 +155,8 @@ def get_config():
             **PAYTABLE_3_MATCH,
             "two_match": PAYTABLE_2_MATCH_MULTIPLIER,
         },
+        "target_win_ratio": TARGET_WIN_RATIO,
+        "jackpot_display_only": True,
     })
 
 
@@ -136,12 +224,10 @@ def spin(
         jackpot_contribution = max(1, int(bet_paisa * 0.02))
         CURRENT_JACKPOT_PAISE += jackpot_contribution
 
-        # 2. Server-authoritative PRNG reel spin
-        reels = [
-            random.choices(SYMBOLS, weights=SYMBOL_WEIGHTS, k=1)[0],
-            random.choices(SYMBOLS, weights=SYMBOL_WEIGHTS, k=1)[0],
-            random.choices(SYMBOLS, weights=SYMBOL_WEIGHTS, k=1)[0],
-        ]
+        # 2. Server-authoritative reel spin, capped at the house win ratio
+        stats = _get_user_stats(db, user.id)
+        allow_win = _should_win(stats)
+        reels = _build_reels(allow_win)
 
         # 3. Evaluate outcome
         won = False
@@ -155,11 +241,10 @@ def spin(
             won = True
             win_symbol = reels[0]
             multiplier = float(PAYTABLE_3_MATCH.get(win_symbol, 10))
+            # Jackpot is display-only — never awarded to users
             if win_symbol == "7":
-                tier = "jackpot"
-                # Award jackpot bonus
-                jackpot_won_inr = round(CURRENT_JACKPOT_PAISE / 100, 2)
-                CURRENT_JACKPOT_PAISE = JACKPOT_BASE_PAISE
+                tier = "bigwin"
+                # jackpot pool continues to grow for display purposes only
             elif multiplier >= 25:
                 tier = "bigwin"
             else:
@@ -228,6 +313,11 @@ def spin(
             "balance_after": current_balance_inr,
             "created_at": uuid.uuid1().time,
         }
+
+        # Keep the win-ratio counters in step with what actually settled.
+        stats["spins"] += 1
+        if won:
+            stats["wins"] += 1
 
         if user.id not in USER_SPIN_HISTORY:
             USER_SPIN_HISTORY[user.id] = []

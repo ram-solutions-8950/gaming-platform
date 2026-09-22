@@ -18,6 +18,7 @@ import {
   type GameStatus,
 } from '../../services/chickenRoad';
 import { walletService } from '../../services/wallet';
+import { getApiErrorMessage } from '../../utils/apiError';
 import { RoadCrossingGame } from '../../components/chickenRoad/RoadCrossingGame';
 import { soundManager } from '../../services/soundManager';
 import { lockLandscape } from '../../utils/nativeOrientation';
@@ -201,7 +202,7 @@ export function ChickenRoadPage() {
         setBalance((prev) => Math.max(0, prev - betAmount));
       }
     } catch (err: any) {
-      const msg = err.response?.data?.detail || err.message || 'Failed to start game';
+      const msg = getApiErrorMessage(err, 'Failed to start game');
       setErrorMessage(msg);
     } finally {
       setIsActionLoading(false);
@@ -263,7 +264,15 @@ export function ChickenRoadPage() {
     if (!roundId) return;
 
     try {
-      const res = await chickenRoadService.finishGame(roundId);
+      // The server only pays out once every lane is registered, so let any
+      // in-flight cross-lane call land first and report the final lane.
+      if (crossLanePromiseRef.current) {
+        try {
+          await crossLanePromiseRef.current;
+        } catch {}
+      }
+      const finalLane = Math.max(currentLaneRef.current, multipliers.length);
+      const res = await chickenRoadService.finishGame(roundId, finalLane);
       soundManager.play('win_clap');
       setGameState('WON');
       setWinAmount(res.won_amount);
@@ -276,8 +285,9 @@ export function ChickenRoadPage() {
       crossLanePromiseRef.current = null;
     } catch (err) {
       console.error('Failed to complete finish:', err);
+      setErrorMessage(getApiErrorMessage(err, 'Failed to complete the round.'));
     }
-  }, [activeRoundId]);
+  }, [activeRoundId, multipliers]);
 
   // Cashout mid-game callback
   const handleCashout = async () => {
@@ -304,7 +314,7 @@ export function ChickenRoadPage() {
       setActiveRoundId(null);
       crossLanePromiseRef.current = null;
     } catch (err: any) {
-      const msg = err.response?.data?.detail || err.message || 'Failed to cash out';
+      const msg = getApiErrorMessage(err, 'Failed to cash out');
       setErrorMessage(msg);
     } finally {
       setIsActionLoading(false);
@@ -326,6 +336,10 @@ export function ChickenRoadPage() {
     setLossLane(null);
     setErrorMessage(null);
   };
+
+  // The stake is committed on start: cashing out is only possible once the
+  // chicken has actually crossed a lane (the server enforces this too).
+  const hasCrossedALane = Math.max(currentLane, currentLaneRef.current) > 0;
 
   return (
     <div className="cr-arcade-container">
@@ -690,22 +704,36 @@ export function ChickenRoadPage() {
           {gameState === 'ACTIVE' ? (
             <button
               type="button"
-              disabled={isActionLoading}
+              disabled={isActionLoading || !hasCrossedALane}
               onClick={handleCashout}
               className="cr-play-btn"
-              style={{
-                background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
-                borderColor: '#34D399',
-                boxShadow: '0 0 15px rgba(16, 185, 129, 0.4)',
-              }}
+              style={
+                hasCrossedALane
+                  ? {
+                      background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
+                      borderColor: '#34D399',
+                      boxShadow: '0 0 15px rgba(16, 185, 129, 0.4)',
+                    }
+                  : {
+                      background: 'linear-gradient(135deg, #374151 0%, #1F2937 100%)',
+                      borderColor: '#4B5563',
+                      boxShadow: 'none',
+                      opacity: 0.75,
+                    }
+              }
             >
               <span className="cr-btn-icon-slot">
-                <Coins size={16} className="text-yellow-300 animate-bounce" />
+                <Coins
+                  size={16}
+                  className={hasCrossedALane ? 'text-yellow-300 animate-bounce' : 'text-gray-400'}
+                />
               </span>
               <span className="cr-btn-label">
                 {isActionLoading
                   ? 'CASHING OUT...'
-                  : `CASH OUT ₹${(betAmount * (Math.max(currentLane, currentLaneRef.current) > 0 ? currentMultiplier : 1.0)).toFixed(2)} (${(Math.max(currentLane, currentLaneRef.current) > 0 ? currentMultiplier : 1.0).toFixed(2)}x)`}
+                  : !hasCrossedALane
+                  ? 'CROSS A LANE TO CASH OUT'
+                  : `CASH OUT ₹${(betAmount * currentMultiplier).toFixed(2)} (${currentMultiplier.toFixed(2)}x)`}
               </span>
             </button>
           ) : (

@@ -58,6 +58,7 @@ class CrossLaneIn(BaseModel):
 
 class FinishIn(BaseModel):
     round_id: str
+    lane_index: Optional[int] = Field(None, ge=1, le=20, description="Optional crossed lane index to settle a racing cross-lane call")
 
 
 class CollisionIn(BaseModel):
@@ -237,6 +238,19 @@ def finish_game(
                 detail="Active game round not found.",
             )
 
+        if data.lane_index is not None and 1 <= data.lane_index <= rnd.total_lanes:
+            rnd.current_lane = max(rnd.current_lane, data.lane_index)
+
+        # The full payout is only earned by actually crossing every lane —
+        # without this a client could start a round and finish it immediately.
+        if rnd.current_lane < rnd.total_lanes:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    f"Cannot finish: only {rnd.current_lane} of {rnd.total_lanes} lanes crossed."
+                ),
+            )
+
         final_multiplier = rnd.multipliers[-1]
         win_paisa = int(round(rnd.bet_paisa * final_multiplier))
         rnd.status = "WON"
@@ -326,10 +340,13 @@ def cashout_game(
             rnd.current_lane = max(rnd.current_lane, data.lane_index)
 
         if rnd.current_lane == 0:
-            # At start sidewalk, refund/cashout 1.00x
-            cashout_mult = 1.0
-        else:
-            cashout_mult = rnd.multipliers[rnd.current_lane - 1]
+            # Cannot cash out before crossing any lane — bet is committed
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="You must cross at least one lane before cashing out. Your bet is committed for this round.",
+            )
+
+        cashout_mult = rnd.multipliers[rnd.current_lane - 1]
 
         win_paisa = int(round(rnd.bet_paisa * cashout_mult))
         rnd.status = "CASHED_OUT"

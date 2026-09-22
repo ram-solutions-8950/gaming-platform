@@ -114,8 +114,17 @@ def play_instant_hand(
         elif active:
             hand._finish_hand(active[0], reason="Time cap")
 
-    user_won = (hand.winner_seat == 0)
-    payout = hand.pot if user_won else 0
+    winners = getattr(hand, "winner_seats", None)
+    if not winners:
+        winners = [hand.winner_seat] if hand.winner_seat is not None else []
+    user_won = 0 in winners
+    if user_won:
+        share = hand.pot // len(winners)
+        if winners[0] == 0:
+            share += hand.pot - share * len(winners)
+        payout = share
+    else:
+        payout = 0
 
     if user_won and req.mode == "real":
         user_bet = hand.seats[0].total_bet

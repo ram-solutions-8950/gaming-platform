@@ -43,10 +43,21 @@ class SettlementCalculation:
     total_return: int            # Total amount to credit to wallet (original_bet + net_profit)
 
 
-def get_admin_winning_fee_percent(db: Session) -> Decimal:
-    """Read the authoritative winning fee percent from FeeConfiguration singleton in the DB."""
+def get_admin_winning_fee_percent(db: Session, game_slug: str | None = None) -> Decimal:
+    """Read the authoritative winning fee percent from FeeConfiguration singleton in the DB.
+    Checks per-game overrides first, then falls back to global winning_fee_percent."""
     cfg = db.query(FeeConfiguration).first()
-    if not cfg or cfg.winning_fee_percent is None:
+    if not cfg:
+        return Decimal("0.00")
+    # Check per-game commission override
+    if game_slug and cfg.game_commission_overrides:
+        overrides = cfg.game_commission_overrides
+        if isinstance(overrides, dict):
+            target = game_slug.strip().lower().replace("_", "-")
+            for k, v in overrides.items():
+                if str(k).strip().lower().replace("_", "-") == target:
+                    return Decimal(str(v))
+    if cfg.winning_fee_percent is None:
         return Decimal("0.00")
     return Decimal(str(cfg.winning_fee_percent))
 
@@ -57,6 +68,7 @@ def calculate_winning_settlement(
     gross_profit: int,
     is_refund: bool = False,
     fee_percent_override: Optional[Decimal] = None,
+    game_slug: Optional[str] = None,
 ) -> SettlementCalculation:
     """Calculate winning fee, net profit, and total return.
 
@@ -66,6 +78,7 @@ def calculate_winning_settlement(
         gross_profit: The profit won above original_bet in paise.
         is_refund: True if this is a refund / push returning the original stake with 0 profit.
         fee_percent_override: Optional override (e.g. for testing or explicit game config).
+        game_slug: Optional game identifier to look up per-game commission overrides.
 
     Returns:
         SettlementCalculation dataclass.
@@ -81,7 +94,7 @@ def calculate_winning_settlement(
             total_return=original_bet if is_refund else 0,
         )
 
-    pct = fee_percent_override if fee_percent_override is not None else get_admin_winning_fee_percent(db)
+    pct = fee_percent_override if fee_percent_override is not None else get_admin_winning_fee_percent(db, game_slug=game_slug)
 
     if pct <= Decimal("0"):
         fee = 0
@@ -128,6 +141,7 @@ def settle_winning_bet(
         gross_profit=gross_profit,
         is_refund=is_refund,
         fee_percent_override=fee_percent_override,
+        game_slug=game_slug,
     )
 
     tx = None
@@ -159,5 +173,14 @@ def settle_winning_bet(
                 )
             else:
                 raise
+
+    # A refund/push returns the stake untouched, so it is not real play-through.
+    # The stake was counted at GAME_ENTRY debit time, so undo it here.
+    if is_refund and original_bet > 0:
+        try:
+            from .wager_service import reverse_wager
+            reverse_wager(db, user_id, original_bet, game_slug or "unknown")
+        except Exception as wager_exc:
+            logger.warning("Failed to reverse wager: %s", wager_exc)
 
     return calc, tx

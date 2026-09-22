@@ -6,6 +6,7 @@ import { authService } from '../../services/auth';
 import { useAuthStore } from '../../store/authStore';
 
 import { useRewardStore } from '../../store/rewardStore';
+import { APP_VERSION } from '../../version';
 
 interface Props {
   user: User | null;
@@ -63,6 +64,7 @@ export const LobbyHeader: React.FC<Props> = ({ user, wallet }) => {
           <span className="text-[11px] font-black text-white truncate max-w-[85px] tracking-wide leading-none">{user?.name || 'Player'}</span>
           <div className="flex items-center gap-1 mt-0.5">
             <span className="text-[9px] text-purple-300 font-semibold leading-none">ID: {user?.id?.slice(0, 8) || '---'}</span>
+            <span className="text-[8px] bg-purple-900/60 text-amber-300 font-mono font-bold px-1 py-0.2 rounded border border-purple-500/30 leading-none">v{APP_VERSION}</span>
             <button
               type="button"
               onClick={handleLogout}

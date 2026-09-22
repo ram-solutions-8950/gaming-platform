@@ -9,6 +9,7 @@ import { isNativePlatform } from '../../utils/platform';
 import { soundManager } from '../../services/soundManager';
 import splashBg from '../../assets/corona888-logo.webp';
 import '../../styles/login-page.css';
+import { getApiErrorMessage } from '../../utils/apiError';
 
 interface FormData {
   email: string;
@@ -65,7 +66,7 @@ export function LoginPage() {
         setError(res.error?.message || 'Login failed');
       }
     } catch (e: any) {
-      const backendMsg = e.response?.data?.error?.message || e.response?.data?.detail || e.message;
+      const backendMsg = getApiErrorMessage(e, 'Login failed');
       setError(backendMsg || 'Login failed');
     } finally {
       setLoading(false);

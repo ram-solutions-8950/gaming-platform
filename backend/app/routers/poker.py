@@ -171,6 +171,9 @@ def join_poker_table(
                 reference_type="poker_refund",
                 reference_id=f"poker_refund_{uuid.uuid4()}"
             )
+            # The buy-in was never played, so it must not count as play-through.
+            from ..services.wager_service import reverse_wager
+            reverse_wager(db, current_user.id, req.buy_in_amount, "poker")
             db.commit()
         raise HTTPException(status_code=400, detail=msg)
 

@@ -169,8 +169,9 @@ def test_unqualified_referral_receives_no_reward(db):
 
 
 def test_qualification_rewards_referrer(db):
-    # Set reward setting to ₹150
+    # Set reward setting to ₹150 (FLAT)
     settings = get_referral_settings(db)
+    settings.reward_type = "FLAT"
     settings.reward_amount = 15000
     db.commit()
 
@@ -217,6 +218,7 @@ def test_qualification_rewards_referrer(db):
 def test_changing_reward_configuration(db):
     # Admin sets ₹50
     settings = get_referral_settings(db)
+    settings.reward_type = "FLAT"
     settings.reward_amount = 5000
     db.commit()
 
@@ -238,6 +240,7 @@ def test_changing_reward_configuration(db):
     assert get_balance(db, referrer.id).balance == 5000
 
     # Admin changes to ₹250
+    settings.reward_type = "FLAT"
     settings.reward_amount = 25000
     db.commit()
 
@@ -264,6 +267,7 @@ def test_changing_reward_configuration(db):
 
 def test_idempotent_rewards(db):
     settings = get_referral_settings(db)
+    settings.reward_type = "FLAT"
     settings.reward_amount = 10000
     db.commit()
 

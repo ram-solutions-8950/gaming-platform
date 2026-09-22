@@ -12,15 +12,64 @@ from ..utils.logging import get_logger
 logger = get_logger("referral")
 
 
+# Refer & Win defaults: 10% of the referred user's first deposit,
+# provided that deposit is at least Rs 100.
+DEFAULT_REWARD_PAISA = 10000        # Rs 100 flat (used only in FLAT mode)
+DEFAULT_REWARD_TYPE = "PERCENTAGE"
+DEFAULT_REWARD_PERCENTAGE = 10.00
+DEFAULT_MIN_DEPOSIT_PAISA = 10000   # Rs 100
+
+
 def get_referral_settings(db: Session) -> ReferralSettings:
     """Gets the singleton referral settings, creating a default one if it doesn't exist."""
     settings = db.query(ReferralSettings).first()
     if not settings:
-        settings = ReferralSettings(reward_amount=10000, is_active=True) # default ₹100
+        settings = ReferralSettings(
+            reward_amount=DEFAULT_REWARD_PAISA,
+            is_active=True,
+            reward_type=DEFAULT_REWARD_TYPE,
+            reward_percentage=DEFAULT_REWARD_PERCENTAGE,
+            min_deposit_amount=DEFAULT_MIN_DEPOSIT_PAISA,
+        )
         db.add(settings)
         db.commit()
         db.refresh(settings)
+        return settings
+
+    # Backfill rows created before the percentage/min-deposit fields existed.
+    changed = False
+    if not settings.reward_type:
+        settings.reward_type = DEFAULT_REWARD_TYPE
+        changed = True
+    if settings.reward_percentage is None:
+        settings.reward_percentage = DEFAULT_REWARD_PERCENTAGE
+        changed = True
+    if settings.min_deposit_amount is None:
+        settings.min_deposit_amount = DEFAULT_MIN_DEPOSIT_PAISA
+        changed = True
+    if changed:
+        db.commit()
+        db.refresh(settings)
     return settings
+
+
+def serialize_referral_settings(settings: ReferralSettings) -> dict:
+    """Shared JSON shape for the admin and player-facing settings payloads."""
+    return {
+        "reward_amount": float(settings.reward_amount or 0) / 100.0,
+        "is_active": bool(settings.is_active),
+        "reward_type": settings.reward_type or DEFAULT_REWARD_TYPE,
+        "reward_percentage": float(
+            settings.reward_percentage
+            if settings.reward_percentage is not None
+            else DEFAULT_REWARD_PERCENTAGE
+        ),
+        "min_deposit": float(
+            settings.min_deposit_amount
+            if settings.min_deposit_amount is not None
+            else DEFAULT_MIN_DEPOSIT_PAISA
+        ) / 100.0,
+    }
 
 
 def check_and_qualify_referral(db: Session, referred_user_id: UUID):
@@ -47,18 +96,37 @@ def check_and_qualify_referral(db: Session, referred_user_id: UUID):
 
     # The current deposit is already in SUCCESS status, so count must be 1 to qualify
     if successful_deposits == 1:
+        # Check minimum deposit amount
+        first_deposit = db.query(Deposit).filter(
+            Deposit.user_id == referred_user_id,
+            Deposit.status == DepositStatus.SUCCESS
+        ).order_by(Deposit.created_at.asc()).first()
+
+        settings = get_referral_settings(db)
+        min_deposit = settings.min_deposit_amount or 0
+        if not first_deposit:
+            logger.warning(f"Referral qualification skipped: no successful deposit for {referred_user_id}")
+            return
+        if first_deposit.amount < min_deposit:
+            logger.info(
+                f"Referral not qualified: deposit {first_deposit.amount} < min {min_deposit}"
+            )
+            return
+
         logger.info(f"Referral qualified for referred={referred_user_id} referrer={referral.referrer_user_id}")
         referral.status = ReferralStatus.QUALIFIED
         referral.qualified_at = datetime.now(timezone.utc)
         db.flush()
 
         # 3. Distribute reward
-        distribute_referral_reward(db, referral)
+        deposit_amount = first_deposit.amount if first_deposit else 0
+        distribute_referral_reward(db, referral, deposit_amount=deposit_amount)
 
 
-def distribute_referral_reward(db: Session, referral: Referral):
+def distribute_referral_reward(db: Session, referral: Referral, deposit_amount: int = 0):
     """
     Distributes the configured reward amount to the referrer.
+    Supports FLAT (fixed amount) and PERCENTAGE (% of first deposit) modes.
     """
     if referral.status != ReferralStatus.QUALIFIED:
         return
@@ -68,7 +136,24 @@ def distribute_referral_reward(db: Session, referral: Referral):
         logger.info("Referral reward not paid: referral system is currently inactive")
         return
 
-    reward_amount = settings.reward_amount
+    # Calculate reward based on reward_type
+    reward_type = (settings.reward_type or DEFAULT_REWARD_TYPE).upper()
+    if reward_type == "PERCENTAGE":
+        if deposit_amount <= 0:
+            logger.warning(
+                f"Percentage referral reward skipped: no deposit amount for referral={referral.id}"
+            )
+            return
+        percentage = float(
+            settings.reward_percentage
+            if settings.reward_percentage is not None
+            else DEFAULT_REWARD_PERCENTAGE
+        )
+        reward_amount = int(deposit_amount * percentage / 100)
+        logger.info(f"Percentage reward: {percentage}% of {deposit_amount} = {reward_amount}")
+    else:
+        reward_amount = settings.reward_amount or 0
+
     if reward_amount <= 0:
         logger.warning(f"Referral reward amount must be positive. Got: {reward_amount}")
         return

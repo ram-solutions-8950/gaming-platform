@@ -84,8 +84,8 @@ export const chickenRoadService = {
     return res.data.data;
   },
 
-  async finishGame(round_id: string): Promise<FinishResponse> {
-    const res = await api.post('/games/chicken-road/finish', { round_id });
+  async finishGame(round_id: string, lane_index?: number): Promise<FinishResponse> {
+    const res = await api.post('/games/chicken-road/finish', { round_id, lane_index });
     return res.data.data;
   },
 

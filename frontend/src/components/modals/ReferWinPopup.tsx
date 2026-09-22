@@ -1,5 +1,10 @@
 import { useEffect, useState } from 'react';
-import { referralService, type ReferralStats, type ReferralHistoryItem } from '../../services/referral';
+import {
+  referralService,
+  describeReferralReward,
+  type ReferralStats,
+  type ReferralHistoryItem,
+} from '../../services/referral';
 
 interface ReferWinPopupProps {
   onClose: () => void;
@@ -45,7 +50,13 @@ export function ReferWinPopup({ onClose }: ReferWinPopupProps) {
     `Join me on Corona 888 and get bonus rewards! Use my referral code ${stats?.referral_code || ''} to play and win: ${referralLink}`
   );
 
-  const rewardPerFriend = stats?.reward_amount ?? 100;
+  const terms = describeReferralReward(stats);
+  // Percentage mode has no fixed rupee value, so the tier ladder shows
+  // example payouts for the minimum qualifying deposit instead.
+  const exampleDeposit = stats?.min_deposit ?? 100;
+  const rewardPerFriend = terms.isPercentage
+    ? Math.round((exampleDeposit * (stats?.reward_percentage ?? 10)) / 100)
+    : stats?.reward_amount ?? 100;
 
   return (
     <div
@@ -152,7 +163,10 @@ export function ReferWinPopup({ onClose }: ReferWinPopupProps) {
 
             {/* Description Terms List */}
             <ul className="refer-desc-list">
-              <li>Earn ₹{rewardPerFriend} for every friend who registers with your code and makes their first deposit!</li>
+              <li>
+                Earn {terms.perFriend} for every friend who registers with your code and makes
+                their first deposit. {terms.condition}.
+              </li>
               <li>Rewards are instantly credited to your wallet ledger.</li>
               <li>Share your referral link on WhatsApp, Telegram, or Facebook to invite friends.</li>
             </ul>
@@ -197,7 +211,7 @@ export function ReferWinPopup({ onClose }: ReferWinPopupProps) {
             {history.length === 0 ? (
               <div className="text-center py-8 text-gray-400 text-xs">
                 <p>No referrals yet.</p>
-                <p className="text-gray-500 mt-1">Share your referral link to start earning ₹{rewardPerFriend} per friend!</p>
+                <p className="text-gray-500 mt-1">Share your referral link to start earning {terms.perFriend}!</p>
               </div>
             ) : (
               <div className="space-y-2">

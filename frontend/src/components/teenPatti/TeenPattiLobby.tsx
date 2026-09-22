@@ -5,6 +5,7 @@ import { GameRulesModal } from '../common/GameRulesModal';
 import { TEEN_PATTI_RULES_DATA } from '../common/gameRulesData';
 import { HelpCircle, Crown } from 'lucide-react';
 import { walletService } from '../../services/wallet';
+import { getApiErrorMessage } from '../../utils/apiError';
 
 interface TeenPattiLobbyProps {
   onJoinTable: (tableId: string) => void;
@@ -61,7 +62,7 @@ export const TeenPattiLobby: React.FC<TeenPattiLobbyProps> = ({ onJoinTable }) =
     } catch (e: any) {
       let errorMsg = 'Could not join or create table.';
       const status = e.response?.status;
-      const detail = e.response?.data?.detail;
+      const detail = getApiErrorMessage(e, '');
       const message = e.response?.data?.message;
 
       if (status === 401) {

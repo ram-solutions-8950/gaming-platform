@@ -281,6 +281,13 @@ def handle_webhook(
             },
         )
 
+        # Mirror the checkout path: a credited deposit must be played through
+        # before it can be withdrawn.
+        from ..services.wager_service import create_wager_requirement
+        create_wager_requirement(
+            db, deposit.user_id, int(deposit.amount), deposit_id=deposit.id
+        )
+
     except ValueError as exc:
         # Checkout verification may have already created
         # the transaction between webhook delivery and now.

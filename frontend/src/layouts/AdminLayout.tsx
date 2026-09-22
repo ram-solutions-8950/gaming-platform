@@ -4,6 +4,7 @@ import { useAuthStore } from '../store/authStore';
 import { authService } from '../services/auth';
 import { CasinoLogo } from '../components/common/CasinoLogo';
 import { soundManager } from '../services/soundManager';
+import { APP_VERSION } from '../version';
 
 const adminNav = [
   { to: '/admin/dashboard', label: 'Dashboard', icon: '📊' },
@@ -69,6 +70,9 @@ export function AdminLayout() {
           >
             ↩ Sign Out
           </button>
+          <div className="mt-2 text-center">
+            <span className="text-[10px] text-gray-500 font-mono tracking-wider">v{APP_VERSION}</span>
+          </div>
         </div>
       </aside>
 

@@ -5,7 +5,8 @@ import { Card } from '../../components/common/Card';
 import { Badge } from '../../components/common/Badge';
 import { Loader } from '../../components/common/Loader';
 import api from '../../services/api';
-import { walletService } from '../../services/wallet';
+import { walletService, type WagerStatus } from '../../services/wallet';
+import { getApiErrorMessage } from '../../utils/apiError';
 import type { Wallet, Withdrawal, WithdrawalStatus } from '../../types';
 
 interface FeeConfig {
@@ -44,6 +45,7 @@ export function WithdrawalPage() {
   const [wallet, setWallet] = useState<Wallet | null>(null);
   const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([]);
   const [feeConfig, setFeeConfig] = useState<FeeConfig | null>(null);
+  const [wagerStatus, setWagerStatus] = useState<WagerStatus | null>(null);
   const [loading, setLoading] = useState(true);
 
   // Form State
@@ -60,14 +62,16 @@ export function WithdrawalPage() {
 
   const fetchData = async () => {
     try {
-      const [w, res, feeRes] = await Promise.all([
+      const [w, res, feeRes, wager] = await Promise.all([
         walletService.getWallet(),
         api.get('/withdrawals?page_size=20'),
         api.get('/fees'),
+        walletService.getWagerStatus().catch(() => null),
       ]);
       setWallet(w);
       setWithdrawals(res.data.data?.items ?? []);
       setFeeConfig(feeRes.data.data);
+      setWagerStatus(wager);
     } catch (e: any) {
       console.error('Failed to load withdrawal data', e);
     } finally {
@@ -85,6 +89,13 @@ export function WithdrawalPage() {
     e.preventDefault();
     setFormError('');
     setSuccessMsg('');
+
+    if (wagerStatus && !wagerStatus.is_fulfilled) {
+      setFormError(
+        `You still need to play through ₹${wagerStatus.remaining_inr.toFixed(2)} of your deposits before withdrawing.`,
+      );
+      return;
+    }
 
     const numAmount = parseFloat(amount);
     if (isNaN(numAmount) || numAmount <= 0) {
@@ -133,7 +144,7 @@ export function WithdrawalPage() {
       setIfscCode('');
       await fetchData();
     } catch (e: any) {
-      setFormError(e.response?.data?.error?.message || 'Failed to submit withdrawal request.');
+      setFormError(getApiErrorMessage(e, 'Failed to submit withdrawal request.'));
     } finally {
       setSubmitting(false);
     }
@@ -160,6 +171,38 @@ export function WithdrawalPage() {
           <p className="withdrawal-balance-val text-base font-extrabold text-gold-400">₹{wallet?.balance_inr ?? '0.00'}</p>
         </div>
       </div>
+
+      {wagerStatus && !wagerStatus.is_fulfilled && (
+        <div className="mb-4 rounded-xl border border-amber-500/30 bg-amber-500/10 p-4">
+          <div className="flex items-start gap-3">
+            <span className="text-xl leading-none">🔒</span>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-bold text-amber-300">Play-through required</p>
+              <p className="mt-1 text-xs text-amber-200/80">
+                Withdrawals unlock once you have played through your deposits. Every bet you
+                place counts, whether you win or lose.
+              </p>
+
+              <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-dark-800">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-amber-500 to-gold-400 transition-all duration-500"
+                  style={{ width: `${Math.min(100, Math.max(0, wagerStatus.progress_percent))}%` }}
+                />
+              </div>
+
+              <div className="mt-2 flex flex-wrap justify-between gap-x-4 gap-y-1 text-[11px] font-mono">
+                <span className="text-gray-400">
+                  Wagered ₹{wagerStatus.total_completed_inr.toFixed(2)} of ₹
+                  {wagerStatus.total_required_inr.toFixed(2)}
+                </span>
+                <span className="font-bold text-amber-300">
+                  ₹{wagerStatus.remaining_inr.toFixed(2)} remaining
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <Card title="Withdrawal Details" className="withdrawal-card">
         <form onSubmit={handleWithdrawalSubmit} className="withdrawal-form space-y-6">
@@ -285,10 +328,14 @@ export function WithdrawalPage() {
 
           <button
             type="submit"
-            disabled={submitting || !amount}
+            disabled={submitting || !amount || (!!wagerStatus && !wagerStatus.is_fulfilled)}
             className="withdrawal-submit-btn w-full bg-brand-600 hover:bg-brand-500 disabled:bg-dark-700 disabled:text-gray-500 text-white font-bold py-3 px-4 rounded-lg transition-colors cursor-pointer"
           >
-            {submitting ? 'Submitting Request...' : 'Submit Withdrawal Request'}
+            {submitting
+              ? 'Submitting Request...'
+              : wagerStatus && !wagerStatus.is_fulfilled
+              ? `Play through ₹${wagerStatus.remaining_inr.toFixed(2)} to unlock`
+              : 'Submit Withdrawal Request'}
           </button>
         </form>
       </Card>

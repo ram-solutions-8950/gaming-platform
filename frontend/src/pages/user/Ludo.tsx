@@ -18,6 +18,7 @@ import { getWebSocketUrl } from '../../utils/ws';
 import { lockLandscape } from '../../utils/nativeOrientation';
 import { ArrowLeft, HelpCircle, MessageSquare } from 'lucide-react';
 import '../../styles/ludo.css';
+import { getApiErrorMessage } from '../../utils/apiError';
 
 interface FloatingReaction {
   id: string;
@@ -613,7 +614,7 @@ export const Ludo: React.FC = () => {
         setSearchElapsedSeconds(0);
       }
     } catch (e: any) {
-      alert(e.response?.data?.detail || 'Failed to start matchmaking');
+      alert(getApiErrorMessage(e, 'Failed to start matchmaking'));
       if (mmWsRef.current) {
         mmWsRef.current.close();
         mmWsRef.current = null;

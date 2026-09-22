@@ -16,6 +16,7 @@ import { JackpotModal } from '../components/modals/JackpotModal';
 import { VipBonusModal } from '../components/modals/VipBonusModal';
 import { ServiceModal } from '../components/modals/ServiceModal';
 import { ReferWinPopup } from '../components/modals/ReferWinPopup';
+import { APP_VERSION } from '../version';
 
 const navItems = [
   { to: '/dashboard', label: 'Dashboard', icon: '📊' },
@@ -156,6 +157,9 @@ export function UserLayout() {
           <button onClick={handleLogout} className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-bold text-danger bg-danger/10 hover:bg-danger/20 rounded-xl transition-all duration-200">
             Sign Out
           </button>
+          <div className="mt-2 text-center">
+            <span className="text-[10px] text-gray-500 font-mono tracking-wider">v{APP_VERSION}</span>
+          </div>
         </div>
       </aside>
 

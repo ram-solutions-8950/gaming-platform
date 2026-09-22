@@ -5,7 +5,13 @@ import { Card } from '../../components/common/Card';
 import { Input } from '../../components/common/Input';
 import { Button } from '../../components/common/Button';
 import { Badge } from '../../components/common/Badge';
-import { referralService, type ReferralStats, type ReferralHistoryItem } from '../../services/referral';
+import {
+  referralService,
+  describeReferralReward,
+  type ReferralStats,
+  type ReferralHistoryItem,
+} from '../../services/referral';
+import { APP_VERSION, BUILD_DATE } from '../../version';
 import api from '../../services/api';
 
 const AVATAR_PRESETS = ['👑', '🐉', '🐅', '🦁', '💎', '🃏', '🎲', '🎯'];
@@ -112,6 +118,7 @@ export function ProfilePage() {
     }
   };
 
+  const referralTerms = describeReferralReward(refStats);
   const referralLink = refStats?.referral_code
     ? `${window.location.origin}/signup?ref=${refStats.referral_code}`
     : `${window.location.origin}/signup`;
@@ -244,10 +251,17 @@ export function ProfilePage() {
       {/* Refer & Earn Section */}
       <Card title="🎁 Refer & Earn Rewards" className="refer-earn-card">
         <div className="space-y-4">
+          <p className="text-xs text-gray-400">
+            Invite a friend and earn {referralTerms.perFriend} when they make their first
+            deposit. {referralTerms.condition}.
+          </p>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="bg-dark-800/80 border border-dark-700 p-3 rounded-xl text-center">
               <span className="text-gray-400 text-xs font-medium">Earn Per Friend</span>
-              <div className="text-xl font-extrabold text-gold-400 mt-1">₹{refStats?.reward_amount ?? 100}</div>
+              <div className="text-xl font-extrabold text-gold-400 mt-1">{referralTerms.headline}</div>
+              <div className="text-[10px] text-gray-500 mt-0.5">
+                {referralTerms.isPercentage ? 'of their first deposit' : 'per friend'}
+              </div>
             </div>
             <div className="bg-dark-800/80 border border-dark-700 p-3 rounded-xl text-center">
               <span className="text-gray-400 text-xs font-medium">Successful Referrals</span>
@@ -303,6 +317,17 @@ export function ProfilePage() {
           )}
         </div>
       </Card>
+
+      {/* App Version Info */}
+      <div className="flex items-center justify-between text-xs text-gray-500 py-3 px-2 border-t border-dark-800">
+        <span>Corona888 Gaming Platform</span>
+        <div className="flex items-center gap-2">
+          <span className="text-[11px] text-gray-400">Build: {BUILD_DATE}</span>
+          <span className="font-mono font-bold bg-dark-800/90 border border-dark-700 px-2 py-0.5 rounded text-amber-400 text-xs">
+            v{APP_VERSION}
+          </span>
+        </div>
+      </div>
     </div>
   );
 }
