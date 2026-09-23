@@ -204,10 +204,6 @@ class LudoEngine:
         if match.last_dice_roll is not None:
             raise ValueError("Dice already rolled for this turn. Must make a move.")
 
-        # Authoritative Server RNG (1-6)
-        roll = secrets.randbelow(6) + 1
-        match.last_dice_roll = roll
-
         match_key = str(match.id)
         current_sixes = _CONSECUTIVE_SIXES.get(match_key, 0)
 

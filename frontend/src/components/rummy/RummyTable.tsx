@@ -532,13 +532,11 @@ export default function GameTable({
     });
     setFinishCard((prev) => (prev && hand.includes(prev) ? prev : null));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hand]);
   }, [hand, wildRank]);
 
   const me = state?.players.find((p) => (user?.id && p.id === user.id) || p.name === myUsername) ?? null;
   const myTurn = !!(state && me && state.turn === me.id);
   const phase = state?.phase ?? "connecting";
-  const wildRank = state?.wild_rank ?? null;
   const opponents = state?.players.filter((p) => p.id !== me?.id) ?? [];
 
   // Auto-start: once enough players are seated, the deal begins on its own — no
