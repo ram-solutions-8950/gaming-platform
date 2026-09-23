@@ -67,6 +67,28 @@ export const TeenPattiTable: React.FC<TeenPattiTableProps> = ({
     handleLeave();
   }, [handleLeave]);
 
+  // Ensure table departure on component unmount
+  useEffect(() => {
+    return () => {
+      try {
+        leaveTable();
+      } catch (e) {}
+    };
+  }, [leaveTable]);
+
+  // Intercept Android hardware back button to show exit confirmation
+  useEffect(() => {
+    (window as any).__gameSpecificBackPressed = () => {
+      setShowLobbyConfirm(true);
+      return true;
+    };
+    return () => {
+      if ((window as any).__gameSpecificBackPressed) {
+        (window as any).__gameSpecificBackPressed = null;
+      }
+    };
+  }, []);
+
   // Audio effects & phase change reactions
   const lastPhaseRef = useRef<string>('');
   const lastBetRef = useRef<number>(0);

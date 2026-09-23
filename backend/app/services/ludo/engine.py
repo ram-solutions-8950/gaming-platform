@@ -58,32 +58,24 @@ def _compute_ludo_roll(
 
     # 1. Player has all 4 tokens in yard (zero tokens out)
     if yard_count == 4:
-        if other_has_active:
-            # Opponent is running on track while this player is stuck in yard
-            if turns_without_6 >= 1:
-                roll_is_six = True
-            else:
-                roll_is_six = secrets.randbelow(100) < 65
+        # Prompt entry: player never waits more than 1 failed turn to bring out token 1
+        if turns_without_6 >= 1:
+            roll_is_six = True
         else:
-            # Game start / neither has active token
-            if turns_without_6 >= 2:
-                roll_is_six = True
-            elif turns_without_6 == 1:
-                roll_is_six = secrets.randbelow(100) < 60
-            else:
-                roll_is_six = secrets.randbelow(100) < 35
+            roll_is_six = secrets.randbelow(100) < 65
     # 2. Player has 1, 2, or 3 tokens in yard (releasing subsequent tokens)
     elif yard_count > 0:
-        if turns_without_6 >= 4:
+        # Never endure 6-droughts when releasing subsequent tokens: guaranteed 6 on turn 2
+        if turns_without_6 >= 2:
             roll_is_six = True
-        elif turns_without_6 >= 2:
-            roll_is_six = secrets.randbelow(100) < 45
+        elif turns_without_6 == 1:
+            roll_is_six = secrets.randbelow(100) < 65
         else:
-            roll_is_six = secrets.randbelow(100) < 25
+            roll_is_six = secrets.randbelow(100) < 45
     # 3. All tokens are out on the board
     else:
-        if turns_without_6 >= 6:
-            roll_is_six = secrets.randbelow(100) < 40
+        if turns_without_6 >= 4:
+            roll_is_six = True
         else:
             roll_is_six = (secrets.randbelow(6) + 1) == 6
 

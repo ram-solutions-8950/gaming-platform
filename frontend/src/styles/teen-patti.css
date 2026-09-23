@@ -245,6 +245,23 @@
 .tp-card-red { color: #dc2626; }
 .tp-card-black { color: #0f172a; }
 
+.tp-card-corner {
+  font-size: 0.58rem;
+  line-height: 1;
+  font-weight: 800;
+}
+.tp-card-corner-tl {
+  align-self: flex-start;
+}
+.tp-card-corner-br {
+  align-self: flex-end;
+}
+.tp-card-center {
+  font-size: 0.88rem;
+  line-height: 1;
+  text-align: center;
+}
+
 /* Bottom Action Bar */
 .tp-action-dock {
   width: 100%;
@@ -467,11 +484,23 @@
   .tp-seat-bottom-right { bottom: 6px; right: 12%; }
 
   .tp-card {
-    width: 14px;
-    height: 20px;
-    border-radius: 2px;
-    padding: 1px;
-    font-size: 0.38rem;
+    width: 26px;
+    height: 38px;
+    border-radius: 4px;
+    padding: 2px;
+    font-size: 0.5rem;
+  }
+
+  .tp-card .tp-card-corner {
+    font-size: 0.44rem;
+  }
+
+  .tp-card .tp-card-center {
+    font-size: 0.68rem;
+  }
+
+  .tp-card-back {
+    font-size: 0.75rem;
   }
 
   .tp-card-fan { margin-top: 0px; }
@@ -528,8 +557,23 @@
   .tp-seat-right  { right: 10px; top: 50%; }
 
   .tp-card {
-    width: 17px;
-    height: 26px;
+    width: 26px;
+    height: 38px;
+    border-radius: 4px;
+    padding: 2px;
+    font-size: 0.5rem;
+  }
+
+  .tp-card .tp-card-corner {
+    font-size: 0.44rem;
+  }
+
+  .tp-card .tp-card-center {
+    font-size: 0.68rem;
+  }
+
+  .tp-card-back {
+    font-size: 0.75rem;
   }
 
   .tp-action-dock {

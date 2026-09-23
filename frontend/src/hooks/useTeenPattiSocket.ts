@@ -128,6 +128,10 @@ export function useTeenPattiSocket({ tableId, onEvent, onError }: UseTeenPattiSo
       if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
       if (wsRef.current) {
         try {
+          if (wsRef.current.readyState === WebSocket.OPEN) {
+            const action_id = `tp_leave_${Date.now()}`;
+            wsRef.current.send(JSON.stringify({ action: 'leave', action_id }));
+          }
           wsRef.current.close();
         } catch (e) {}
         wsRef.current = null;

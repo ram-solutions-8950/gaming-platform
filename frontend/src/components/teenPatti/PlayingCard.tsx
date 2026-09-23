@@ -28,9 +28,9 @@ export const PlayingCard: React.FC<PlayingCardProps> = ({ cardCode, hidden = fal
 
   return (
     <div className={`tp-card ${isRed ? 'tp-card-red' : 'tp-card-black'}`}>
-      <div style={{ fontSize: '0.75rem', lineHeight: 1 }}>{rankPart}</div>
-      <div style={{ fontSize: '1.1rem', textAlign: 'center', lineHeight: 1 }}>{symbol}</div>
-      <div style={{ fontSize: '0.75rem', textAlign: 'right', lineHeight: 1 }}>{rankPart}</div>
+      <span className="tp-card-corner tp-card-corner-tl">{rankPart}</span>
+      <span className="tp-card-center">{symbol}</span>
+      <span className="tp-card-corner tp-card-corner-br">{rankPart}</span>
     </div>
   );
 };
