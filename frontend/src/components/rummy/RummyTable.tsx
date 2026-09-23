@@ -515,6 +515,8 @@ export default function GameTable({
     }
   }, [state?.phase]);
 
+  const wildRank = state?.wild_rank ?? null;
+
   // Reconcile local grouping with the server hand: keep existing arrangement, drop
   // cards that left the hand (discarded/declared), and drop newly drawn cards into
   // their own trailing group so the player notices and places them.
@@ -523,11 +525,15 @@ export default function GameTable({
       const kept = prev.map((g) => g.filter((c) => hand.includes(c))).filter((g) => g.length > 0);
       const placed = new Set(kept.flat());
       const fresh = hand.filter((c) => c !== finishCard && !placed.has(c));
+      if (prev.length === 0 && fresh.length >= 13) {
+        return autoArrange(fresh, wildRank);
+      }
       return fresh.length > 0 ? [...kept, fresh] : kept;
     });
     setFinishCard((prev) => (prev && hand.includes(prev) ? prev : null));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hand]);
+  }, [hand, wildRank]);
 
   const me = state?.players.find((p) => (user?.id && p.id === user.id) || p.name === myUsername) ?? null;
   const myTurn = !!(state && me && state.turn === me.id);

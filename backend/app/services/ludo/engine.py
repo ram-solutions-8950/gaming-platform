@@ -24,6 +24,77 @@ from .rules import (
 
 # In-memory tracking of consecutive sixes per match: match_id -> int
 _CONSECUTIVE_SIXES: Dict[str, int] = {}
+# In-memory tracking of turns without rolling a six: match_id -> {player_id -> int}
+_TURNS_WITHOUT_SIX: Dict[str, Dict[str, int]] = {}
+
+
+def _compute_ludo_roll(
+    match: LudoMatch,
+    current_player: LudoPlayer,
+    current_sixes: int,
+) -> int:
+    """
+    Adaptive anti-starvation & dynamic pacing dice roll generator.
+    Guarantees:
+    - Players with all 4 tokens in yard enter the board within 2-3 turns max.
+    - If opponent is already active on the board, trailing player gets a 6 promptly.
+    - Players can steadily roll 6s to bring out their 2nd, 3rd, and 4th tokens (prevents 6-droughts).
+    - If player already has 2 consecutive sixes, standard RNG is used (no forced 3rd six).
+    """
+    # If player already has 2 consecutive sixes, use standard RNG so we never force a 3rd six forfeiture
+    if current_sixes >= 2:
+        return secrets.randbelow(6) + 1
+
+    tokens = current_player.tokens
+    yard_count = sum(1 for t in tokens if t.position == -1)
+
+    other_players = [p for p in match.players if p.id != current_player.id]
+    other_has_active = any(any(0 <= t.position < HOME_STEP for t in p.tokens) for p in other_players)
+
+    match_key = str(match.id)
+    player_key = str(current_player.id)
+    history = _TURNS_WITHOUT_SIX.setdefault(match_key, {})
+    turns_without_6 = history.get(player_key, 0)
+
+    # 1. Player has all 4 tokens in yard (zero tokens out)
+    if yard_count == 4:
+        if other_has_active:
+            # Opponent is running on track while this player is stuck in yard
+            if turns_without_6 >= 1:
+                roll_is_six = True
+            else:
+                roll_is_six = secrets.randbelow(100) < 65
+        else:
+            # Game start / neither has active token
+            if turns_without_6 >= 2:
+                roll_is_six = True
+            elif turns_without_6 == 1:
+                roll_is_six = secrets.randbelow(100) < 60
+            else:
+                roll_is_six = secrets.randbelow(100) < 35
+    # 2. Player has 1, 2, or 3 tokens in yard (releasing subsequent tokens)
+    elif yard_count > 0:
+        if turns_without_6 >= 4:
+            roll_is_six = True
+        elif turns_without_6 >= 2:
+            roll_is_six = secrets.randbelow(100) < 45
+        else:
+            roll_is_six = secrets.randbelow(100) < 25
+    # 3. All tokens are out on the board
+    else:
+        if turns_without_6 >= 6:
+            roll_is_six = secrets.randbelow(100) < 40
+        else:
+            roll_is_six = (secrets.randbelow(6) + 1) == 6
+
+    if roll_is_six:
+        roll = 6
+        history[player_key] = 0
+    else:
+        roll = secrets.randbelow(5) + 1
+        history[player_key] = turns_without_6 + 1
+
+    return roll
 
 class LudoEngine:
     def __init__(self, db: Session):
@@ -139,6 +210,10 @@ class LudoEngine:
 
         match_key = str(match.id)
         current_sixes = _CONSECUTIVE_SIXES.get(match_key, 0)
+
+        # Dynamic Authoritative Server RNG with anti-starvation & pacing
+        roll = _compute_ludo_roll(match, player, current_sixes)
+        match.last_dice_roll = roll
 
         if roll == 6:
             current_sixes += 1
@@ -382,3 +457,6 @@ class LudoEngine:
                 match.is_settled = True
             else:
                 raise
+        finally:
+            _CONSECUTIVE_SIXES.pop(str(match.id), None)
+            _TURNS_WITHOUT_SIX.pop(str(match.id), None)

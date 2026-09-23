@@ -250,6 +250,9 @@
   overflow-y: hidden;
   min-height: 5.4rem;
   padding: 0.15rem 0.2rem 0.1rem;
+  min-height: 5.6rem;
+  padding: 0.65rem 0.2rem 0.1rem;
+  margin-top: -0.45rem;
   -webkit-overflow-scrolling: touch;
 }
 
@@ -275,6 +278,7 @@
 
 .gt-hand-card + .gt-hand-card {
   margin-left: clamp(-1.45rem, -3.4vw, -0.75rem);
+  margin-left: clamp(-1.35rem, -3.2vw, -0.75rem);
 }
 
 .gt-card-hand {

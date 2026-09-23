@@ -66,6 +66,7 @@ export default function PlayingCard({
       className={[
         size,
         "relative rounded-lg shadow-lg select-none border",
+        "relative rounded-lg shadow-lg select-none border text-slate-950",
         disabled
           ? "cursor-default pointer-events-none opacity-85"
           : "transition-transform [@media(hover:hover)]:hover:-translate-y-1.5 [@media(hover:hover)]:hover:shadow-xl",
@@ -84,13 +85,16 @@ export default function PlayingCard({
       ) : (
         <>
           <div className={`absolute top-0.5 left-1 flex flex-col items-center leading-none font-display font-bold ${pipSize} ${c.red ? "text-red-600" : "text-ink-950"}`}>
+          <div className={`absolute top-0.5 left-0.5 flex flex-col items-center leading-none font-bold ${pipSize} ${c.red ? "text-red-600" : "text-slate-950"}`}>
             <span>{c.rank}</span>
             <span>{c.glyph}</span>
           </div>
           <div className={`w-full h-full flex items-center justify-center ${glyphSize} ${c.red ? "text-red-600" : "text-ink-950"}`}>
+          <div className={`w-full h-full flex items-center justify-center font-bold ${glyphSize} ${c.red ? "text-red-600" : "text-slate-950"}`}>
             {c.glyph}
           </div>
           <div className={`absolute bottom-0.5 right-1 flex flex-col items-center leading-none font-display font-bold rotate-180 ${pipSize} ${c.red ? "text-red-600" : "text-ink-950"}`}>
+          <div className={`absolute bottom-0.5 right-0.5 flex flex-col items-center leading-none font-bold rotate-180 ${pipSize} ${c.red ? "text-red-600" : "text-slate-950"}`}>
             <span>{c.rank}</span>
             <span>{c.glyph}</span>
           </div>
