@@ -29,8 +29,8 @@ logger = get_logger("aviator_engine")
 HOUSE_EDGE = 0.04          # 4% house edge (96% RTP, official commercial standard for crash games)
 BETTING_DURATION = 10.0    # seconds
 COOLDOWN_DURATION = 3.0    # seconds
-MULTIPLIER_TICK_INTERVAL = 0.25   # server snapshot interval (4 per second)
-GROWTH_RATE = 0.09         # dynamic balanced exponential growth rate for engaging flight timing
+MULTIPLIER_TICK_INTERVAL = 0.10   # fast server snapshot interval (10 per second)
+GROWTH_RATE = 0.20         # fast exponential growth rate so flight accelerates quickly
 
 
 # ──────────────────────────────────────────────────────────────

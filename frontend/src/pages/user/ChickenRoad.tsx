@@ -113,6 +113,30 @@ export function ChickenRoadPage() {
     syncState();
   }, [syncState]);
 
+  useEffect(() => {
+    const handleBackPressed = (): boolean => {
+      if (showHowToPlay) {
+        setShowHowToPlay(false);
+        return true;
+      }
+      if (showExitConfirm) {
+        setShowExitConfirm(false);
+        return true;
+      }
+      if (gameState === 'ACTIVE') {
+        setShowExitConfirm(true);
+        return true;
+      }
+      navigate('/dashboard');
+      return true;
+    };
+
+    (window as any).__gameSpecificBackPressed = handleBackPressed;
+    return () => {
+      delete (window as any).__gameSpecificBackPressed;
+    };
+  }, [showHowToPlay, showExitConfirm, gameState, navigate]);
+
   // Dynamic viewport-height fallback for Android landscape fitting.
   // `100dvh` alone can be unreliable in some Android WebViews (Capacitor)
   // while system bars / safe-area insets settle after mount or the on-screen

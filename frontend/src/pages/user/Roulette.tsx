@@ -155,6 +155,34 @@ export function RoulettePage() {
     };
   }, []);
 
+  useEffect(() => {
+    const handleBackPressed = (): boolean => {
+      if (showRules) {
+        setShowRules(false);
+        return true;
+      }
+      if (showRanking) {
+        setShowRanking(false);
+        return true;
+      }
+      if (showTrends) {
+        setShowTrends(false);
+        return true;
+      }
+      if (showChat) {
+        setShowChat(false);
+        return true;
+      }
+      navigate('/dashboard');
+      return true;
+    };
+
+    (window as any).__gameSpecificBackPressed = handleBackPressed;
+    return () => {
+      delete (window as any).__gameSpecificBackPressed;
+    };
+  }, [showRules, showRanking, showTrends, showChat, navigate]);
+
   // Dynamic viewport-height fallback for Android landscape fitting
   useEffect(() => {
     const root = document.documentElement;

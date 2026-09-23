@@ -391,6 +391,38 @@ export default function GameTable({
     }
   }, []);
 
+  useEffect(() => {
+    const handleBackPressed = (): boolean => {
+      if (rulesOpen) {
+        setRulesOpen(false);
+        return true;
+      }
+      if (historyModalOpen) {
+        setHistoryModalOpen(false);
+        return true;
+      }
+      if (scoreModalOpen) {
+        setScoreModalOpen(false);
+        return true;
+      }
+      if (chatModalOpen) {
+        setChatModalOpen(false);
+        return true;
+      }
+      if (leaveConfirmOpen) {
+        setLeaveConfirmOpen(false);
+        return true;
+      }
+      setLeaveConfirmOpen(true);
+      return true;
+    };
+
+    (window as any).__gameSpecificBackPressed = handleBackPressed;
+    return () => {
+      delete (window as any).__gameSpecificBackPressed;
+    };
+  }, [rulesOpen, historyModalOpen, scoreModalOpen, chatModalOpen, leaveConfirmOpen]);
+
   function toggleSound() {
     setSoundOn((v) => {
       const next = !v;

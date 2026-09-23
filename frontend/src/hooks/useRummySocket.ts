@@ -95,6 +95,11 @@ export function useRummySocket(tableId: string, token: string | null) {
     connect();
     return () => {
       closedRef.current = true;
+      try {
+        if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+          wsRef.current.send(JSON.stringify({ action: "leave" }));
+        }
+      } catch {}
       wsRef.current?.close();
     };
   }, [connect]);

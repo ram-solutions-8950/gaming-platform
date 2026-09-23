@@ -96,6 +96,7 @@ class RummyConnectionManager:
 manager = RummyConnectionManager()
 
 _turn_timers: dict[str, asyncio.Task] = {}
+_player_timeouts: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
 _BOT_ID_PREFIX = "bot-"
 _BOT_JOIN_DELAY_SECONDS = 10
 _BOT_NAMES = ["Rummy Master", "Asha (Bot)", "Rahul (Bot)", "Meera (Bot)", "Vikram (Bot)", "Priya (Bot)"]
@@ -204,6 +205,17 @@ async def _turn_timeout(table_id: str, seconds: int) -> None:
         return
     try:
         current = game.current_player().id
+        _player_timeouts[table_id][current] += 1
+        timeouts = _player_timeouts[table_id][current]
+        is_disconnected = (current not in manager.connected_users(table_id) and not _is_bot(current))
+
+        # Auto-forfeit if disconnected and missed 2 turns, or missed 3 turns total
+        if (is_disconnected and timeouts >= 2) or timeouts >= 3:
+            logger.info("Player %s exceeded timeout limit (%d) on table %s. Forfeiting.", current, timeouts, table_id)
+            await manager.broadcast(table_id, {"type": "event", "event": "left", "player": current, "reason": "timeout"})
+            await _handle_player_leave(table_id, current)
+            return
+
         if game.phase == Phase.AWAIT_DRAW:
             drawn = game.draw(current, "stock")
             game.discard(current, drawn.code)
@@ -519,6 +531,7 @@ async def _handle_action(table_id: str, user_id: str, msg: dict) -> None:
     game = game_manager.get(table_id)
     if game is None:
         return
+    _player_timeouts[table_id][user_id] = 0
     action = msg.get("action")
     action_id = msg.get("action_id")
 

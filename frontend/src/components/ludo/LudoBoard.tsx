@@ -735,7 +735,7 @@ export const LudoBoard: React.FC<Props> = ({
 
   return (
     <div
-      className={`ludo-board-wrapper relative w-full max-w-[min(90vw,calc(100dvh-var(--safe-top)-var(--safe-bottom)-100px),430px)] aspect-square rounded-2xl p-2 sm:p-2.5 bg-gradient-to-br from-slate-900 via-slate-950 to-amber-950/40 shadow-2xl border border-amber-500/30 overflow-hidden flex items-center justify-center shrink-0 ${
+      className={`ludo-board-wrapper relative w-full max-w-[min(90vw,calc(100dvh-var(--safe-top)-var(--safe-bottom)-100px),430px)] aspect-square rounded-2xl p-1.5 sm:p-2 bg-slate-900 border-2 border-amber-500/40 shadow-2xl overflow-hidden flex items-center justify-center shrink-0 ${
         boardShaking ? 'animate-board-impact' : ''
       }`}
     >
@@ -858,10 +858,10 @@ export const LudoBoard: React.FC<Props> = ({
           </radialGradient>
         </defs>
 
-        {/* Board Background */}
-        <rect width="1500" height="1500" fill="#0b1120" rx="32" />
+        {/* Board Background: Crisp Clean White */}
+        <rect width="1500" height="1500" fill="#ffffff" stroke="#94a3b8" strokeWidth="6" rx="28" />
 
-        {/* 4 Large Corner Yards with Beveled Trays & Sunk Sockets */}
+        {/* 4 Large Corner Yards with Clean Trays & Pedestals */}
         <g>
           {/* Red Yard (Top Left) */}
           <g>
@@ -873,9 +873,8 @@ export const LudoBoard: React.FC<Props> = ({
               height="430"
               fill="url(#yardTrayGrad)"
               rx="36"
-              stroke="#fbbf24"
-              strokeWidth="3"
-              strokeOpacity="0.6"
+              stroke="#ef4444"
+              strokeWidth="3.5"
             />
             {[
               [200, 200],
@@ -884,16 +883,9 @@ export const LudoBoard: React.FC<Props> = ({
               [400, 400],
             ].map(([sx, sy], idx) => (
               <g key={`red-sock-${idx}`} transform={`translate(${sx}, ${sy})`}>
-                <circle cx="0" cy="0" r="54" fill="#1e293b" stroke="#ef4444" strokeWidth="3" />
-                <circle
-                  cx="0"
-                  cy="0"
-                  r="46"
-                  fill="url(#socketDepth)"
-                  stroke="rgba(255,255,255,0.2)"
-                  strokeWidth="1.5"
-                />
-                <text x="0" y="8" fontSize="24" textAnchor="middle" fill="#ef4444" opacity="0.45">
+                <circle cx="0" cy="0" r="54" fill="#fee2e2" stroke="#ef4444" strokeWidth="4" />
+                <circle cx="0" cy="0" r="44" fill="#ffffff" stroke="#fca5a5" strokeWidth="2" />
+                <text x="0" y="9" fontSize="26" textAnchor="middle" fill="#ef4444" opacity="0.65">
                   ★
                 </text>
               </g>
@@ -910,9 +902,8 @@ export const LudoBoard: React.FC<Props> = ({
               height="430"
               fill="url(#yardTrayGrad)"
               rx="36"
-              stroke="#fbbf24"
-              strokeWidth="3"
-              strokeOpacity="0.6"
+              stroke="#10b981"
+              strokeWidth="3.5"
             />
             {[
               [1100, 200],
@@ -921,16 +912,9 @@ export const LudoBoard: React.FC<Props> = ({
               [1300, 400],
             ].map(([sx, sy], idx) => (
               <g key={`green-sock-${idx}`} transform={`translate(${sx}, ${sy})`}>
-                <circle cx="0" cy="0" r="54" fill="#1e293b" stroke="#10b981" strokeWidth="3" />
-                <circle
-                  cx="0"
-                  cy="0"
-                  r="46"
-                  fill="url(#socketDepth)"
-                  stroke="rgba(255,255,255,0.2)"
-                  strokeWidth="1.5"
-                />
-                <text x="0" y="8" fontSize="24" textAnchor="middle" fill="#10b981" opacity="0.45">
+                <circle cx="0" cy="0" r="54" fill="#d1fae5" stroke="#10b981" strokeWidth="4" />
+                <circle cx="0" cy="0" r="44" fill="#ffffff" stroke="#86efac" strokeWidth="2" />
+                <text x="0" y="9" fontSize="26" textAnchor="middle" fill="#10b981" opacity="0.65">
                   ★
                 </text>
               </g>
@@ -947,9 +931,8 @@ export const LudoBoard: React.FC<Props> = ({
               height="430"
               fill="url(#yardTrayGrad)"
               rx="36"
-              stroke="#fbbf24"
-              strokeWidth="3"
-              strokeOpacity="0.6"
+              stroke="#f59e0b"
+              strokeWidth="3.5"
             />
             {[
               [1100, 1100],
@@ -958,16 +941,9 @@ export const LudoBoard: React.FC<Props> = ({
               [1300, 1300],
             ].map(([sx, sy], idx) => (
               <g key={`yellow-sock-${idx}`} transform={`translate(${sx}, ${sy})`}>
-                <circle cx="0" cy="0" r="54" fill="#1e293b" stroke="#f59e0b" strokeWidth="3" />
-                <circle
-                  cx="0"
-                  cy="0"
-                  r="46"
-                  fill="url(#socketDepth)"
-                  stroke="rgba(255,255,255,0.2)"
-                  strokeWidth="1.5"
-                />
-                <text x="0" y="8" fontSize="24" textAnchor="middle" fill="#f59e0b" opacity="0.45">
+                <circle cx="0" cy="0" r="54" fill="#fef3c7" stroke="#f59e0b" strokeWidth="4" />
+                <circle cx="0" cy="0" r="44" fill="#ffffff" stroke="#fde047" strokeWidth="2" />
+                <text x="0" y="9" fontSize="26" textAnchor="middle" fill="#f59e0b" opacity="0.65">
                   ★
                 </text>
               </g>
@@ -984,9 +960,8 @@ export const LudoBoard: React.FC<Props> = ({
               height="430"
               fill="url(#yardTrayGrad)"
               rx="36"
-              stroke="#fbbf24"
-              strokeWidth="3"
-              strokeOpacity="0.6"
+              stroke="#3b82f6"
+              strokeWidth="3.5"
             />
             {[
               [200, 1100],
@@ -995,40 +970,35 @@ export const LudoBoard: React.FC<Props> = ({
               [400, 1300],
             ].map(([sx, sy], idx) => (
               <g key={`blue-sock-${idx}`} transform={`translate(${sx}, ${sy})`}>
-                <circle cx="0" cy="0" r="54" fill="#1e293b" stroke="#3b82f6" strokeWidth="3" />
-                <circle
-                  cx="0"
-                  cy="0"
-                  r="46"
-                  fill="url(#socketDepth)"
-                  stroke="rgba(255,255,255,0.2)"
-                  strokeWidth="1.5"
-                />
-                <text x="0" y="8" fontSize="24" textAnchor="middle" fill="#3b82f6" opacity="0.45">
+                <circle cx="0" cy="0" r="54" fill="#dbeafe" stroke="#3b82f6" strokeWidth="4" />
+                <circle cx="0" cy="0" r="44" fill="#ffffff" stroke="#93c5fd" strokeWidth="2" />
+                <text x="0" y="9" fontSize="26" textAnchor="middle" fill="#3b82f6" opacity="0.65">
                   ★
                 </text>
               </g>
             ))}
           </g>
 
-          {/* Common Track Grid Cells */}
+          {/* Common Track Grid Cells: Crisp Bright Light Theme */}
           {TRACK_COORDINATES.map(([gx, gy], i) => {
-            let cellFill = '#111827';
+            let cellFill = '#ffffff';
             let isStart = false;
-            let isStar = [8, 21, 34, 47].includes(i);
+            const isStar = [8, 21, 34, 47].includes(i);
 
             if (i === 0) {
-              cellFill = '#dc2626';
+              cellFill = '#ef4444';
               isStart = true;
             } else if (i === 13) {
-              cellFill = '#059669';
+              cellFill = '#10b981';
               isStart = true;
             } else if (i === 26) {
-              cellFill = '#d97706';
+              cellFill = '#f59e0b';
               isStart = true;
             } else if (i === 39) {
-              cellFill = '#2563eb';
+              cellFill = '#3b82f6';
               isStart = true;
+            } else if (isStar) {
+              cellFill = '#fef3c7';
             }
 
             return (
@@ -1039,8 +1009,8 @@ export const LudoBoard: React.FC<Props> = ({
                   width="100"
                   height="100"
                   fill={cellFill}
-                  stroke="#1f2937"
-                  strokeWidth="2"
+                  stroke="#94a3b8"
+                  strokeWidth="2.5"
                 />
                 {isStar && (
                   <g>
@@ -1050,7 +1020,7 @@ export const LudoBoard: React.FC<Props> = ({
                       cy={gy * 100 + 50}
                       r="36"
                       fill="none"
-                      stroke="#fbbf24"
+                      stroke="#d97706"
                       strokeWidth="2"
                       strokeDasharray="6,4"
                       className="animate-star-halo"
@@ -1060,14 +1030,14 @@ export const LudoBoard: React.FC<Props> = ({
                       cx={gx * 100 + 50}
                       cy={gy * 100 + 50}
                       r="28"
-                      fill="#0f172a"
-                      stroke="#fbbf24"
+                      fill="#fef3c7"
+                      stroke="#f59e0b"
                       strokeWidth="2.5"
                     />
                     <text
                       x={gx * 100 + 50}
                       y={gy * 100 + 64}
-                      fill="#fbbf24"
+                      fill="#b45309"
                       fontSize="40"
                       textAnchor="middle"
                       fontWeight="bold"
@@ -1082,14 +1052,14 @@ export const LudoBoard: React.FC<Props> = ({
                       gx * 100 + 25
                     },${gy * 100 + 75}`}
                     fill="#ffffff"
-                    opacity="0.85"
+                    opacity="0.95"
                   />
                 )}
               </g>
             );
           })}
 
-          {/* Home Stretch Paths with Step Indicators */}
+          {/* Home Stretch Paths with Crisp Step Indicators */}
           {HOME_PATHS.RED.map(([gx, gy], i) => (
             <g key={`red-h-${i}`}>
               <rect
@@ -1097,16 +1067,16 @@ export const LudoBoard: React.FC<Props> = ({
                 y={gy * 100}
                 width="100"
                 height="100"
-                fill="#dc2626"
-                stroke="#450a0a"
-                strokeWidth="2"
-                opacity="0.9"
+                fill="#ef4444"
+                stroke="#ffffff"
+                strokeWidth="2.5"
+                opacity="0.95"
               />
               <text
                 x={gx * 100 + 50}
-                y={gy * 100 + 60}
+                y={gy * 100 + 62}
                 fill="#ffffff"
-                opacity="0.3"
+                opacity="0.85"
                 fontSize="32"
                 fontWeight="900"
                 textAnchor="middle"
@@ -1122,16 +1092,16 @@ export const LudoBoard: React.FC<Props> = ({
                 y={gy * 100}
                 width="100"
                 height="100"
-                fill="#059669"
-                stroke="#022c22"
-                strokeWidth="2"
-                opacity="0.9"
+                fill="#10b981"
+                stroke="#ffffff"
+                strokeWidth="2.5"
+                opacity="0.95"
               />
               <text
                 x={gx * 100 + 50}
-                y={gy * 100 + 60}
+                y={gy * 100 + 62}
                 fill="#ffffff"
-                opacity="0.3"
+                opacity="0.85"
                 fontSize="32"
                 fontWeight="900"
                 textAnchor="middle"
@@ -1147,16 +1117,16 @@ export const LudoBoard: React.FC<Props> = ({
                 y={gy * 100}
                 width="100"
                 height="100"
-                fill="#d97706"
-                stroke="#451a03"
-                strokeWidth="2"
-                opacity="0.9"
+                fill="#f59e0b"
+                stroke="#ffffff"
+                strokeWidth="2.5"
+                opacity="0.95"
               />
               <text
                 x={gx * 100 + 50}
-                y={gy * 100 + 60}
+                y={gy * 100 + 62}
                 fill="#ffffff"
-                opacity="0.3"
+                opacity="0.85"
                 fontSize="32"
                 fontWeight="900"
                 textAnchor="middle"
@@ -1172,16 +1142,16 @@ export const LudoBoard: React.FC<Props> = ({
                 y={gy * 100}
                 width="100"
                 height="100"
-                fill="#2563eb"
-                stroke="#1e3a8a"
-                strokeWidth="2"
-                opacity="0.9"
+                fill="#3b82f6"
+                stroke="#ffffff"
+                strokeWidth="2.5"
+                opacity="0.95"
               />
               <text
                 x={gx * 100 + 50}
-                y={gy * 100 + 60}
+                y={gy * 100 + 62}
                 fill="#ffffff"
-                opacity="0.3"
+                opacity="0.85"
                 fontSize="32"
                 fontWeight="900"
                 textAnchor="middle"
@@ -1192,10 +1162,10 @@ export const LudoBoard: React.FC<Props> = ({
           ))}
 
           {/* Center Home Triangles */}
-          <polygon points="600,600 750,750 600,900" fill="#dc2626" />
-          <polygon points="600,600 750,750 900,600" fill="#059669" />
-          <polygon points="900,600 750,750 900,900" fill="#d97706" />
-          <polygon points="600,900 750,750 900,900" fill="#2563eb" />
+          <polygon points="600,600 750,750 600,900" fill="#ef4444" stroke="#ffffff" strokeWidth="2.5" />
+          <polygon points="600,600 750,750 900,600" fill="#10b981" stroke="#ffffff" strokeWidth="2.5" />
+          <polygon points="900,600 750,750 900,900" fill="#f59e0b" stroke="#ffffff" strokeWidth="2.5" />
+          <polygon points="600,900 750,750 900,900" fill="#3b82f6" stroke="#ffffff" strokeWidth="2.5" />
         </g>
 
         {/* Center Golden Medallion Crown with Rotating Sunburst & Home Counters */}
@@ -1219,8 +1189,8 @@ export const LudoBoard: React.FC<Props> = ({
           </g>
 
           {/* Center Medallion Plate */}
-          <circle cx="750" cy="750" r="64" fill="#090d16" stroke="url(#goldCollar)" strokeWidth="5" />
-          <circle cx="750" cy="750" r="54" fill="#1e1b4b" stroke="#fbbf24" strokeWidth="1.5" opacity="0.8" />
+          <circle cx="750" cy="750" r="64" fill="#ffffff" stroke="url(#goldCollar)" strokeWidth="5" />
+          <circle cx="750" cy="750" r="54" fill="#fef3c7" stroke="#fbbf24" strokeWidth="1.5" opacity="0.95" />
           <text x="750" y="768" fill="#fbbf24" fontSize="46" textAnchor="middle" fontWeight="bold">
             👑
           </text>

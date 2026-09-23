@@ -21,7 +21,20 @@ export function PokerPage() {
   const [showResultModal, setShowResultModal] = useState<boolean>(false);
   const [winnersSummary, setWinnersSummary] = useState<any[]>([]);
   const [showRulesModal, setShowRulesModal] = useState<boolean>(false);
+  const [showExitConfirm, setShowExitConfirm] = useState<boolean>(false);
   const [actionErrorMessage, setActionErrorMessage] = useState<string | null>(null);
+
+  const activeTableIdRef = useRef<string | null>(activeTableId);
+  activeTableIdRef.current = activeTableId;
+
+  useEffect(() => {
+    return () => {
+      const tid = activeTableIdRef.current;
+      if (tid) {
+        pokerService.leaveTable(tid).catch(() => {});
+      }
+    };
+  }, []);
 
   useEffect(() => {
     setActiveTableId(paramTableId || null);
@@ -31,6 +44,34 @@ export function PokerPage() {
   useEffect(() => {
     setNativeLandscape().catch(() => {});
   }, []);
+
+  useEffect(() => {
+    const handleBackPressed = (): boolean => {
+      if (showRulesModal) {
+        setShowRulesModal(false);
+        return true;
+      }
+      if (showResultModal) {
+        setShowResultModal(false);
+        return true;
+      }
+      if (showExitConfirm) {
+        setShowExitConfirm(false);
+        return true;
+      }
+      if (activeTableId) {
+        setShowExitConfirm(true);
+        return true;
+      }
+      navigate('/dashboard');
+      return true;
+    };
+
+    (window as any).__gameSpecificBackPressed = handleBackPressed;
+    return () => {
+      delete (window as any).__gameSpecificBackPressed;
+    };
+  }, [showRulesModal, showResultModal, showExitConfirm, activeTableId, navigate]);
 
   const refreshWallet = useCallback(async () => {
     try {
@@ -207,7 +248,7 @@ export function PokerPage() {
           currentUserId={currentUserId}
           walletBalancePaise={walletBalancePaise}
           onSendAction={sendAction}
-          onLeaveTable={handleLeaveTable}
+          onLeaveTable={() => setShowExitConfirm(true)}
           onStartHand={startHand}
           onOpenRules={() => setShowRulesModal(true)}
         />
@@ -226,6 +267,48 @@ export function PokerPage() {
       {/* Rules Modal */}
       {showRulesModal && (
         <RulesModal onClose={() => setShowRulesModal(false)} />
+      )}
+
+      {/* Leave Table Confirmation Modal */}
+      {showExitConfirm && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/85 backdrop-blur-md p-4 animate-fade-in select-none"
+          onClick={() => setShowExitConfirm(false)}
+        >
+          <div
+            className="w-full max-w-sm bg-gradient-to-b from-[#240505] via-[#1a0404] to-[#0d0202] border-2 border-red-500/60 rounded-3xl p-6 text-center shadow-[0_0_40px_rgba(0,0,0,0.9)] text-white"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-14 h-14 mx-auto mb-3 rounded-full bg-gradient-to-br from-red-600/30 via-red-950/40 to-slate-900 border-2 border-red-500/50 flex items-center justify-center text-3xl shadow-inner">
+              🚪
+            </div>
+            <h2 className="font-display text-lg font-black text-transparent bg-clip-text bg-gradient-to-r from-red-300 via-rose-200 to-amber-400 uppercase tracking-wide mb-1.5">
+              Leave Poker Table?
+            </h2>
+            <p className="text-xs text-slate-300 mb-5 leading-relaxed">
+              Are you sure you want to leave? Your remaining stack will be returned directly to your wallet.
+            </p>
+            <div className="flex gap-2.5">
+              <button
+                type="button"
+                className="flex-1 py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-200 border border-slate-700 transition active:scale-95 cursor-pointer"
+                onClick={() => setShowExitConfirm(false)}
+              >
+                Stay
+              </button>
+              <button
+                type="button"
+                className="flex-1 py-2.5 px-3 rounded-xl bg-gradient-to-r from-red-600 via-rose-600 to-red-700 hover:brightness-110 text-xs font-black text-white shadow-lg shadow-red-900/40 border border-red-400/50 transition active:scale-95 cursor-pointer uppercase tracking-wider"
+                onClick={async () => {
+                  setShowExitConfirm(false);
+                  await handleLeaveTable();
+                }}
+              >
+                Leave Table
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

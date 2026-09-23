@@ -103,6 +103,26 @@ export function DragonTigerPage() {
     };
   }, []);
 
+  useEffect(() => {
+    const handleBackPressed = (): boolean => {
+      if (showRules) {
+        setShowRules(false);
+        return true;
+      }
+      if (showRanking) {
+        setShowRanking(false);
+        return true;
+      }
+      navigate('/dashboard');
+      return true;
+    };
+
+    (window as any).__gameSpecificBackPressed = handleBackPressed;
+    return () => {
+      delete (window as any).__gameSpecificBackPressed;
+    };
+  }, [showRules, showRanking, navigate]);
+
   /* ── animation state ── */
   const [phase, setPhase] = useState<ArenaPhase>('waiting');
   const [dragonFlipped, setDragonFlipped] = useState(false);

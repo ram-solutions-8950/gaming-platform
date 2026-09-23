@@ -108,6 +108,34 @@ export function AndarBaharPage() {
     };
   }, []);
 
+  useEffect(() => {
+    const handleBackPressed = (): boolean => {
+      if (rulesPopup) {
+        setRulesPopup(null);
+        return true;
+      }
+      if (showHistory) {
+        setShowHistory(false);
+        return true;
+      }
+      if (confirmLeave) {
+        setConfirmLeave(false);
+        return true;
+      }
+      if (myBet && phase !== 'result') {
+        setConfirmLeave(true);
+        return true;
+      }
+      navigate('/dashboard');
+      return true;
+    };
+
+    (window as any).__gameSpecificBackPressed = handleBackPressed;
+    return () => {
+      delete (window as any).__gameSpecificBackPressed;
+    };
+  }, [rulesPopup, showHistory, confirmLeave, myBet, phase, navigate]);
+
   // Refresh balance from server
   const refreshBalance = useCallback(async () => {
     try {

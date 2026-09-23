@@ -39,7 +39,7 @@ class LiveBet:
     cashed_out_at: Optional[datetime] = None
 
 
-AVIATOR_GROWTH_RATE = 0.09  # balanced exponential growth rate
+AVIATOR_GROWTH_RATE = 0.20  # fast exponential growth rate so flight accelerates quickly
 
 
 @dataclass

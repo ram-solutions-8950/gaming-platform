@@ -19,8 +19,8 @@ from app.services.aviator.models import AVIATOR_GROWTH_RATE
 
 def test_growth_rates_aligned():
     """Verify backend engine and models have consistent growth rate."""
-    assert GROWTH_RATE == 0.09
-    assert AVIATOR_GROWTH_RATE == 0.09
+    assert GROWTH_RATE == 0.20
+    assert AVIATOR_GROWTH_RATE == 0.20
 
 
 def test_provably_fair_determinism():
@@ -78,22 +78,25 @@ def test_crash_point_always_gte_one():
         assert cp >= 1.0
 
 
-def test_crash_timing_balanced_not_crashing_under_5_seconds_at_2x():
+def test_crash_timing_fast_and_exciting_at_2x():
     """
-    Flight timing must provide players an engaging duration.
-    Reaching 2.0x multiplier should take ~7.7 seconds (well above 5 seconds).
+    Flight timing must provide players an exciting fast flight.
+    Reaching 2.0x multiplier should take ~3.47 seconds (under 4s instead of sluggish 8s).
+    1.2x takes ~0.91 seconds so players cannot casually farm low multipliers.
     """
     t_2x = time_for_multiplier(2.0)
-    assert t_2x > 7.0, f"Flight reached 2x too fast: {t_2x:.2f}s"
-    assert t_2x < 8.5
+    assert 3.0 < t_2x < 4.0, f"2x flight time should be ~3.47s: {t_2x:.2f}s"
 
-    # 1.5x should take > 4s
+    t_1_2x = time_for_multiplier(1.2)
+    assert 0.8 < t_1_2x < 1.1, f"1.2x should take ~0.91s: {t_1_2x:.2f}s"
+
+    # 1.5x should take ~2.0s
     t_1_5x = time_for_multiplier(1.5)
-    assert t_1_5x > 4.0
+    assert 1.8 < t_1_5x < 2.3
 
-    # 3.0x should take > 11s
+    # 3.0x should take ~5.5s
     t_3x = time_for_multiplier(3.0)
-    assert t_3x > 11.0
+    assert 5.0 < t_3x < 6.0
 
 
 def test_multiplier_roundtrip():

@@ -199,6 +199,42 @@ export function Triple777Page() {
     };
   }, []);
 
+  useEffect(() => {
+    const handleBackPressed = (): boolean => {
+      if (showPaytable) {
+        setShowPaytable(false);
+        return true;
+      }
+      if (showHistory) {
+        setShowHistory(false);
+        return true;
+      }
+      if (showRules) {
+        setShowRules(false);
+        return true;
+      }
+      if (showResultPopup) {
+        setShowResultPopup(false);
+        return true;
+      }
+      if (showExitConfirm) {
+        setShowExitConfirm(false);
+        return true;
+      }
+      if (spinning || autoSpinsLeft !== null) {
+        setShowExitConfirm(true);
+        return true;
+      }
+      navigate('/dashboard');
+      return true;
+    };
+
+    (window as any).__gameSpecificBackPressed = handleBackPressed;
+    return () => {
+      delete (window as any).__gameSpecificBackPressed;
+    };
+  }, [showPaytable, showHistory, showRules, showResultPopup, showExitConfirm, spinning, autoSpinsLeft, navigate]);
+
   // 1b. Dynamic viewport-height fallback for reliable portrait fitting.
   // `100dvh` alone can misreport on some Android browsers/WebViews when the
   // OS gesture-navigation bar is present, which previously left the bottom

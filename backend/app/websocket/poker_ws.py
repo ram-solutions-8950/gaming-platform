@@ -102,17 +102,16 @@ def _decide_bot_action(engine: PokerEngine, player) -> Tuple[str, int]:
 
 _bot_turns_active: Set[str] = set()
 
-async def run_bot_turns(engine: PokerEngine, db: Session):
+async def run_bot_turns(engine: PokerEngine, db: Optional[Session] = None):
     """Drives bot actions for the current hand, and iteratively progresses through
     settlement + subsequent auto-started hands as long as it stays a bot's turn."""
-    # Guard against two coroutines (e.g. two connections, or a connect racing
-    # an in-flight action) concurrently driving the same table's bots — with
-    # bots now resumed on every reconnect, this race became meaningfully more
-    # likely. Whichever runner is already active will pick up state changes
-    # on its own next loop iteration, so a concurrent call is safe to skip.
     if engine.table_id in _bot_turns_active:
         return
     _bot_turns_active.add(engine.table_id)
+    own_db = False
+    if db is None:
+        db = SessionLocal()
+        own_db = True
     try:
         while True:
             while engine.phase not in ('WAITING', 'SETTLEMENT'):
@@ -143,6 +142,8 @@ async def run_bot_turns(engine: PokerEngine, db: Session):
             await broadcast_hand_start(engine)
     finally:
         _bot_turns_active.discard(engine.table_id)
+        if own_db and db:
+            db.close()
 
 def _authenticate(token: str) -> str:
     payload = decode_access_token(token)
@@ -333,6 +334,10 @@ async def poker_websocket_endpoint(
                         elif engine.current_turn_seat_idx == p.seat_index:
                             engine.advance_hand_state()
                 await poker_ws_manager.broadcast_table_state(engine)
+                if engine.phase == 'SETTLEMENT':
+                    asyncio.create_task(run_bot_turns(engine))
+                elif engine.phase not in ('WAITING', 'SETTLEMENT'):
+                    asyncio.create_task(run_bot_turns(engine))
     except Exception as e:
         print(f"[POKER WS EXCEPTION] {e}")
         poker_ws_manager.disconnect(table_id, user_id, ws)
@@ -352,8 +357,12 @@ async def broadcast_hand_start(engine: PokerEngine):
                 "hole_cards": [c.to_str() for c in p.hole_cards]
             })
 
-async def persist_hand_result(engine: PokerEngine, db: Session):
+async def persist_hand_result(engine: PokerEngine, db: Optional[Session] = None):
     """Persists a completed hand's result to the database."""
+    own_db = False
+    if db is None:
+        db = SessionLocal()
+        own_db = True
     try:
         db_hand = PokerHand(
             id=engine.hand_id or f"hand_{int(asyncio.get_event_loop().time())}",
@@ -369,3 +378,6 @@ async def persist_hand_result(engine: PokerEngine, db: Session):
         db.commit()
     except Exception as e:
         print(f"[POKER DB SAVE ERROR] {e}")
+    finally:
+        if own_db and db:
+            db.close()

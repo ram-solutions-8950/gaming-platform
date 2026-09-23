@@ -123,12 +123,12 @@ export const AviatorArena: React.FC<AviatorArenaProps> = ({
       if (phase === 'FLYING') {
         const target = Math.max(1.0, multiplier);
         if (target > smoothMultRef.current) {
-          // Catch up smoothly to server target while never stopping
+          // Catch up smoothly to server target while accelerating fast
           const diff = target - smoothMultRef.current;
-          smoothMultRef.current += Math.max(diff * 0.15, dt * 0.09 * smoothMultRef.current);
+          smoothMultRef.current += Math.max(diff * 0.35, dt * 0.20 * smoothMultRef.current);
         } else {
           // Extrapolate at growth rate so plane never sits still between ticks
-          smoothMultRef.current += dt * 0.09 * smoothMultRef.current;
+          smoothMultRef.current += dt * 0.20 * smoothMultRef.current;
         }
       }
 
@@ -138,7 +138,7 @@ export const AviatorArena: React.FC<AviatorArenaProps> = ({
 
       // 2. Background stars moving faster during flight
       if (phase === 'FLYING' || crashFlyAwayRef.current.active) {
-        const starSpeedMult = Math.min(activeMult * 1.2, 8);
+        const starSpeedMult = Math.min(activeMult * 2.2, 16);
         stars.forEach((s) => {
           s.x -= s.speed * starSpeedMult;
           if (s.x < 0) s.x = width;
@@ -241,16 +241,17 @@ export const AviatorArena: React.FC<AviatorArenaProps> = ({
           ctx.fill();
 
           // Afterburner / Thrust Flame
-          const flameLength = (14 + Math.random() * 12) * (phase === 'FLYING' ? 1 : 1.8);
+          const flameLength = (20 + Math.random() * 16) * (phase === 'FLYING' ? 1.3 : 2.0);
           const flameGrad = ctx.createLinearGradient(-14, 0, -14 - flameLength, 0);
           flameGrad.addColorStop(0, '#fde047');
-          flameGrad.addColorStop(0.5, '#f97316');
+          flameGrad.addColorStop(0.35, '#f97316');
+          flameGrad.addColorStop(0.7, '#ef4444');
           flameGrad.addColorStop(1, 'transparent');
           ctx.fillStyle = flameGrad;
           ctx.beginPath();
-          ctx.moveTo(-14, -4);
+          ctx.moveTo(-14, -5);
           ctx.lineTo(-14 - flameLength, 0);
-          ctx.lineTo(-14, 4);
+          ctx.lineTo(-14, 5);
           ctx.closePath();
           ctx.fill();
 
