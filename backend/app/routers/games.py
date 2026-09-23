@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from ..dependencies.database import get_db
 from ..schemas.game import PlaceBetIn, GameBetOut, GameRoundOut, GameStateOut, PublicBetOut
 from ..schemas.game_catalog import GameCreate, GameUpdate, GameOut
-from ..services import game_service, game_catalog_service
+from ..services import game_service, game_catalog_service, admin_game_service
 from ..services.game_engines import get_engine
 from ..security.permissions import require_user, require_admin, require_super_admin
 from ..utils.responses import success_response, error_response
@@ -229,23 +229,12 @@ def admin_list_rounds(
     status: str | None = Query(default=None),
     search: str | None = Query(default=None),
 ):
-    result = game_service.get_admin_rounds(
+    # Covers every round-based game (including Aviator, which keeps its own
+    # tables) and carries the per-round bet count and pool total.
+    result = admin_game_service.list_rounds(
         db, page=page, page_size=page_size, game_id=game_id, status=status, search=search
     )
-    items = []
-    for r in result["items"]:
-        rd = GameRoundOut.model_validate(r).model_dump()
-        summary = game_service.get_round_bets_summary(db, r.id)
-        rd["total_bets"] = summary["total_bets"]
-        rd["total_amount"] = summary["total_amount"]
-        rd["game_name"] = r.game.name if r.game else "Colour Prediction"
-        items.append(rd)
-    return success_response({
-        "total": result["total"],
-        "page": result["page"],
-        "page_size": result["page_size"],
-        "items": items,
-    })
+    return success_response(result)
 
 
 @router.get("/admin/games/bets")
@@ -258,22 +247,14 @@ def admin_list_bets(
     game_id: _UUID | None = Query(default=None),
     search: str | None = Query(default=None),
 ):
-    rid = _UUID(round_id) if round_id else None
-    result = game_service.get_admin_bets(
+    try:
+        rid = _UUID(round_id) if round_id else None
+    except ValueError:
+        return error_response("VALIDATION_ERROR", "round_id must be a valid UUID", status_code=422)
+    result = admin_game_service.list_bets(
         db, round_id=rid, page=page, page_size=page_size, game_id=game_id, search=search
     )
-    items = []
-    for b in result["items"]:
-        bd = GameBetOut.model_validate(b).model_dump()
-        bd["game_name"] = b.game.name if b.game else "Colour Prediction"
-        bd["user_name"] = (b.user.full_name or b.user.username) if b.user else "Unknown"
-        items.append(bd)
-    return success_response({
-        "total": result["total"],
-        "page": result["page"],
-        "page_size": result["page_size"],
-        "items": items,
-    })
+    return success_response(result)
 
 
 @router.get("/admin/games/{game_id}")

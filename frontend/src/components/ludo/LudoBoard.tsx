@@ -66,6 +66,14 @@ const HOME_CENTERS: Record<LudoColor, [number, number]> = {
   BLUE: [7, 7.5],
 };
 
+// The pawn artwork is drawn ~107 units tall around its anchor point, with the
+// crown reaching far above it — in a 100-unit cell that left every token sitting
+// a quarter-cell high and poking into the row above, so a board with several
+// tokens out looked scattered. Shrink the art to fit inside one cell and drop it
+// back onto the cell it belongs to, keeping a slight lift for the 3D look.
+const PAWN_FIT_SCALE = 0.86;
+const PAWN_SETTLE_Y = 18;
+
 const START_OFFSETS: Record<LudoColor, number> = {
   RED: 0,
   GREEN: 13,
@@ -143,7 +151,7 @@ export const LudoBoard: React.FC<Props> = ({
         if (token.position === -1) {
           cellKey = `yard_${player.color}_${token.token_index}`;
         } else if (token.position >= 56 || token.is_home) {
-          cellKey = `home_${player.color}_${token.token_index}`;
+          cellKey = `home_${player.color}`;
         } else if (token.position > 50) {
           cellKey = `stretch_${player.color}_${token.position - 51}`;
         } else {
@@ -1375,7 +1383,7 @@ export const LudoBoard: React.FC<Props> = ({
             if (token.position === -1) {
               cellKey = `yard_${player.color}_${token.token_index}`;
             } else if (token.position >= 56 || token.is_home) {
-              cellKey = `home_${player.color}_${token.token_index}`;
+              cellKey = `home_${player.color}`;
             } else if (token.position > 50) {
               cellKey = `stretch_${player.color}_${token.position - 51}`;
             } else {
@@ -1497,24 +1505,29 @@ export const LudoBoard: React.FC<Props> = ({
                     transition: 'transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.25s ease',
                   }}
                 >
-                  {/* Ground Contact Shadow */}
-                  <ellipse
-                    cx={cx}
-                    cy={cy + 18}
-                    rx={isThisTokenWalking ? 22 : 32}
-                    ry={isThisTokenWalking ? 7 : 11}
-                    fill="rgba(0,0,0,0.65)"
-                  />
+                  <g
+                    transform={`translate(0 ${PAWN_SETTLE_Y}) translate(${cx} ${cy}) scale(${PAWN_FIT_SCALE}) translate(${-cx} ${-cy})`}
+                  >
+                    {/* Ground Contact Shadow */}
+                    <ellipse
+                      cx={cx}
+                      cy={cy + 18}
+                      rx={isThisTokenWalking ? 22 : 32}
+                      ry={isThisTokenWalking ? 7 : 11}
+                      fill="rgba(0,0,0,0.65)"
+                    />
 
-                  {/* Render chosen token style */}
-                  {renderPawnGraphic(tokenStyle, cx, cy, colorKey, Boolean(isHighlighted))}
+                    {/* Render chosen token style */}
+                    {renderPawnGraphic(tokenStyle, cx, cy, colorKey, Boolean(isHighlighted))}
+                  </g>
                 </g>
 
-                {/* Enlarged touch area for mobile click comfort */}
+                {/* Enlarged touch area for mobile click comfort — centred on the
+                    pawn where it now sits, so taps near its base register too. */}
                 {isLegal && (
                   <circle
                     cx={cx}
-                    cy={cy - 24}
+                    cy={cy - 4}
                     r="60"
                     fill="#ffffff"
                     opacity="0.001"

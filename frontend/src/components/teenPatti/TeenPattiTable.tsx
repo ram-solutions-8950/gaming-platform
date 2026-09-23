@@ -46,6 +46,7 @@ export const TeenPattiTable: React.FC<TeenPattiTableProps> = ({
     respondSideShow,
     startHand,
     leaveTable,
+    syncState,
     errorMessage,
   } = useTeenPattiSocket({ tableId });
 
@@ -71,6 +72,52 @@ export const TeenPattiTable: React.FC<TeenPattiTableProps> = ({
   const lastBetRef = useRef<number>(0);
   const lastSeenRef = useRef<boolean>(false);
   const lastWinnerSeatRef = useRef<number | null>(null);
+
+  // Backgrounding & Disconnection recovery
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        syncState();
+        refreshWallet();
+      }
+    };
+    const handleOnline = () => {
+      syncState();
+      refreshWallet();
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('online', handleOnline);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('online', handleOnline);
+    };
+  }, [syncState, refreshWallet]);
+
+  // Chip movement animation & pot bump
+  const [chipsFlying, setChipsFlying] = useState<Array<{ id: number; fromSeat: number }>>([]);
+  const [potBump, setPotBump] = useState<boolean>(false);
+  const lastPotRef = useRef<number>(0);
+
+  useEffect(() => {
+    if (!gameState) return;
+    if (gameState.pot > lastPotRef.current && lastPotRef.current > 0) {
+      setPotBump(true);
+      const actingSeat = gameState.last_action?.seat ?? (gameState.current_turn > 0 ? gameState.current_turn - 1 : 0);
+      const chipId = Date.now();
+      setChipsFlying((prev) => [...prev, { id: chipId, fromSeat: actingSeat }]);
+      const t1 = setTimeout(() => setPotBump(false), 500);
+      const t2 = setTimeout(() => {
+        setChipsFlying((prev) => prev.filter((c) => c.id !== chipId));
+      }, 750);
+      lastPotRef.current = gameState.pot;
+      return () => {
+        clearTimeout(t1);
+        clearTimeout(t2);
+      };
+    }
+    lastPotRef.current = gameState.pot;
+  }, [gameState?.pot, gameState?.last_action]);
 
   useEffect(() => {
     if (!gameState || !currentUserId) return;
@@ -147,6 +194,48 @@ export const TeenPattiTable: React.FC<TeenPattiTableProps> = ({
   const isTargetOfSideShow = pendingSideShow && pendingSideShow.target === currentUserId;
   const requesterSeat = pendingSideShow ? gameState.seats.find((s) => s.id === pendingSideShow.requester) : null;
 
+  // Derive top action banner text
+  const actionBannerText = (() => {
+    if (pendingSideShow) {
+      const isMe = pendingSideShow.requester === currentUserId;
+      return isMe ? 'You requested a Side Show' : `${requesterSeat?.name || 'Opponent'} requested a Side Show`;
+    }
+    if (gameState.phase === 'showdown') {
+      return gameState.reason || 'Showdown! Comparing hands...';
+    }
+    if (gameState.phase === 'finished') {
+      return gameState.reason || 'Round finished';
+    }
+    const last = gameState.last_action;
+    if (!last) {
+      if (gameState.phase === 'playing') {
+        const activeSeat = gameState.seats[gameState.current_turn];
+        const isMyTurn = activeSeat?.id === currentUserId;
+        return isMyTurn ? "It's your turn to bet!" : `${activeSeat?.name || 'Player'}'s turn to play`;
+      }
+      return 'Waiting for round to begin...';
+    }
+    const isMe = last.user_id === currentUserId;
+    const name = isMe ? 'You' : (last.player_name || gameState.seats[last.seat]?.name || 'Player');
+    const amountStr = last.amount ? `₹${(last.amount / 100).toFixed(0)}` : '';
+    if (last.action === 'pack') {
+      return isMe ? 'You packed (folded)' : `${name} packed (folded)`;
+    }
+    if (last.action === 'raise') {
+      return isMe ? `You raised the stake to ${amountStr}` : `${name} raised the stake to ${amountStr}`;
+    }
+    if (last.action === 'chaal' || last.action === 'blind') {
+      if (!last.seen) {
+        return isMe ? `You placed a Blind bet of ${amountStr}` : `${name} placed a Blind bet of ${amountStr}`;
+      }
+      return isMe ? `You called a Chaal of ${amountStr}` : `${name} called a Chaal of ${amountStr}`;
+    }
+    if (last.action === 'side_show_declined') {
+      return isMe ? 'Side show was declined' : `${name} declined the side show`;
+    }
+    return `${name} took action`;
+  })();
+
   return (
     <div className="tp-arena-container">
       {/* Top Navigation & Status Bar — placed outside oval felt to prevent overlapping player */}
@@ -192,6 +281,14 @@ export const TeenPattiTable: React.FC<TeenPattiTableProps> = ({
         </div>
       </div>
 
+      {/* Live Action Notification Banner */}
+      <div className="tp-action-banner-row">
+        <div className="tp-action-banner">
+          <span className="tp-action-dot" />
+          <span className="tp-action-text">{actionBannerText}</span>
+        </div>
+      </div>
+
       {/* Main Oval Table */}
       <div className="tp-table-oval">
         {/* In-table waiting notice when 2nd player has not yet joined */}
@@ -203,10 +300,15 @@ export const TeenPattiTable: React.FC<TeenPattiTableProps> = ({
         )}
 
         {/* Pot in center */}
-        <div className="tp-center-pot">
+        <div className={`tp-center-pot ${potBump ? 'tp-pot-bump' : ''}`}>
           <span className="tp-pot-label">Main Pot</span>
           <span className="tp-pot-amount">₹{(gameState.pot / 100).toFixed(0)}</span>
           <span className="tp-stake-info">Current Stake: ₹{(gameState.current_stake / 100).toFixed(0)}</span>
+          {chipsFlying.map((c) => (
+            <div key={c.id} className={`tp-flying-chip tp-flying-chip-${c.fromSeat}`}>
+              🪙
+            </div>
+          ))}
         </div>
 
         {/* Player Seats */}
@@ -219,6 +321,8 @@ export const TeenPattiTable: React.FC<TeenPattiTableProps> = ({
             isCurrentTurn={gameState.phase === 'playing' && gameState.current_turn === idx}
             isDealer={gameState.dealer_seat === idx}
             isViewer={seat.id === currentUserId}
+            turnSeconds={15}
+            onSee={seeCards}
           />
         ))}
       </div>

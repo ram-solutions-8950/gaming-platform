@@ -2,21 +2,26 @@ import { useEffect, useState, useCallback } from 'react';
 import { Card } from '../../components/common/Card';
 import { Badge } from '../../components/common/Badge';
 import { Loader } from '../../components/common/Loader';
+import { CopyableId } from '../../components/common/CopyableId';
+import { FilterSelect } from '../../components/common/FilterSelect';
+import { SearchInput } from '../../components/common/SearchInput';
+import { RefreshOverlay } from '../../components/common/RefreshOverlay';
+import { useDebouncedValue } from '../../hooks/useDebouncedValue';
+import { useRefreshIndicator } from '../../hooks/useRefreshIndicator';
 import api from '../../services/api';
 import type { Withdrawal, WithdrawalStatus } from '../../types';
 import {
   RefreshCw,
-  Search,
   Filter,
   Eye,
   CheckCircle2,
   XCircle,
   Calendar,
-  Copy,
-  Check,
   ChevronLeft,
   ChevronRight,
   ArrowUpCircle,
+  Landmark,
+  RotateCcw,
   X,
 } from 'lucide-react';
 
@@ -62,6 +67,57 @@ function formatDateTime(dateStr?: string | null): string {
   }
 }
 
+interface AccountField {
+  label: string;
+  value: string;
+}
+
+const ACCOUNT_FIELD_LABELS: Record<string, string> = {
+  name: 'Account Holder',
+  holder: 'Account Holder',
+  'a/c': 'Account Number',
+  ac: 'Account Number',
+  account: 'Account Number',
+  'account no': 'Account Number',
+  ifsc: 'IFSC Code',
+  bank: 'Bank Name',
+  branch: 'Branch',
+  upi: 'UPI ID',
+};
+
+/**
+ * Split the stored destination string into labelled fields.
+ *
+ * Bank withdrawals arrive as `Name: A B, A/C: 123456, IFSC: HDFC0001` and UPI ones
+ * as a bare handle. Rendered raw, that whole string was squeezed into one
+ * right-aligned line and wrapped mid-word, which is what made the expanded
+ * Account Details unreadable.
+ */
+function parseAccountDetails(
+  destination?: string | null,
+  method?: string | null,
+): AccountField[] {
+  const raw = (destination || '').trim();
+  if (!raw) return [];
+
+  const fields = raw
+    .split(/\s*,\s*/)
+    .map((part) => {
+      const separator = part.indexOf(':');
+      if (separator === -1) return null;
+      const rawLabel = part.slice(0, separator).trim();
+      const value = part.slice(separator + 1).trim();
+      if (!rawLabel || !value) return null;
+      return { label: ACCOUNT_FIELD_LABELS[rawLabel.toLowerCase()] ?? rawLabel, value };
+    })
+    .filter((field): field is AccountField => field !== null);
+
+  if (fields.length > 0) return fields;
+
+  const isUpi = (method || '').toLowerCase() === 'upi' || raw.includes('@');
+  return [{ label: isUpi ? 'UPI ID' : 'Account Details', value: raw }];
+}
+
 function WithdrawalDetailsModal({
   withdrawal,
   onClose,
@@ -73,15 +129,9 @@ function WithdrawalDetailsModal({
   onApprove?: (id: string) => void;
   onReject?: (id: string) => void;
 }) {
-  const [copied, setCopied] = useState<string | null>(null);
-
   if (!withdrawal) return null;
 
-  const handleCopy = (text: string, label: string) => {
-    navigator.clipboard.writeText(text);
-    setCopied(label);
-    setTimeout(() => setCopied(null), 2000);
-  };
+  const accountFields = parseAccountDetails(withdrawal.destination, withdrawal.payment_method || withdrawal.method);
 
   return (
     <div
@@ -104,18 +154,15 @@ function WithdrawalDetailsModal({
         </div>
 
         <div className="space-y-3 text-sm">
-          <div className="flex justify-between items-center py-2 border-b border-dark-800">
-            <span className="text-gray-400">Withdrawal ID</span>
-            <div className="flex items-center gap-1.5 font-mono text-xs text-white">
-              <span>{withdrawal.id}</span>
-              <button
-                onClick={() => handleCopy(withdrawal.id, 'id')}
-                className="p-1 hover:bg-dark-700 rounded text-gray-400 hover:text-white"
-                title="Copy Withdrawal ID"
-              >
-                {copied === 'id' ? <Check className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
-              </button>
-            </div>
+          <div className="flex justify-between items-start gap-3 py-2 border-b border-dark-800">
+            <span className="text-gray-400 shrink-0">Withdrawal ID</span>
+            <CopyableId
+              value={withdrawal.id}
+              label="Withdrawal ID"
+              full
+              valueClassName="text-white"
+              className="min-w-0 justify-end"
+            />
           </div>
 
           <div className="flex justify-between items-center py-2 border-b border-dark-800">
@@ -123,9 +170,9 @@ function WithdrawalDetailsModal({
             <span className="font-semibold text-white">{withdrawal.user_name || 'Unknown User'}</span>
           </div>
 
-          <div className="flex justify-between items-center py-2 border-b border-dark-800">
-            <span className="text-gray-400">User ID</span>
-            <span className="font-mono text-xs text-gray-300">{withdrawal.user_id}</span>
+          <div className="flex justify-between items-start gap-3 py-2 border-b border-dark-800">
+            <span className="text-gray-400 shrink-0">User ID</span>
+            <CopyableId value={withdrawal.user_id} label="User ID" full className="min-w-0 justify-end" />
           </div>
 
           <div className="flex justify-between items-center py-2 border-b border-dark-800">
@@ -142,26 +189,35 @@ function WithdrawalDetailsModal({
             </span>
           </div>
 
-          <div className="flex justify-between items-start py-2 border-b border-dark-800">
-            <span className="text-gray-400">Account Details</span>
-            <div className="text-right">
-              <span className="font-mono text-xs text-amber-300 break-all">
-                {withdrawal.destination || '—'}
-              </span>
-              {withdrawal.destination && (
-                <button
-                  onClick={() => handleCopy(withdrawal.destination!, 'dest')}
-                  className="ml-2 inline p-0.5 hover:bg-dark-700 rounded text-gray-400 hover:text-white align-middle"
-                  title="Copy Account Details"
-                >
-                  {copied === 'dest' ? (
-                    <Check className="w-3 h-3 text-green-400 inline" />
-                  ) : (
-                    <Copy className="w-3 h-3 inline" />
-                  )}
-                </button>
-              )}
+          {/* Account Details — one labelled row per field so long bank strings
+              stay aligned and readable, each copyable on its own. */}
+          <div className="py-2 border-b border-dark-800 space-y-2">
+            <div className="flex items-center gap-2 text-gray-400">
+              <Landmark className="w-4 h-4 text-amber-400/80" />
+              <span>Account Details</span>
             </div>
+            {accountFields.length === 0 ? (
+              <p className="pl-6 text-xs text-gray-500">No payment details were submitted.</p>
+            ) : (
+              <dl className="divide-y divide-dark-800 rounded-xl border border-dark-700 bg-dark-950/60">
+                {accountFields.map((field) => (
+                  <div
+                    key={`${field.label}-${field.value}`}
+                    className="grid gap-1 px-3 py-2.5 sm:grid-cols-[8.5rem_minmax(0,1fr)] sm:items-start sm:gap-3"
+                  >
+                    <dt className="text-xs font-medium text-gray-400">{field.label}</dt>
+                    <dd className="min-w-0">
+                      <CopyableId
+                        value={field.value}
+                        label={field.label}
+                        full
+                        valueClassName="text-amber-300"
+                      />
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            )}
           </div>
 
           <div className="flex justify-between items-center py-2 border-b border-dark-800">
@@ -228,10 +284,11 @@ export function AdminWithdrawalsPage() {
   const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([]);
   const [totalWithdrawals, setTotalWithdrawals] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+  const { refreshing, runRefresh } = useRefreshIndicator();
 
   // Filters (BUG-041 & BUG-044)
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebouncedValue(search);
   const [statusFilter, setStatusFilter] = useState('');
   const [dateFilter, setDateFilter] = useState('');
 
@@ -251,16 +308,13 @@ export function AdminWithdrawalsPage() {
   const [errorMsg, setErrorMsg] = useState<string>('');
   const [processingAction, setProcessingAction] = useState(false);
 
-  // Copy feedback state
-  const [copiedId, setCopiedId] = useState<string | null>(null);
-
   const fetchWithdrawals = useCallback(async () => {
     try {
       const params: Record<string, unknown> = {
         page,
         page_size: pageSize,
       };
-      if (search.trim()) params.search = search.trim();
+      if (debouncedSearch.trim()) params.search = debouncedSearch.trim();
       if (statusFilter) params.status = statusFilter;
       if (dateFilter) params.date_filter = dateFilter;
 
@@ -271,24 +325,23 @@ export function AdminWithdrawalsPage() {
       console.error('Failed to load admin withdrawals', e);
     } finally {
       setLoading(false);
-      setRefreshing(false);
     }
-  }, [page, pageSize, search, statusFilter, dateFilter]);
+  }, [page, pageSize, debouncedSearch, statusFilter, dateFilter]);
 
   useEffect(() => {
     fetchWithdrawals();
   }, [fetchWithdrawals]);
 
-  const handleRefresh = () => {
-    setRefreshing(true);
-    fetchWithdrawals();
-  };
+  const handleRefresh = () => runRefresh(fetchWithdrawals);
 
-  const handleCopy = (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    navigator.clipboard.writeText(id);
-    setCopiedId(id);
-    setTimeout(() => setCopiedId(null), 2000);
+  // Reset (BUG-041): one click back to the unfiltered list.
+  const filtersActive = Boolean(search || statusFilter || dateFilter);
+
+  const handleResetFilters = () => {
+    setSearch('');
+    setStatusFilter('');
+    setDateFilter('');
+    setPage(1);
   };
 
   const openActionModal = (
@@ -348,71 +401,81 @@ export function AdminWithdrawalsPage() {
           disabled={refreshing}
           className="flex items-center gap-2 px-4 py-2 bg-dark-800 hover:bg-dark-700 text-gray-200 border border-dark-600 rounded-lg text-sm font-medium transition shadow-sm hover:border-gray-500 disabled:opacity-50"
         >
-          <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin text-primary-400' : ''}`} />
-          <span>Refresh</span>
+          <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin text-brand-400' : ''}`} />
+          <span>{refreshing ? 'Refreshing…' : 'Refresh'}</span>
         </button>
       </div>
 
       {/* Filters & Search bar (BUG-041 & BUG-044) */}
-      <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
-        {/* Search by ID, User Name, or Destination */}
-        <div className="sm:col-span-6 relative">
-          <Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
-              setPage(1);
-            }}
-            placeholder="Search by Withdrawal ID, User Name, or Account..."
-            className="w-full pl-9 pr-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-primary-500"
-          />
-        </div>
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+        {/* Search by Withdrawal ID, User Name, User ID or Account */}
+        <SearchInput
+          value={search}
+          onChange={(value) => {
+            setSearch(value);
+            setPage(1);
+          }}
+          busy={search !== debouncedSearch}
+          placeholder="Search by Withdrawal ID, User Name, User ID or Account…"
+          ariaLabel="Search withdrawals"
+          className="min-w-0 flex-1"
+        />
 
         {/* Status Filter (BUG-044) */}
-        <div className="sm:col-span-3 relative">
-          <Filter className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
-          <select
-            value={statusFilter}
-            onChange={(e) => {
-              setStatusFilter(e.target.value);
-              setPage(1);
-            }}
-            className="w-full pl-9 pr-8 py-2 bg-dark-800 border border-dark-700 rounded-lg text-sm text-white focus:outline-none focus:border-primary-500 appearance-none"
-          >
-            <option value="">All Statuses</option>
-            <option value="PENDING">PENDING</option>
-            <option value="APPROVED">APPROVED</option>
-            <option value="PROCESSING">PROCESSING</option>
-            <option value="COMPLETED">COMPLETED</option>
-            <option value="REJECTED">REJECTED</option>
-            <option value="FAILED">FAILED</option>
-            <option value="CANCELLED">CANCELLED</option>
-          </select>
-        </div>
+        <FilterSelect
+          value={statusFilter}
+          onChange={(e) => {
+            setStatusFilter(e.target.value);
+            setPage(1);
+          }}
+          icon={<Filter className="h-4 w-4" />}
+          aria-label="Filter by status"
+          wrapperClassName="w-full lg:w-48"
+        >
+          <option value="">All Statuses</option>
+          <option value="PENDING">PENDING</option>
+          <option value="APPROVED">APPROVED</option>
+          <option value="PROCESSING">PROCESSING</option>
+          <option value="COMPLETED">COMPLETED</option>
+          <option value="REJECTED">REJECTED</option>
+          <option value="FAILED">FAILED</option>
+          <option value="CANCELLED">CANCELLED</option>
+        </FilterSelect>
 
         {/* Date Filter */}
-        <div className="sm:col-span-3 relative">
-          <Calendar className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
-          <select
-            value={dateFilter}
-            onChange={(e) => {
-              setDateFilter(e.target.value);
-              setPage(1);
-            }}
-            className="w-full pl-9 pr-8 py-2 bg-dark-800 border border-dark-700 rounded-lg text-sm text-white focus:outline-none focus:border-primary-500 appearance-none"
-          >
-            <option value="">All Time</option>
-            <option value="TODAY">Today</option>
-            <option value="WEEK">This Week</option>
-            <option value="MONTH">This Month</option>
-          </select>
-        </div>
+        <FilterSelect
+          value={dateFilter}
+          onChange={(e) => {
+            setDateFilter(e.target.value);
+            setPage(1);
+          }}
+          icon={<Calendar className="h-4 w-4" />}
+          aria-label="Filter by date"
+          wrapperClassName="w-full lg:w-44"
+        >
+          <option value="">All Time</option>
+          <option value="TODAY">Today</option>
+          <option value="WEEK">This Week</option>
+          <option value="MONTH">This Month</option>
+        </FilterSelect>
+
+        {/* Reset all filters at once (BUG-041) */}
+        <button
+          type="button"
+          onClick={handleResetFilters}
+          disabled={!filtersActive}
+          title={filtersActive ? 'Clear the search and all filters' : 'No filters applied'}
+          className="flex shrink-0 cursor-pointer items-center justify-center gap-2 rounded-lg border border-dark-600 bg-dark-800 px-4 py-2 text-sm font-medium text-gray-200 transition hover:border-gray-500 hover:bg-dark-700 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          <RotateCcw className="h-4 w-4" />
+          <span>Reset</span>
+        </button>
       </div>
 
       {/* Withdrawals Table - 8 Required Columns (BUG-040) */}
-      <Card>
+      <Card className="relative">
+        {/* Visible refresh state (BUG-043) */}
+        <RefreshOverlay active={refreshing} />
         {loading ? (
           <div className="flex justify-center py-16">
             <Loader size="lg" />
@@ -452,27 +515,19 @@ export function AdminWithdrawalsPage() {
                     <tr key={w.id} className="hover:bg-dark-800/50 transition-colors">
                       {/* 1. Withdrawal ID */}
                       <td className="py-3 px-3 whitespace-nowrap">
-                        <div className="flex items-center gap-1.5 font-mono text-xs text-gray-300">
-                          <span title={w.id}>{w.id.slice(0, 8)}...</span>
-                          <button
-                            onClick={(e) => handleCopy(w.id, e)}
-                            title="Copy Full Withdrawal ID"
-                            className="p-1 hover:bg-dark-700 rounded text-gray-400 hover:text-white transition"
-                          >
-                            {copiedId === w.id ? (
-                              <Check className="w-3.5 h-3.5 text-green-400" />
-                            ) : (
-                              <Copy className="w-3.5 h-3.5" />
-                            )}
-                          </button>
-                        </div>
+                        <CopyableId value={w.id} label="Withdrawal ID" widthClass="max-w-[6rem]" />
                       </td>
 
-                      {/* 2. User Name */}
+                      {/* 2. User Name (with a copyable User ID) */}
                       <td className="py-3 px-3 whitespace-nowrap">
-                        <span className="font-medium text-gray-200 hover:text-white" title={w.user_id}>
-                          {w.user_name || 'Unknown User'}
-                        </span>
+                        <p className="font-medium text-gray-200">{w.user_name || 'Unknown User'}</p>
+                        <CopyableId
+                          value={w.user_id}
+                          label="User ID"
+                          widthClass="max-w-[5.5rem]"
+                          valueClassName="text-gray-500"
+                          className="mt-0.5"
+                        />
                       </td>
 
                       {/* 3. Amount */}
@@ -487,7 +542,7 @@ export function AdminWithdrawalsPage() {
 
                       {/* 5. Account Details */}
                       <td
-                        className="py-3 px-3 text-xs font-mono text-gray-400 max-w-xs truncate"
+                        className="py-3 px-3 text-xs font-mono text-gray-400 max-w-[9.5rem] truncate"
                         title={w.destination ?? ''}
                       >
                         {w.destination || '—'}

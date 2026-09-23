@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Copy, Check, ShieldCheck } from 'lucide-react';
+import { copyToClipboard } from '../../utils/clipboard';
 
 export interface BaseTransaction {
   id: string;
@@ -32,9 +33,9 @@ export const TransactionDetailsModal: React.FC<TransactionDetailsModalProps> = (
   const isCredit = CREDIT_TYPES.includes(tx.type);
   const amountInRupees = (tx.amount / 100).toFixed(2);
 
-  const handleCopyRef = (e: React.MouseEvent, refId: string) => {
+  const handleCopyRef = async (e: React.MouseEvent, refId: string) => {
     e.stopPropagation();
-    navigator.clipboard?.writeText(refId);
+    if (!(await copyToClipboard(refId))) return;
     setCopiedId(refId);
     setTimeout(() => {
       setCopiedId(null);

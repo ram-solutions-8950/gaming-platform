@@ -174,14 +174,16 @@ export function PokerPage() {
 
   return (
     <div className="poker-game-wrapper">
-      {/* Mobile Landscape Orientation Banner */}
-      <div className="poker-portrait-reminder">
-        <div className="rotate-icon">📱</div>
-        <h2 className="text-xl font-bold text-white">Please Rotate Your Phone</h2>
-        <p className="text-sm text-gray-400">
-          Poker requires landscape mode for high-speed table action.
-        </p>
-      </div>
+      {/* Mobile Landscape Orientation Banner (only when seated at table) */}
+      {activeTableId && (
+        <div className="poker-portrait-reminder">
+          <div className="rotate-icon">📱</div>
+          <h2 className="text-xl font-bold text-white">Please Rotate Your Phone</h2>
+          <p className="text-sm text-gray-400">
+            Poker table requires landscape mode for optimal play.
+          </p>
+        </div>
+      )}
 
       {/* Error Alert Toast */}
       {actionErrorMessage && (

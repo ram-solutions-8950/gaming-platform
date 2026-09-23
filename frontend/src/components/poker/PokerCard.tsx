@@ -11,16 +11,17 @@ const SUIT_ICONS: Record<string, string> = {
   C: '♣',
 };
 
-const SUIT_COLORS: Record<string, string> = {
-  S: 'text-gray-900',
-  H: 'text-red-600',
-  D: 'text-blue-600',
-  C: 'text-emerald-700',
+// Four-colour deck: at the size a phone shows hole cards, colour separates the
+// suits faster than the pip shape does.
+const SUIT_CLASSES: Record<string, string> = {
+  S: 'suit-spade',
+  H: 'suit-heart',
+  D: 'suit-diamond',
+  C: 'suit-club',
 };
 
 export function PokerCard({ card, className = '', size = 'md' }: PokerCardProps) {
   if (!card || card === '??') {
-    // Face-down card back
     return (
       <div className={`poker-card poker-card-back ${size} ${className}`}>
         <div className="card-pattern" />
@@ -31,19 +32,12 @@ export function PokerCard({ card, className = '', size = 'md' }: PokerCardProps)
   const suit = card.slice(-1).toUpperCase();
   const rank = card.slice(0, -1);
   const icon = SUIT_ICONS[suit] || '';
-  const colorClass = SUIT_COLORS[suit] || 'text-gray-900';
+  const suitClass = SUIT_CLASSES[suit] || 'suit-spade';
 
   return (
-    <div className={`poker-card poker-card-front ${size} ${className}`}>
-      <div className={`card-corner top-left ${colorClass}`}>
-        <span className="card-rank">{rank}</span>
-        <span className="card-suit">{icon}</span>
-      </div>
-      <div className={`card-center-icon ${colorClass}`}>{icon}</div>
-      <div className={`card-corner bottom-right ${colorClass}`}>
-        <span className="card-rank">{rank}</span>
-        <span className="card-suit">{icon}</span>
-      </div>
+    <div className={`poker-card poker-card-front ${size} ${suitClass} ${className}`}>
+      <span className="card-rank">{rank}</span>
+      <span className="card-pip">{icon}</span>
     </div>
   );
 }

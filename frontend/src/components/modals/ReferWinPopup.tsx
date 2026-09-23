@@ -5,6 +5,7 @@ import {
   type ReferralStats,
   type ReferralHistoryItem,
 } from '../../services/referral';
+import { copyToClipboard } from '../../utils/clipboard';
 
 interface ReferWinPopupProps {
   onClose: () => void;
@@ -40,8 +41,8 @@ export function ReferWinPopup({ onClose }: ReferWinPopupProps) {
     ? `${window.location.origin}/signup?ref=${stats.referral_code}`
     : `${window.location.origin}/signup`;
 
-  const copyLink = () => {
-    navigator.clipboard.writeText(referralLink);
+  const copyLink = async () => {
+    if (!(await copyToClipboard(referralLink))) return;
     setCopied(true);
     setTimeout(() => setCopied(false), 2500);
   };

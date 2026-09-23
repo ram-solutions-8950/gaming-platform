@@ -5,14 +5,13 @@ import type { PokerTableInfo } from '../../services/poker';
 interface PokerLobbyProps {
   tables: PokerTableInfo[];
   onSelectTable: (tableId: string, buyInAmount: number) => void;
-  onCreateTable: (isPractice: boolean) => void;
-  walletBalancePaise: number;
+  onCreateTable?: (isPractice: boolean) => void;
+  walletBalancePaise?: number;
 }
 
 export function PokerLobby({
   tables,
   onSelectTable,
-  onCreateTable,
 }: PokerLobbyProps) {
   const navigate = useNavigate();
   const [selectedTable, setSelectedTable] = useState<PokerTableInfo | null>(null);
@@ -31,22 +30,6 @@ export function PokerLobby({
           <h1 className="text-xl sm:text-2xl font-bold text-white flex items-center gap-2">
             <span>♠️</span> Texas Hold'em Poker Lobby
           </h1>
-        </div>
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={() => onCreateTable(false)}
-            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm font-bold shadow-lg transition-transform active:scale-95"
-          >
-            + Create Real Money Table
-          </button>
-          <button
-            type="button"
-            onClick={() => onCreateTable(true)}
-            className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg text-sm font-bold shadow-lg transition-transform active:scale-95"
-          >
-            🎮 Practice Mode
-          </button>
         </div>
       </div>
 

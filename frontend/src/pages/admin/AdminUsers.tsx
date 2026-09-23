@@ -2,20 +2,24 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { Card } from '../../components/common/Card';
 import { Badge } from '../../components/common/Badge';
 import { Loader } from '../../components/common/Loader';
+import { CopyableId } from '../../components/common/CopyableId';
+import { FilterSelect } from '../../components/common/FilterSelect';
+import { SearchInput } from '../../components/common/SearchInput';
+import { RefreshOverlay } from '../../components/common/RefreshOverlay';
+import { useDebouncedValue } from '../../hooks/useDebouncedValue';
+import { useRefreshIndicator } from '../../hooks/useRefreshIndicator';
 import api from '../../services/api';
 import { walletService } from '../../services/wallet';
 import { useAuthStore } from '../../store/authStore';
 import type { User, WalletTransaction } from '../../types';
 import {
   RefreshCw,
-  Search,
   Filter,
   ArrowLeft,
-  Copy,
-  Check,
   ChevronLeft,
   ChevronRight,
   Coins,
+  RotateCcw,
   X,
 } from 'lucide-react';
 import { getApiErrorMessage } from '../../utils/apiError';
@@ -441,10 +445,11 @@ export function AdminUsersPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [totalUsers, setTotalUsers] = useState<number>(0);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+  const { refreshing, runRefresh } = useRefreshIndicator();
 
   // Filters & Search (BUG-026)
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebouncedValue(search);
   const [roleFilter, setRoleFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
 
@@ -456,9 +461,6 @@ export function AdminUsersPage() {
   const [adjustTarget, setAdjustTarget] = useState<User | null>(null);
   const [targetBalance, setTargetBalance] = useState<number | null>(null);
 
-  // Copy feedback state (BUG-017)
-  const [copiedId, setCopiedId] = useState<string | null>(null);
-
   // Toast state
   const [toast, setToast] = useState<ToastState | null>(null);
   const showToast = (message: string, type: ToastState['type']) => setToast({ message, type });
@@ -469,7 +471,7 @@ export function AdminUsersPage() {
         page,
         page_size: pageSize,
       };
-      if (search.trim()) params.search = search.trim();
+      if (debouncedSearch.trim()) params.search = debouncedSearch.trim();
       if (roleFilter) params.role = roleFilter;
       if (statusFilter) params.status = statusFilter;
 
@@ -480,23 +482,23 @@ export function AdminUsersPage() {
       showToast('Failed to load users.', 'error');
     } finally {
       setLoading(false);
-      setRefreshing(false);
     }
-  }, [page, pageSize, search, roleFilter, statusFilter]);
+  }, [page, pageSize, debouncedSearch, roleFilter, statusFilter]);
 
   useEffect(() => {
     fetchUsers();
   }, [fetchUsers]);
 
-  const handleRefresh = () => {
-    setRefreshing(true);
-    fetchUsers();
-  };
-  const handleCopy = (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    navigator.clipboard.writeText(id);
-    setCopiedId(id);
-    setTimeout(() => setCopiedId(null), 2000);
+  const handleRefresh = () => runRefresh(fetchUsers);
+
+  // Reset (BUG-026): clear every applied filter in one click.
+  const filtersActive = Boolean(search || roleFilter || statusFilter);
+
+  const handleResetFilters = () => {
+    setSearch('');
+    setRoleFilter('');
+    setStatusFilter('');
+    setPage(1);
   };
 
   const openAdjustModal = (targetUser: User) => {
@@ -541,64 +543,73 @@ export function AdminUsersPage() {
           disabled={refreshing}
           className="flex items-center gap-2 px-4 py-2 bg-dark-800 hover:bg-dark-700 text-gray-200 border border-dark-600 rounded-lg text-sm font-medium transition shadow-sm hover:border-gray-500 disabled:opacity-50"
         >
-          <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin text-primary-400' : ''}`} />
-          <span>Refresh</span>
+          <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin text-brand-400' : ''}`} />
+          <span>{refreshing ? 'Refreshing…' : 'Refresh'}</span>
         </button>
       </div>
 
-      {/* Filters: Search Bar, Role filter, Status filter (BUG-026) */}
-      <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
-        <div className="sm:col-span-6 relative">
-          <Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
-              setPage(1);
-            }}
-            placeholder="Search by User ID, name, email or username..."
-            className="w-full pl-9 pr-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-primary-500"
-          />
-        </div>
+      {/* Filters: Search Bar, Role filter, Status filter, Reset (BUG-026) */}
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+        <SearchInput
+          value={search}
+          onChange={(value) => {
+            setSearch(value);
+            setPage(1);
+          }}
+          busy={search !== debouncedSearch}
+          placeholder="Search by User ID, name, email or username…"
+          ariaLabel="Search users"
+          className="min-w-0 flex-1"
+        />
 
-        <div className="sm:col-span-3 relative">
-          <Filter className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
-          <select
-            value={roleFilter}
-            onChange={(e) => {
-              setRoleFilter(e.target.value);
-              setPage(1);
-            }}
-            className="w-full pl-9 pr-8 py-2 bg-dark-800 border border-dark-700 rounded-lg text-sm text-white focus:outline-none focus:border-primary-500 appearance-none"
-          >
-            <option value="">All Roles</option>
-            <option value="USER">USER</option>
-            <option value="ADMIN">ADMIN</option>
-            <option value="SUPER_ADMIN">SUPER_ADMIN</option>
-          </select>
-        </div>
+        <FilterSelect
+          value={roleFilter}
+          onChange={(e) => {
+            setRoleFilter(e.target.value);
+            setPage(1);
+          }}
+          icon={<Filter className="h-4 w-4" />}
+          aria-label="Filter by role"
+          wrapperClassName="w-full lg:w-44"
+        >
+          <option value="">All Roles</option>
+          <option value="USER">USER</option>
+          <option value="ADMIN">ADMIN</option>
+          <option value="SUPER_ADMIN">SUPER_ADMIN</option>
+        </FilterSelect>
 
-        <div className="sm:col-span-3 relative">
-          <Filter className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
-          <select
-            value={statusFilter}
-            onChange={(e) => {
-              setStatusFilter(e.target.value);
-              setPage(1);
-            }}
-            className="w-full pl-9 pr-8 py-2 bg-dark-800 border border-dark-700 rounded-lg text-sm text-white focus:outline-none focus:border-primary-500 appearance-none"
-          >
-            <option value="">All Statuses</option>
-            <option value="ACTIVE">ACTIVE</option>
-            <option value="SUSPENDED">SUSPENDED</option>
-            <option value="DISABLED">DISABLED</option>
-          </select>
-        </div>
+        <FilterSelect
+          value={statusFilter}
+          onChange={(e) => {
+            setStatusFilter(e.target.value);
+            setPage(1);
+          }}
+          icon={<Filter className="h-4 w-4" />}
+          aria-label="Filter by status"
+          wrapperClassName="w-full lg:w-44"
+        >
+          <option value="">All Statuses</option>
+          <option value="ACTIVE">ACTIVE</option>
+          <option value="SUSPENDED">SUSPENDED</option>
+          <option value="DISABLED">DISABLED</option>
+        </FilterSelect>
+
+        <button
+          type="button"
+          onClick={handleResetFilters}
+          disabled={!filtersActive}
+          title={filtersActive ? 'Clear the search and all filters' : 'No filters applied'}
+          className="flex shrink-0 cursor-pointer items-center justify-center gap-2 rounded-lg border border-dark-600 bg-dark-800 px-4 py-2 text-sm font-medium text-gray-200 transition hover:border-gray-500 hover:bg-dark-700 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          <RotateCcw className="h-4 w-4" />
+          <span>Reset</span>
+        </button>
       </div>
 
       {/* Users Table */}
-      <Card>
+      <Card className="relative">
+        {/* Visible refresh state (BUG-025) */}
+        <RefreshOverlay active={refreshing} />
         {loading ? (
           <div className="flex justify-center py-16">
             <Loader size="lg" />
@@ -629,20 +640,7 @@ export function AdminUsersPage() {
                     <tr key={u.id} className="hover:bg-dark-800/50 transition-colors">
                       {/* User ID column with copy button (BUG-017) */}
                       <td className="py-3 px-3 whitespace-nowrap">
-                        <div className="flex items-center gap-1.5 font-mono text-xs text-gray-300">
-                          <span title={u.id}>{u.id.slice(0, 8)}...</span>
-                          <button
-                            onClick={(e) => handleCopy(u.id, e)}
-                            title="Copy Full User ID"
-                            className="p-1 hover:bg-dark-700 rounded text-gray-400 hover:text-white transition"
-                          >
-                            {copiedId === u.id ? (
-                              <Check className="w-3.5 h-3.5 text-green-400" />
-                            ) : (
-                              <Copy className="w-3.5 h-3.5" />
-                            )}
-                          </button>
-                        </div>
+                        <CopyableId value={u.id} label="User ID" />
                       </td>
 
                       {/* User info */}

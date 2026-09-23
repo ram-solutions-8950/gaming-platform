@@ -39,6 +39,17 @@
     text-align: center;
     white-space: nowrap;
   }
+
+  .tp-action-dock {
+    padding: 0.6rem 0.75rem;
+    gap: 8px;
+  }
+
+  .tp-btn {
+    min-width: 72px;
+    padding: 6px 10px;
+    font-size: 0.78rem;
+  }
 }
 
 /* The Emerald Felt Table */
@@ -241,6 +252,10 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  /* Blind/Chaal, Raise and Show can all be live at once — wrap rather than
+     pushing an action off the edge on a narrow screen. */
+  flex-wrap: wrap;
+  row-gap: 8px;
   gap: 12px;
   margin-top: 1rem;
   background: rgba(15, 23, 42, 0.85);
@@ -285,6 +300,14 @@
   background: linear-gradient(135deg, #16a34a 0%, #15803d 100%);
   color: #fff;
   box-shadow: 0 4px 12px rgba(22, 163, 74, 0.4);
+}
+
+/* Playing blind: teal, distinct from the green seen-player chaal so a player
+   can tell at a glance that they are staking without looking. */
+.tp-btn-blind {
+  background: linear-gradient(135deg, #0d9488 0%, #0f766e 100%);
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(13, 148, 136, 0.4);
 }
 
 .tp-btn-raise {

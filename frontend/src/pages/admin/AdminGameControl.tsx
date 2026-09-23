@@ -1,9 +1,15 @@
 import { useState, useCallback, useEffect } from 'react';
 import { Card } from '../../components/common/Card';
 import { Loader } from '../../components/common/Loader';
+import { CopyableId } from '../../components/common/CopyableId';
+import { FilterSelect } from '../../components/common/FilterSelect';
+import { SearchInput } from '../../components/common/SearchInput';
+import { RefreshOverlay } from '../../components/common/RefreshOverlay';
+import { useDebouncedValue } from '../../hooks/useDebouncedValue';
+import { useRefreshIndicator } from '../../hooks/useRefreshIndicator';
 import { gameService } from '../../services/game';
 import type { GameRoundAdmin, GameBet, PaginatedResult } from '../../types';
-import { RefreshCw, Copy, Check, ChevronLeft, ChevronRight, Search, Filter } from 'lucide-react';
+import { RefreshCw, ChevronLeft, ChevronRight, Filter, RotateCcw } from 'lucide-react';
 
 function paiseToRupees(p: number | undefined | null): string {
   if (typeof p !== 'number') return '0.00';
@@ -14,15 +20,14 @@ function formatDateTime(dateStr?: string | null): string {
   if (!dateStr) return '-';
   try {
     const d = new Date(dateStr);
-    return d.toLocaleString('en-IN', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
+    const date = d.toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: '2-digit' });
+    const time = d.toLocaleTimeString('en-IN', {
       hour: '2-digit',
       minute: '2-digit',
       second: '2-digit',
       hour12: false,
     });
+    return `${date} ${time}`;
   } catch {
     return dateStr;
   }
@@ -35,9 +40,10 @@ export function AdminGameControlPage() {
   const [bets, setBets] = useState<PaginatedResult<GameBet> | null>(null);
   const [loadingRounds, setLoadingRounds] = useState(true);
   const [loadingBets, setLoadingBets] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
+  const { refreshing, runRefresh } = useRefreshIndicator();
   // Filters & Pagination for Rounds
   const [searchRound, setSearchRound] = useState('');
+  const debouncedSearchRound = useDebouncedValue(searchRound);
   const [statusFilter, setStatusFilter] = useState('');
   const [roundPage, setRoundPage] = useState(1);
   const roundPageSize = 10;
@@ -46,9 +52,6 @@ export function AdminGameControlPage() {
   const [betPage, setBetPage] = useState(1);
   const betPageSize = 20;
 
-  // Copy feedback state
-  const [copiedId, setCopiedId] = useState<string | null>(null);
-
   const fetchRounds = useCallback(async () => {
     try {
       const data = await gameService.getAdminRounds(
@@ -56,16 +59,15 @@ export function AdminGameControlPage() {
         roundPageSize,
         undefined,
         statusFilter || undefined,
-        searchRound.trim() || undefined
+        debouncedSearchRound.trim() || undefined
       );
       setRounds(data);
     } catch (err) {
       console.error('Failed to load admin rounds', err);
     } finally {
       setLoadingRounds(false);
-      setRefreshing(false);
     }
-  }, [roundPage, statusFilter, searchRound]);
+  }, [roundPage, statusFilter, debouncedSearchRound]);
 
   const fetchBets = useCallback(async (roundId: string, page = 1) => {
     setLoadingBets(true);
@@ -90,19 +92,27 @@ export function AdminGameControlPage() {
       setBets(null);
     }
   }, [selectedRound, betPage, fetchBets]);
-  const handleRefresh = () => {
-    setRefreshing(true);
-    fetchRounds();
-    if (selectedRound) {
-      fetchBets(selectedRound, betPage);
-    }
-  };
 
-  const handleCopy = (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    navigator.clipboard.writeText(id);
-    setCopiedId(id);
-    setTimeout(() => setCopiedId(null), 2000);
+  // Keep the selected round's pool figure in step with the refreshed list.
+  useEffect(() => {
+    if (!selectedRound || !rounds?.items) return;
+    const fresh = rounds.items.find((r) => r.id === selectedRound);
+    if (fresh) setSelectedRoundObj(fresh);
+  }, [rounds, selectedRound]);
+  const handleRefresh = () =>
+    runRefresh(async () => {
+      await Promise.all([
+        fetchRounds(),
+        selectedRound ? fetchBets(selectedRound, betPage) : Promise.resolve(),
+      ]);
+    });
+
+  const filtersActive = Boolean(searchRound || statusFilter);
+
+  const handleResetFilters = () => {
+    setSearchRound('');
+    setStatusFilter('');
+    setRoundPage(1);
   };
 
   const totalRoundPages = rounds ? Math.max(1, Math.ceil(rounds.total / roundPageSize)) : 1;
@@ -166,47 +176,56 @@ export function AdminGameControlPage() {
           disabled={refreshing}
           className="flex items-center gap-2 px-4 py-2 bg-dark-800 hover:bg-dark-700 text-gray-200 border border-dark-600 rounded-lg text-sm font-medium transition shadow-sm hover:border-gray-500 disabled:opacity-50"
         >
-          <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin text-primary-400' : ''}`} />
-          <span>Refresh</span>
+          <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin text-brand-400' : ''}`} />
+          <span>{refreshing ? 'Refreshing…' : 'Refresh'}</span>
         </button>
       </div>
 
-      {/* Main Grid */}
-      <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
-        {/* Left: Recent Rounds (7 columns) */}
-        <div className="xl:col-span-7">
-          <Card title="Recent Rounds">
+      {/* Rounds above, bets for the selected round below — full width each, so the
+          complete Round ID and the Bets / Total Pool columns all stay on screen. */}
+      <div className="space-y-6">
+        <div>
+          <Card title="Recent Rounds" className="relative">
+            {/* Visible refresh state (BUG-008) */}
+            <RefreshOverlay active={refreshing} />
             {/* Search & Filter Bar */}
-            <div className="flex flex-col sm:flex-row gap-3 mb-4">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="Search by Round ID..."
-                  value={searchRound}
-                  onChange={(e) => {
-                    setSearchRound(e.target.value);
-                    setRoundPage(1);
-                  }}
-                  className="w-full pl-9 pr-3 py-2 bg-dark-900 border border-dark-700 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-primary-500"
-                />
-              </div>
-              <div className="relative w-full sm:w-44">
-                <Filter className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
-                <select
-                  value={statusFilter}
-                  onChange={(e) => {
-                    setStatusFilter(e.target.value);
-                    setRoundPage(1);
-                  }}
-                  className="w-full pl-9 pr-8 py-2 bg-dark-900 border border-dark-700 rounded-lg text-sm text-white focus:outline-none focus:border-primary-500 appearance-none"
-                >
-                  <option value="">All Statuses</option>
-                  <option value="BETTING">BETTING</option>
-                  <option value="CALCULATING">CALCULATING</option>
-                  <option value="COMPLETED">COMPLETED</option>
-                </select>
-              </div>
+            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+              <SearchInput
+                value={searchRound}
+                onChange={(value) => {
+                  setSearchRound(value);
+                  setRoundPage(1);
+                }}
+                busy={searchRound !== debouncedSearchRound}
+                placeholder="Search by Round ID…"
+                ariaLabel="Search rounds"
+                className="min-w-0 flex-1"
+              />
+              <FilterSelect
+                value={statusFilter}
+                onChange={(e) => {
+                  setStatusFilter(e.target.value);
+                  setRoundPage(1);
+                }}
+                icon={<Filter className="h-4 w-4" />}
+                aria-label="Filter by status"
+                wrapperClassName="w-full sm:w-44"
+              >
+                <option value="">All Statuses</option>
+                <option value="BETTING">BETTING</option>
+                <option value="CALCULATING">CALCULATING</option>
+                <option value="COMPLETED">COMPLETED</option>
+              </FilterSelect>
+              <button
+                type="button"
+                onClick={handleResetFilters}
+                disabled={!filtersActive}
+                title={filtersActive ? 'Clear the search and all filters' : 'No filters applied'}
+                className="flex shrink-0 cursor-pointer items-center justify-center gap-2 rounded-lg border border-dark-600 bg-dark-800 px-3 py-2 text-sm font-medium text-gray-200 transition hover:border-gray-500 hover:bg-dark-700 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <RotateCcw className="h-4 w-4" />
+                <span>Reset</span>
+              </button>
             </div>
 
             {loadingRounds ? (
@@ -241,21 +260,14 @@ export function AdminGameControlPage() {
                             setBetPage(1);
                           }}
                         >
-                          <td className="py-3 px-2 whitespace-nowrap">
-                            <div className="flex items-center gap-1.5 font-mono text-xs text-gray-300">
-                              <span title={r.id}>{r.id.slice(0, 8)}...</span>
-                              <button
-                                onClick={(e) => handleCopy(r.id, e)}
-                                title="Copy Full Round ID"
-                                className="p-1 hover:bg-dark-700 rounded text-gray-400 hover:text-white transition"
-                              >
-                                {copiedId === r.id ? (
-                                  <Check className="w-3.5 h-3.5 text-green-400" />
-                                ) : (
-                                  <Copy className="w-3.5 h-3.5" />
-                                )}
-                              </button>
-                            </div>
+                          {/* Full Round ID, no "..." to cut a manual copy short (BUG-014) */}
+                          <td className="py-3 px-2">
+                            <CopyableId
+                              value={r.id}
+                              label="Round ID"
+                              full
+                              valueClassName="whitespace-nowrap text-gray-300"
+                            />
                           </td>
                           <td className="py-3 px-2 text-xs font-semibold text-white whitespace-nowrap">
                             {r.game_name || 'Colour Prediction'}
@@ -328,28 +340,20 @@ export function AdminGameControlPage() {
           </Card>
         </div>
 
-        {/* Right: Bets of Round (5 columns) */}
-        <div className="xl:col-span-5">
+        {/* Bets for the selected round */}
+        <div>
           <Card
             title={
               selectedRound ? (
                 <div className="flex items-center justify-between w-full">
-                  <div className="flex items-center gap-2 text-sm font-semibold text-white">
+                  <div className="flex min-w-0 flex-wrap items-center gap-2 text-sm font-semibold text-white">
                     <span>Bets for Round</span>
-                    <span className="font-mono text-xs text-primary-400 bg-primary-950/50 px-2 py-0.5 rounded border border-primary-800/60">
-                      {selectedRound.slice(0, 8)}...
-                    </span>
-                    <button
-                      onClick={(e) => handleCopy(selectedRound, e)}
-                      title="Copy Full Round ID"
-                      className="p-1 hover:bg-dark-700 rounded text-gray-400 hover:text-white transition"
-                    >
-                      {copiedId === selectedRound ? (
-                        <Check className="w-3.5 h-3.5 text-green-400" />
-                      ) : (
-                        <Copy className="w-3.5 h-3.5" />
-                      )}
-                    </button>
+                    <CopyableId
+                      value={selectedRound}
+                      label="Round ID"
+                      full
+                      valueClassName="rounded border border-brand-500/40 bg-brand-500/10 px-2 py-0.5 text-brand-400"
+                    />
                   </div>
                   {selectedRoundObj && (
                     <span className="text-xs text-gray-400 font-normal">

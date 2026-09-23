@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.orm import Session
+from sqlalchemy import cast, String
 from uuid import UUID
 import uuid
 from typing import Optional
@@ -30,6 +31,7 @@ from ..schemas.reward import (
 )
 from ..security.permissions import require_admin, require_super_admin
 from ..utils.responses import success_response, error_response
+from ..utils.search import normalize_search_term, as_uuid
 from ..middleware.rate_limiter import limiter
 
 router = APIRouter(prefix="/admin", tags=["Admin"])
@@ -168,10 +170,11 @@ def list_users(
         query = query.filter(User.status == status)
     if role and role != "ALL":
         query = query.filter(User.role == role)
-    if search and search.strip():
-        term = f"%{search.strip()}%"
+    term = normalize_search_term(search)
+    if term:
+        like = f"%{term}%"
         query = query.filter(
-            (User.name.ilike(term)) | (User.email.ilike(term)) | (User.username.ilike(term)) | (cast(User.id, String).ilike(term))
+            (User.name.ilike(like)) | (User.email.ilike(like)) | (User.username.ilike(like)) | (cast(User.id, String).ilike(like))
         )
     total = query.count()
     items = query.order_by(User.created_at.desc()).offset((page - 1) * page_size).limit(page_size).all()
@@ -230,17 +233,23 @@ def list_all_transactions(
     query = db.query(WalletTransaction)
     if status and status != "ALL":
         query = query.filter(WalletTransaction.status == status)
-    if search and search.strip():
-        term = search.strip()
-        try:
-            tx_uuid = UUID(term)
-            query = query.filter(WalletTransaction.id == tx_uuid)
-        except ValueError:
+    term = normalize_search_term(search)
+    if term:
+        term_uuid = as_uuid(term)
+        if term_uuid:
+            # A full UUID is either the transaction or the user it belongs to.
+            query = query.filter(
+                (WalletTransaction.id == term_uuid) | (WalletTransaction.user_id == term_uuid)
+            )
+        else:
+            like = f"%{term}%"
             query = query.join(User, WalletTransaction.user_id == User.id).filter(
-                (User.name.ilike(f"%{term}%")) |
-                (User.username.ilike(f"%{term}%")) |
-                (WalletTransaction.reference_id.ilike(f"%{term}%")) |
-                (cast(WalletTransaction.id, String).ilike(f"%{term}%"))
+                (User.name.ilike(like)) |
+                (User.username.ilike(like)) |
+                (User.email.ilike(like)) |
+                (WalletTransaction.reference_id.ilike(like)) |
+                (cast(WalletTransaction.id, String).ilike(like)) |
+                (cast(WalletTransaction.user_id, String).ilike(like))
             )
     total = query.count()
     items = query.order_by(WalletTransaction.created_at.desc()).offset((page - 1) * page_size).limit(page_size).all()
@@ -248,6 +257,9 @@ def list_all_transactions(
     for t in items:
         td = WalletTransactionOut.model_validate(t).model_dump()
         user_obj = db.query(User).filter(User.id == t.user_id).first()
+        # WalletTransactionOut is shared with the player-facing wallet API and
+        # carries no owner, but the admin table lists and copies the User ID.
+        td["user_id"] = str(t.user_id)
         td["user_name"] = user_obj.name if user_obj else "Unknown"
         td["user_email"] = user_obj.email if user_obj else ""
         method = "—"
@@ -278,17 +290,20 @@ def list_all_deposits(
     query = db.query(Deposit)
     if status and status != "ALL":
         query = query.filter(Deposit.status == status)
-    if search and search.strip():
-        term = search.strip()
-        try:
-            dep_uuid = UUID(term)
-            query = query.filter(Deposit.id == dep_uuid)
-        except ValueError:
+    term = normalize_search_term(search)
+    if term:
+        term_uuid = as_uuid(term)
+        if term_uuid:
+            query = query.filter((Deposit.id == term_uuid) | (Deposit.user_id == term_uuid))
+        else:
+            like = f"%{term}%"
             query = query.join(User, Deposit.user_id == User.id).filter(
-                (User.name.ilike(f"%{term}%")) |
-                (User.username.ilike(f"%{term}%")) |
-                (Deposit.provider_order_id.ilike(f"%{term}%")) |
-                (cast(Deposit.id, String).ilike(f"%{term}%"))
+                (User.name.ilike(like)) |
+                (User.username.ilike(like)) |
+                (User.email.ilike(like)) |
+                (Deposit.provider_order_id.ilike(like)) |
+                (cast(Deposit.id, String).ilike(like)) |
+                (cast(Deposit.user_id, String).ilike(like))
             )
     total = query.count()
     items = query.order_by(Deposit.created_at.desc()).offset((page - 1) * page_size).limit(page_size).all()
@@ -330,17 +345,20 @@ def list_all_withdrawals(
         elif date_filter == "MONTH":
             start = now - timedelta(days=30)
             query = query.filter(Withdrawal.created_at >= start)
-    if search and search.strip():
-        term = search.strip()
-        try:
-            w_uuid = UUID(term)
-            query = query.filter(Withdrawal.id == w_uuid)
-        except ValueError:
+    term = normalize_search_term(search)
+    if term:
+        term_uuid = as_uuid(term)
+        if term_uuid:
+            query = query.filter((Withdrawal.id == term_uuid) | (Withdrawal.user_id == term_uuid))
+        else:
+            like = f"%{term}%"
             query = query.join(User, Withdrawal.user_id == User.id).filter(
-                (User.name.ilike(f"%{term}%")) |
-                (User.username.ilike(f"%{term}%")) |
-                (Withdrawal.destination.ilike(f"%{term}%")) |
-                (cast(Withdrawal.id, String).ilike(f"%{term}%"))
+                (User.name.ilike(like)) |
+                (User.username.ilike(like)) |
+                (User.email.ilike(like)) |
+                (Withdrawal.destination.ilike(like)) |
+                (cast(Withdrawal.id, String).ilike(like)) |
+                (cast(Withdrawal.user_id, String).ilike(like))
             )
     total = query.count()
     items = query.order_by(Withdrawal.created_at.desc()).offset((page - 1) * page_size).limit(page_size).all()

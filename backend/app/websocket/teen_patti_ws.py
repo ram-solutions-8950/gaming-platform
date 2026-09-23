@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import random
 import uuid
 from collections import defaultdict
@@ -795,13 +796,24 @@ async def _handle_action(table_id: str, user_id: str, msg: dict) -> None:
             hand.see(user_id)
         elif action == "bet":
             is_raise = bool(msg.get("raise", False))
+            raw_amount = msg.get("amount")
+            custom_amount: Optional[int] = None
+            if raw_amount is not None:
+                try:
+                    custom_amount = int(raw_amount)
+                except (ValueError, TypeError):
+                    custom_amount = None
+
+            seat = hand.seats[seat_idx]
             if is_real:
-                seat = hand.seats[seat_idx]
-                mult = 2 if seat.seen else 1
-                next_stake = hand.current_stake * 2 if is_raise else hand.current_stake
-                if hand.config.max_stake and next_stake > hand.config.max_stake:
-                    next_stake = hand.config.max_stake
-                bet_cost = next_stake * mult
+                if custom_amount is not None:
+                    bet_cost = custom_amount
+                else:
+                    mult = 2 if seat.seen else 1
+                    next_stake = hand.current_stake * 2 if is_raise else hand.current_stake
+                    if hand.config.max_stake and next_stake > hand.config.max_stake:
+                        next_stake = hand.config.max_stake
+                    bet_cost = next_stake * mult
 
                 with _get_db_session() as db:
                     wallet = get_balance(db, uuid.UUID(user_id))
@@ -812,7 +824,7 @@ async def _handle_action(table_id: str, user_id: str, msg: dict) -> None:
                         await _after_action(table_id)
                         return
 
-            hand.bet(user_id, raise_=is_raise)
+            hand.bet(user_id, raise_=is_raise, amount=custom_amount)
         elif action == "pack":
             hand.pack(user_id)
         elif action == "show":

@@ -1,6 +1,5 @@
 import { PlayerSeat } from './PlayerSeat';
 import { CommunityCards } from './CommunityCards';
-import { PotDisplay } from './PotDisplay';
 import { PokerActions } from './PokerActions';
 import type { PokerTableState, PokerPlayerInfo } from '../../hooks/usePokerSocket';
 
@@ -40,44 +39,42 @@ export function PokerTable({
   const myPlayer = players.find((p) => p.user_id === currentUserId);
   const isMyTurn = myPlayer ? current_turn_seat_idx === myPlayer.seat_index : false;
 
-  // Map 6 seats around the oval felt table
-  const seatsMap: (PokerPlayerInfo | null)[] = Array.from({ length: 6 }).map((_, idx) => {
-    return players.find((p) => p.seat_index === idx) || null;
-  });
+  // Every poker room seats you at the bottom of the screen and deals the table
+  // around you, so rotate the six seats until the viewer's own seat is position
+  // 0. Spectators keep the table's own order.
+  const seatCount = 6;
+  const viewerSeat = myPlayer?.seat_index ?? 0;
+  const seatsMap: { player: PokerPlayerInfo | null; seatIndex: number; screenPos: number }[] =
+    Array.from({ length: seatCount }).map((_, seatIndex) => ({
+      player: players.find((p) => p.seat_index === seatIndex) || null,
+      seatIndex,
+      screenPos: (seatIndex - viewerSeat + seatCount) % seatCount,
+    }));
 
   return (
     <div className="poker-table-view">
-      {/* Top Header Bar */}
+      {/* The header answers the two questions a seated player has about the
+          table itself: what it costs to play here, and what I have left. */}
       <header className="poker-header">
-        <div className="flex items-center gap-2">
-          <span className="text-xl">♠️</span>
-          <span className="font-extrabold text-white text-lg tracking-wide">POKER</span>
-          <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-400 text-xs font-bold rounded">
-            {tableState.is_practice ? 'PRACTICE' : 'REAL MONEY'}
+        <div className="table-identity">
+          <span className="table-suit" aria-hidden="true">♠</span>
+          <span className="table-name">Hold&rsquo;em</span>
+          <span className="table-stakes">
+            ₹{(tableState.small_blind / 100).toFixed(0)}/₹{(tableState.big_blind / 100).toFixed(0)}
           </span>
+          {tableState.is_practice && <span className="table-tag">Practice</span>}
         </div>
 
-        <div className="flex items-center gap-2 sm:gap-3">
-          {/* Total Balance */}
-          <div className="flex items-center gap-1.5 px-2.5 sm:px-3.5 py-1 bg-black/70 rounded-full border border-yellow-500/50 shadow-inner">
-            <span className="text-[10px] text-zinc-400 font-semibold hidden xs:inline uppercase">Balance:</span>
-            <span className="text-xs sm:text-sm font-black text-yellow-400">
-              ₹{(walletBalancePaise / 100).toFixed(2)}
-            </span>
-          </div>
-          <button
-            type="button"
-            onClick={onOpenRules}
-            className="px-3 py-1 bg-gray-800 hover:bg-gray-700 text-gray-200 text-xs font-bold rounded border border-gray-700 transition"
-          >
-            Rules 📜
+        <div className="table-tools">
+          <span className="table-balance">
+            <span className="balance-word">Balance</span>
+            <span className="balance-amount">₹{(walletBalancePaise / 100).toFixed(2)}</span>
+          </span>
+          <button type="button" onClick={onOpenRules} className="table-btn">
+            Rules
           </button>
-          <button
-            type="button"
-            onClick={onLeaveTable}
-            className="px-3 py-1 bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold rounded shadow transition"
-          >
-            Leave Table
+          <button type="button" onClick={onLeaveTable} className="table-btn table-btn-leave">
+            Leave table
           </button>
         </div>
       </header>
@@ -85,31 +82,28 @@ export function PokerTable({
       {/* Main Oval Felt Arena */}
       <div className="poker-felt-table">
         <div className="poker-felt-inner">
-          {/* Center Community Cards & Pot */}
+          {/* The board and the pot own the middle of the felt; nothing else is
+              allowed into this band, which is what used to bury the pot under
+              the top seat. */}
           <div className="poker-table-center">
-            <PotDisplay pot={pot} />
-            <CommunityCards cards={community_cards} phase={phase} />
+            <CommunityCards cards={community_cards} phase={phase} pot={pot} />
 
             {phase === 'WAITING' && players.length >= 2 && (
-              <button
-                type="button"
-                onClick={onStartHand}
-                className="mt-4 px-6 py-2 bg-amber-500 hover:bg-amber-400 text-gray-950 font-extrabold rounded-full shadow-lg text-sm transition animate-bounce"
-              >
-                Deal Hand 🃏
+              <button type="button" onClick={onStartHand} className="deal-hand-btn">
+                Deal the next hand
               </button>
             )}
           </div>
 
-          {/* 6 Seating Positions */}
-          {seatsMap.map((p, seatIdx) => (
+          {/* Six seats around the felt, rotated so the viewer sits at the bottom */}
+          {seatsMap.map(({ player, seatIndex, screenPos }) => (
             <PlayerSeat
-              key={seatIdx}
-              player={p}
-              seatIndex={seatIdx}
-              isCurrentTurn={current_turn_seat_idx === seatIdx}
-              isDealer={dealer_seat_idx === seatIdx}
-              isCurrentUser={Boolean(currentUserId && p?.user_id === currentUserId)}
+              key={seatIndex}
+              player={player}
+              screenPos={screenPos}
+              isCurrentTurn={current_turn_seat_idx === seatIndex}
+              isDealer={dealer_seat_idx === seatIndex}
+              isCurrentUser={Boolean(currentUserId && player?.user_id === currentUserId)}
               myHoleCards={myHoleCards}
             />
           ))}

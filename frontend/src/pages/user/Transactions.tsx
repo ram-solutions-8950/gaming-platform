@@ -16,6 +16,7 @@ import { walletService } from '../../services/wallet';
 import { TransactionDetailsModal } from '../../components/common/TransactionDetailsModal';
 import type { WalletTransaction, TxType, TxStatus } from '../../types';
 import '../../styles/transactions-page.css';
+import { copyToClipboard } from '../../utils/clipboard';
 
 const CREDIT_TYPES: TxType[] = ['DEPOSIT', 'GAME_WIN', 'REFUND', 'ADJUSTMENT'];
 
@@ -188,9 +189,9 @@ export function TransactionsPage() {
     return () => observer.disconnect();
   }, [hasMore, loading, loadingMore, page]);
 
-  const handleCopyRef = (e: React.MouseEvent, refId: string) => {
+  const handleCopyRef = async (e: React.MouseEvent, refId: string) => {
     e.stopPropagation();
-    navigator.clipboard?.writeText(refId);
+    if (!(await copyToClipboard(refId))) return;
     setCopiedId(refId);
     setTimeout(() => {
       setCopiedId(null);

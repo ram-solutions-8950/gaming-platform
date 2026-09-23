@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { soundManager } from '../../services/soundManager';
+import { copyToClipboard } from '../../utils/clipboard';
 
 interface Props {
   onClose: () => void;
@@ -20,15 +21,11 @@ export const ServiceModal: React.FC<Props> = ({ onClose }) => {
     return () => window.removeEventListener('keydown', handleKey);
   }, [onClose]);
 
-  const handleCopy = (text: string, label: string) => {
-    try {
-      navigator.clipboard.writeText(text);
-      soundManager.play('button_click');
-      setCopiedChannel(label);
-      setTimeout(() => setCopiedChannel(null), 2500);
-    } catch {
-      /* ignore */
-    }
+  const handleCopy = async (text: string, label: string) => {
+    if (!(await copyToClipboard(text))) return;
+    soundManager.play('button_click');
+    setCopiedChannel(label);
+    setTimeout(() => setCopiedChannel(null), 2500);
   };
 
   const handleTicketSubmit = (e: React.FormEvent) => {

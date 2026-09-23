@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { AviatorFairnessData } from '../../services/aviator';
 import { aviatorService } from '../../services/aviator';
+import { copyToClipboard } from '../../utils/clipboard';
 
 interface AviatorHistoryProps {
   crashes: number[];
@@ -13,8 +14,8 @@ export const AviatorHistory: React.FC<AviatorHistoryProps> = ({ crashes, current
   const [loadingFairness, setLoadingFairness] = useState(false);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
-  const copyToClipboard = (text: string, key: string) => {
-    navigator.clipboard?.writeText(text);
+  const handleCopy = async (text: string, key: string) => {
+    if (!(await copyToClipboard(text))) return;
     setCopiedKey(key);
     setTimeout(() => setCopiedKey(null), 2000);
   };
@@ -118,7 +119,7 @@ export const AviatorHistory: React.FC<AviatorHistoryProps> = ({ crashes, current
                     {fairnessModal.round_id && fairnessModal.round_id !== 'Current Round' && (
                       <button
                         type="button"
-                        onClick={() => copyToClipboard(fairnessModal.round_id, 'round_id')}
+                        onClick={() => handleCopy(fairnessModal.round_id, 'round_id')}
                         className="text-[10px] text-amber-400 hover:text-amber-300 font-bold ml-2 cursor-pointer"
                       >
                         {copiedKey === 'round_id' ? '✓ Copied' : 'Copy'}
@@ -137,7 +138,7 @@ export const AviatorHistory: React.FC<AviatorHistoryProps> = ({ crashes, current
                     {fairnessModal.server_seed_hash && (
                       <button
                         type="button"
-                        onClick={() => copyToClipboard(fairnessModal.server_seed_hash, 'seed_hash')}
+                        onClick={() => handleCopy(fairnessModal.server_seed_hash, 'seed_hash')}
                         className="text-[10px] text-amber-400 hover:text-amber-300 font-bold ml-2 cursor-pointer"
                       >
                         {copiedKey === 'seed_hash' ? '✓ Copied' : 'Copy'}
@@ -154,7 +155,7 @@ export const AviatorHistory: React.FC<AviatorHistoryProps> = ({ crashes, current
                     {fairnessModal.server_seed && (
                       <button
                         type="button"
-                        onClick={() => copyToClipboard(fairnessModal.server_seed!, 'seed')}
+                        onClick={() => handleCopy(fairnessModal.server_seed!, 'seed')}
                         className="text-[10px] text-amber-400 hover:text-amber-300 font-bold ml-2 cursor-pointer"
                       >
                         {copiedKey === 'seed' ? '✓ Copied' : 'Copy'}

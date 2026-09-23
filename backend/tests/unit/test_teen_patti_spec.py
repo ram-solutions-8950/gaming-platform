@@ -5,6 +5,7 @@ Section numbers refer to the supplied rules document.
 
 import pytest
 
+from app.services.rummy.errors import InvalidAction
 from app.services.teen_patti.cards import Card, fresh_deck
 from app.services.teen_patti.engine import (
     GameConfig,
@@ -502,3 +503,121 @@ def test_side_show_costs_a_seen_chaal():
     pot_before = h.pot
     h.side_show("p1", accept=False)
     assert h.pot == pot_before + h.current_stake * 2
+
+
+# ═══ Core Betting Mechanics, Relative Staking & Edge Cases ═══════════════
+
+def test_blind_vs_seen_multiplier_and_relative_staking():
+    """Requirement 1 & 3:
+    Blind bets at standard rate 1x.
+    Seen bets automatically enforce minimum of 2x.
+    If Blind bet is 10, Seen bet must automatically enforce minimum of 20.
+    If Blind player plays 250, Seen player must play at least 500.
+    If previous player was Seen at stake 2S, subsequent Blind player's min stake is S.
+    If previous player was Blind at stake S, subsequent Seen player's min stake is 2S.
+    """
+    h = _table(players=3)
+    h.start_hand()
+    assert h.current_stake == 10
+
+    # P0 is Blind and plays 10
+    h.current_turn = 0
+    res0 = h.bet("p0")
+    assert res0["amount"] == 10
+    assert h.current_stake == 10
+
+    # P1 is Seen: minimum bet must automatically double (2x = 20)
+    h.see("p1")
+    res1 = h.bet("p1")
+    assert res1["amount"] == 20
+    assert h.current_stake == 10
+
+    # P2 is Blind: previous player was Seen at 20 (2S), subsequent Blind player's min stake is S (10)
+    # P2 plays 250 (custom amount / stepper increment)
+    res2 = h.bet("p2", amount=250)
+    assert res2["amount"] == 250
+    assert h.current_stake == 250
+
+    # Turn returns to P0, who now sees cards
+    h.see("p0")
+    # P0 must play at least 2 * 250 = 500!
+    res0_seen = h.bet("p0")
+    assert res0_seen["amount"] == 500
+    assert h.current_stake == 250
+
+
+def test_seen_player_strictly_prevented_from_betting_under_2x():
+    """Constraint: A player with seen cards must be strictly prevented
+    from placing a bet lower than the 2x baseline."""
+    h = _table(players=2)
+    h.start_hand()
+    h.current_turn = 0
+
+    # P0 (Blind) bets 250
+    h.bet("p0", amount=250)
+    assert h.current_stake == 250
+
+    # P1 is Seen
+    h.see("p1")
+    # P1 attempts to bet 499 (lower than 2x = 500)
+    with pytest.raises(InvalidAction, match="cannot be less than 2x baseline"):
+        h.bet("p1", amount=499)
+
+    # Bet of 500 succeeds
+    res = h.bet("p1", amount=500)
+    assert res["amount"] == 500
+
+
+def test_blind_player_cannot_bet_under_1x():
+    h = _table(players=2)
+    h.start_hand()
+    h.current_turn = 0
+    h.bet("p0", amount=100)
+
+    # Next player is blind, tries to bet 50 (less than 100)
+    with pytest.raises(InvalidAction, match="cannot be less than current table stake"):
+        h.bet("p1", amount=50)
+
+
+def test_stepper_bet_amount_and_max_stake_cap():
+    """Stepper button increments bet size within table max stake limits."""
+    h = _table(players=2, max_stake=1000)
+    h.start_hand()
+    h.current_turn = 0
+
+    # Blind player tries to bet 1500 (over max_stake 1000) -> capped at 1000
+    res = h.bet("p0", amount=1500)
+    assert res["amount"] == 1000
+    assert h.current_stake == 1000
+
+    # Seen player tries to bet 3000 (over 2x max_stake = 2000) -> capped at 2000
+    h.see("p1")
+    res1 = h.bet("p1", amount=3000)
+    assert res1["amount"] == 2000
+
+
+def test_side_show_rejected_with_only_two_players():
+    """Side Show Restrictions:
+    Reject side show requests if only two active players remain (must perform a Show instead)."""
+    h = _table(players=2)
+    h.start_hand()
+    h.see("p0")
+    h.see("p1")
+    h.current_turn = 0
+    with pytest.raises(InvalidAction, match="Side show not allowed with 2 active players"):
+        h.side_show("p0")
+
+
+def test_side_show_rejected_if_previous_player_is_blind():
+    """Side Show Restrictions:
+    Reject side show requests if the previous player is still Blind (both players must be Seen)."""
+    h = _table(players=3)
+    h.start_hand()
+    # P0 is Blind
+    # P1 is Seen
+    h.see("p1")
+    h.current_turn = 1
+    # P1 tries to side show against P0 who is Blind
+    with pytest.raises(InvalidAction, match="both players must be seen"):
+        h.side_show("p1")
+

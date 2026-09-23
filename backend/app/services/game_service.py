@@ -423,7 +423,7 @@ def get_admin_bets(
                 cast(GameBet.id, String).ilike(s),
                 cast(GameBet.round_id, String).ilike(s),
                 User.username.ilike(s),
-                User.full_name.ilike(s),
+                User.name.ilike(s),
             )
         )
     total = query.count()

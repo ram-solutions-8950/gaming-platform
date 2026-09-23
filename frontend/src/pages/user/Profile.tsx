@@ -13,6 +13,7 @@ import {
 } from '../../services/referral';
 import { APP_VERSION, BUILD_DATE } from '../../version';
 import api from '../../services/api';
+import { copyToClipboard } from '../../utils/clipboard';
 
 const AVATAR_PRESETS = ['👑', '🐉', '🐅', '🦁', '💎', '🃏', '🎲', '🎯'];
 
@@ -123,8 +124,8 @@ export function ProfilePage() {
     ? `${window.location.origin}/signup?ref=${refStats.referral_code}`
     : `${window.location.origin}/signup`;
 
-  const copyLink = () => {
-    navigator.clipboard.writeText(referralLink);
+  const copyLink = async () => {
+    if (!(await copyToClipboard(referralLink))) return;
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };

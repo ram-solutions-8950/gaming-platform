@@ -1,3 +1,4 @@
+
 /**
  * Teen Patti API Service & Type Definitions.
  */
@@ -44,6 +45,8 @@ export interface TeenPattiSeat {
   name: string;
   is_bot: boolean;
   seen: boolean;
+  /** How many blind rounds this player has already played. */
+  blind_count: number;
   status: 'active' | 'packed' | 'lost_side_show' | 'show_winner' | 'show_loser';
   total_bet: number;
   cards: string[] | null;
@@ -55,6 +58,10 @@ export interface TeenPattiGameState {
   pot: number;
   current_stake: number;
   current_turn: number;
+  max_stake?: number | null;
+  pot_limit?: number | null;
+  /** Blind rounds allowed before a player is forced to see their cards. */
+  max_blind_rounds?: number;
   dealer_seat: number;
   winner_seat: number | null;
   reason: string | null;
@@ -62,8 +69,10 @@ export interface TeenPattiGameState {
   last_action?: {
     seat: number;
     user_id?: string;
+    player_name?: string;
     action: string;
     amount?: number;
+    seen?: boolean;
     pot?: number;
   } | null;
 }

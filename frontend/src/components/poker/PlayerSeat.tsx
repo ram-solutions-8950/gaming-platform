@@ -3,16 +3,32 @@ import type { PokerPlayerInfo } from '../../hooks/usePokerSocket';
 
 interface PlayerSeatProps {
   player?: PokerPlayerInfo | null;
-  seatIndex: number;
+  /** Position around the felt as the viewer sees it — 0 is always the viewer. */
+  screenPos: number;
   isCurrentTurn: boolean;
   isDealer: boolean;
   isCurrentUser: boolean;
   myHoleCards: string[];
 }
 
+const ACTION_LABELS: Record<string, string> = {
+  FOLD: 'Fold',
+  CHECK: 'Check',
+  CALL: 'Call',
+  RAISE: 'Raise',
+  BET: 'Bet',
+  ALL_IN: 'All in',
+  SMALL_BLIND: 'Small blind',
+  BIG_BLIND: 'Big blind',
+};
+
+function formatMoney(paise: number): string {
+  return `₹${(paise / 100).toFixed(2)}`;
+}
+
 export function PlayerSeat({
   player,
-  seatIndex,
+  screenPos,
   isCurrentTurn,
   isDealer,
   isCurrentUser,
@@ -20,62 +36,62 @@ export function PlayerSeat({
 }: PlayerSeatProps) {
   if (!player) {
     return (
-      <div className={`poker-seat seat-${seatIndex} empty`}>
-        <div className="empty-seat-placeholder" />
+      <div className={`poker-seat pos-${screenPos} is-open`}>
+        <span className="seat-open">Open seat</span>
       </div>
     );
   }
 
-  const cardsToDisplay = isCurrentUser && myHoleCards.length === 2
-    ? myHoleCards
-    : player.hole_cards || [];
+  const cards = isCurrentUser && myHoleCards.length === 2 ? myHoleCards : player.hole_cards || [];
+  const action = player.last_action ? ACTION_LABELS[player.last_action.toUpperCase()] ?? player.last_action : null;
+
+  const stateClasses = [
+    isCurrentTurn && !player.is_folded ? 'is-turn' : '',
+    player.is_folded ? 'is-folded' : '',
+    player.is_all_in ? 'is-all-in' : '',
+    isCurrentUser ? 'is-you' : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
 
   return (
-    <div className={`poker-seat seat-${seatIndex} ${isCurrentTurn ? 'active-turn' : ''} ${player.is_folded ? 'folded' : ''}`}>
-      {/* Dealer Button Badge */}
-      {isDealer && <div className="dealer-button">D</div>}
-
-      {/* Cards Area */}
-      <div className="player-cards-container">
+    <div className={`poker-seat pos-${screenPos} ${stateClasses}`}>
+      <div className="seat-cards">
         {player.is_folded ? (
-          <div className="folded-label">FOLDED</div>
-        ) : cardsToDisplay.length > 0 ? (
-          <>
-            <PokerCard card={cardsToDisplay[0]} size="sm" className="card-left" />
-            <PokerCard card={cardsToDisplay[1]} size="sm" className="card-right" />
-          </>
+          <span className="seat-folded">Folded</span>
         ) : (
           <>
-            <PokerCard card={null} size="sm" className="card-left" />
-            <PokerCard card={null} size="sm" className="card-right" />
+            <PokerCard card={cards[0] ?? null} size="sm" className="seat-card seat-card-left" />
+            <PokerCard card={cards[1] ?? null} size="sm" className="seat-card seat-card-right" />
           </>
         )}
       </div>
 
-      {/* Seat Avatar & Details Box */}
-      <div className={`player-info-box ${isCurrentTurn ? 'ring-2 ring-amber-400' : ''}`}>
-        <div className="player-avatar">
+      <div className="seat-pod">
+        <span className="seat-avatar" aria-hidden="true">
           {player.username.charAt(0).toUpperCase()}
-        </div>
-        <div className="player-details">
-          <div className="player-name truncate">{player.username} {isCurrentUser && '(You)'}</div>
-          <div className="player-stack">₹{(player.stack / 100).toFixed(2)}</div>
-        </div>
+        </span>
+        <span className="seat-text">
+          <span className="seat-name">{isCurrentUser ? 'You' : player.username}</span>
+          <span className="seat-stack">{player.is_all_in ? 'All in' : formatMoney(player.stack)}</span>
+        </span>
+        {isDealer && (
+          <span className="seat-dealer" title="Dealer">
+            D
+          </span>
+        )}
       </div>
 
-      {/* Last Action Badge */}
-      {player.last_action && (
-        <div className={`action-badge action-${player.last_action.toLowerCase()}`}>
-          {player.last_action}
-        </div>
+      {action && !player.is_folded && (
+        <span className={`seat-action seat-action-${(player.last_action || '').toLowerCase().replace(/[^a-z0-9]/g, '_')}`}>
+          {action}
+        </span>
       )}
 
-      {/* Current Bet Chips */}
       {player.current_bet > 0 && (
-        <div className="player-bet-chips">
-          <span className="chip-icon">🟡</span>
-          <span>₹{(player.current_bet / 100).toFixed(2)}</span>
-        </div>
+        <span className="seat-bet" title="Bet this street">
+          {formatMoney(player.current_bet)}
+        </span>
       )}
     </div>
   );

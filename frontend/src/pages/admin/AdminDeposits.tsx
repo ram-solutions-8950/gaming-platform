@@ -4,7 +4,6 @@ import { Loader } from '../../components/common/Loader';
 import api from '../../services/api';
 import {
   RefreshCw,
-  Search,
   Filter,
   Eye,
   Copy,
@@ -12,8 +11,16 @@ import {
   ChevronLeft,
   ChevronRight,
   ArrowDownCircle,
+  RotateCcw,
   X,
 } from 'lucide-react';
+import { CopyableId } from '../../components/common/CopyableId';
+import { FilterSelect } from '../../components/common/FilterSelect';
+import { SearchInput } from '../../components/common/SearchInput';
+import { RefreshOverlay } from '../../components/common/RefreshOverlay';
+import { useDebouncedValue } from '../../hooks/useDebouncedValue';
+import { useRefreshIndicator } from '../../hooks/useRefreshIndicator';
+import { copyToClipboard } from '../../utils/clipboard';
 
 export interface AdminDepositItem {
   id: string;
@@ -53,8 +60,8 @@ function DepositDetailsModal({
 
   if (!deposit) return null;
 
-  const handleCopy = (text: string, label: string) => {
-    navigator.clipboard.writeText(text);
+  const handleCopy = async (text: string, label: string) => {
+    if (!(await copyToClipboard(text))) return;
     setCopied(label);
     setTimeout(() => setCopied(null), 2000);
   };
@@ -161,10 +168,11 @@ export function AdminDepositsPage() {
   const [deposits, setDeposits] = useState<AdminDepositItem[]>([]);
   const [totalDeposits, setTotalDeposits] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+  const { refreshing, runRefresh } = useRefreshIndicator();
 
   // Filters & Search (BUG-039)
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebouncedValue(search);
   const [statusFilter, setStatusFilter] = useState('');
 
   // Pagination (BUG-038)
@@ -174,16 +182,13 @@ export function AdminDepositsPage() {
   // View modal state (BUG-037)
   const [selectedDeposit, setSelectedDeposit] = useState<AdminDepositItem | null>(null);
 
-  // Copy feedback state
-  const [copiedId, setCopiedId] = useState<string | null>(null);
-
   const fetchDeposits = useCallback(async () => {
     try {
       const params: Record<string, unknown> = {
         page,
         page_size: pageSize,
       };
-      if (search.trim()) params.search = search.trim();
+      if (debouncedSearch.trim()) params.search = debouncedSearch.trim();
       if (statusFilter) params.status = statusFilter;
 
       const r = await api.get('/admin/deposits', { params });
@@ -193,24 +198,21 @@ export function AdminDepositsPage() {
       console.error('Failed to load deposits', err);
     } finally {
       setLoading(false);
-      setRefreshing(false);
     }
-  }, [page, pageSize, search, statusFilter]);
+  }, [page, pageSize, debouncedSearch, statusFilter]);
 
   useEffect(() => {
     fetchDeposits();
   }, [fetchDeposits]);
 
-  const handleRefresh = () => {
-    setRefreshing(true);
-    fetchDeposits();
-  };
+  const handleRefresh = () => runRefresh(fetchDeposits);
 
-  const handleCopy = (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    navigator.clipboard.writeText(id);
-    setCopiedId(id);
-    setTimeout(() => setCopiedId(null), 2000);
+  const filtersActive = Boolean(search || statusFilter);
+
+  const handleResetFilters = () => {
+    setSearch('');
+    setStatusFilter('');
+    setPage(1);
   };
 
   const totalPages = Math.max(1, Math.ceil(totalDeposits / pageSize));
@@ -233,47 +235,56 @@ export function AdminDepositsPage() {
           disabled={refreshing}
           className="flex items-center gap-2 px-4 py-2 bg-dark-800 hover:bg-dark-700 text-gray-200 border border-dark-600 rounded-lg text-sm font-medium transition shadow-sm hover:border-gray-500 disabled:opacity-50"
         >
-          <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin text-primary-400' : ''}`} />
-          <span>Refresh</span>
+          <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin text-brand-400' : ''}`} />
+          <span>{refreshing ? 'Refreshing…' : 'Refresh'}</span>
         </button>
       </div>
 
       {/* Filters & Search bar (BUG-039) */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
-              setPage(1);
-            }}
-            placeholder="Search by Deposit ID or User Name..."
-            className="w-full pl-9 pr-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-primary-500"
-          />
-        </div>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        <SearchInput
+          value={search}
+          onChange={(value) => {
+            setSearch(value);
+            setPage(1);
+          }}
+          busy={search !== debouncedSearch}
+          placeholder="Search by Deposit ID, User ID, User Name or Reference…"
+          ariaLabel="Search deposits"
+          className="min-w-0 flex-1"
+        />
 
-        <div className="relative w-full sm:w-48">
-          <Filter className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
-          <select
-            value={statusFilter}
-            onChange={(e) => {
-              setStatusFilter(e.target.value);
-              setPage(1);
-            }}
-            className="w-full pl-9 pr-8 py-2 bg-dark-800 border border-dark-700 rounded-lg text-sm text-white focus:outline-none focus:border-primary-500 appearance-none"
-          >
-            <option value="">All Statuses</option>
-            <option value="SUCCESS">SUCCESS</option>
-            <option value="PENDING">PENDING</option>
-            <option value="FAILED">FAILED</option>
-          </select>
-        </div>
+        <FilterSelect
+          value={statusFilter}
+          onChange={(e) => {
+            setStatusFilter(e.target.value);
+            setPage(1);
+          }}
+          icon={<Filter className="h-4 w-4" />}
+          aria-label="Filter by status"
+          wrapperClassName="w-full sm:w-48"
+        >
+          <option value="">All Statuses</option>
+          <option value="SUCCESS">SUCCESS</option>
+          <option value="PENDING">PENDING</option>
+          <option value="FAILED">FAILED</option>
+        </FilterSelect>
+
+        <button
+          type="button"
+          onClick={handleResetFilters}
+          disabled={!filtersActive}
+          title={filtersActive ? 'Clear the search and all filters' : 'No filters applied'}
+          className="flex shrink-0 cursor-pointer items-center justify-center gap-2 rounded-lg border border-dark-600 bg-dark-800 px-4 py-2 text-sm font-medium text-gray-200 transition hover:border-gray-500 hover:bg-dark-700 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          <RotateCcw className="h-4 w-4" />
+          <span>Reset</span>
+        </button>
       </div>
 
       {/* Deposits Table - 7 Required Columns (BUG-037) */}
-      <Card>
+      <Card className="relative">
+        <RefreshOverlay active={refreshing} />
         {loading ? (
           <div className="flex justify-center py-16">
             <Loader size="lg" />
@@ -311,27 +322,19 @@ export function AdminDepositsPage() {
                     <tr key={d.id} className="hover:bg-dark-800/50 transition-colors">
                       {/* 1. Deposit ID */}
                       <td className="py-3 px-3 whitespace-nowrap">
-                        <div className="flex items-center gap-1.5 font-mono text-xs text-gray-300">
-                          <span title={d.id}>{d.id.slice(0, 8)}...</span>
-                          <button
-                            onClick={(e) => handleCopy(d.id, e)}
-                            title="Copy Full Deposit ID"
-                            className="p-1 hover:bg-dark-700 rounded text-gray-400 hover:text-white transition"
-                          >
-                            {copiedId === d.id ? (
-                              <Check className="w-3.5 h-3.5 text-green-400" />
-                            ) : (
-                              <Copy className="w-3.5 h-3.5" />
-                            )}
-                          </button>
-                        </div>
+                        <CopyableId value={d.id} label="Deposit ID" />
                       </td>
 
-                      {/* 2. User Name */}
+                      {/* 2. User Name (with a copyable User ID) */}
                       <td className="py-3 px-3 whitespace-nowrap">
-                        <span className="font-medium text-gray-200 hover:text-white">
-                          {d.user_name || 'Unknown User'}
-                        </span>
+                        <p className="font-medium text-gray-200">{d.user_name || 'Unknown User'}</p>
+                        <CopyableId
+                          value={d.user_id}
+                          label="User ID"
+                          widthClass="max-w-[5.5rem]"
+                          valueClassName="text-gray-500"
+                          className="mt-0.5"
+                        />
                       </td>
 
                       {/* 3. Amount */}

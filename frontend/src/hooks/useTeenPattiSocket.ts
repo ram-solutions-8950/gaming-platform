@@ -142,7 +142,7 @@ export function useTeenPattiSocket({ tableId, onEvent, onError }: UseTeenPattiSo
   }, []);
 
   const seeCards = useCallback(() => sendAction('see'), [sendAction]);
-  const chaal = useCallback(() => sendAction('bet', { raise: false }), [sendAction]);
+  const chaal = useCallback((amount?: number) => sendAction('bet', { raise: false, ...(amount ? { amount } : {}) }), [sendAction]);
   const raiseBet = useCallback(() => sendAction('bet', { raise: true }), [sendAction]);
   const pack = useCallback(() => sendAction('pack'), [sendAction]);
   const show = useCallback(() => sendAction('show'), [sendAction]);
@@ -150,6 +150,7 @@ export function useTeenPattiSocket({ tableId, onEvent, onError }: UseTeenPattiSo
   const respondSideShow = useCallback((accept: boolean) => sendAction('side_show_respond', { accept }), [sendAction]);
   const startHand = useCallback(() => sendAction('start'), [sendAction]);
   const leaveTable = useCallback(() => sendAction('leave'), [sendAction]);
+  const syncState = useCallback(() => sendAction('sync'), [sendAction]);
 
   return {
     gameState,
@@ -167,5 +168,6 @@ export function useTeenPattiSocket({ tableId, onEvent, onError }: UseTeenPattiSo
     respondSideShow,
     startHand,
     leaveTable,
+    syncState,
   };
 }

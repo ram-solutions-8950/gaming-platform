@@ -238,20 +238,50 @@ class TeenPattiHand:
             raise InvalidAction("player is packed")
         s.seen = True
 
-    def bet(self, user_id: str, raise_: bool = False) -> Dict[str, Any]:
+    def bet(self, user_id: str, raise_: bool = False, amount: Optional[int] = None) -> Dict[str, Any]:
         idx = self._require_turn(user_id)
         s = self.seats[idx]
 
         if not s.seen and s.blind_count >= self.config.max_blind_rounds:
             s.seen = True
 
-        if raise_:
-            self.current_stake *= 2
-            if self.config.max_stake and self.current_stake > self.config.max_stake:
-                self.current_stake = self.config.max_stake
-
-        multiplier = 2 if s.seen else 1
-        bet_amount = self.current_stake * multiplier
+        if not s.seen:
+            # Blind player rules: standard baseline 1x table current_stake (S)
+            min_bet = self.current_stake
+            if amount is not None:
+                if amount < min_bet:
+                    raise InvalidAction(f"Blind bet ({amount}) cannot be less than current table stake ({min_bet})")
+                if self.config.max_stake and amount > self.config.max_stake:
+                    amount = self.config.max_stake
+                bet_amount = amount
+                self.current_stake = amount
+            elif raise_:
+                self.current_stake *= 2
+                if self.config.max_stake and self.current_stake > self.config.max_stake:
+                    self.current_stake = self.config.max_stake
+                bet_amount = self.current_stake
+            else:
+                bet_amount = self.current_stake
+        else:
+            # Seen player rules: minimum bet must automatically double (2x baseline = 2 * S)
+            # Constraint: A player with seen cards must be strictly prevented from placing a bet lower than the 2x baseline.
+            min_bet = self.current_stake * 2
+            if amount is not None:
+                if amount < min_bet:
+                    raise InvalidAction(f"Seen bet ({amount}) cannot be less than 2x baseline ({min_bet})")
+                max_allowed = (self.config.max_stake * 2) if self.config.max_stake else None
+                if max_allowed and amount > max_allowed:
+                    amount = max_allowed
+                bet_amount = amount
+                # Relative Staking: If previous player was Seen at stake 2S, table base stake becomes S
+                self.current_stake = amount // 2
+            elif raise_:
+                self.current_stake *= 2
+                if self.config.max_stake and self.current_stake > self.config.max_stake:
+                    self.current_stake = self.config.max_stake
+                bet_amount = self.current_stake * 2
+            else:
+                bet_amount = self.current_stake * 2
 
         # A pot-limit table caps the chaal at whatever the pot can still take,
         # and the hand goes straight to a compulsory show once it is reached.
@@ -271,6 +301,7 @@ class TeenPattiHand:
         self.last_action = {
             "seat": idx,
             "user_id": user_id,
+            "player_name": s.name,
             "action": "raise" if raise_ else "chaal",
             "amount": bet_amount,
             "seen": s.seen,
@@ -292,6 +323,7 @@ class TeenPattiHand:
         self.last_action = {
             "seat": idx,
             "user_id": user_id,
+            "player_name": s.name,
             "action": "pack",
             "pot": self.pot,
         }
@@ -393,9 +425,13 @@ class TeenPattiHand:
         if not s.seen:
             raise InvalidAction("must be seen to request side-show")
 
+        active = self._active_seats()
+        if len(active) <= 2:
+            raise InvalidAction("Side show not allowed with 2 active players; must perform a Show instead")
+
         target_idx = self.prev_seen_seat_index(idx)
         if target_idx is None:
-            raise InvalidAction("no previous seen player to side-show with")
+            raise InvalidAction("no previous seen player to side-show with; both players must be seen")
 
         target = self.seats[target_idx]
 
@@ -503,6 +539,11 @@ class TeenPattiHand:
             "pot": self.pot,
             "current_stake": self.current_stake,
             "current_turn": self.current_turn,
+            "max_stake": self.config.max_stake,
+            "pot_limit": self.config.pot_limit,
+            # The engine forces a blind player to see after this many blind
+            # rounds, so the table shows how many they have left.
+            "max_blind_rounds": self.config.max_blind_rounds,
             "dealer_seat": self.dealer_seat,
             "winner_seat": self.winner_seat,
             "reason": self.reason,
@@ -512,6 +553,7 @@ class TeenPattiHand:
                     "name": s.name,
                     "is_bot": s.is_bot,
                     "seen": s.seen,
+                    "blind_count": s.blind_count,
                     "status": s.status.value,
                     "total_bet": s.total_bet,
                     "cards": [c.code for c in s.cards] if (s.show_cards or (viewer_idx is not None and viewer_idx == i and s.seen)) else None,
