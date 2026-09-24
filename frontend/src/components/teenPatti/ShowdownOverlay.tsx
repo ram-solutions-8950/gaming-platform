@@ -16,6 +16,7 @@ interface ShowdownOverlayProps {
   onLeaveTable?: () => void;
   onNextHand?: () => void;
   onDismiss?: () => void;
+  isTableClosed?: boolean;
 }
 
 export const ShowdownOverlay: React.FC<ShowdownOverlayProps> = ({
@@ -27,6 +28,7 @@ export const ShowdownOverlay: React.FC<ShowdownOverlayProps> = ({
   onLeaveTable,
   onNextHand,
   onDismiss,
+  isTableClosed,
 }) => {
   const [countdown, setCountdown] = useState<number>(NEXT_HAND_DELAY_SECONDS);
   const winner = winnerSeat !== null ? seats[winnerSeat] : null;
@@ -35,13 +37,28 @@ export const ShowdownOverlay: React.FC<ShowdownOverlayProps> = ({
   const isDoubleLoss = winnerSeat === null;
   const myBet = mySeat?.total_bet || 0;
 
-  // Display only: the server owns the deal. A client firing "start" at the end
-  // of its own countdown would cut the result short for everyone else.
+  const isOpponentLeft = Boolean(
+    isTableClosed ||
+    (reason && reason.toLowerCase().includes('left')) ||
+    seats.length < 2
+  );
+
+  // Auto-countdown to exit to lobby if opponent left, or deal next hand if normal game
   useEffect(() => {
-    if (seats.length < 2) return;
-    const timer = setInterval(() => setCountdown((prev) => Math.max(0, prev - 1)), 1000);
+    const timer = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          if (isOpponentLeft) {
+            onLeaveTable?.();
+          }
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
     return () => clearInterval(timer);
-  }, [seats.length]);
+  }, [isOpponentLeft, onLeaveTable]);
 
   return (
     <div className="tp-modal-overlay animate-fade-in" style={{ zIndex: 120 }}>
@@ -131,13 +148,15 @@ export const ShowdownOverlay: React.FC<ShowdownOverlayProps> = ({
         )}
 
         {/* Countdown Indicator */}
-        {seats.length >= 2 ? (
-          <div style={{ color: '#fbbf24', fontSize: '0.8rem', fontWeight: 700, margin: '8px 0 16px' }}>
-            {countdown > 0 ? `⏱ Next hand dealing automatically in ${countdown}s...` : '⏱ Dealing next hand...'}
+        {isOpponentLeft ? (
+          <div style={{ color: '#fbbf24', fontSize: '0.82rem', fontWeight: 700, margin: '8px 0 16px' }}>
+            {countdown > 0
+              ? `⏳ Opponent left the match. Returning to lobby in ${countdown}s...`
+              : 'Returning to lobby...'}
           </div>
         ) : (
-          <div style={{ color: '#94a3b8', fontSize: '0.8rem', fontWeight: 600, margin: '8px 0 16px' }}>
-            ⏳ Opponent left the table. Waiting for a new opponent to join...
+          <div style={{ color: '#fbbf24', fontSize: '0.8rem', fontWeight: 700, margin: '8px 0 16px' }}>
+            {countdown > 0 ? `⏱ Next hand dealing automatically in ${countdown}s...` : '⏱ Dealing next hand...'}
           </div>
         )}
 
@@ -147,15 +166,19 @@ export const ShowdownOverlay: React.FC<ShowdownOverlayProps> = ({
             <button
               type="button"
               onClick={onLeaveTable}
-              className="tp-btn"
+              className={`tp-btn ${isOpponentLeft ? 'tp-btn-chaal' : ''}`}
               style={{
-                background: 'rgba(239, 68, 68, 0.2)',
-                border: '1px solid rgba(239, 68, 68, 0.5)',
-                color: '#fca5a5',
-                padding: '9px 18px',
-                borderRadius: 12,
-                fontSize: '0.85rem',
-                fontWeight: 700,
+                ...(isOpponentLeft
+                  ? { padding: '10px 24px', fontSize: '0.9rem', fontWeight: 800 }
+                  : {
+                      background: 'rgba(239, 68, 68, 0.2)',
+                      border: '1px solid rgba(239, 68, 68, 0.5)',
+                      color: '#fca5a5',
+                      padding: '9px 18px',
+                      borderRadius: 12,
+                      fontSize: '0.85rem',
+                      fontWeight: 700,
+                    }),
                 display: 'flex',
                 alignItems: 'center',
                 gap: 6,
@@ -163,11 +186,11 @@ export const ShowdownOverlay: React.FC<ShowdownOverlayProps> = ({
               }}
             >
               <LogOut size={15} />
-              <span>Leave Table</span>
+              <span>{isOpponentLeft ? 'Back to Lobby' : 'Leave Table'}</span>
             </button>
           )}
 
-          {onNextHand && seats.length >= 2 && (
+          {!isOpponentLeft && onNextHand && seats.length >= 2 && (
             <button
               type="button"
               onClick={onNextHand}

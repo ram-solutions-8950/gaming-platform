@@ -28,7 +28,7 @@ export const BettingControls: React.FC<BettingControlsProps> = ({
   const viewerSeat = gameState.seats.find((s) => s.id === currentUserId);
   const isMyTurn = viewerSeat && gameState.seats[gameState.current_turn]?.id === currentUserId;
   const isPlaying = gameState.phase === 'playing';
-  const isWaiting = gameState.phase === 'waiting' || gameState.phase === 'finished';
+  const isWaiting = gameState.phase === 'waiting';
 
   const activeSeats = gameState.seats.filter((s) => s.status === 'active');
   const canShow = isPlaying && activeSeats.length === 2;
@@ -126,6 +126,16 @@ export const BettingControls: React.FC<BettingControlsProps> = ({
             <span className="tp-btn-sub">Waiting for Player 2 ({playerCount}/2)</span>
           </button>
         )}
+      </div>
+    );
+  }
+
+  if (gameState.phase === 'finished') {
+    return (
+      <div className="tp-action-dock">
+        <div style={{ color: '#94a3b8', fontSize: '0.85rem', fontWeight: 600 }}>
+          {gameState.reason || 'Round finished'}
+        </div>
       </div>
     );
   }

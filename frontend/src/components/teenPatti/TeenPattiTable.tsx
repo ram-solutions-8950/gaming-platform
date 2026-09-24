@@ -24,6 +24,16 @@ export const TeenPattiTable: React.FC<TeenPattiTableProps> = ({
   const [showRules, setShowRules] = useState<boolean>(false);
   const [showdownDismissed, setShowdownDismissed] = useState<boolean>(false);
   const [showLobbyConfirm, setShowLobbyConfirm] = useState<boolean>(false);
+  const [tableClosedEvent, setTableClosedEvent] = useState<{ reason: string; winnerSeat?: number } | null>(null);
+
+  const handleSocketEvent = useCallback((event: any) => {
+    if (event.event === 'table_closed') {
+      setTableClosedEvent({
+        reason: event.reason || 'Opponent left the match. Match ended.',
+        winnerSeat: event.winner_seat,
+      });
+    }
+  }, []);
 
   const refreshWallet = useCallback(() => {
     walletService.getWallet().then((w) => setWalletBalance(w.balance || 0)).catch(() => {});
@@ -48,7 +58,7 @@ export const TeenPattiTable: React.FC<TeenPattiTableProps> = ({
     leaveTable,
     syncState,
     errorMessage,
-  } = useTeenPattiSocket({ tableId });
+  } = useTeenPattiSocket({ tableId, onEvent: handleSocketEvent });
 
   const handleLeave = useCallback(() => {
     try {
@@ -75,6 +85,16 @@ export const TeenPattiTable: React.FC<TeenPattiTableProps> = ({
       } catch (e) {}
     };
   }, [leaveTable]);
+
+  // Auto-leave if table is closed while not in result stage (e.g. opponent left in waiting)
+  useEffect(() => {
+    if (tableClosedEvent && gameState?.phase !== 'finished') {
+      const timer = setTimeout(() => {
+        handleLeaveImmediately();
+      }, 2500);
+      return () => clearTimeout(timer);
+    }
+  }, [tableClosedEvent, gameState?.phase, handleLeaveImmediately]);
 
   // Intercept Android hardware back button to show exit confirmation
   useEffect(() => {
@@ -238,6 +258,9 @@ export const TeenPattiTable: React.FC<TeenPattiTableProps> = ({
       return gameState.reason || 'Showdown! Comparing hands...';
     }
     if (gameState.phase === 'finished') {
+      if (gameState.reason?.toLowerCase().includes('opponent left')) {
+        return 'Opponent left the match — You Won!';
+      }
       return gameState.reason || 'Round finished';
     }
     const last = gameState.last_action;
@@ -395,7 +418,30 @@ export const TeenPattiTable: React.FC<TeenPattiTableProps> = ({
           onLeaveTable={handleLeaveImmediately}
           onNextHand={handleDealHandNow}
           onDismiss={() => setShowdownDismissed(true)}
+          isTableClosed={Boolean(tableClosedEvent)}
         />
+      )}
+
+      {/* Table Closed Modal (when table closed before finish stage, e.g. waiting) */}
+      {tableClosedEvent && !isResultStage && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
+          <div className="w-full max-w-sm rounded-2xl bg-gradient-to-b from-slate-900 via-slate-950 to-slate-900 border border-amber-500/40 p-6 shadow-2xl text-center">
+            <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400">
+              <LogOut size={24} />
+            </div>
+            <h3 className="text-lg font-bold text-white mb-2">Match Ended</h3>
+            <p className="text-sm text-slate-300 mb-6">
+              {tableClosedEvent.reason}
+            </p>
+            <button
+              type="button"
+              onClick={handleLeaveImmediately}
+              className="w-full py-2.5 px-4 rounded-xl font-bold text-white bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 transition cursor-pointer"
+            >
+              Back to Lobby
+            </button>
+          </div>
+        </div>
       )}
 
       {/* Rules Modal */}

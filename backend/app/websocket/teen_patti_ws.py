@@ -207,6 +207,41 @@ async def _broadcast_state(table_id: str) -> None:
         await manager.send_to_user(table_id, seat.id, payload)
 
 
+async def _close_table(
+    table_id: str,
+    reason: str = "Opponent left the match. Match ended.",
+    winner_seat: Optional[int] = None,
+) -> None:
+    _cancel(_turn_timers, table_id)
+    _cancel(_bot_timers, table_id)
+    _cancel(_start_timers, table_id)
+    _cancel(_bot_join_timers, table_id)
+    _pending_side_show.pop(table_id, None)
+
+    with _get_db_session() as db:
+        try:
+            tid = uuid.UUID(str(table_id))
+            tbl = db.query(TeenPattiTable).filter(TeenPattiTable.id == tid).first()
+            if tbl:
+                tbl.status = TeenPattiTableStatus.FINISHED
+                db.commit()
+        except Exception as e:
+            logging.getLogger(__name__).warning("Error setting table %s to FINISHED: %s", table_id, e)
+
+    await manager.broadcast(table_id, {
+        "type": "event",
+        "event": "table_closed",
+        "reason": reason,
+        "winner_seat": winner_seat,
+    })
+
+    teen_patti_manager.remove(table_id)
+    _processed_actions.pop(table_id, None)
+    _rng_per_table.pop(table_id, None)
+    _hand_number.pop(table_id, None)
+
+
+
 # Real-money stakes leave the wallet the moment they go into the pot (boot,
 # chaal, raise, show, side show). Settling a hand then only pays winners, so a
 # player can't bet and then empty their wallet before the hand is over.
@@ -312,19 +347,7 @@ async def _start_hand(table_id: str) -> None:
 
     connected_players = [s for s in hand.seats if s.id and (_is_bot(s.id) or manager.is_connected(table_id, s.id))]
     if len(connected_players) < 2:
-        hand.reset_for_next_hand()
-        hand.winner_seat = None
-        hand.reason = None
-        with _get_db_session() as db:
-            try:
-                tid = uuid.UUID(str(table_id))
-                tbl = db.query(TeenPattiTable).filter(TeenPattiTable.id == tid).first()
-                if tbl:
-                    tbl.status = TeenPattiTableStatus.OPEN
-                    db.commit()
-            except Exception:
-                pass
-        await _broadcast_state(table_id)
+        await _close_table(table_id, reason="Waiting for opponent timed out or player left.")
         return
 
     _cancel(_turn_timers, table_id)
@@ -534,7 +557,7 @@ async def _resolve_side_show(table_id: str, accept: bool) -> None:
     await _after_action(table_id)
 
 
-def _settle_hand(table_id: str, hand: TeenPattiHand) -> None:
+def _settle_hand(table_id: str, hand: TeenPattiHand, finish_table: bool = False) -> None:
     if hand.is_settled:
         return
     hand.is_settled = True
@@ -638,7 +661,7 @@ def _settle_hand(table_id: str, hand: TeenPattiHand) -> None:
                 server_seed=hand.server_seed or "",
                 server_seed_hash=s_seed_hash,
             ))
-        table.status = TeenPattiTableStatus.OPEN
+        table.status = TeenPattiTableStatus.FINISHED if finish_table else TeenPattiTableStatus.OPEN
         db.commit()
 
 
@@ -672,24 +695,7 @@ async def _schedule_next_hand(table_id: str) -> None:
                 hand.reset_for_next_hand()
                 await _start_hand(table_id)
             else:
-                hand.reset_for_next_hand()
-                hand.winner_seat = None
-                hand.reason = None
-                with _get_db_session() as db:
-                    try:
-                        tid = uuid.UUID(str(table_id))
-                        tbl = db.query(TeenPattiTable).filter(TeenPattiTable.id == tid).first()
-                        if tbl:
-                            tbl.status = TeenPattiTableStatus.OPEN
-                            db.commit()
-                    except Exception:
-                        pass
-                await manager.broadcast(table_id, {
-                    "type": "event",
-                    "event": "next_hand_ready",
-                    "hand_number": _hand_number[table_id],
-                })
-                await _broadcast_state(table_id)
+                await _close_table(table_id, reason="Opponent left the table. Match ended.")
 
 
 async def _after_action(table_id: str) -> None:
@@ -720,19 +726,7 @@ async def _after_action(table_id: str) -> None:
                 hand.remove_seat(s.id)
         connected_players = [s for s in hand.seats if s.id and (_is_bot(s.id) or manager.is_connected(table_id, s.id))]
         if len(connected_players) < 2:
-            hand.reset_for_next_hand()
-            hand.winner_seat = None
-            hand.reason = None
-            with _get_db_session() as db:
-                try:
-                    tid = uuid.UUID(str(table_id))
-                    tbl = db.query(TeenPattiTable).filter(TeenPattiTable.id == tid).first()
-                    if tbl:
-                        tbl.status = TeenPattiTableStatus.OPEN
-                        db.commit()
-                except Exception:
-                    pass
-            await _broadcast_state(table_id)
+            await _close_table(table_id, reason="Opponent left the table. Match ended.", winner_seat=hand.winner_seat)
             return
 
         _start_timers[table_id] = asyncio.create_task(_schedule_next_hand(table_id))
@@ -750,7 +744,7 @@ async def _handle_player_leave(table_id: str, user_id: str) -> None:
     if seat_idx is None:
         return
 
-    was_playing = (hand.phase == Phase.PLAYING)
+    was_playing = (hand.phase in (Phase.BOOT, Phase.PLAYING, Phase.SHOWDOWN))
     # 1. If currently playing and this player is in the hand, pack them to forfeit
     if was_playing and hand.seats[seat_idx].is_in_hand:
         hand.seats[seat_idx].status = PlayerStatus.PACKED
@@ -762,56 +756,41 @@ async def _handle_player_leave(table_id: str, user_id: str) -> None:
 
     # 2. If forfeit ended the hand, settle and broadcast hand_over
     if was_playing and hand.phase == Phase.FINISHED:
+        winner_seat = hand.winner_seat
         _cancel(_turn_timers, table_id)
         _cancel(_bot_timers, table_id)
         _cancel(_start_timers, table_id)
+        _cancel(_bot_join_timers, table_id)
+        _cancel_disconnect_timer((table_id, user_id))
+        _pending_side_show.pop(table_id, None)
+
         try:
-            _settle_hand(table_id, hand)
+            _settle_hand(table_id, hand, finish_table=True)
         except Exception as e:
             logging.getLogger(__name__).warning("Error settling hand on player leave: %s", e)
+
+        # Broadcast state with Phase.FINISHED and winner_seat BEFORE closing table so remaining player sees they won!
+        await _broadcast_state(table_id)
         await manager.broadcast(table_id, {
             "type": "event",
             "event": "hand_over",
-            "winner_seat": hand.winner_seat,
+            "winner_seat": winner_seat,
             "reason": "Opponent left the match",
         })
-        _hand_number[table_id] += 1
+        await manager.broadcast(table_id, {"type": "event", "event": "left", "seat": user_id})
 
-    # 3. Cancel all pending timers on this table
-    _cancel(_turn_timers, table_id)
-    _cancel(_bot_timers, table_id)
-    _cancel(_start_timers, table_id)
-    _cancel(_bot_join_timers, table_id)
-    _cancel_disconnect_timer((table_id, user_id))
-    _pending_side_show.pop(table_id, None)
+        # Close the table completely
+        await _close_table(table_id, reason="Opponent left the match. Match ended.", winner_seat=winner_seat)
+        return
 
-    # 4. Remove the departing player's seat
+    # 3. If hand was not playing (waiting or already finished)
     hand.remove_seat(user_id)
-
-    # 5. When fewer than 2 players remain, the match cannot continue.
-    # Reset table to WAITING phase so no further automatic hands or bets run, and clear stale winners.
+    await manager.broadcast(table_id, {"type": "event", "event": "left", "seat": user_id})
     seated = [s for s in hand.seats if s.id is not None]
     if len(seated) < 2:
-        hand.reset_for_next_hand()
-        hand.winner_seat = None
-        hand.reason = None
-        _cancel(_start_timers, table_id)
-        with _get_db_session() as db:
-            try:
-                tid = uuid.UUID(str(table_id))
-                tbl = db.query(TeenPattiTable).filter(TeenPattiTable.id == tid).first()
-                if tbl:
-                    tbl.status = TeenPattiTableStatus.OPEN
-                    db.commit()
-            except Exception:
-                pass
-    elif hand.phase in (Phase.SHOWDOWN, Phase.FINISHED):
-        # The hand is over but the table carries on. The timers cancelled above
-        # include the post-hand pacing, so restart it or the table never deals again.
-        _start_timers[table_id] = asyncio.create_task(_schedule_next_hand(table_id))
+        await _close_table(table_id, reason="Opponent left the table. Match ended.")
+        return
 
-    # 6. Broadcast left event and updated table state
-    await manager.broadcast(table_id, {"type": "event", "event": "left", "seat": user_id})
     await _broadcast_state(table_id)
 
 
@@ -843,6 +822,18 @@ async def teen_patti_socket(websocket: WebSocket, table_id: str) -> None:
 
     lock = _get_table_lock(table_id)
     async with lock:
+        with _get_db_session() as db:
+            try:
+                tid = uuid.UUID(str(table_id))
+                tbl = db.query(TeenPattiTable).filter(TeenPattiTable.id == tid).first()
+                if tbl and tbl.status == TeenPattiTableStatus.FINISHED:
+                    await websocket.accept()
+                    await websocket.send_json({"type": "error", "message": "This table has ended."})
+                    await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+                    return
+            except Exception:
+                pass
+
         hand = teen_patti_manager.get_or_create(table_id, cfg)
         if hand.phase == Phase.WAITING:
             for s in list(hand.seats):

@@ -516,32 +516,25 @@ def test_player_exits_during_match_ends_match_and_stops_new_rounds(client, db, t
             # Player 2 exits the match while it's in progress
             ws2.send_json({"action": "leave"})
 
-        # Remaining player (ws1) receives updated state
-        # The hand must be finished/reset to waiting, opponent is gone, only 1 player remains
+        # Remaining player (ws1) receives updated state with finished phase and won status
         s1_after = _recv_state(ws1)
-        assert len(s1_after["seats"]) == 1
-        assert s1_after["seats"][0]["id"] == str(test_users[0].id)
-        assert s1_after["phase"] == "waiting"
+        assert s1_after["phase"] == "finished"
+        assert s1_after["winner_seat"] == 0
+        assert s1_after["reason"] == "Opponent left the match"
 
         # Record Player 2 wallet balance right after Hand 1 forfeit settlement
         db.expire_all()
         w2_settled = get_balance(db, test_users[1].id).balance
         assert w2_settled == 49000 # 50000 - 1000 boot for Hand 1
 
-        # Table stays waiting with 1 player - no new hand starts
-        ws1.send_json({"action": "sync"})
-        s1_check = _recv_state(ws1)
-        assert len(s1_check["seats"]) == 1
-        assert s1_check["phase"] == "waiting"
+        # Table in DB must be FINISHED
+        tbl = db.execute(select(TeenPattiTable).where(TeenPattiTable.id == uuid.UUID(table_id))).scalar_one()
+        assert tbl.status == TeenPattiTableStatus.FINISHED
 
-        # Verify Player 1 cannot start new hand alone
-        ws1.send_json({"action": "start"})
-        err = ws1.receive_json()
-        assert err["type"] == "error"
-        assert "Need at least 2 players" in err["message"]
+        # Table must be removed from teen_patti_manager
+        assert teen_patti_manager.get(table_id) is None
 
         # Verify Player 2's wallet was NOT debited for any subsequent hand
-        db.expire_all()
         w2_final = get_balance(db, test_users[1].id).balance
         assert w2_final == w2_settled == 49000
 

@@ -310,22 +310,16 @@ def quick_join_table(
                 out.player_count = len(live.seats)
                 return out
 
-        # Priority 2: Reuse an existing open table that is currently empty
+        # Priority 2: Retire any abandoned empty open tables
+        retired = False
         for t in open_tables:
             live = teen_patti_manager.get(str(t.id))
             count = len(live.seats) if live else 0
             if count == 0:
-                if live and live.phase != Phase.WAITING:
-                    live.reset_for_next_hand()
-                cfg = GameConfig(
-                    boot_amount=t.boot_amount,
-                    max_players=t.max_players,
-                    turn_seconds=t.turn_seconds,
-                )
-                teen_patti_manager.get_or_create(str(t.id), cfg)
-                out = TableOut.model_validate(t)
-                out.player_count = 0
-                return out
+                t.status = TeenPattiTableStatus.FINISHED
+                retired = True
+        if retired:
+            db.commit()
 
         # Priority 3: Create a new open table
         tier_label = f"₹{payload.boot_amount // 100}" if payload.boot_amount >= 100 else f"{payload.boot_amount}p"

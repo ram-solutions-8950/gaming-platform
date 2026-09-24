@@ -21,9 +21,11 @@ export function useTeenPattiSocket({ tableId, onEvent, onError }: UseTeenPattiSo
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<any>(null);
   const isRefreshingRef = useRef(false);
+  const isMountedRef = useRef(true);
+  const intentionalLeaveRef = useRef(false);
 
   const connect = useCallback(async () => {
-    if (!tableId) return;
+    if (!tableId || !isMountedRef.current || intentionalLeaveRef.current) return;
 
     let activeToken = authStorage.getAccessToken();
     if (!activeToken) {
@@ -32,7 +34,7 @@ export function useTeenPattiSocket({ tableId, onEvent, onError }: UseTeenPattiSo
         activeToken = authStorage.getAccessToken();
       }
     }
-    if (!activeToken) return;
+    if (!activeToken || !isMountedRef.current || intentionalLeaveRef.current) return;
 
     if (wsRef.current) {
       try {
@@ -50,6 +52,10 @@ export function useTeenPattiSocket({ tableId, onEvent, onError }: UseTeenPattiSo
     wsRef.current = ws;
 
     ws.onopen = () => {
+      if (!isMountedRef.current || intentionalLeaveRef.current) {
+        try { ws.close(); } catch (e) {}
+        return;
+      }
       setIsConnected(true);
       setIsConnecting(false);
     };
@@ -66,6 +72,8 @@ export function useTeenPattiSocket({ tableId, onEvent, onError }: UseTeenPattiSo
             setPendingSideShow(null);
           } else if (msg.event === 'hand_over') {
             setPendingSideShow(null);
+          } else if (msg.event === 'table_closed') {
+            intentionalLeaveRef.current = true;
           }
           onEvent?.(msg);
         } else if (msg.type === 'error') {
@@ -77,7 +85,7 @@ export function useTeenPattiSocket({ tableId, onEvent, onError }: UseTeenPattiSo
               isRefreshingRef.current = true;
               const refreshed = await authService.refreshSession().catch(() => false);
               isRefreshingRef.current = false;
-              if (refreshed) {
+              if (refreshed && isMountedRef.current && !intentionalLeaveRef.current) {
                 setErrorMessage(null);
                 connect();
                 return;
@@ -99,23 +107,28 @@ export function useTeenPattiSocket({ tableId, onEvent, onError }: UseTeenPattiSo
     ws.onclose = async (event: CloseEvent) => {
       setIsConnected(false);
       setIsConnecting(false);
+
+      if (!isMountedRef.current || intentionalLeaveRef.current) {
+        return;
+      }
+
       if (event.code === 1008) {
         // Attempt one silent refresh if closed due to policy / auth
         if (!isRefreshingRef.current) {
           isRefreshingRef.current = true;
           const refreshed = await authService.refreshSession().catch(() => false);
           isRefreshingRef.current = false;
-          if (refreshed) {
+          if (refreshed && isMountedRef.current && !intentionalLeaveRef.current) {
             connect();
             return;
           }
         }
         return;
       }
-      // Auto-reconnect after 3s if still mounted
+      // Auto-reconnect after 3s only if still mounted and not leaving
       if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
       reconnectTimeoutRef.current = setTimeout(() => {
-        if (tableId) {
+        if (tableId && isMountedRef.current && !intentionalLeaveRef.current) {
           connect();
         }
       }, 3000);
@@ -123,9 +136,16 @@ export function useTeenPattiSocket({ tableId, onEvent, onError }: UseTeenPattiSo
   }, [tableId, onEvent, onError]);
 
   useEffect(() => {
+    isMountedRef.current = true;
+    intentionalLeaveRef.current = false;
     connect();
     return () => {
-      if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
+      isMountedRef.current = false;
+      intentionalLeaveRef.current = true;
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+        reconnectTimeoutRef.current = null;
+      }
       if (wsRef.current) {
         try {
           if (wsRef.current.readyState === WebSocket.OPEN) {
@@ -153,7 +173,14 @@ export function useTeenPattiSocket({ tableId, onEvent, onError }: UseTeenPattiSo
   const sideShow = useCallback(() => sendAction('side_show'), [sendAction]);
   const respondSideShow = useCallback((accept: boolean) => sendAction('side_show_respond', { accept }), [sendAction]);
   const startHand = useCallback(() => sendAction('start'), [sendAction]);
-  const leaveTable = useCallback(() => sendAction('leave'), [sendAction]);
+  const leaveTable = useCallback(() => {
+    intentionalLeaveRef.current = true;
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current);
+      reconnectTimeoutRef.current = null;
+    }
+    sendAction('leave');
+  }, [sendAction]);
   const syncState = useCallback(() => sendAction('sync'), [sendAction]);
 
   return {
