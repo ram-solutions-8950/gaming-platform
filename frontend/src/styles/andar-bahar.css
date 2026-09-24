@@ -592,6 +592,18 @@
   gap: 4px;
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.6), inset 0 0 12px rgba(255, 215, 0, 0.15);
   width: 100%;
+  transition: all 0.3s ease;
+}
+
+.andar-bahar-container .ab-pedestal-rim.pedestal-active {
+  border-color: #ffd700;
+  box-shadow: 0 0 24px rgba(255, 215, 0, 0.65), inset 0 0 14px rgba(255, 215, 0, 0.3);
+  animation: ab-pedestal-pulse 1s infinite alternate ease-in-out;
+}
+
+@keyframes ab-pedestal-pulse {
+  0% { transform: scale(1); box-shadow: 0 0 14px rgba(255, 215, 0, 0.4), inset 0 0 10px rgba(255, 215, 0, 0.2); }
+  100% { transform: scale(1.025); box-shadow: 0 0 28px rgba(255, 215, 0, 0.8), inset 0 0 18px rgba(255, 215, 0, 0.4); }
 }
 
 .andar-bahar-container .ab-pedestal-tag {
@@ -607,27 +619,47 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 60px;
+  min-height: 66px;
+}
+
+.andar-bahar-container .ab-pedestal-card-holder .card {
+  width: 46px;
+  height: 64px;
+  border: 1.5px solid rgba(255, 215, 0, 0.7);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.6), 0 0 12px rgba(255, 215, 0, 0.35);
+}
+
+.andar-bahar-container .ab-pedestal-card-holder .card .r {
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.andar-bahar-container .ab-pedestal-card-holder .card .s {
+  font-size: 15px;
 }
 
 .andar-bahar-container .ab-open-card-reveal {
-  animation: ab-card-flip 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  animation: ab-card-flip 0.65s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+  perspective: 600px;
 }
 
 @keyframes ab-card-flip {
-  0% { transform: scale(0.5) rotateY(90deg); opacity: 0; }
-  100% { transform: scale(1) rotateY(0); opacity: 1; }
+  0% { transform: scale(0.3) rotateY(180deg); opacity: 0; filter: drop-shadow(0 0 20px rgba(255, 215, 0, 1)); }
+  50% { transform: scale(1.15) rotateY(90deg); opacity: 0.9; }
+  100% { transform: scale(1) rotateY(0deg); opacity: 1; filter: drop-shadow(0 0 10px rgba(255, 215, 0, 0.6)); }
 }
 
 .andar-bahar-container .ab-target-badge {
-  font-size: 9.5px;
-  font-weight: 800;
-  background: rgba(0, 0, 0, 0.7);
-  padding: 2px 8px;
-  border-radius: 4px;
-  border: 1px solid rgba(255, 215, 0, 0.35);
+  font-size: 10px;
+  font-weight: 900;
+  background: linear-gradient(135deg, rgba(255, 215, 0, 0.28), rgba(0, 0, 0, 0.85));
+  padding: 2.5px 10px;
+  border-radius: 6px;
+  border: 1.5px solid rgba(255, 215, 0, 0.65);
   color: #ffd700;
   text-align: center;
+  box-shadow: 0 0 12px rgba(255, 215, 0, 0.4);
+  letter-spacing: 0.5px;
 }
 
 .andar-bahar-container .ab-target-placeholder {

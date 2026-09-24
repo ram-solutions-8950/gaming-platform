@@ -250,102 +250,139 @@ export function AndarBaharPage() {
       timers.current.forEach(clearTimeout);
       timers.current = [];
 
-      // 1. Reveal open card immediately
-      setMiddle(rd.middle);
-      soundManager.play("card_deal");
+      // 1. Enter dealing phase and clear table
+      setPhase("dealing");
+      phaseRef.current = "dealing";
+      setWinningSide(null);
+      setResultBanner(null);
       setAndar([]);
       setBahar([]);
 
-      // 2. Reveal winner & player outcome immediately
-      const winner = String(rd.winner || "").toLowerCase() as Side;
-      setWinningSide(winner);
-      const bet = myBetRef.current;
-      const didWin = bet && bet.roundId === roundId && bet.side === winner;
-      const didLose = bet && bet.roundId === roundId && bet.side !== winner;
+      // 2. Reveal open card (Trump Card) with deal audio
+      setMiddle(rd.middle);
+      soundManager.play("card_deal");
 
-      if (didWin) {
-        const netProfit = Math.round(bet.amount * (PAYOUT[winner] ?? 0.8));
-        const totalReturn = bet.amount + netProfit;
-        setResultBanner({
-          type: "win",
-          title: "YOU WIN!",
-          amount: totalReturn,
-          subText: `Bet: ₹${bet.amount} on ${winner.toUpperCase()} • Won +₹${totalReturn}`,
-        });
-        soundManager.play("win_clap");
-      } else if (didLose) {
-        setResultBanner({
-          type: "lose",
-          title: "YOU LOSE",
-          amount: bet.amount,
-          subText: `Bet: ₹${bet.amount} on ${bet.side.toUpperCase()} • Winner: ${winner.toUpperCase()}`,
-        });
-        soundManager.play("loss");
-      } else {
-        setResultBanner({
-          type: "neutral",
-          title: `${winner.toUpperCase()} WINS!`,
-          subText: `Target Rank: ${rankLabel(rd.middle?.rank || 0)}`,
-        });
-      }
-      setPhase("result");
-      phaseRef.current = "result";
-
-      refreshBalance();
-      getRoundHistory(20).then((h) => setHistory(formatHistory(h)));
-
-      // 3. Deal the winning card sequence onto the table smoothly and quickly
+      // 3. Pause so the player clearly registers the Trump Card and Target Rank (~1400ms)
       const steps = rd.steps || [];
-      const stepDelay = Math.max(35, Math.min(75, Math.round(500 / Math.max(1, steps.length))));
+      const winner = String(rd.winner || "").toLowerCase() as Side;
 
-      let i = 0;
-      const step = () => {
-        // Round ID check: Never append cards from a cancelled or stale round
+      // Pacing: smooth and readable dealing speed per card (~260ms - 420ms)
+      const stepDelay = Math.max(260, Math.min(420, Math.round(3200 / Math.max(1, steps.length))));
+
+      const openCardPauseTimer = window.setTimeout(() => {
         if (activeAnimatingRoundIdRef.current !== roundId) {
           return;
         }
 
-        if (i >= steps.length) {
-          // Cards finished dealing -> Hold winner on screen (~2s) before allowing next round transition
-          const holdTimer = window.setTimeout(() => {
-            if (activeAnimatingRoundIdRef.current !== roundId) {
-              return;
-            }
+        let i = 0;
+        const dealNextCard = () => {
+          if (activeAnimatingRoundIdRef.current !== roundId) {
+            return;
+          }
 
-            isAnimatingRef.current = false;
-            activeAnimatingRoundIdRef.current = null;
+          if (i >= steps.length) {
+            // All cards dealt! Matching card has landed!
+            // First highlight the winning side zone so player sees the match
+            setWinningSide(winner);
 
-            // Transition: If a new round arrived while displaying result, transition now
-            if (pendingRoundStartRef.current) {
-              const nextRound = pendingRoundStartRef.current;
-              pendingRoundStartRef.current = null;
-              applyRoundStart(nextRound);
-            } else if (pendingResultRef.current) {
-              const nextResult = pendingResultRef.current;
-              pendingResultRef.current = null;
-              animateServerDeal(nextResult.rd, nextResult.roundId);
-            }
-          }, 2000);
+            // Wait ~850ms so player sees the matching card on the table before the modal pops up
+            const matchPauseTimer = window.setTimeout(() => {
+              if (activeAnimatingRoundIdRef.current !== roundId) {
+                return;
+              }
 
-          timers.current.push(holdTimer);
-          return;
-        }
+              // Now show the Win / Lose result modal!
+              const bet = myBetRef.current;
+              const didWin = bet && bet.roundId === roundId && bet.side === winner;
+              const didLose = bet && bet.roundId === roundId && bet.side !== winner;
 
-        const s = steps[i];
-        if (s.side === "andar") {
-          setAndar((prev) => [...prev, s.card]);
+              if (didWin) {
+                const netProfit = Math.round(bet.amount * (PAYOUT[winner] ?? 0.8));
+                const totalReturn = bet.amount + netProfit;
+                setResultBanner({
+                  type: "win",
+                  title: "YOU WIN!",
+                  amount: totalReturn,
+                  subText: `Bet: ₹${bet.amount} on ${winner.toUpperCase()} • Won +₹${totalReturn}`,
+                });
+                soundManager.play("win_clap");
+              } else if (didLose) {
+                setResultBanner({
+                  type: "lose",
+                  title: "YOU LOSE",
+                  amount: bet.amount,
+                  subText: `Bet: ₹${bet.amount} on ${bet.side.toUpperCase()} • Winner: ${winner.toUpperCase()}`,
+                });
+                soundManager.play("loss");
+              } else {
+                setResultBanner({
+                  type: "neutral",
+                  title: `${winner.toUpperCase()} WINS!`,
+                  subText: `Target Rank: ${rankLabel(rd.middle?.rank || 0)} matched on ${winner.toUpperCase()}`,
+                });
+              }
+              setPhase("result");
+              phaseRef.current = "result";
+
+              refreshBalance();
+              getRoundHistory(20).then((h) => setHistory(formatHistory(h)));
+
+              // Hold the result modal on screen (~2.5s) before allowing next round transition
+              const holdTimer = window.setTimeout(() => {
+                if (activeAnimatingRoundIdRef.current !== roundId) {
+                  return;
+                }
+
+                isAnimatingRef.current = false;
+                activeAnimatingRoundIdRef.current = null;
+
+                // Transition: If a new round arrived while displaying result, transition now
+                if (pendingRoundStartRef.current) {
+                  const nextRound = pendingRoundStartRef.current;
+                  pendingRoundStartRef.current = null;
+                  applyRoundStart(nextRound);
+                } else if (pendingResultRef.current) {
+                  const nextResult = pendingResultRef.current;
+                  pendingResultRef.current = null;
+                  animateServerDeal(nextResult.rd, nextResult.roundId);
+                }
+              }, 2500);
+
+              timers.current.push(holdTimer);
+            }, 850);
+
+            timers.current.push(matchPauseTimer);
+            return;
+          }
+
+          const s = steps[i];
+          if (s.side === "andar") {
+            setAndar((prev) => [...prev, s.card]);
+          } else {
+            setBahar((prev) => [...prev, s.card]);
+          }
+          soundManager.play("card_deal");
+          i += 1;
+
+          const nextStepTimer = window.setTimeout(dealNextCard, stepDelay);
+          timers.current.push(nextStepTimer);
+        };
+
+        // If there are cards to deal, deal them sequentially
+        if (steps.length > 0) {
+          dealNextCard();
         } else {
-          setBahar((prev) => [...prev, s.card]);
+          setWinningSide(winner);
+          setPhase("result");
+          phaseRef.current = "result";
+          refreshBalance();
+          getRoundHistory(20).then((h) => setHistory(formatHistory(h)));
+          isAnimatingRef.current = false;
+          activeAnimatingRoundIdRef.current = null;
         }
-        soundManager.play("card_deal");
-        i += 1;
+      }, 1400);
 
-        const nextStepTimer = window.setTimeout(step, stepDelay);
-        timers.current.push(nextStepTimer);
-      };
-
-      // Start card animation immediately with zero lead-in delay
-      step();
+      timers.current.push(openCardPauseTimer);
     },
     [applyRoundStart, formatHistory, refreshBalance]
   );
@@ -669,8 +706,10 @@ export function AndarBaharPage() {
                 </>
               ) : phase === "dealing" ? (
                 <>
-                  <span className="ab-phase-icon animate-spin">🎴</span>
-                  <span className="ab-phase-label">DEALING CARDS</span>
+                  <span className="ab-phase-icon">🎴</span>
+                  <span className="ab-phase-label">
+                    {middle ? `DEALING • TARGET: ${rankLabel(middle.rank)}` : "DEALING CARDS"}
+                  </span>
                 </>
               ) : (
                 <>
@@ -759,7 +798,7 @@ export function AndarBaharPage() {
                 {/* Dealt Cards Tray */}
                 <div className="ab-cards-tray">
                   {andar.map((c, idx) => (
-                    <div key={idx} className="ab-card-deal-anim" style={{ animationDelay: `${idx * 0.04}s` }}>
+                    <div key={idx} className="ab-card-deal-anim">
                       <CardView card={c} />
                     </div>
                   ))}
@@ -781,11 +820,11 @@ export function AndarBaharPage() {
 
               {/* JOKER / OPEN CARD (Center Pedestal) */}
               <div className="ab-center-pedestal">
-                <div className="ab-pedestal-rim">
+                <div className={`ab-pedestal-rim ${middle && phase === "dealing" ? "pedestal-active" : ""}`}>
                   <div className="ab-pedestal-tag">OPEN CARD</div>
                   <div className="ab-pedestal-card-holder">
                     {middle ? (
-                      <div className="ab-open-card-reveal">
+                      <div className="ab-open-card-reveal" key={`${middle.rank}-${middle.suit}`}>
                         <CardView card={middle} />
                       </div>
                     ) : phase === "closed" ? (
@@ -824,7 +863,7 @@ export function AndarBaharPage() {
                 {/* Dealt Cards Tray */}
                 <div className="ab-cards-tray">
                   {bahar.map((c, idx) => (
-                    <div key={idx} className="ab-card-deal-anim" style={{ animationDelay: `${idx * 0.04}s` }}>
+                    <div key={idx} className="ab-card-deal-anim">
                       <CardView card={c} />
                     </div>
                   ))}

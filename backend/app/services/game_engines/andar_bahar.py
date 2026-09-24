@@ -187,6 +187,9 @@ def calculate_payout_gross(
 
 class AndarBaharEngine(GameEngine):
     slug = "andar-bahar"
+    # Covers the client's result sequence in pages/user/AndarBahar.tsx:
+    # open card reveal (~1.4s) + card dealing sequence (~2.5s - 3.5s) + match pause (0.85s) + winner popup (2.5s) = ~7.5s - 8s.
+    result_display_seconds = 8
 
     def _get_or_create_game(self, db: Session) -> Game:
         game = db.query(Game).filter(Game.slug == self.slug).first()

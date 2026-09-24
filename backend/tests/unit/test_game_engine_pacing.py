@@ -38,7 +38,8 @@ def _pause_after_result(engine) -> float:
 
     original = game_engine.asyncio, game_engine.SessionLocal
     game_engine.asyncio = SimpleNamespace(sleep=sleep)
-    game_engine.SessionLocal = lambda: SimpleNamespace(close=lambda: None)
+    query_mock = lambda *a: SimpleNamespace(filter=lambda *f: SimpleNamespace(first=lambda: None, all=lambda: []))
+    game_engine.SessionLocal = lambda: SimpleNamespace(close=lambda: None, query=query_mock)
     try:
         with pytest.raises(_StopLoop):
             asyncio.run(game_engine._run_engine_for_game(fake, broadcast))
@@ -55,6 +56,10 @@ def test_dragon_tiger_holds_the_result_before_the_next_round():
     assert _pause_after_result(get_engine("dragon-tiger")) >= 7.75
 
 
+def test_andar_bahar_holds_the_result_before_the_next_round():
+    # Card reveal + dealing + winner popup on the client take >= 7.5s
+    assert _pause_after_result(get_engine("andar-bahar")) >= 7.5
+
+
 def test_other_games_keep_their_short_pause():
-    assert _pause_after_result(get_engine("andar-bahar")) == 1
     assert _pause_after_result(get_engine("colour-prediction")) == 1
