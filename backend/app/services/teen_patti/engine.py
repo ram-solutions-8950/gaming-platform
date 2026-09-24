@@ -365,11 +365,11 @@ class TeenPattiHand:
             for i in active:
                 self.seats[i].show_cards = True
                 self.seats[i].status = PlayerStatus.SHOW_WINNER
-            self.phase = Phase.SHOWDOWN
             self._finish_hand(
                 winner_idx=None,
                 reason=f"Showdown Tie: Pot split on {category_of(s.cards, self.config.sequence_rules)}",
                 winner_seats=list(active),
+                showdown=True,
             )
             return {
                 "winner_seat": None,
@@ -384,13 +384,12 @@ class TeenPattiHand:
             for i in active:
                 self.seats[i].show_cards = True
                 self.seats[i].status = PlayerStatus.SHOW_LOSER
-            self.phase = Phase.SHOWDOWN
             tie_reason = (
                 "Showdown Tie: Equal hands — both players lost stakes to House"
                 if is_tie
                 else "House Takes Pot: Both players lost stakes"
             )
-            self._finish_hand(winner_idx=None, reason=tie_reason)
+            self._finish_hand(winner_idx=None, reason=tie_reason, showdown=True)
             return {
                 "winner_seat": None,
                 "winner_seats": [],
@@ -410,8 +409,11 @@ class TeenPattiHand:
         self.seats[winner_idx].status = PlayerStatus.SHOW_WINNER
         self.seats[loser_idx].status = PlayerStatus.SHOW_LOSER
 
-        self.phase = Phase.SHOWDOWN
-        self._finish_hand(winner_idx=winner_idx, reason=f"Showdown: {category_of(self.seats[winner_idx].cards, self.config.sequence_rules)}")
+        self._finish_hand(
+            winner_idx=winner_idx,
+            reason=f"Showdown: {category_of(self.seats[winner_idx].cards, self.config.sequence_rules)}",
+            showdown=True,
+        )
         return {
             "winner_seat": winner_idx,
             "loser_seat": loser_idx,
@@ -493,8 +495,11 @@ class TeenPattiHand:
         winner_idx: Optional[int],
         reason: str,
         winner_seats: Optional[List[int]] = None,
+        showdown: bool = False,
     ) -> None:
-        self.phase = Phase.FINISHED
+        # The result is final either way. A showdown stops in SHOWDOWN, with both
+        # hands face-up, until the table moves it on with complete_showdown().
+        self.phase = Phase.SHOWDOWN if showdown else Phase.FINISHED
         self.winner_seat = winner_idx
         # winner_seats carries split pots; a single winner fills it too so the
         # settlement layer only has to read one field.
@@ -514,6 +519,11 @@ class TeenPattiHand:
                     self.win_streak[s.id] = 0
         else:
             self.win_streak.clear()
+
+    def complete_showdown(self) -> None:
+        """End the showdown reveal: hands stay face-up, the result is announced."""
+        if self.phase == Phase.SHOWDOWN:
+            self.phase = Phase.FINISHED
 
     def reset_for_next_hand(self) -> None:
         self.phase = Phase.WAITING

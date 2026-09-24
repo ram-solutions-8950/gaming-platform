@@ -7,7 +7,6 @@ interface RoadCrossingGameProps {
   currentLane: number;
   difficulty: Difficulty;
   onLaneCross: (laneIndex: number) => void;
-  onCollision: (laneIndex: number) => void;
   onFinish: () => void;
   onSteer?: (direction: 'left' | 'right' | null) => void;
   externalSteer?: 'left' | 'right' | null;
@@ -167,7 +166,6 @@ const RoadCrossingGameComponent: React.FC<RoadCrossingGameProps> = ({
   currentLane,
   difficulty,
   onLaneCross,
-  onCollision,
   onFinish,
   externalSteer,
 }) => {
@@ -175,11 +173,11 @@ const RoadCrossingGameComponent: React.FC<RoadCrossingGameProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const containerRectRef = useRef<{ width: number; height: number }>({ width: 844, height: 270 });
 
-  const callbacksRef = useRef({ onLaneCross, onCollision, onFinish });
-  callbacksRef.current = { onLaneCross, onCollision, onFinish };
+  const callbacksRef = useRef({ onLaneCross, onFinish });
+  callbacksRef.current = { onLaneCross, onFinish };
   useEffect(() => {
-    callbacksRef.current = { onLaneCross, onCollision, onFinish };
-  }, [onLaneCross, onCollision, onFinish]);
+    callbacksRef.current = { onLaneCross, onFinish };
+  }, [onLaneCross, onFinish]);
 
   const totalLanes = multipliers.length || 10;
   const roadWidth = totalLanes * LANE_WIDTH;
@@ -220,6 +218,8 @@ const RoadCrossingGameComponent: React.FC<RoadCrossingGameProps> = ({
     potholes: [] as Pothole[],
     particles: [] as Particle[],
     screenShake: 0,
+    // Set when the server rules a hit; the render loop plays the crash effect.
+    hitFx: false,
     highestLaneCrossed: 0,
     lastFrameTime: performance.now(),
   });
@@ -266,7 +266,15 @@ const RoadCrossingGameComponent: React.FC<RoadCrossingGameProps> = ({
       s.potholes = [];
       s.screenShake = 0;
     } else if (gameState === 'LOST') {
-      stateRef.current.chicken.isHit = true;
+      // The server's draw decided the hit; show it where the chicken stands.
+      const s = stateRef.current;
+      if (!s.chicken.isHit) {
+        s.chicken.isHit = true;
+        s.chicken.vx = 0;
+        s.screenShake = 16;
+        s.hitFx = true;
+        sounds.playCollision();
+      }
     } else if (gameState === 'WON') {
       stateRef.current.chicken.isWon = true;
     }
@@ -647,7 +655,6 @@ const RoadCrossingGameComponent: React.FC<RoadCrossingGameProps> = ({
 
         // Check safe zones
         const finishStartX = START_ZONE_WIDTH + s.totalLanes * LANE_WIDTH;
-        const inStartSafeZone = s.chicken.x <= START_ZONE_WIDTH;
         const inFinishSafeZone = s.chicken.x >= finishStartX;
 
         // Check if chicken reached the RIGHT Finish Safe Zone (Green Point)
@@ -658,42 +665,13 @@ const RoadCrossingGameComponent: React.FC<RoadCrossingGameProps> = ({
           callbacksRef.current.onFinish();
         }
 
-        // ──────────────────────────────────────────
-        // 2. ACCURATE VEHICLE COLLISION DETECTION (BUG-004)
-        // Active when chicken is on the road surface across active traffic lanes
-        // ──────────────────────────────────────────
-        if (!inStartSafeZone && !inFinishSafeZone && !s.chicken.isWon && !s.chicken.isHit) {
-          const chickenBox = {
-            left: s.chicken.x - 12,
-            right: s.chicken.x + 12,
-            top: s.chicken.y - 12,
-            bottom: s.chicken.y + 12,
-          };
+        // Traffic is scenery: whether the chicken survives a lane is decided by
+        // the server's draw (see handleLaneCross), never by what the canvas sees.
+      }
 
-          for (const v of s.vehicles) {
-            const vBox = {
-              left: v.x - v.width / 2 - 4,
-              right: v.x + v.width / 2 + 4,
-              top: v.y - v.height / 2 + 6,
-              bottom: v.y + v.height / 2 - 6,
-            };
-
-            // AABB Box intersection
-            if (
-              chickenBox.left < vBox.right &&
-              chickenBox.right > vBox.left &&
-              chickenBox.top < vBox.bottom &&
-              chickenBox.bottom > vBox.top
-            ) {
-              s.chicken.isHit = true;
-              s.screenShake = 16;
-              spawnFeathers(s.chicken.x, s.chicken.y);
-              sounds.playCollision();
-              callbacksRef.current.onCollision(v.lane);
-              break;
-            }
-          }
-        }
+      if (s.hitFx) {
+        s.hitFx = false;
+        spawnFeathers(s.chicken.x, s.chicken.y);
       }
 
       // Smooth horizontal camera follow (chicken positioned ~30% from the left)

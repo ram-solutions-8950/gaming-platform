@@ -22,7 +22,7 @@ from ..schemas.rummy import TableCreate
 from ..security.jwt import decode_access_token
 from ..services.rummy import bot_strategy
 from ..services.rummy.deals_rummy import DealsRummyGame, GameConfig, Phase, Player
-from ..services.rummy.errors import GameError
+from ..services.rummy.errors import GameError, GameStateError
 from ..services.rummy.game_manager import game_manager
 from ..services.wallet_service import credit_wallet, debit_wallet, get_balance
 from ..services.settlement_service import settle_winning_bet
@@ -324,83 +324,143 @@ async def _run_bot_turn(table_id: str) -> None:
         _maybe_trigger_bot_turn(table_id)
 
 
-def _settle_real_money(table_id: str, game: DealsRummyGame) -> None:
-    if game.winner_id is None:
-        return
+# Real-money deals hold each player's maximum loss (the table's entry fee, the
+# 80-point cap) from their wallet when the deal starts, and settle out of those
+# holds. A player can't sit through a losing deal having already spent the money.
+# deal key -> player id -> amount held for that deal.
+_deal_holds: Dict[str, Dict[str, int]] = defaultdict(dict)
+
+
+def _real_money_table(db, table_id: str) -> Optional[RummyTable]:
+    try:
+        table = db.query(RummyTable).filter(RummyTable.id == uuid.UUID(str(table_id))).first()
+    except Exception:
+        return None
+    if table is None or table.entry_fee_paise <= 0:
+        return None
+    mode = table.mode.value if hasattr(table.mode, "value") else table.mode
+    return table if str(mode) == "real_money" else None
+
+
+def _hold_deal_stakes(table_id: str, game: DealsRummyGame) -> List[str]:
+    """Hold the maximum loss from every human dealt into the next deal.
+    Returns the players who couldn't cover it (nothing is held from anyone then)."""
     with _get_db_session() as db:
-        try:
-            tid = uuid.UUID(str(table_id))
-            table = db.query(RummyTable).filter(RummyTable.id == tid).first()
-        except Exception:
-            return
-        if table is None or str(table.mode.value if hasattr(table.mode, "value") else table.mode) != "real_money":
-            return
-        if table.entry_fee_paise <= 0:
+        table = _real_money_table(db, table_id)
+        if table is None:
+            return []
+        deal_key = f"{table_id}:{game.deal_number + 1}"
+        players = [p for p in game._live_players() if not _is_bot(p.id)]
+        short = []
+        for p in players:
+            wallet = get_balance(db, uuid.UUID(p.id))
+            if not wallet or wallet.balance < table.entry_fee_paise:
+                short.append(p.id)
+        if short:
+            return short
+        holds = _deal_holds[deal_key]
+        for p in players:
+            debit_wallet(
+                db=db,
+                user_id=uuid.UUID(p.id),
+                amount=table.entry_fee_paise,
+                tx_type=WalletTransactionType.GAME_ENTRY,
+                reference_type="RUMMY_STAKE",
+                reference_id=f"rummy_hold_{deal_key}_{p.id}",
+                metadata={"game": "rummy", "table_id": table_id, "deal_number": game.deal_number + 1},
+            )
+            holds[p.id] = table.entry_fee_paise
+        db.commit()
+        return []
+
+
+def _release_holds(db, deal_key: str, holds: Dict[str, int], reason: str) -> None:
+    from ..services.wager_service import reverse_wager
+    for pid, amount in holds.items():
+        credit_wallet(
+            db=db,
+            user_id=uuid.UUID(pid),
+            amount=amount,
+            tx_type=WalletTransactionType.REFUND,
+            reference_type="RUMMY_REFUND",
+            reference_id=f"rummy_refund_{deal_key}_{pid}",
+            metadata={"deal_key": deal_key, "reason": reason},
+        )
+        reverse_wager(db, uuid.UUID(pid), amount, "rummy")
+
+
+def _settle_real_money(table_id: str, game: DealsRummyGame) -> None:
+    deal_key = f"{table_id}:{game.deal_number}"
+    if deal_key in _settled_deals:
+        return
+    holds = _deal_holds.get(deal_key)
+    if not holds:
+        return  # nothing was held: a free table, or a deal that never started
+    with _get_db_session() as db:
+        table = _real_money_table(db, table_id)
+        if table is None:
             return
 
         # In Points Rummy, entry_fee_paise represents the 80-point maximum loss cap.
-        # The point value per point is table.entry_fee_paise // 80.
         # e.g., ₹0.10/point: entry_fee_paise = 800 -> point_value_paise = 10 paise (₹0.10).
-        # 80 points * 10 paise = 800 paise = ₹8.00.
         if table.entry_fee_paise >= 80:
             point_value_paise = max(1, round(table.entry_fee_paise / 80))
         else:
             point_value_paise = max(1, table.entry_fee_paise)
 
-        deal_key = f"{table_id}:{game.deal_number}"
-        if deal_key in _settled_deals:
-            return
-
-        # Check if transaction with this deal key already exists in DB ledger
-        existing_tx = db.query(WalletTransaction).filter(
-            WalletTransaction.reference_id.like(f"%{deal_key}%")
-        ).first()
-        if existing_tx is not None:
-            _settled_deals.add(deal_key)
-            return
-
-        total_credit = 0
-
-        # Enforce atomic savepoint transaction for all wallet entries in this deal
+        total_losses = 0
+        # All wallet entries of a deal settle together or not at all; every one
+        # has an exact reference, so a repeat is rejected as a duplicate.
         sp = db.begin_nested()
         try:
-            for p in game.players:
-                if p.id == game.winner_id or p.deal_points <= 0 or _is_bot(p.id):
-                    continue
-                # Calculate exact loss capped at entry_fee_paise (80 points maximum)
-                amount = min(p.deal_points * point_value_paise, table.entry_fee_paise)
-                uid = uuid.UUID(p.id)
-                debit_wallet(
-                    db=db,
-                    user_id=uid,
-                    amount=amount,
-                    tx_type=WalletTransactionType.GAME_ENTRY,
-                    reference_type="RUMMY_STAKE",
-                    reference_id=f"rummy_stake_{deal_key}_{p.id}",
-                    metadata={"table_id": table_id, "deal_number": game.deal_number, "points": p.deal_points}
-                )
-                total_credit += amount
-
-            if total_credit > 0 and not _is_bot(game.winner_id):
-                winner_uid = uuid.UUID(game.winner_id)
-                calc, _ = settle_winning_bet(
-                    db=db,
-                    user_id=winner_uid,
-                    original_bet=0,
-                    gross_profit=total_credit,
-                    reference_type="RUMMY_PAYOUT",
-                    reference_id=f"rummy_payout_{deal_key}",
-                    game_slug="rummy",
-                    metadata={"table_id": table_id, "deal_number": game.deal_number, "prize_pool": total_credit},
-                )
+            if game.winner_id is None:
+                _release_holds(db, deal_key, holds, "no_winner")
+            else:
+                from ..services.wager_service import reverse_wager
+                for pid, held in holds.items():
+                    if pid == game.winner_id:
+                        continue
+                    p = next((pl for pl in game.players if pl.id == pid), None)
+                    points = p.deal_points if p else 80
+                    loss = min(points * point_value_paise, held)
+                    total_losses += loss
+                    unused = held - loss
+                    if unused > 0:
+                        credit_wallet(
+                            db=db,
+                            user_id=uuid.UUID(pid),
+                            amount=unused,
+                            tx_type=WalletTransactionType.REFUND,
+                            reference_type="RUMMY_REFUND",
+                            reference_id=f"rummy_refund_{deal_key}_{pid}",
+                            metadata={"table_id": table_id, "deal_number": game.deal_number, "points": points},
+                        )
+                        reverse_wager(db, uuid.UUID(pid), unused, "rummy")
+                winner_hold = holds.get(game.winner_id, 0)
+                if not _is_bot(game.winner_id) and (winner_hold or total_losses):
+                    if total_losses > 0:
+                        settle_winning_bet(
+                            db=db,
+                            user_id=uuid.UUID(game.winner_id),
+                            original_bet=winner_hold,
+                            gross_profit=total_losses,
+                            reference_type="RUMMY_PAYOUT",
+                            reference_id=f"rummy_payout_{deal_key}",
+                            game_slug="rummy",
+                            metadata={"table_id": table_id, "deal_number": game.deal_number, "prize_pool": total_losses},
+                        )
+                    else:
+                        _release_holds(db, deal_key, {game.winner_id: winner_hold}, "won_without_losses")
             sp.commit()
             _settled_deals.add(deal_key)
+            _deal_holds.pop(deal_key, None)
         except Exception as e:
             sp.rollback()
             err_msg = str(e)
             if "Duplicate transaction reference" in err_msg or "already exists" in err_msg:
                 logger.warning("RUMMY_SETTLEMENT_ALREADY_SETTLED: table_id=%s deal=%d: %s", table_id, game.deal_number, err_msg)
                 _settled_deals.add(deal_key)
+                _deal_holds.pop(deal_key, None)
                 return
             logger.error("RUMMY_SETTLEMENT_FAILED: table_id=%s deal=%d error=%s. Rollback wallet changes.", table_id, game.deal_number, err_msg)
             return
@@ -408,11 +468,11 @@ def _settle_real_money(table_id: str, game: DealsRummyGame) -> None:
         # Record finished round
         try:
             round_record = RummyRound(
-                table_id=tid,
-                winner_user_id=uuid.UUID(game.winner_id) if not _is_bot(game.winner_id) else None,
+                table_id=table.id,
+                winner_user_id=uuid.UUID(game.winner_id) if game.winner_id and not _is_bot(game.winner_id) else None,
                 deals_played=game.deal_number,
                 result_json=json.dumps(game.public_state()),
-                prize_pool_paise=total_credit,
+                prize_pool_paise=total_losses,
             )
             db.add(round_record)
             if game.phase == Phase.GAME_OVER:
@@ -421,6 +481,22 @@ def _settle_real_money(table_id: str, game: DealsRummyGame) -> None:
             pass
 
         db.commit()
+
+
+def refund_live_deals() -> None:
+    """On shutdown: a deal still being played is void, so its holds go back."""
+    for deal_key, holds in list(_deal_holds.items()):
+        table_id = deal_key.rsplit(":", 1)[0]
+        game = game_manager.get(table_id)
+        if game is not None and game.phase in (Phase.DEAL_OVER, Phase.GAME_OVER):
+            continue  # finished: settled (or about to be) the normal way
+        with _get_db_session() as db:
+            try:
+                _release_holds(db, deal_key, holds, "server_shutdown")
+                db.commit()
+                _deal_holds.pop(deal_key, None)
+            except Exception:
+                db.rollback()
 
 
 @router.websocket("/ws/game/{table_id}")
@@ -541,7 +617,31 @@ async def _handle_action(table_id: str, user_id: str, msg: dict) -> None:
 
     try:
         if action == "start":
-            game.start_deal()
+            if game.phase not in (Phase.WAITING, Phase.DEAL_OVER):
+                raise GameStateError("a deal is already in progress")
+            short = _hold_deal_stakes(table_id, game)
+            if short:
+                # Players who can't cover the deal's maximum loss leave first
+                for pid in short:
+                    await manager.send_to_user(table_id, pid, {
+                        "type": "error",
+                        "message": "Insufficient balance for the next deal. Add money to keep playing.",
+                    })
+                    await _handle_player_leave(table_id, pid)
+                if game.phase == Phase.GAME_OVER or len(game._live_players()) < game.config.min_players:
+                    return
+                if _hold_deal_stakes(table_id, game):
+                    return
+            try:
+                game.start_deal()
+            except GameError:
+                # The deal didn't start: give back what was just held for it
+                holds = _deal_holds.pop(f"{table_id}:{game.deal_number + 1}", None)
+                if holds:
+                    with _get_db_session() as db:
+                        _release_holds(db, f"{table_id}:{game.deal_number + 1}", holds, "deal_not_started")
+                        db.commit()
+                raise
             await manager.broadcast(table_id, {"type": "event", "event": "deal_started",
                                                "deal": game.deal_number})
         elif action == "draw":

@@ -15,8 +15,40 @@ logger = get_logger("game_engine")
 _engine_tasks: list[asyncio.Task] = []
 
 
+def _settle_interrupted_rounds(engine) -> None:
+    """Rounds a restart left open still hold players' stakes. Betting on them is
+    over, so they are drawn and settled like any other round."""
+    from ..models.game import GameRound, GameRoundStatus
+    from ..models.game_catalog import Game
+
+    db = SessionLocal()
+    try:
+        game = db.query(Game).filter(Game.slug == engine.slug).first()
+        if game is None:
+            return
+        stale = (
+            db.query(GameRound.id)
+            .filter(
+                GameRound.game_id == game.id,
+                GameRound.status.in_([GameRoundStatus.BETTING, GameRoundStatus.CALCULATING]),
+            )
+            .all()
+        )
+        for (round_id,) in stale:
+            try:
+                engine.lock_round_for_calculation(db, round_id)
+                engine.settle_round(db, round_id)
+                logger.info("[%s] Settled round %s left open by a restart", engine.slug, round_id)
+            except Exception as exc:
+                db.rollback()
+                logger.error("[%s] Could not settle interrupted round %s: %s", engine.slug, round_id, exc)
+    finally:
+        db.close()
+
+
 async def _run_engine_for_game(engine, broadcast_fn=None):
     logger.info("Game engine started for %s", engine.slug)
+    _settle_interrupted_rounds(engine)
     while True:
         db = SessionLocal()
         try:
@@ -76,7 +108,7 @@ async def _run_engine_for_game(engine, broadcast_fn=None):
         finally:
             db.close()
 
-        await asyncio.sleep(1)
+        await asyncio.sleep(engine.result_display_seconds)
 
 
 def start_engine(broadcast_fn=None):

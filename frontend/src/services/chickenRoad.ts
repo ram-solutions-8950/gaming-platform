@@ -32,6 +32,16 @@ export interface StartResponse {
   wallet_balance: number;
 }
 
+/** The server's draw ended the round: the chicken was hit on `lane_index`. */
+export interface LostResponse {
+  round_id: string;
+  status: 'LOST';
+  lane_index: number;
+  current_lane: number;
+  bet_amount: number;
+  won_amount: number;
+}
+
 export interface CrossLaneResponse {
   round_id: string;
   status: 'ACTIVE';
@@ -79,12 +89,12 @@ export const chickenRoadService = {
     return res.data.data;
   },
 
-  async crossLane(round_id: string, lane_index: number): Promise<CrossLaneResponse> {
+  async crossLane(round_id: string, lane_index: number): Promise<CrossLaneResponse | LostResponse> {
     const res = await api.post('/games/chicken-road/cross-lane', { round_id, lane_index });
     return res.data.data;
   },
 
-  async finishGame(round_id: string, lane_index?: number): Promise<FinishResponse> {
+  async finishGame(round_id: string, lane_index?: number): Promise<FinishResponse | LostResponse> {
     const res = await api.post('/games/chicken-road/finish', { round_id, lane_index });
     return res.data.data;
   },
@@ -94,7 +104,7 @@ export const chickenRoadService = {
     return res.data.data;
   },
 
-  async cashout(round_id: string, lane_index?: number): Promise<CashoutResponse> {
+  async cashout(round_id: string, lane_index?: number): Promise<CashoutResponse | LostResponse> {
     const res = await api.post('/games/chicken-road/cashout', { round_id, lane_index });
     return res.data.data;
   },

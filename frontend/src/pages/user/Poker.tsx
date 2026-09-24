@@ -23,6 +23,9 @@ export function PokerPage() {
   const [showRulesModal, setShowRulesModal] = useState<boolean>(false);
   const [showExitConfirm, setShowExitConfirm] = useState<boolean>(false);
   const [actionErrorMessage, setActionErrorMessage] = useState<string | null>(null);
+  // Set when the server took our seat after we ran out of chips.
+  const [bustedBuyIn, setBustedBuyIn] = useState<number | null>(null);
+  const [seatBusy, setSeatBusy] = useState<boolean>(false);
 
   const activeTableIdRef = useRef<string | null>(activeTableId);
   activeTableIdRef.current = activeTableId;
@@ -122,7 +125,30 @@ export function PokerPage() {
       setActionErrorMessage(err);
       setTimeout(() => setActionErrorMessage(null), 3000);
     },
+    onBusted: (info) => {
+      setShowResultModal(false);
+      setBustedBuyIn(info.min_buy_in ?? tables.find((t) => t.id === activeTableIdRef.current)?.min_buy_in ?? 2000);
+    },
   });
+
+  const activeTableInfo = tables.find((t) => t.id === activeTableId);
+
+  // Buying in again after busting, or sitting down at a table opened by link:
+  // the same explicit, confirmed buy-in as joining from the lobby.
+  const takeSeat = async (buyInAmount: number) => {
+    if (!activeTableId || seatBusy) return;
+    setSeatBusy(true);
+    try {
+      await pokerService.joinTable(activeTableId, buyInAmount);
+      setBustedBuyIn(null);
+      refreshWallet();
+    } catch (e: any) {
+      setActionErrorMessage(getApiErrorMessage(e, 'Failed to buy in'));
+      setTimeout(() => setActionErrorMessage(null), 3000);
+    } finally {
+      setSeatBusy(false);
+    }
+  };
 
   // Track state transitions for betting_start/stop, card_deal, and bet_coin
   const lastPhaseRef = useRef<string | null>(null);
@@ -251,6 +277,8 @@ export function PokerPage() {
           onLeaveTable={() => setShowExitConfirm(true)}
           onStartHand={startHand}
           onOpenRules={() => setShowRulesModal(true)}
+          seatBuyIn={activeTableInfo?.min_buy_in}
+          onTakeSeat={activeTableInfo ? () => takeSeat(activeTableInfo.min_buy_in) : undefined}
         />
       )}
 
@@ -262,6 +290,38 @@ export function PokerPage() {
           myBetPaise={tableState.players?.find((p) => p.user_id === currentUserId)?.total_bet_in_hand || 0}
           onClose={() => setShowResultModal(false)}
         />
+      )}
+
+      {/* Out of chips: buy in again or leave */}
+      {bustedBuyIn !== null && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/85 backdrop-blur-md p-4 select-none">
+          <div className="w-full max-w-sm bg-gradient-to-b from-[#1c1030] to-[#0d0718] border-2 border-amber-500/60 rounded-3xl p-6 text-center text-white">
+            <h2 className="font-display text-lg font-black text-amber-300 uppercase tracking-wide mb-1.5">Out of chips</h2>
+            <p className="text-xs text-slate-300 mb-5 leading-relaxed">
+              Buy in again for ₹{(bustedBuyIn / 100).toFixed(2)} to keep your seat in the game, or leave the table.
+            </p>
+            <div className="flex gap-2.5">
+              <button
+                type="button"
+                className="flex-1 py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-200 border border-slate-700"
+                onClick={async () => {
+                  setBustedBuyIn(null);
+                  await handleLeaveTable();
+                }}
+              >
+                Leave table
+              </button>
+              <button
+                type="button"
+                disabled={seatBusy}
+                className="flex-1 py-2.5 px-3 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 text-xs font-black text-slate-950 disabled:opacity-60"
+                onClick={() => takeSeat(bustedBuyIn)}
+              >
+                Buy in ₹{(bustedBuyIn / 100).toFixed(2)}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Rules Modal */}

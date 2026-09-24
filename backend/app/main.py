@@ -85,6 +85,19 @@ async def lifespan(app: FastAPI):
     start_engine(broadcast_fn=game_ws_manager.broadcast)
     yield
     stop_engine()
+    # Stakes of games that live in memory would vanish with the process: pay
+    # out or refund whatever is still in play before exit.
+    from .websocket.poker_ws import cash_out_all_tables
+    from .websocket.teen_patti_ws import refund_live_hands
+    from .websocket.rummy_ws import refund_live_deals
+    from .routers.chicken_road import void_active_rounds
+    from .services.roulette.engine import refund_open_round
+    for settle_in_flight in (refund_live_hands, refund_live_deals, void_active_rounds, refund_open_round):
+        try:
+            settle_in_flight()
+        except Exception as exc:
+            print(f"[SHUTDOWN] {settle_in_flight.__name__} failed: {exc}")
+    await cash_out_all_tables()
 
 
 app = FastAPI(

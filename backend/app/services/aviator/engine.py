@@ -255,6 +255,33 @@ class AviatorEngine:
         db.commit()
         logger.info("Round %s SETTLED", rnd.round_id)
 
+    def void_unfinished_rounds(self, db: Session) -> None:
+        """At startup: a round cut off by a restart can't be finished (its crash
+        point lived only in memory), so bets still in the air get their stake
+        back, recorded as a cash-out at 1.00x."""
+        from ...services.wager_service import reverse_wager
+
+        rounds = db.query(AviatorRound).filter(AviatorRound.status != AviatorRoundStatus.SETTLED).all()
+        for rnd in rounds:
+            live = db.query(AviatorBet).filter(
+                AviatorBet.round_id == rnd.id,
+                AviatorBet.status == AviatorBetStatus.ACTIVE,
+            ).all()
+            for bet in live:
+                credit_wallet(
+                    db, bet.user_id, bet.amount,
+                    WalletTransactionType.REFUND,
+                    "aviator_void", f"aviator-void-{rnd.id}-{bet.user_id}-{bet.slot}",
+                    metadata={"round_id": str(rnd.id), "slot": bet.slot, "reason": "server_restart"},
+                )
+                reverse_wager(db, bet.user_id, bet.amount, "aviator")
+                bet.status = AviatorBetStatus.CASHED_OUT
+                bet.cashout_multiplier = 1.0
+                bet.payout = bet.amount
+            rnd.status = AviatorRoundStatus.SETTLED
+            rnd.settled_at = datetime.now(timezone.utc)
+        db.commit()
+
     # ── Bet placement ──
 
     def place_bet(
@@ -367,14 +394,18 @@ class AviatorEngine:
 
         return self._settle_cashout(db, rnd, bet, mult, now)
 
-    def process_auto_cashouts(self, db: Session) -> list[tuple[LiveBet, float]]:
-        """Check all active bets with auto_cashout and settle if target reached."""
+    def process_auto_cashouts(self, db: Session, at_crash: bool = False) -> list[tuple[LiveBet, float]]:
+        """Settle active bets whose auto-cashout target has been reached.
+
+        With at_crash, every target below the crash point counts as reached:
+        the plane passed it on the way up even if no tick landed in between.
+        """
         rnd = self.current_round
         if rnd is None or rnd.phase != RoundPhase.FLYING:
             return []
 
         now = datetime.now(timezone.utc)
-        mult = rnd.current_multiplier(now)
+        mult = rnd.crash_point if at_crash else rnd.current_multiplier(now)
         results = []
 
         for bet in rnd.bets:

@@ -38,7 +38,6 @@ export function ChickenRoadPage() {
 
   // Game States
   const [gameState, setGameState] = useState<GameStatus>('READY');
-  const [activeRoundId, setActiveRoundId] = useState<string | null>(null);
   const [balance, setBalance] = useState<number>(0);
   const [betAmount, setBetAmount] = useState<number>(10);
   const [difficulty, setDifficulty] = useState<Difficulty>('MEDIUM');
@@ -85,7 +84,6 @@ export function ChickenRoadPage() {
         if (gameStateData.status === 'ACTIVE' && gameStateData.round_id) {
           activeRoundIdRef.current = gameStateData.round_id;
           currentLaneRef.current = gameStateData.current_lane || 0;
-          setActiveRoundId(gameStateData.round_id);
           setGameState('ACTIVE');
           setCurrentLane(gameStateData.current_lane || 0);
           setCurrentMultiplier(gameStateData.current_multiplier || 1.0);
@@ -100,7 +98,6 @@ export function ChickenRoadPage() {
           activeRoundIdRef.current = null;
           currentLaneRef.current = 0;
           setGameState('READY');
-          setActiveRoundId(null);
         }
       }
     } catch (err) {
@@ -214,7 +211,6 @@ export function ChickenRoadPage() {
       activeRoundIdRef.current = res.round_id;
       currentLaneRef.current = 0;
       crossLanePromiseRef.current = null;
-      setActiveRoundId(res.round_id);
       setGameState('ACTIVE');
       setCurrentLane(0);
       setCurrentMultiplier(1.0);
@@ -233,70 +229,61 @@ export function ChickenRoadPage() {
     }
   };
 
-  // Safe lane crossed callback from canvas
+  // The server's draw hit the chicken. It has already settled the round as
+  // lost; all that's left is to show it.
+  const showLoss = useCallback((laneIndex: number, laneReached: number) => {
+    currentLaneRef.current = laneReached;
+    setCurrentLane(laneReached);
+    setCurrentMultiplier(laneReached > 0 ? multipliers[laneReached - 1] || 1.0 : 1.0);
+    setGameState('LOST');
+    setLossLane(laneIndex);
+    soundManager.play('loss');
+    activeRoundIdRef.current = null;
+    crossLanePromiseRef.current = null;
+  }, [multipliers]);
+
+  // The chicken stepped into the next lane: the server decides whether it made it.
   const handleLaneCross = useCallback(async (laneIndex: number) => {
     const roundId = activeRoundIdRef.current;
     if (!roundId) return;
-
-    // Optimistically update local UI immediately so multiplier & cashout are instant
-    currentLaneRef.current = Math.max(currentLaneRef.current, laneIndex);
-    setCurrentLane(currentLaneRef.current);
-    const mult = multipliers[laneIndex - 1] || 1.0;
-    setCurrentMultiplier(mult);
-    if (laneIndex < multipliers.length) {
-      setNextMultiplier(multipliers[laneIndex]);
-    }
-    soundManager.play('reveal_tick');
 
     try {
       const p = chickenRoadService.crossLane(roundId, laneIndex);
       crossLanePromiseRef.current = p;
       const res = await p;
-      if (res && res.round_id === activeRoundIdRef.current) {
-        currentLaneRef.current = Math.max(currentLaneRef.current, res.current_lane);
-        setCurrentLane(currentLaneRef.current);
-        setCurrentMultiplier(res.current_multiplier);
-        setNextMultiplier(res.next_multiplier);
+      if (!res || res.round_id !== activeRoundIdRef.current) return;
+      if (res.status === 'LOST') {
+        showLoss(res.lane_index, res.current_lane);
+        return;
       }
+      currentLaneRef.current = Math.max(currentLaneRef.current, res.current_lane);
+      setCurrentLane(currentLaneRef.current);
+      setCurrentMultiplier(res.current_multiplier);
+      setNextMultiplier(res.next_multiplier);
+      soundManager.play('reveal_tick');
     } catch (err) {
       console.error('Failed to register lane cross:', err);
     }
-  }, [multipliers]);
-
-  // Collision callback from canvas
-  const handleCollision = useCallback(async (laneIndex: number) => {
-    const roundId = activeRoundIdRef.current || activeRoundId;
-    if (!roundId) return;
-
-    setGameState('LOST');
-    setLossLane(laneIndex);
-    soundManager.play('loss');
-    activeRoundIdRef.current = null;
-    setActiveRoundId(null);
-    crossLanePromiseRef.current = null;
-
-    try {
-      await chickenRoadService.reportCollision(roundId, laneIndex);
-    } catch (err) {
-      console.error('Failed to report collision:', err);
-    }
-  }, [activeRoundId]);
+  }, [showLoss]);
 
   // Finish safe line reached callback from canvas
   const handleFinish = useCallback(async () => {
-    const roundId = activeRoundIdRef.current || activeRoundId;
+    const roundId = activeRoundIdRef.current;
     if (!roundId) return;
 
     try {
-      // The server only pays out once every lane is registered, so let any
-      // in-flight cross-lane call land first and report the final lane.
+      // Let an in-flight crossing land first: it may have ended the round.
       if (crossLanePromiseRef.current) {
         try {
           await crossLanePromiseRef.current;
         } catch {}
       }
-      const finalLane = Math.max(currentLaneRef.current, multipliers.length);
-      const res = await chickenRoadService.finishGame(roundId, finalLane);
+      if (activeRoundIdRef.current !== roundId) return;
+      const res = await chickenRoadService.finishGame(roundId, multipliers.length);
+      if (res.status === 'LOST') {
+        showLoss(res.lane_index, res.current_lane);
+        return;
+      }
       soundManager.play('win_clap');
       setGameState('WON');
       setWinAmount(res.won_amount);
@@ -305,28 +292,31 @@ export function ChickenRoadPage() {
         setBalance(res.wallet_balance);
       }
       activeRoundIdRef.current = null;
-      setActiveRoundId(null);
       crossLanePromiseRef.current = null;
     } catch (err) {
       console.error('Failed to complete finish:', err);
       setErrorMessage(getApiErrorMessage(err, 'Failed to complete the round.'));
     }
-  }, [activeRoundId, multipliers]);
+  }, [multipliers, showLoss]);
 
   // Cashout mid-game callback
   const handleCashout = async () => {
-    const roundId = activeRoundIdRef.current || activeRoundId;
+    const roundId = activeRoundIdRef.current;
     if (!roundId || gameState !== 'ACTIVE' || isActionLoading) return;
     setIsActionLoading(true);
     try {
-      // If a crossLane request is currently in-flight, await it first
+      // Let an in-flight crossing land first: it may have ended the round.
       if (crossLanePromiseRef.current) {
         try {
           await crossLanePromiseRef.current;
         } catch {}
       }
-      const targetLane = Math.max(currentLaneRef.current, currentLane);
-      const res = await chickenRoadService.cashout(roundId, targetLane > 0 ? targetLane : undefined);
+      if (activeRoundIdRef.current !== roundId) return;
+      const res = await chickenRoadService.cashout(roundId);
+      if (res.status === 'LOST') {
+        showLoss(res.lane_index, res.current_lane);
+        return;
+      }
       soundManager.play('win_clap');
       setGameState('WON');
       setWinAmount(res.won_amount);
@@ -335,7 +325,6 @@ export function ChickenRoadPage() {
         setBalance(res.wallet_balance);
       }
       activeRoundIdRef.current = null;
-      setActiveRoundId(null);
       crossLanePromiseRef.current = null;
     } catch (err: any) {
       const msg = getApiErrorMessage(err, 'Failed to cash out');
@@ -351,7 +340,6 @@ export function ChickenRoadPage() {
     currentLaneRef.current = 0;
     crossLanePromiseRef.current = null;
     setGameState('READY');
-    setActiveRoundId(null);
     setCurrentLane(0);
     setCurrentMultiplier(1.0);
     setNextMultiplier(multipliers[0]);
@@ -460,7 +448,6 @@ export function ChickenRoadPage() {
             currentLane={currentLane}
             difficulty={difficulty}
             onLaneCross={handleLaneCross}
-            onCollision={handleCollision}
             onFinish={handleFinish}
             externalSteer={externalSteer}
           />

@@ -3,7 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import {
   ArrowLeft, Users, History, BarChart3, Volume2, VolumeX, Flag,
   Trash2, RotateCcw, Sparkles, Shuffle, Trophy, MessageCircle, Minus, Plus,
-  Send,
+  Send, Play,
 } from "lucide-react";
 import PlayingCard from "./PlayingCard";
 import "./RummyTable.css";
@@ -846,29 +846,12 @@ export default function GameTable({
             <div className="gt-watermark">RUMMY</div>
           </div>
 
-          {/* Central Turn Announcement Banner */}
-          {isPlayingPhase && !showingResult && (
-            <div className={`gt-turn-banner ${isMyTurnActive ? "gt-turn-mine animate-pulse" : "gt-turn-opponent"}`}>
-              {isMyTurnActive ? (
-                <span>👉 YOUR TURN: {phase === "await_draw" ? "Pick Open or Closed Card" : "Discard or Declare"}</span>
-              ) : (
-                <span>⏳ {activeTurnPlayer?.name || "Player"}'s Turn ({secondsLeft !== null ? `${secondsLeft}s` : "..."})</span>
-              )}
-            </div>
-          )}
-
           <div className={`relative z-10 pt-1 text-center ${showingResult ? "invisible" : ""}`}>
             <div className="flex justify-center gap-5 flex-wrap px-6">
               {opponents.map((p) => {
                 const isOpponentTurn = state?.turn === p.id && isPlayingPhase && !isGameOver;
                 return (
                   <div key={p.id} className="text-center relative">
-                    {/* Opponent Active Turn Indicator */}
-                    {isOpponentTurn && (
-                      <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 whitespace-nowrap bg-gradient-to-r from-amber-500 to-yellow-400 text-slate-950 font-black text-[8px] px-2 py-0.5 rounded-full shadow-lg border border-amber-300 animate-bounce flex items-center gap-1 z-30 pointer-events-none">
-                        <span>▶ TURN</span>
-                      </div>
-                    )}
                     <div className={`relative gt-seat-avatar ${isOpponentTurn ? "ring-4 ring-amber-400 ring-offset-2 ring-offset-black rounded-full" : ""}`}>
                       <div className={`absolute inset-0 rounded-full bg-gradient-to-br from-[#2B3045] to-[#090B14] border-2 flex items-center justify-center font-display font-bold text-sm ${isOpponentTurn ? "border-[#F4C542] shadow-[0_0_24px_rgba(244,197,66,.8)]" : "border-white/30"}`}>{p.name.slice(0, 2).toUpperCase()}</div>
                       {isOpponentTurn && secondsLeft !== null && <TurnRing seconds={secondsLeft} total={table?.turn_seconds ?? 30} size={40} />}
@@ -877,7 +860,13 @@ export default function GameTable({
                         <span className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-red-900 border border-red-600 flex items-center justify-center text-[7px]">✕</span>
                       )}
                     </div>
-                    <div className={`text-[10px] font-semibold mt-0.5 leading-tight ${isOpponentTurn ? "text-amber-300 font-extrabold" : "text-white"}`}>{p.name}</div>
+                    {/* The name doubles as the turn badge: a floating badge above the
+                        avatar has no room at the top of the felt and gets clipped. */}
+                    <div className="text-[10px] font-semibold mt-0.5 leading-tight text-white">
+                      {isOpponentTurn ? (
+                        <span className="gt-seat-turn gt-seat-turn-opponent"><Play size={8} fill="currentColor" />{p.name}</span>
+                      ) : p.name}
+                    </div>
                     <div className="text-[8px] text-white/70 leading-tight">🪙{p.chips} · 🂠{p.hand_count}</div>
                   </div>
                 );
@@ -940,17 +929,17 @@ export default function GameTable({
 
           {me && (
             <div className={`relative z-10 text-center pb-1 ${showingResult ? "invisible" : ""}`}>
-              {/* Active Player Turn Badge */}
-              {isMyTurnActive && (
-                <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 whitespace-nowrap bg-gradient-to-r from-emerald-500 via-green-400 to-emerald-500 text-slate-950 font-black text-[9px] px-2.5 py-0.5 rounded-full shadow-[0_0_15px_rgba(16,185,129,0.9)] border border-green-200 animate-pulse flex items-center gap-1 z-30 pointer-events-none">
-                  <span>✨ YOUR TURN</span>
-                </div>
-              )}
               <div className={`relative gt-seat-avatar ${isMyTurnActive ? "ring-4 ring-emerald-400 ring-offset-2 ring-offset-black rounded-full" : ""}`}>
                 <div className={`absolute inset-0 rounded-full bg-gradient-to-br from-[#2B3045] to-[#090B14] border-2 flex items-center justify-center font-display font-bold text-xs ${isMyTurnActive ? "border-emerald-400 shadow-[0_0_22px_rgba(16,185,129,.8)]" : "border-white/30"}`}>{me.name.slice(0, 2).toUpperCase()}</div>
                 {isMyTurnActive && secondsLeft !== null && <TurnRing seconds={secondsLeft} total={table?.turn_seconds ?? 30} size={36} />}
               </div>
-              <div className={`text-[10px] font-semibold mt-0.5 leading-tight ${isMyTurnActive ? "text-emerald-400 font-extrabold" : "text-white"}`}>You ({me.name})</div>
+              {/* Same as the opponents: a badge floating above the avatar sat on
+                  top of the pile labels, so the name carries the turn highlight. */}
+              <div className="text-[10px] font-semibold mt-0.5 leading-tight text-white">
+                {isMyTurnActive ? (
+                  <span className="gt-seat-turn gt-seat-turn-mine"><Sparkles size={9} />You ({me.name})</span>
+                ) : `You (${me.name})`}
+              </div>
             </div>
           )}
 
@@ -1025,6 +1014,20 @@ export default function GameTable({
               <button type="button" className="gt-icon-btn" onClick={groupSelected} aria-label="Group"><Plus size={14} /></button>
             )}
           </div>
+          {/* Turn announcement banner. It lives in the action bar rather than on
+              the felt: the felt has no free height on a landscape phone, and
+              pinned to its top it covered the opponent seat. */}
+          {isPlayingPhase && !showingResult && (
+            <div className="gt-turn-slot">
+              <div className={`gt-turn-banner ${isMyTurnActive ? "gt-turn-mine animate-pulse" : "gt-turn-opponent"}`}>
+                {isMyTurnActive ? (
+                  <span>👉 YOUR TURN: {phase === "await_draw" ? "Pick Open or Closed Card" : "Discard or Declare"}</span>
+                ) : (
+                  <span>⏳ {activeTurnPlayer?.name || "Player"}'s Turn ({secondsLeft !== null ? `${secondsLeft}s` : "..."})</span>
+                )}
+              </div>
+            </div>
+          )}
           <div className="flex items-center gap-1.5 shrink-0">
             {canDiscard && !isGameOver && (
               <button type="button" className="gt-btn-discard inline-flex items-center justify-center gap-1" onClick={doDiscard}>

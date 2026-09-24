@@ -7,6 +7,11 @@ from ...models.game import GameRound, GameBet
 
 
 class GameEngine(ABC):
+    # Pause between a round's result broadcast and the next round opening.
+    # Games whose client presents the result (reveal, hold, popup) raise it so
+    # the next betting window doesn't open underneath that presentation.
+    result_display_seconds: float = 1
+
     @property
     @abstractmethod
     def slug(self) -> str:

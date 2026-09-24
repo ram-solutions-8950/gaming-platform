@@ -15,6 +15,21 @@ import tigerImg from '../../assets/tiger-3d.webp';
 
 const SLUG = 'dragon-tiger';
 
+/* Result presentation: CARDS_REVEAL -> CARDS_HOLD -> WINNER_DISPLAY -> ROUND_RESET.
+ * Offsets are from the moment round_result arrives. The backend waits
+ * DragonTigerEngine.result_display_seconds (8s) before opening the next round,
+ * so the whole sequence has to fit inside that. */
+const DRAGON_FLIP_AT_MS = 400; // once the dragon card's 400ms deal-in has landed
+const TIGER_FLIP_AT_MS = 850; // once the tiger card's 450ms-delayed deal-in has landed
+const CARD_FLIP_MS = 400; // .dvt-card-inner flip transition
+const CARDS_HOLD_MS = 3500; // both cards face-up with nothing drawn over them
+const WINNER_DISPLAY_MS = 3000; // winner animation + result popup
+const CARDS_REVEALED_AT_MS = TIGER_FLIP_AT_MS + CARD_FLIP_MS;
+const WINNER_AT_MS = CARDS_REVEALED_AT_MS + CARDS_HOLD_MS;
+const ROUND_RESET_AT_MS = WINNER_AT_MS + WINNER_DISPLAY_MS;
+
+type RevealStage = 'idle' | 'reveal' | 'hold' | 'winner';
+
 export type WinningSide = 'DRAGON' | 'TIGER' | 'TIE';
 
 export function normalizeDtResult(raw: any): WinningSide | null {
@@ -129,6 +144,10 @@ export function DragonTigerPage() {
   const [tigerFlipped, setTigerFlipped] = useState(false);
   const [showPlayer, setShowPlayer] = useState(false);
   const [winnerResult, setWinnerResult] = useState<WinningSide | null>(null);
+  const [revealStage, setRevealStage] = useState<RevealStage>('idle');
+  /** True from the reveal until the winner is announced: the outcome must not
+   *  leak early through the wallet balance or the history strip. */
+  const holdingResultRef = useRef(false);
 
   // Keep myBets ref synchronized for animation callbacks
   const myBetsRef = useRef(myBets);
@@ -186,8 +205,10 @@ export function DragonTigerPage() {
       if (!animatingRef.current && !displayRound && !pendingRoundStartRef.current) {
         setGameState(gs);
       }
-      setWallet(w);
-      setHistory(h);
+      if (!holdingResultRef.current) {
+        setWallet(w);
+        setHistory(h);
+      }
       setMyBets(b.items);
       if (gs?.public_bets) {
         setPublicBets(gs.public_bets);
@@ -444,21 +465,10 @@ export function DragonTigerPage() {
                   setDisplayRound(syntheticRound);
                 }
 
-                // Update settlement data immediately and with a short delay for DB commit
-                const syncSettlement = () => {
-                  Promise.all([
-                    walletService.getWallet(),
-                    gameService.getMyBets(1, 10, SLUG),
-                    gameService.getHistory(12, SLUG),
-                  ]).then(([w, b, h]) => {
-                    setWallet(w);
-                    setMyBets(b.items);
-                    setHistory(h);
-                  }).catch(() => {});
-                };
-                syncSettlement();
-                setTimeout(syncSettlement, 1200);
-                setTimeout(syncSettlement, 3000);
+                // Bets are needed now to pick the win/loss outcome; the wallet and
+                // history strip are refreshed when the winner is announced, so
+                // they don't give the result away during the card hold.
+                gameService.getMyBets(1, 10, SLUG).then((b) => setMyBets(b.items)).catch(() => {});
               }
             }
           } catch {
@@ -534,10 +544,13 @@ export function DragonTigerPage() {
     phase,
   ]);
 
+  // Both status bars give way as soon as a result is on the table: the live
+  // round stays CALCULATING until the next one opens, which used to leave
+  // "Revealing..." drawn across the screen for the whole reveal.
   // Stop betting overlay flag — shown when betting locks or timer reaches 0 during BETTING status
-  const showStopBettingOverlay = round?.status === 'BETTING' && (isBettingLocked || countdown <= 0);
+  const showStopBettingOverlay = !displayRound && round?.status === 'BETTING' && (isBettingLocked || countdown <= 0);
   // Calculating overlay flag (when in CALCULATING phase without result data yet)
-  const showCalculatingOverlay = isCalculating && !(round?.result_data?.result);
+  const showCalculatingOverlay = !displayRound && isCalculating && !(round?.result_data?.result);
 
   // The round we use for display: the frozen completed round during animation,
   // otherwise the live round.
@@ -580,10 +593,18 @@ export function DragonTigerPage() {
     }
   }, [round?.id, round?.status, round?.result_data, history, displayRound]);
 
+  // Read through refs so the presentation below depends on displayRound alone:
+  // a re-created callback must not restart a reveal that is already running.
+  const applyRoundStartRef = useRef(applyRoundStart);
+  applyRoundStartRef.current = applyRoundStart;
+  const fetchAllRef = useRef(fetchAll);
+  fetchAllRef.current = fetchAll;
+
   useEffect(() => {
     if (!displayRound) {
       // No round to animate — ensure idle state
       if (!animatingRef.current) {
+        setRevealStage('idle');
         setPhase('waiting');
         setDragonFlipped(false);
         setTigerFlipped(false);
@@ -597,39 +618,43 @@ export function DragonTigerPage() {
     if (animatingRef.current) return;
     animatingRef.current = true;
 
-    const rd = displayRound.result_data;
     const roundId = displayRound.id;
     // Authoritative result stored for this exact round ID
-    const resVal = roundResultMapRef.current[roundId] || extractDtResult(rd, displayRound);
+    const resVal = roundResultMapRef.current[roundId] || extractDtResult(displayRound.result_data, displayRound);
 
-    let cancelled = false;
-    const delay = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+    // Every step runs on a timer held here, so leaving the page or moving to
+    // another round clears the whole sequence instead of letting it fire late.
+    let active = true;
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    const at = (ms: number, step: () => void) => {
+      timers.push(setTimeout(step, ms));
+    };
 
-    const run = async () => {
-      // Prompt card dealing and flip sequence
-      setPhase('revealing');
-      setDragonFlipped(false);
-      setTigerFlipped(false);
-      setShowPlayer(false);
-      setWinnerResult(null);
+    // 1. CARDS_REVEAL: deal both cards face-down, flip each once it has landed.
+    holdingResultRef.current = true;
+    setRevealStage('reveal');
+    setPhase('revealing');
+    setDragonFlipped(false);
+    setTigerFlipped(false);
+    setShowPlayer(false);
+    setWinnerResult(null);
 
-      // Dragon card slide + flip (faster reveal: 100ms lead-in)
-      await delay(100);
-      if (cancelled) return;
+    at(DRAGON_FLIP_AT_MS, () => {
       setDragonFlipped(true);
       audio.playFlip();
-
-      // Tiger card slide + flip (faster reveal: 250ms deal & flip)
-      await delay(250);
-      if (cancelled) return;
+    });
+    at(TIGER_FLIP_AT_MS, () => {
       setTigerFlipped(true);
       audio.playFlip();
+    });
 
-      // Both cards visible — brief pause before result display (200ms)
-      await delay(200);
-      if (cancelled) return;
+    // 2. CARDS_HOLD: both faces up, no winner styling, popup or banner on top.
+    at(CARDS_REVEALED_AT_MS, () => setRevealStage('hold'));
 
-      // 2. Authoritative winner output display
+    // 3. WINNER_DISPLAY: winner animation, result popup and the settled balance.
+    at(WINNER_AT_MS, () => {
+      holdingResultRef.current = false;
+      setRevealStage('winner');
       if (resVal === 'DRAGON') {
         setPhase('dragon-winning');
         setWinnerResult('DRAGON');
@@ -642,56 +667,64 @@ export function DragonTigerPage() {
         setPhase('tie-result');
         setWinnerResult('TIE');
       }
-
-      // Show player outcome banner immediately!
       setShowPlayer(true);
 
-      const displayRoundIdVal = displayRound.id;
-      if (resultSoundPlayedRef.current !== displayRoundIdVal) {
-        const userBets = myBetsRef.current.filter((b) => b.round_id === displayRoundIdVal);
+      if (resultSoundPlayedRef.current !== roundId) {
+        const userBets = myBetsRef.current.filter((b) => b.round_id === roundId);
         const isUserWin = userBets.some((b) => b.status === 'WON') || (resVal && userBets.some((b) => b.prediction === resVal));
         const isUserLoss = userBets.some((b) => b.status === 'LOST') || (resVal && userBets.some((b) => b.prediction !== resVal));
         if (isUserWin) {
           audio.playWin();
-          resultSoundPlayedRef.current = displayRoundIdVal;
+          resultSoundPlayedRef.current = roundId;
         } else if (isUserLoss) {
           audio.playLoss();
-          resultSoundPlayedRef.current = displayRoundIdVal;
+          resultSoundPlayedRef.current = roundId;
         }
       }
 
-      // 3. RESULT HOLD: Hold everything on screen for 2.4 seconds so user clearly sees the winner!
-      await delay(2400);
-      if (cancelled) return;
+      Promise.all([
+        walletService.getWallet(),
+        gameService.getMyBets(1, 10, SLUG),
+        gameService.getHistory(12, SLUG),
+      ]).then(([w, b, h]) => {
+        if (!active) return;
+        setWallet(w);
+        setMyBets(b.items);
+        setHistory(h);
+      }).catch(() => {});
+    });
 
-      // 4. Clear — next round takes over
+    // 4. ROUND_RESET: clear the table and hand over to the next round.
+    at(ROUND_RESET_AT_MS, () => {
       animatingRef.current = false;
       setDisplayRound(null);
+      setRevealStage('idle');
       setPhase('waiting');
       setDragonFlipped(false);
       setTigerFlipped(false);
       setShowPlayer(false);
       setWinnerResult(null);
-      fetchAll();
+      fetchAllRef.current();
 
-      // If a new round was buffered during presentation, transition cleanly now!
+      // A round that opened during the presentation was buffered; start it now.
       if (pendingRoundStartRef.current) {
         const pending = pendingRoundStartRef.current;
         pendingRoundStartRef.current = null;
-        applyRoundStart(pending.round, pending.startedAt, pending.bettingClosesAt);
+        applyRoundStartRef.current(pending.round, pending.startedAt, pending.bettingClosesAt);
       } else if (pendingResultRoundRef.current) {
         const pendingRes = pendingResultRoundRef.current;
         pendingResultRoundRef.current = null;
         setDisplayRound(pendingRes);
       }
-    };
+    });
 
-    run();
     return () => {
-      cancelled = true;
+      active = false;
+      timers.forEach(clearTimeout);
       animatingRef.current = false;
+      holdingResultRef.current = false;
     };
-  }, [displayRound, applyRoundStart]);
+  }, [displayRound]);
 
   /* ── bet matching (incorporating both server-settled and immediate local bets) ── */
   const displayRoundId = displayRound?.id || round?.id;
@@ -821,7 +854,7 @@ export function DragonTigerPage() {
   /* ── countdown status label & styling ── */
   const isAnimating = Boolean(displayRound);
   const countdownLabel = isAnimating
-    ? 'Revealing'
+    ? revealStage === 'winner' ? 'Result' : 'Revealing'
     : isBetting
       ? 'Bet Time'
       : isCalculating ? 'Drawing' : 'Waiting';
@@ -889,17 +922,20 @@ export function DragonTigerPage() {
             </button>
           </div>
 
-          {/* HUD top-center: Live Public Bets Indicator */}
-          <div className="absolute top-1.5 left-1/2 -translate-x-1/2 z-30 flex items-center gap-1.5 bg-black/70 backdrop-blur-sm px-3 py-1 rounded-full border border-yellow-500/40 shadow-lg">
-            <span className="w-2 h-2 rounded-full bg-red-500 animate-ping" />
-            <span className="text-[10px] sm:text-xs font-bold text-white/90">
-              {totalPublicBettors} {totalPublicBettors === 1 ? 'Player' : 'Players'}
-            </span>
-            <span className="text-zinc-500 text-[10px]">|</span>
-            <span className="text-[10px] sm:text-xs font-extrabold text-yellow-400">
-              ₹{paiseToRupees(totalPublicVolume)}
-            </span>
-          </div>
+          {/* HUD top-center: Live Public Bets Indicator. It sits over the top of
+              the cards on short screens, so it steps aside while a result is shown. */}
+          {!displayRound && (
+            <div className="absolute top-1.5 left-1/2 -translate-x-1/2 z-30 flex items-center gap-1.5 bg-black/70 backdrop-blur-sm px-3 py-1 rounded-full border border-yellow-500/40 shadow-lg">
+              <span className="w-2 h-2 rounded-full bg-red-500 animate-ping" />
+              <span className="text-[10px] sm:text-xs font-bold text-white/90">
+                {totalPublicBettors} {totalPublicBettors === 1 ? 'Player' : 'Players'}
+              </span>
+              <span className="text-zinc-500 text-[10px]">|</span>
+              <span className="text-[10px] sm:text-xs font-extrabold text-yellow-400">
+                ₹{paiseToRupees(totalPublicVolume)}
+              </span>
+            </div>
+          )}
 
           {/* HUD top-center sub-ticker: Live incoming bet notification */}
           {recentLiveBets.length > 0 && isBetting && (

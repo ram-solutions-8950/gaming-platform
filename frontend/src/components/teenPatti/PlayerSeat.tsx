@@ -142,6 +142,8 @@ export const PlayerSeat: React.FC<PlayerSeatProps> = ({
             <Crown size={10} className="text-white fill-white shrink-0" />
             <span>Winner</span>
           </span>
+        ) : seat.status === 'show_loser' ? (
+          <span className="tp-seat-status-badge tp-badge-packed">Lost</span>
         ) : (
           <span className="tp-seat-status-badge tp-badge-packed">Packed</span>
         )}
@@ -155,7 +157,7 @@ export const PlayerSeat: React.FC<PlayerSeatProps> = ({
 
       {seat.card_count > 0 && (
         <div
-          className={`tp-card-fan ${canTapToSee ? 'tp-card-fan-interactive' : ''}`}
+          className={`tp-card-fan ${canTapToSee ? 'tp-card-fan-interactive' : ''} ${isWinner && seat.cards ? 'tp-card-fan-winner' : ''}`}
           onClick={canTapToSee ? onSee : undefined}
           role={canTapToSee ? 'button' : undefined}
           tabIndex={canTapToSee ? 0 : undefined}

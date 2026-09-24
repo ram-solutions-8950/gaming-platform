@@ -29,6 +29,15 @@ from app.security.jwt import create_access_token
 from app.routers.chicken_road import DIFFICULTY_MULTIPLIERS
 
 
+@pytest.fixture(autouse=True)
+def _chicken_always_survives(monkeypatch):
+    """These tests are about the round lifecycle, not luck: no lane is a hit
+    unless a test sets one (see test_chicken_road_draw.py for the draw)."""
+    import app.routers.chicken_road as chicken_road
+    monkeypatch.setattr(chicken_road, "draw_hit_lane", lambda multipliers: None)
+
+
+
 @pytest.fixture
 def user_a(db: Session):
     rand = str(uuid4())[:8]

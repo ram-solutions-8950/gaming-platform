@@ -3,6 +3,10 @@ import type { TeenPattiSeat } from '../../services/teenPatti';
 import { PlayingCard } from './PlayingCard';
 import { LogOut, Play, X, Crown } from 'lucide-react';
 
+// Mirrors _NEXT_HAND_DELAY_SECONDS in teen_patti_ws.py: the server deals the
+// next hand by itself once the result has been up this long.
+const NEXT_HAND_DELAY_SECONDS = 5;
+
 interface ShowdownOverlayProps {
   winnerSeat: number | null;
   reason: string | null;
@@ -24,28 +28,20 @@ export const ShowdownOverlay: React.FC<ShowdownOverlayProps> = ({
   onNextHand,
   onDismiss,
 }) => {
-  const [countdown, setCountdown] = useState<number>(5);
+  const [countdown, setCountdown] = useState<number>(NEXT_HAND_DELAY_SECONDS);
   const winner = winnerSeat !== null ? seats[winnerSeat] : null;
   const mySeat = seats.find((s) => s.id === currentUserId);
   const isMeWinner = Boolean(winner && winner.id === currentUserId);
   const isDoubleLoss = winnerSeat === null;
   const myBet = mySeat?.total_bet || 0;
 
+  // Display only: the server owns the deal. A client firing "start" at the end
+  // of its own countdown would cut the result short for everyone else.
   useEffect(() => {
     if (seats.length < 2) return;
-    const timer = setInterval(() => {
-      setCountdown((prev) => {
-        if (prev <= 1) {
-          clearInterval(timer);
-          onNextHand?.();
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
+    const timer = setInterval(() => setCountdown((prev) => Math.max(0, prev - 1)), 1000);
     return () => clearInterval(timer);
-  }, [onNextHand, seats.length]);
+  }, [seats.length]);
 
   return (
     <div className="tp-modal-overlay animate-fade-in" style={{ zIndex: 120 }}>
@@ -137,7 +133,7 @@ export const ShowdownOverlay: React.FC<ShowdownOverlayProps> = ({
         {/* Countdown Indicator */}
         {seats.length >= 2 ? (
           <div style={{ color: '#fbbf24', fontSize: '0.8rem', fontWeight: 700, margin: '8px 0 16px' }}>
-            ⏱ Next hand dealing automatically in {countdown}s...
+            {countdown > 0 ? `⏱ Next hand dealing automatically in ${countdown}s...` : '⏱ Dealing next hand...'}
           </div>
         ) : (
           <div style={{ color: '#94a3b8', fontSize: '0.8rem', fontWeight: 600, margin: '8px 0 16px' }}>

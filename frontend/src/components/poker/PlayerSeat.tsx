@@ -6,6 +6,8 @@ interface PlayerSeatProps {
   /** Position around the felt as the viewer sees it — 0 is always the viewer. */
   screenPos: number;
   isCurrentTurn: boolean;
+  /** A hand is being played or its result is showing. */
+  handInProgress: boolean;
   isDealer: boolean;
   isCurrentUser: boolean;
   myHoleCards: string[];
@@ -30,6 +32,7 @@ export function PlayerSeat({
   player,
   screenPos,
   isCurrentTurn,
+  handInProgress,
   isDealer,
   isCurrentUser,
   myHoleCards,
@@ -59,12 +62,14 @@ export function PlayerSeat({
       <div className="seat-cards">
         {player.is_folded ? (
           <span className="seat-folded">Folded</span>
-        ) : (
+        ) : handInProgress && player.in_hand !== false ? (
           <>
             <PokerCard card={cards[0] ?? null} size="sm" className="seat-card seat-card-left" />
             <PokerCard card={cards[1] ?? null} size="sm" className="seat-card seat-card-right" />
           </>
-        )}
+        ) : player.is_sitting_out ? (
+          <span className="seat-folded">Sitting out</span>
+        ) : null}
       </div>
 
       <div className="seat-pod">

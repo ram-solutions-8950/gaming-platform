@@ -105,6 +105,9 @@ def _parse_prediction(prediction: str) -> GamePrediction:
 
 class DragonTigerEngine(GameEngine):
     slug = "dragon-tiger"
+    # Covers the client's result sequence in pages/user/DragonTiger.tsx:
+    # card reveal (~1.25s) + 3.5s card hold + 3s winner popup = 7.75s.
+    result_display_seconds = 8
 
     def _get_or_create_game(self, db: Session) -> Game:
         game = db.query(Game).filter(Game.slug == self.slug).first()

@@ -99,6 +99,14 @@ async def _game_loop() -> None:
       BETTING (10s) → FLYING (variable) → CRASHED → SETTLED → COOLDOWN (3s) → repeat
     """
     logger.info("Aviator game loop started")
+    db = SessionLocal()
+    try:
+        aviator_engine.void_unfinished_rounds(db)
+    except Exception as exc:
+        db.rollback()
+        logger.error("Could not void unfinished Aviator rounds: %s", exc)
+    finally:
+        db.close()
 
     while True:
         # ── 1. Create round ──
@@ -128,7 +136,7 @@ async def _game_loop() -> None:
         finally:
             db.close()
 
-        flight_start_time = datetime.now(timezone.utc)
+        flight_start_time = rnd.flight_started_at
         crash_time = time_for_multiplier(rnd.crash_point)
 
         await _broadcast({
@@ -140,16 +148,12 @@ async def _game_loop() -> None:
         })
 
         # ── 4. Flying phase — send multiplier snapshots ──
-        elapsed = 0.0
-        while elapsed < crash_time:
-            await asyncio.sleep(MULTIPLIER_TICK_INTERVAL)
-            elapsed += MULTIPLIER_TICK_INTERVAL
-
-            # Process auto cashouts
+        # Timed by the wall clock from the same start the multiplier uses, so
+        # the loop can't drift past the crash or stop short of it.
+        async def _auto_cashouts(at_crash: bool = False) -> None:
             db = SessionLocal()
             try:
-                auto_results = aviator_engine.process_auto_cashouts(db)
-                for bet, mult in auto_results:
+                for bet, mult in aviator_engine.process_auto_cashouts(db, at_crash=at_crash):
                     await _broadcast({
                         "type": "cashout_broadcast",
                         "round_id": str(rnd.round_id),
@@ -162,14 +166,21 @@ async def _game_loop() -> None:
             finally:
                 db.close()
 
+        while True:
+            await asyncio.sleep(MULTIPLIER_TICK_INTERVAL)
             now = datetime.now(timezone.utc)
-            current_mult = rnd.current_multiplier(now)
+            if (now - rnd.flight_started_at).total_seconds() >= crash_time:
+                break
+            await _auto_cashouts()
             await _broadcast({
                 "type": "multiplier_update",
                 "round_id": str(rnd.round_id),
-                "multiplier": round(current_mult, 2),
+                "multiplier": round(rnd.current_multiplier(now), 2),
                 "timestamp": now.isoformat(),
             })
+
+        # Targets the plane passed after the last tick still pay out
+        await _auto_cashouts(at_crash=True)
 
         # Send final snapshot at exact crash point
         await _broadcast({

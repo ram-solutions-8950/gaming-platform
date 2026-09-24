@@ -513,4 +513,40 @@ class RouletteEngine:
             }
 
 
+def refund_open_round() -> None:
+    """On shutdown: bets only live in memory, so a round that hasn't been
+    settled gives every stake back instead of losing it with the process."""
+    from ...services.wager_service import reverse_wager
+
+    with roulette_engine.lock:
+        rnd = roulette_engine.current_round
+        if rnd is None or rnd.settled or not rnd.bets:
+            return
+        stakes: Dict[str, int] = {}
+        for b in rnd.bets:
+            stakes[b.user_id] = stakes.get(b.user_id, 0) + b.amount_paise
+        rnd.bets = []
+        rnd.settled = True
+    db = SessionLocal()
+    try:
+        for user_id, amount in stakes.items():
+            try:
+                credit_wallet(
+                    db,
+                    user_id=UUID(user_id),
+                    amount=amount,
+                    tx_type=WalletTransactionType.REFUND,
+                    reference_type="roulette_void",
+                    reference_id=f"roulette_void_{rnd.round_id}_{user_id}",
+                    metadata={"round_id": rnd.round_id, "reason": "server_shutdown"},
+                )
+                reverse_wager(db, UUID(user_id), amount, "roulette")
+                db.commit()
+            except Exception as exc:
+                db.rollback()
+                logger.error(f"Failed refunding roulette stake to {user_id}: {exc}")
+    finally:
+        db.close()
+
+
 roulette_engine = RouletteEngine.get_instance()

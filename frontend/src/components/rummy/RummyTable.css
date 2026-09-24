@@ -591,12 +591,17 @@
   filter: brightness(1.1);
 }
 
+/* Takes the free middle of the action bar, between the stats and the buttons. */
+.gt-turn-slot {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  justify-content: center;
+}
+
 .gt-turn-banner {
-  position: absolute;
-  top: 0.65rem;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 25;
+  min-width: 0;
+  max-width: 100%;
   padding: 0.25rem 0.85rem;
   border-radius: 9999px;
   font-size: 11px;
@@ -611,6 +616,12 @@
   gap: 0.35rem;
 }
 
+.gt-turn-banner span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .gt-turn-mine {
   background: linear-gradient(135deg, #10b981 0%, #059669 100%);
   color: #ffffff;
@@ -623,4 +634,40 @@
   color: #0f172a;
   border: 1.5px solid rgba(253, 230, 138, 0.9);
   box-shadow: 0 0 16px rgba(245, 158, 11, 0.5);
+}
+
+/* Seat name as turn badge — no vertical padding, so highlighting a seat never
+   shifts the rows on a felt that has no spare height. */
+.gt-seat-turn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  height: 1.25em;
+  vertical-align: top;
+  padding: 0 0.4rem;
+  border-radius: 9999px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.gt-seat-turn-opponent {
+  background: linear-gradient(90deg, #f59e0b 0%, #facc15 100%);
+  color: #0f172a;
+  box-shadow: 0 0 10px rgba(245, 158, 11, 0.6);
+}
+
+.gt-seat-turn-mine {
+  background: linear-gradient(90deg, #10b981 0%, #4ade80 100%);
+  color: #052e16;
+  box-shadow: 0 0 10px rgba(16, 185, 129, 0.7);
+}
+
+@media (max-height: 500px) and (orientation: landscape) {
+  .gt-turn-banner { font-size: 10px; padding: 0.2rem 0.65rem; }
+}
+
+@media (orientation: portrait) {
+  /* Too narrow to share a row with the stats and buttons: give it its own line. */
+  .gt-actions { flex-wrap: wrap !important; row-gap: 0.3rem; }
+  .gt-turn-slot { order: -1; flex-basis: 100%; }
 }

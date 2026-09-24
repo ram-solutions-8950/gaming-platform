@@ -12,6 +12,9 @@ interface PokerTableProps {
   onLeaveTable: () => void;
   onStartHand: () => void;
   onOpenRules: () => void;
+  /** Buy-in for taking a seat, when the viewer isn't seated and one is free. */
+  seatBuyIn?: number;
+  onTakeSeat?: () => void;
 }
 
 export function PokerTable({
@@ -23,6 +26,8 @@ export function PokerTable({
   onLeaveTable,
   onStartHand,
   onOpenRules,
+  seatBuyIn,
+  onTakeSeat,
 }: PokerTableProps) {
   const {
     players,
@@ -38,6 +43,10 @@ export function PokerTable({
 
   const myPlayer = players.find((p) => p.user_id === currentUserId);
   const isMyTurn = myPlayer ? current_turn_seat_idx === myPlayer.seat_index : false;
+  // Same rule the server's start_hand applies: two players who still have chips
+  // (practice tables top busted players back up when the hand is dealt).
+  const playersWithChips = players.filter((p) => !p.is_sitting_out && (tableState.is_practice || p.stack > 0));
+  const canDealHand = phase === 'WAITING' && playersWithChips.length >= 2;
 
   // Every poker room seats you at the bottom of the screen and deals the table
   // around you, so rotate the six seats until the viewer's own seat is position
@@ -87,12 +96,6 @@ export function PokerTable({
               the top seat. */}
           <div className="poker-table-center">
             <CommunityCards cards={community_cards} phase={phase} pot={pot} />
-
-            {phase === 'WAITING' && players.length >= 2 && (
-              <button type="button" onClick={onStartHand} className="deal-hand-btn">
-                Deal the next hand
-              </button>
-            )}
           </div>
 
           {/* Six seats around the felt, rotated so the viewer sits at the bottom */}
@@ -102,6 +105,7 @@ export function PokerTable({
               player={player}
               screenPos={screenPos}
               isCurrentTurn={current_turn_seat_idx === seatIndex}
+              handInProgress={['PRE_FLOP', 'FLOP', 'TURN', 'RIVER', 'SHOWDOWN', 'SETTLEMENT'].includes(phase)}
               isDealer={dealer_seat_idx === seatIndex}
               isCurrentUser={Boolean(currentUserId && player?.user_id === currentUserId)}
               myHoleCards={myHoleCards}
@@ -115,6 +119,14 @@ export function PokerTable({
         <PokerActions
           isMyTurn={isMyTurn}
           myPlayer={myPlayer}
+          phase={phase}
+          playerCount={players.length}
+          canDealHand={canDealHand}
+          onDealHand={onStartHand}
+          turnKey={`${tableState.hand_id ?? ''}:${current_turn_seat_idx ?? ''}:${tableState.turn_start_time ?? ''}`}
+          turnDurationSeconds={tableState.turn_duration ?? 15}
+          seatBuyIn={!myPlayer && players.length < tableState.max_players ? seatBuyIn : undefined}
+          onTakeSeat={onTakeSeat}
           currentHighBet={current_high_bet}
           minRaiseAmount={min_raise_amount}
           bigBlind={big_blind}

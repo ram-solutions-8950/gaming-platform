@@ -1,4 +1,5 @@
 import json
+import time
 import uuid
 import asyncio
 import random
@@ -8,11 +9,10 @@ from sqlalchemy.orm import Session
 from ..database import SessionLocal
 from ..security.jwt import decode_access_token
 from ..services.poker.game_manager import poker_manager
-from ..services.poker.engine import PokerEngine
-from ..services.wallet_service import credit_wallet, debit_wallet
-from ..models.transaction import WalletTransactionType
+from ..services.poker.engine import PokerEngine, BETTING_PHASES
+from ..services.poker.cashout import cash_out_stack
 from ..models.user import User
-from ..models.poker import PokerTable, PokerHand, PokerAction, PokerPlayer
+from ..models.poker import PokerTable, PokerHand, PokerPlayer
 
 router = APIRouter(prefix="/poker", tags=["Poker WebSocket"])
 
@@ -36,6 +36,9 @@ class PokerConnectionManager:
         # game to silently stop broadcasting updates to the live socket.
         if table_id in self.connections and self.connections[table_id].get(user_id) is ws:
             self.connections[table_id].pop(user_id, None)
+
+    def is_connected(self, table_id: str, user_id: str) -> bool:
+        return user_id in self.connections.get(table_id, {})
 
     async def send_to_user(self, table_id: str, user_id: str, payload: dict):
         if table_id in self.connections and user_id in self.connections[table_id]:
@@ -102,6 +105,159 @@ def _decide_bot_action(engine: PokerEngine, player) -> Tuple[str, int]:
 
 _bot_turns_active: Set[str] = set()
 
+# How long a settled hand's result stays on the felt before the table moves on.
+_SETTLEMENT_COOLDOWN_SECONDS = 4
+# Range of the pause before each bot action, so bots don't act instantly.
+_BOT_THINK_SECONDS = (0.8, 1.6)
+# Slack after a player's turn clock runs out before the table acts for them.
+_TURN_GRACE_SECONDS = 1.0
+# A player whose connection stays gone this long is cashed out and unseated,
+# so their chips never sit stranded at a table they aren't coming back to.
+_DISCONNECT_CASHOUT_SECONDS = 120
+
+_turn_clocks: Dict[str, asyncio.Task] = {}
+_cashout_timers: Dict[Tuple[str, str], asyncio.Task] = {}
+
+
+def _is_human(player) -> bool:
+    return not player.is_bot
+
+
+async def tidy_seats(engine: PokerEngine, db: Session) -> None:
+    """Between hands: players out of chips give up their seat (they can buy in
+    again), and humans whose connection is gone sit out instead of being dealt
+    in to fold and bleed blinds."""
+    if engine.phase in BETTING_PHASES:
+        return
+    table_id = engine.table_id
+    if not engine.is_practice:
+        busted = [p for p in engine.players if _is_human(p) and p.stack <= 0]
+        if busted:
+            table = db.query(PokerTable).filter(PokerTable.id == table_id).first()
+            for p in busted:
+                engine.remove_player(p.user_id)
+                cash_out_stack(db, table, table_id, p.user_id, 0)
+                await poker_ws_manager.send_to_user(table_id, p.user_id, {
+                    "type": "busted",
+                    "message": "You're out of chips. Buy in again to keep playing.",
+                    "min_buy_in": table.min_buy_in if table else None,
+                    "max_buy_in": table.max_buy_in if table else None,
+                })
+    for p in engine.players:
+        if _is_human(p):
+            p.is_sitting_out = not poker_ws_manager.is_connected(table_id, p.user_id)
+
+
+async def deal_next_hand(engine: PokerEngine, db: Session) -> bool:
+    """Tidy the seats and deal, telling every client the outcome either way."""
+    await tidy_seats(engine, db)
+    ok, _ = engine.start_hand()
+    if ok:
+        await broadcast_hand_start(engine)
+    else:
+        await poker_ws_manager.broadcast_table_state(engine)
+    return ok
+
+
+async def on_seat_taken(engine: PokerEngine) -> None:
+    """Someone bought in: show them to the table, and deal if it was idle."""
+    await poker_ws_manager.broadcast_table_state(engine)
+    if engine.phase == 'WAITING' and len(engine.players) >= 2:
+        db = SessionLocal()
+        try:
+            if await deal_next_hand(engine, db):
+                asyncio.create_task(run_bot_turns(engine))
+        finally:
+            db.close()
+
+
+def ensure_turn_clock(engine: PokerEngine) -> None:
+    task = _turn_clocks.get(engine.table_id)
+    if task is None or task.done():
+        _turn_clocks[engine.table_id] = asyncio.create_task(_run_turn_clock(engine))
+
+
+async def _run_turn_clock(engine: PokerEngine) -> None:
+    """Acts for a player whose turn clock runs out: check if it's free, otherwise
+    fold. Covers players who are away or have lost their connection."""
+    while engine.phase in BETTING_PHASES:
+        seat, started, hand_id = engine.current_turn_seat_idx, engine.turn_start_time, engine.hand_id
+        deadline = started + engine.turn_duration + _TURN_GRACE_SECONDS
+        await asyncio.sleep(max(0.05, deadline - time.time()))
+        still_waiting = (
+            engine.phase in BETTING_PHASES
+            and engine.hand_id == hand_id
+            and engine.current_turn_seat_idx == seat
+            and engine.turn_start_time == started
+        )
+        if not still_waiting:
+            continue  # they acted in time, or the hand moved on
+        player = next((p for p in engine.players if p.seat_index == seat), None)
+        if player is None or player.is_bot:
+            # Bots are driven by run_bot_turns; nudge it in case nothing is.
+            asyncio.create_task(run_bot_turns(engine))
+            await asyncio.sleep(1)
+            continue
+        owed = engine.current_high_bet - player.current_bet
+        engine.process_action(player.user_id, 'check' if owed <= 0 else 'fold')
+        await poker_ws_manager.broadcast_table_state(engine)
+        asyncio.create_task(run_bot_turns(engine))
+
+
+def _cancel_cashout_timer(table_id: str, user_id: str) -> None:
+    task = _cashout_timers.pop((table_id, user_id), None)
+    if task and not task.done():
+        task.cancel()
+
+
+async def _cash_out_when_gone(table_id: str, user_id: str) -> None:
+    try:
+        await asyncio.sleep(_DISCONNECT_CASHOUT_SECONDS)
+        engine = poker_manager.get_table(table_id)
+        # Let a hand they are still contesting finish first (the turn clock plays it out)
+        while engine and engine.phase in BETTING_PHASES:
+            player = engine.get_player_by_id(user_id)
+            if player is None or not player.in_hand or player.is_folded:
+                break
+            await asyncio.sleep(2)
+        if not engine or poker_ws_manager.is_connected(table_id, user_id):
+            return
+        _cashout_timers.pop((table_id, user_id), None)
+        ok, _, stack = engine.remove_player(user_id)
+        if not ok:
+            return
+        db = SessionLocal()
+        try:
+            table = db.query(PokerTable).filter(PokerTable.id == table_id).first()
+            cash_out_stack(db, table, table_id, user_id, stack)
+        finally:
+            db.close()
+        await poker_ws_manager.broadcast_table_state(engine)
+        if engine.phase != 'WAITING':
+            asyncio.create_task(run_bot_turns(engine))
+    except asyncio.CancelledError:
+        pass
+
+
+async def cash_out_all_tables() -> None:
+    """On shutdown: table stacks only live in memory, so void any hand in
+    progress and return every player's chips to their wallet."""
+    db = SessionLocal()
+    try:
+        for engine in list(poker_manager.tables.values()):
+            engine.abort_hand()
+            table = db.query(PokerTable).filter(PokerTable.id == engine.table_id).first()
+            for p in [p for p in engine.players if _is_human(p)]:
+                try:
+                    ok, _, stack = engine.remove_player(p.user_id)
+                    if ok:
+                        cash_out_stack(db, table, engine.table_id, p.user_id, stack)
+                except Exception as e:
+                    db.rollback()
+                    print(f"[POKER SHUTDOWN CASHOUT] {engine.table_id}/{p.user_id}: {e}")
+    finally:
+        db.close()
+
 async def run_bot_turns(engine: PokerEngine, db: Optional[Session] = None):
     """Drives bot actions for the current hand, and iteratively progresses through
     settlement + subsequent auto-started hands as long as it stays a bot's turn."""
@@ -119,7 +275,7 @@ async def run_bot_turns(engine: PokerEngine, db: Optional[Session] = None):
                 player = next((p for p in engine.players if p.seat_index == seat), None) if seat is not None else None
                 if not player or not player.is_bot:
                     return
-                await asyncio.sleep(random.uniform(0.8, 1.6))
+                await asyncio.sleep(random.uniform(*_BOT_THINK_SECONDS))
                 action, amount = _decide_bot_action(engine, player)
                 ok, _ = engine.process_action(user_id=player.user_id, action=action, amount=amount)
                 if not ok:
@@ -130,16 +286,19 @@ async def run_bot_turns(engine: PokerEngine, db: Optional[Session] = None):
                 return
 
             await persist_hand_result(engine, db)
-            await asyncio.sleep(4)
-            if len(engine.players) < 2:
-                engine.phase = 'WAITING'
+            await asyncio.sleep(_SETTLEMENT_COOLDOWN_SECONDS)
+            if engine.phase != 'SETTLEMENT':
+                return  # the table already moved on
+            await tidy_seats(engine, db)
+            # Nobody left to play against (or only bots, with every human gone or
+            # sitting out): end here and clear the settled hand rather than
+            # leaving its pot, bets and cards on the felt.
+            if len(engine.players) < 2 or not any(_is_human(p) and not p.is_sitting_out for p in engine.players):
+                engine.reset_to_waiting()
                 await poker_ws_manager.broadcast_table_state(engine)
                 return
-            ok, _ = engine.start_hand()
-            if not ok:
-                await poker_ws_manager.broadcast_table_state(engine)
+            if not await deal_next_hand(engine, db):
                 return
-            await broadcast_hand_start(engine)
     finally:
         _bot_turns_active.discard(engine.table_id)
         if own_db and db:
@@ -175,10 +334,8 @@ async def poker_websocket_endpoint(
 
         table = db.query(PokerTable).filter(PokerTable.id == table_id).first()
         if not table:
-            # Auto-create table record if missing
-            table = PokerTable(id=table_id, name=f"Table {table_id[:8]}", small_blind=100, big_blind=200)
-            db.add(table)
-            db.commit()
+            await ws.close(code=status.WS_1008_POLICY_VIOLATION, reason="Table not found")
+            return
 
         engine = poker_manager.get_or_create_table(
             table_id=table.id,
@@ -189,12 +346,15 @@ async def poker_websocket_endpoint(
         )
 
         await poker_ws_manager.connect(table_id, user_id, ws)
+        _cancel_cashout_timer(table_id, user_id)
 
-        # Auto-seat user if not already seated
+        # Seat the user if they aren't at the table. Opening the table never
+        # charges a buy-in: that only happens through the explicit join call.
+        # A cash seat record without a live seat (the server restarted) is
+        # restored as-is.
         if not engine.get_player_by_id(user_id):
-            buy_in = table.min_buy_in if table.min_buy_in else 2000
             if table.is_practice:
-                engine.add_player(user_id=user_id, username=username, buy_in_amount=buy_in)
+                engine.add_player(user_id=user_id, username=username, buy_in_amount=table.min_buy_in or 2000)
             else:
                 db_player = db.query(PokerPlayer).filter(
                     PokerPlayer.table_id == table_id,
@@ -202,27 +362,6 @@ async def poker_websocket_endpoint(
                 ).first()
                 if db_player:
                     engine.add_player(user_id=user_id, username=username, buy_in_amount=db_player.stack)
-                else:
-                    try:
-                        debit_wallet(
-                            db=db,
-                            user_id=user.id,
-                            amount=buy_in,
-                            tx_type=WalletTransactionType.GAME_ENTRY,
-                            reference_type="poker_buyin",
-                            reference_id=f"poker_buyin_{uuid.uuid4()}"
-                        )
-                        db_player = PokerPlayer(
-                            table_id=table.id,
-                            user_id=user.id,
-                            seat_index=0,
-                            stack=buy_in
-                        )
-                        db.add(db_player)
-                        db.commit()
-                        engine.add_player(user_id=user_id, username=username, buy_in_amount=buy_in)
-                    except Exception as e:
-                        print(f"[POKER WS] User {user_id} could not be seated on cash table: {e}")
 
         # Fill remaining seats with bots on practice tables
         _seat_practice_bots(engine, table)
@@ -241,27 +380,20 @@ async def poker_websocket_endpoint(
                 "hole_cards": [c.to_str() for c in p_state.hole_cards]
             })
 
-        # Auto-start hand if 2+ players and WAITING
         if engine.phase == 'WAITING' and len(engine.players) >= 2:
-            ok, _ = engine.start_hand()
-            if ok:
-                await broadcast_hand_start(engine)
-
-        # Resume bot turns on (re)connect if it's currently a bot's turn
-        # mid-hand (e.g. page refresh while a bot is up) — previously
-        # nothing re-triggered the bots in that case since it's not the
-        # human's turn either, so the game would sit deadlocked. SETTLEMENT
-        # is deliberately excluded: that transient cooldown window is
-        # already being driven by whichever connection just finished the
-        # hand, and re-entering it here could double-persist/double-start.
-        if engine.phase not in ('WAITING', 'SETTLEMENT'):
-            await run_bot_turns(engine, db)
+            await deal_next_hand(engine, db)
+        elif engine.phase in BETTING_PHASES:
+            # Reconnecting mid-hand: keep bots and the turn clock moving
+            asyncio.create_task(run_bot_turns(engine))
+            ensure_turn_clock(engine)
 
         while True:
             data_text = await ws.receive_text()
             try:
                 msg = json.loads(data_text)
-                action_type = msg.get("action", "").lower().strip()
+                if not isinstance(msg, dict):
+                    raise json.JSONDecodeError("not an object", data_text, 0)
+                action_type = str(msg.get("action", "")).lower().strip()
                 action_id = msg.get("action_id")
 
                 if action_type == "sync":
@@ -272,20 +404,27 @@ async def poker_websocket_endpoint(
                     continue
 
                 if action_type == "start_hand":
-                    if engine.phase in ['WAITING', 'SETTLEMENT']:
-                        ok, err_msg = engine.start_hand()
-                        if ok:
-                            await broadcast_hand_start(engine)
-                            await run_bot_turns(engine, db)
+                    # Only an idle table can be dealt by hand; after a hand the
+                    # settlement cooldown deals the next one itself.
+                    if engine.phase == 'WAITING':
+                        if await deal_next_hand(engine, db):
+                            asyncio.create_task(run_bot_turns(engine))
                         else:
                             await poker_ws_manager.send_to_user(table_id, user_id, {
                                 "type": "error",
-                                "message": err_msg
+                                "message": "Need at least 2 players with chips to deal"
                             })
                     continue
 
                 # Process turn action (fold, check, call, bet, raise, all_in)
-                amount = int(msg.get("amount", 0))
+                try:
+                    amount = int(msg.get("amount") or 0)
+                except (TypeError, ValueError):
+                    await poker_ws_manager.send_to_user(table_id, user_id, {
+                        "type": "error",
+                        "message": "Invalid amount"
+                    })
+                    continue
                 ok, err_msg = engine.process_action(
                     user_id=user_id,
                     action=action_type,
@@ -304,8 +443,9 @@ async def poker_websocket_endpoint(
                     await poker_ws_manager.broadcast_table_state(engine)
 
                     # Drive any bot turns that follow, and handle settlement +
-                    # automatic next-hand progression (persists DB, applies cooldown)
-                    await run_bot_turns(engine, db)
+                    # automatic next-hand progression (persists DB, applies
+                    # cooldown) without holding up this player's messages.
+                    asyncio.create_task(run_bot_turns(engine))
 
             except json.JSONDecodeError:
                 await poker_ws_manager.send_to_user(table_id, user_id, {
@@ -315,34 +455,33 @@ async def poker_websocket_endpoint(
 
     except WebSocketDisconnect:
         print(f"[POKER WS] User {user_id} disconnected from table {table_id}")
-        poker_ws_manager.disconnect(table_id, user_id, ws)
-        # Notify remaining table players
-        if table_id in poker_ws_manager.connections:
-            engine = poker_manager.get_table(table_id)
-            if engine:
-                if table_id not in poker_ws_manager.connections or user_id not in poker_ws_manager.connections[table_id]:
-                    p = engine.get_player_by_id(user_id)
-                    if p and engine.phase not in ['WAITING', 'SETTLEMENT'] and not p.is_folded:
-                        p.is_folded = True
-                        p.last_action = 'FOLD'
-                        active_unfolded = engine.get_active_unfolded_players()
-                        if len(active_unfolded) <= 1:
-                            if len(active_unfolded) == 1:
-                                engine.settle_default_winner(active_unfolded[0])
-                            else:
-                                engine.phase = 'WAITING'
-                        elif engine.current_turn_seat_idx == p.seat_index:
-                            engine.advance_hand_state()
-                await poker_ws_manager.broadcast_table_state(engine)
-                if engine.phase == 'SETTLEMENT':
-                    asyncio.create_task(run_bot_turns(engine))
-                elif engine.phase not in ('WAITING', 'SETTLEMENT'):
-                    asyncio.create_task(run_bot_turns(engine))
     except Exception as e:
         print(f"[POKER WS EXCEPTION] {e}")
-        poker_ws_manager.disconnect(table_id, user_id, ws)
     finally:
+        poker_ws_manager.disconnect(table_id, user_id, ws)
         db.close()
+        await _on_player_gone(table_id, user_id)
+
+
+async def _on_player_gone(table_id: str, user_id: str) -> None:
+    """A connection dropped. A hand in progress isn't folded on the spot: the
+    turn clock plays it out if they don't come back in time. Between hands they
+    sit out, and a cash player who stays away is cashed out."""
+    engine = poker_manager.get_table(table_id)
+    if not engine or poker_ws_manager.is_connected(table_id, user_id):
+        return  # a newer connection from the same user is live
+    player = engine.get_player_by_id(user_id)
+    if player is None:
+        return
+    if engine.phase not in BETTING_PHASES:
+        player.is_sitting_out = True
+    if not engine.is_practice:
+        _cancel_cashout_timer(table_id, user_id)
+        _cashout_timers[(table_id, user_id)] = asyncio.create_task(_cash_out_when_gone(table_id, user_id))
+    await poker_ws_manager.broadcast_table_state(engine)
+    if engine.phase != 'WAITING':
+        asyncio.create_task(run_bot_turns(engine))
+
 
 async def broadcast_hand_start(engine: PokerEngine):
     """Sends public table state + private hole cards directly to individual clients."""
@@ -356,6 +495,7 @@ async def broadcast_hand_start(engine: PokerEngine):
                 "type": "hole_cards",
                 "hole_cards": [c.to_str() for c in p.hole_cards]
             })
+    ensure_turn_clock(engine)
 
 async def persist_hand_result(engine: PokerEngine, db: Optional[Session] = None):
     """Persists a completed hand's result to the database."""

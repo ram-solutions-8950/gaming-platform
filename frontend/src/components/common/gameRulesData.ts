@@ -272,33 +272,32 @@ export const CHICKEN_ROAD_RULES_DATA: {
     {
       title: 'Crossing Lanes',
       icon: '🛣️',
-      body: 'Each forward hop into the next lane increases your win multiplier. You can Cash Out at any time to collect your winnings.',
+      body: 'Each lane you step into raises your win multiplier — and is a new chance to get hit. Whether the chicken makes it across a lane is decided by the game server the moment it steps in, never by how you steer. You can Cash Out after any lane you have crossed.',
     },
     {
       title: 'The Crash (Squash)',
       icon: '🚗',
-      body: 'If a vehicle hits the chicken before you cash out, the round is lost! Take the money and run before you get squashed.',
+      body: 'If the chicken is hit before you cash out, the round is lost. Reach the far side and you are paid the top multiplier.',
       isPositive: false,
     },
     {
       title: 'Difficulty Modes',
       icon: '⚡',
       body: [
-        'Easy: Slower cars, safe crossings, moderate multipliers.',
-        'Medium: Balanced traffic and attractive multiplier jumps.',
-        'Hard: Fast lanes, significant risk, rapid multiplier growth.',
-        'Daredevil: Extreme highway speed with monumental jackpot multipliers!',
+        'Medium: 10 lanes paying 1.03x up to 3.00x — gentler risk per lane.',
+        'Hard: 10 lanes paying 1.05x up to 10.00x — each lane is riskier.',
       ],
     },
   ],
   payouts: [
-    { name: 'Lane 1 – 3', payout: '1.2x – 2.0x', desc: 'Safe early crossing zone' },
-    { name: 'Lane 4 – 8', payout: '2.5x – 10.0x', desc: 'High profit danger zone' },
-    { name: 'Lane 9+', payout: '15x – 100x+', desc: 'Legendary jackpot territory' },
+    { name: 'Medium · Lane 1 – 5', payout: '1.03x – 1.38x', desc: 'Low risk per lane' },
+    { name: 'Medium · Lane 6 – 10', payout: '1.55x – 3.00x', desc: 'All 10 lanes pays 3.00x' },
+    { name: 'Hard · Lane 1 – 5', payout: '1.05x – 1.90x', desc: 'Higher risk from the first lane' },
+    { name: 'Hard · Lane 6 – 10', payout: '2.40x – 10.00x', desc: 'All 10 lanes pays 10.00x' },
   ],
   tips: [
-    'Lock in profits by cashing out around 2.0x – 3.0x on higher difficulties.',
-    'Minimum bet is ₹10.',
+    'Every cash-out point returns 97% of stakes on average: a later cash-out pays more but is reached less often.',
+    'Bets are ₹10 to ₹100 per round.',
   ],
 };
 

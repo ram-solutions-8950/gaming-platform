@@ -1,9 +1,10 @@
-import math
 import time
 from typing import List, Dict, Any, Optional, Tuple
 from .cards import Card, Deck
 from .evaluator import evaluate_best_hand, EvaluatedHand
-from .hand_rank import HandCategory
+
+BETTING_PHASES = ('PRE_FLOP', 'FLOP', 'TURN', 'RIVER')
+
 
 class PokerPlayerState:
     def __init__(self, user_id: str, username: str, seat_index: int, stack: int, is_bot: bool = False):
@@ -18,7 +19,12 @@ class PokerPlayerState:
         self.is_all_in = False
         self.is_sitting_out = False
         self.is_bot = is_bot
-        self.auto_cashout_multiplier: Optional[float] = None
+        # Dealt into the current hand. Anyone seated after the deal, or sitting
+        # out when it happened, watches the hand without taking part in it.
+        self.in_hand = False
+        # Has acted since the current street began; a street only closes once
+        # every player who can still act has acted and matched the high bet.
+        self.acted_this_street = False
         self.last_action: Optional[str] = None
 
     def reset_for_hand(self):
@@ -27,6 +33,8 @@ class PokerPlayerState:
         self.total_bet_in_hand = 0
         self.is_folded = False
         self.is_all_in = False
+        self.in_hand = False
+        self.acted_this_street = False
         self.last_action = None
 
     def to_dict(self, for_user_id: Optional[str] = None, reveal_cards: bool = False) -> Dict[str, Any]:
@@ -42,15 +50,12 @@ class PokerPlayerState:
             "is_folded": self.is_folded,
             "is_all_in": self.is_all_in,
             "is_sitting_out": self.is_sitting_out,
+            "in_hand": self.in_hand,
             "is_bot": self.is_bot,
             "last_action": self.last_action,
             "hole_cards": [c.to_str() for c in self.hole_cards] if show_cards and self.hole_cards else None,
         }
 
-class SidePot:
-    def __init__(self, amount: int, eligible_user_ids: List[str]):
-        self.amount = amount
-        self.eligible_user_ids = eligible_user_ids
 
 class PokerEngine:
     def __init__(self, table_id: str, is_practice: bool = False, small_blind: int = 100, big_blind: int = 200, max_players: int = 6):
@@ -71,7 +76,12 @@ class PokerEngine:
         self.current_high_bet: int = 0
         self.min_raise_amount: int = big_blind
         self.pot: int = 0
-        self.side_pots: List[SidePot] = []
+        # What players who left mid-hand had already put in. Their chips stay in
+        # the pot and have to be paid out with it, so they keep their pot layers.
+        self.dead_contributions: List[int] = []
+        # Only hands that reach a real showdown are turned face-up; a hand won
+        # because everyone else folded is never shown, and folded hands never are.
+        self.showdown_reached: bool = False
         self.winners_summary: List[Dict[str, Any]] = []
         self.turn_start_time: float = time.time()
         self.turn_duration: int = 15  # 15 seconds per turn
@@ -96,6 +106,8 @@ class PokerEngine:
         while seat_index in taken_seats:
             seat_index += 1
 
+        # A player seated mid-hand is not dealt in (in_hand stays False) and
+        # joins from the next hand.
         player = PokerPlayerState(user_id, username, seat_index, buy_in_amount, is_bot=is_bot)
         self.players.append(player)
         return True, "Successfully seated"
@@ -105,33 +117,69 @@ class PokerEngine:
         if not player:
             return False, "Player not at table", 0
 
-        remaining_stack = player.stack
-        if self.phase not in ['WAITING', 'SETTLEMENT']:
-            # Unconditionally fold player if hand is active
+        hand_live = self.phase in BETTING_PHASES
+        if hand_live and player.in_hand and not player.is_folded:
+            # Leaving forfeits the hand: chips already in the pot stay there,
+            # and a bet the player made still stands for everyone else.
             player.is_folded = True
             player.last_action = 'FOLD'
-            active_unfolded = self.get_active_unfolded_players()
-            if len(active_unfolded) <= 1:
-                if len(active_unfolded) == 1:
-                    self.settle_default_winner(active_unfolded[0])
-                else:
-                    self.phase = 'WAITING'
-            elif self.current_turn_seat_idx == player.seat_index:
+            was_their_turn = self.current_turn_seat_idx == player.seat_index
+            contenders = self.get_active_unfolded_players()
+            if len(contenders) == 1:
+                self.settle_default_winner(contenders[0])
+            elif was_their_turn:
                 self.advance_hand_state()
+        if hand_live and player.total_bet_in_hand > 0 and self.phase != 'SETTLEMENT':
+            self.dead_contributions.append(player.total_bet_in_hand)
 
+        remaining_stack = player.stack
         self.players = [p for p in self.players if p.user_id != user_id]
         if len(self.players) < 2 and self.phase not in ['SETTLEMENT']:
-            self.phase = 'WAITING'
+            self.reset_to_waiting()
 
         return True, "Player left table", remaining_stack
 
+    def reset_to_waiting(self):
+        """Park the table between hands. Only call once the pot has been paid out:
+        it clears the finished hand so clients stop showing its pot, bets and cards."""
+        self.phase = 'WAITING'
+        self.pot = 0
+        self.dead_contributions = []
+        self.showdown_reached = False
+        self.community_cards = []
+        self.current_high_bet = 0
+        self.min_raise_amount = self.big_blind
+        self.current_turn_seat_idx = None
+        self.winners_summary = []
+        for p in self.players:
+            p.reset_for_hand()
+
     def get_active_unfolded_players(self) -> List[PokerPlayerState]:
-        return [p for p in self.players if not p.is_folded and not p.is_sitting_out]
+        return [p for p in self.players if p.in_hand and not p.is_folded]
 
     def get_active_can_act_players(self) -> List[PokerPlayerState]:
-        return [p for p in self.players if not p.is_folded and not p.is_all_in and not p.is_sitting_out]
+        return [p for p in self.players if p.in_hand and not p.is_folded and not p.is_all_in]
+
+    def abort_hand(self) -> None:
+        """Call off a hand in progress (server shutdown): it is void, so everyone
+        gets back what they put in and chips left by players who quit are shared."""
+        if self.phase not in BETTING_PHASES:
+            return
+        for p in self.players:
+            p.stack += p.total_bet_in_hand
+        dead = sum(self.dead_contributions)
+        sharers = self.get_active_unfolded_players() or self.players
+        if dead and sharers:
+            share, remainder = divmod(dead, len(sharers))
+            for p in sharers:
+                p.stack += share
+            sharers[0].stack += remainder
+        self.reset_to_waiting()
 
     def start_hand(self) -> Tuple[bool, str]:
+        if self.phase in BETTING_PHASES:
+            # Dealing over a live hand would wipe its pot.
+            return False, "A hand is already in progress"
         # In practice mode, automatically rebuy/reload players or bots with 0 stack
         if self.is_practice:
             for p in self.players:
@@ -141,20 +189,23 @@ class PokerEngine:
 
         active_players = [p for p in self.players if p.stack > 0 and not p.is_sitting_out]
         if len(active_players) < 2:
-            self.phase = 'WAITING'
+            self.reset_to_waiting()
             return False, "Need at least 2 active players to start hand"
 
         self.hand_nonce += 1
         self.hand_id = f"pk_{self.table_id}_{self.hand_nonce}_{int(time.time())}"
         self.community_cards = []
         self.pot = 0
-        self.side_pots = []
+        self.dead_contributions = []
+        self.showdown_reached = False
         self.winners_summary = []
         self.action_history = []
 
-        # Reset all player states
+        # Reset all player states; only players with chips who aren't sitting out are dealt in
         for p in self.players:
             p.reset_for_hand()
+        for p in active_players:
+            p.in_hand = True
 
         # Advance dealer button
         seated_sorted = sorted(active_players, key=lambda p: p.seat_index)
@@ -178,7 +229,9 @@ class PokerEngine:
         self.post_blind(sb_player, self.small_blind)
         self.post_blind(bb_player, self.big_blind)
 
-        self.current_high_bet = max(sb_player.current_bet, bb_player.current_bet)
+        # The price to play is the full big blind even when a short-stacked big
+        # blind could only post part of it.
+        self.current_high_bet = self.big_blind
         self.min_raise_amount = self.big_blind
 
         # Deal cards
@@ -200,6 +253,9 @@ class PokerEngine:
 
         self.current_turn_seat_idx = first_act_player.seat_index
         self.turn_start_time = time.time()
+        # The first in line may already be all-in from posting a blind.
+        if first_act_player.is_all_in:
+            self.advance_hand_state()
 
         return True, "Hand started"
 
@@ -216,6 +272,8 @@ class PokerEngine:
         player = self.get_player_by_id(user_id)
         if not player:
             return False, "Player not found at table"
+        if self.phase not in BETTING_PHASES or not player.in_hand:
+            return False, "You are not in this hand"
 
         # Server-authoritative turn enforcement
         if self.current_turn_seat_idx != player.seat_index:
@@ -256,7 +314,11 @@ class PokerEngine:
                 self.pot += added
                 player.is_all_in = True
                 if total_put > self.current_high_bet:
-                    self.min_raise_amount = max(self.big_blind, total_put - self.current_high_bet)
+                    # Only a full raise moves the minimum raise; a short all-in
+                    # leaves it at the last full raise.
+                    raise_size = total_put - self.current_high_bet
+                    if raise_size >= self.min_raise_amount:
+                        self.min_raise_amount = raise_size
                     self.current_high_bet = total_put
                 player.last_action = 'ALL-IN'
             else:
@@ -277,6 +339,7 @@ class PokerEngine:
         else:
             return False, f"Invalid action: {action}"
 
+        player.acted_this_street = True
         self.action_history.append({
             "user_id": user_id,
             "action": player.last_action,
@@ -290,23 +353,21 @@ class PokerEngine:
         return True, "Action accepted"
 
     def advance_hand_state(self):
-        active_unfolded = self.get_active_unfolded_players()
-        if len(active_unfolded) <= 1:
+        contenders = self.get_active_unfolded_players()
+        if len(contenders) <= 1:
             # Everyone else folded -> Single winner by default
-            self.settle_default_winner(active_unfolded[0])
+            if contenders:
+                self.settle_default_winner(contenders[0])
             return
 
+        # The street is over once everyone who can still act has acted and
+        # matched the high bet (all-in players are done acting).
         can_act = self.get_active_can_act_players()
-        # Check if betting round is complete
-        # Round complete if all non-folded non-all-in players have matched current_high_bet
-        bets_equal = all(p.current_bet == self.current_high_bet for p in can_act)
-        acted_this_round = all(p.last_action is not None for p in can_act)
+        street_done = all(p.acted_this_street and p.current_bet == self.current_high_bet for p in can_act)
 
-        if (bets_equal and acted_this_round) or len(can_act) == 0:
-            # Move to next phase
+        if street_done:
             self.next_phase()
         else:
-            # Advance turn to next available player
             self.advance_turn()
 
     def advance_turn(self):
@@ -319,15 +380,18 @@ class PokerEngine:
 
         for k in range(1, len(seated_sorted) + 1):
             next_player = seated_sorted[(curr_idx + k) % len(seated_sorted)]
-            if not next_player.is_folded and not next_player.is_all_in and not next_player.is_sitting_out:
+            if next_player.in_hand and not next_player.is_folded and not next_player.is_all_in:
                 self.current_turn_seat_idx = next_player.seat_index
                 self.turn_start_time = time.time()
                 return
 
     def next_phase(self):
-        # Reset current_bet for next betting round
+        # A new street: fresh bets, and everyone still in has to act again
         for p in self.players:
             p.current_bet = 0
+            p.acted_this_street = False
+            if not p.is_folded and not p.is_all_in:
+                p.last_action = None
         self.current_high_bet = 0
         self.min_raise_amount = self.big_blind
 
@@ -364,76 +428,73 @@ class PokerEngine:
 
         for k in range(1, len(seated_sorted) + 1):
             next_player = seated_sorted[(dealer_pos + k) % len(seated_sorted)]
-            if not next_player.is_folded and not next_player.is_all_in and not next_player.is_sitting_out:
+            if next_player.in_hand and not next_player.is_folded and not next_player.is_all_in:
                 self.current_turn_seat_idx = next_player.seat_index
                 self.turn_start_time = time.time()
                 break
 
+    def _left_of_button(self, player: PokerPlayerState) -> int:
+        return (player.seat_index - self.dealer_seat_idx - 1) % max(self.max_players, 1)
+
     def evaluate_showdown(self):
         self.current_turn_seat_idx = None
-        active_unfolded = self.get_active_unfolded_players()
+        self.showdown_reached = True
+        contenders = self.get_active_unfolded_players()
+        evals: Dict[str, EvaluatedHand] = {
+            p.user_id: evaluate_best_hand(p.hole_cards + self.community_cards) for p in contenders
+        }
 
-        # Evaluate hands for each player
-        player_evals: Dict[str, EvaluatedHand] = {}
-        for p in active_unfolded:
-            hand_cards = p.hole_cards + self.community_cards
-            player_evals[p.user_id] = evaluate_best_hand(hand_cards)
-
-        # Side Pot & Main Pot Distribution Algorithm
-        # Calculate distinct contribution levels
-        contribs = sorted(list({p.total_bet_in_hand for p in self.players if p.total_bet_in_hand > 0}))
-        prev_level = 0
-        pot_layers = []
-
-        for level in contribs:
-            layer_amount = 0
-            eligible = []
-            for p in self.players:
-                contributed_at_level = min(p.total_bet_in_hand - prev_level, level - prev_level)
-                if contributed_at_level > 0:
-                    layer_amount += contributed_at_level
-                if p.total_bet_in_hand >= level and not p.is_folded:
-                    eligible.append(p)
-            if layer_amount > 0 and eligible:
-                pot_layers.append((layer_amount, eligible))
-            prev_level = level
+        # Main pot and side pots: each distinct contribution level is a layer
+        # that only players who put in at least that much (and are still in)
+        # can win. Folded players' and leavers' chips fill layers but win nothing.
+        stakes: List[Tuple[int, Optional[PokerPlayerState]]] = [
+            (p.total_bet_in_hand, p) for p in self.players if p.total_bet_in_hand > 0
+        ]
+        stakes += [(amt, None) for amt in self.dead_contributions if amt > 0]
+        levels = sorted({amt for amt, _ in stakes})
 
         payout_map: Dict[str, int] = {p.user_id: 0 for p in self.players}
-        winners_info = []
-
-        for pot_amount, eligible_players in pot_layers:
-            # Find best hand among eligible players
-            best_score = max(player_evals[p.user_id] for p in eligible_players)
-            winners = [p for p in eligible_players if player_evals[p.user_id] == best_score]
-
-            share = pot_amount // len(winners)
-            remainder = pot_amount % len(winners)
-
+        prev_level = 0
+        for level in levels:
+            layer_amount = sum(min(amt, level) - min(amt, prev_level) for amt, _ in stakes)
+            eligible = [p for amt, p in stakes if p in contenders and amt >= level]
+            prev_level = level
+            if layer_amount <= 0:
+                continue
+            if not eligible:
+                # Nobody still in reached this layer (its owners folded or left):
+                # it goes to the players contesting the hand.
+                eligible = contenders
+            best_score = max(evals[p.user_id] for p in eligible)
+            winners = sorted(
+                (p for p in eligible if evals[p.user_id] == best_score),
+                key=self._left_of_button,
+            )
+            share, remainder = divmod(layer_amount, len(winners))
             for w in winners:
                 payout_map[w.user_id] += share
+            # Odd chips go to the winner closest to the left of the button
+            payout_map[winners[0].user_id] += remainder
 
-            # Distribute remainder chip to player closest left of dealer
-            if remainder > 0:
-                payout_map[winners[0].user_id] += remainder
-
-            for w in winners:
+        winners_info = []
+        for p in sorted(contenders, key=self._left_of_button):
+            won = payout_map[p.user_id]
+            p.stack += won
+            if won > 0:
                 winners_info.append({
-                    "user_id": w.user_id,
-                    "username": w.username,
-                    "amount": share,
-                    "hand_description": player_evals[w.user_id].description,
-                    "best_five": [c.to_str() for c in player_evals[w.user_id].best_five],
+                    "user_id": p.user_id,
+                    "username": p.username,
+                    "amount": won,
+                    "hand_description": evals[p.user_id].description,
+                    "best_five": [c.to_str() for c in evals[p.user_id].best_five],
                 })
-
-        # Apply payouts to stacks
-        for p in self.players:
-            p.stack += payout_map[p.user_id]
 
         self.winners_summary = winners_info
         self.phase = 'SETTLEMENT'
 
     def settle_default_winner(self, winner: PokerPlayerState):
         self.current_turn_seat_idx = None
+        self.showdown_reached = False
         winner.stack += self.pot
         self.winners_summary = [{
             "user_id": winner.user_id,
@@ -446,7 +507,7 @@ class PokerEngine:
 
     def get_public_state(self, for_user_id: Optional[str] = None) -> Dict[str, Any]:
         """Returns the state of the table with strict private card filtering."""
-        reveal_all_cards = self.phase in ['SHOWDOWN', 'SETTLEMENT']
+        showdown = self.showdown_reached and self.phase in ['SHOWDOWN', 'SETTLEMENT']
         return {
             "table_id": self.table_id,
             "is_practice": self.is_practice,
@@ -461,7 +522,14 @@ class PokerEngine:
             "min_raise_amount": self.min_raise_amount,
             "pot": self.pot,
             "community_cards": [c.to_str() for c in self.community_cards],
-            "players": [p.to_dict(for_user_id=for_user_id, reveal_cards=reveal_all_cards) for p in self.players],
+            "players": [
+                p.to_dict(
+                    for_user_id=for_user_id,
+                    # At a showdown only the hands still contesting the pot are shown
+                    reveal_cards=showdown and p.in_hand and not p.is_folded,
+                )
+                for p in self.players
+            ],
             "winners_summary": self.winners_summary,
             "turn_start_time": self.turn_start_time,
             "turn_duration": self.turn_duration,

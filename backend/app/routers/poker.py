@@ -1,3 +1,4 @@
+import asyncio
 import uuid
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -8,8 +9,8 @@ from ..security.permissions import require_user
 from ..models.user import User
 from ..models.poker import PokerTable, PokerHand, PokerPlayer
 from ..services.poker.game_manager import poker_manager
+from ..services.poker.cashout import cash_out_stack
 from ..services.wallet_service import credit_wallet, debit_wallet
-from ..services.settlement_service import settle_winning_bet
 from ..models.transaction import WalletTransactionType
 
 router = APIRouter(prefix="/poker", tags=["Poker"])
@@ -112,7 +113,7 @@ def get_poker_table_details(
     return engine.get_public_state(for_user_id=str(current_user.id))
 
 @router.post("/tables/{table_id}/join")
-def join_poker_table(
+async def join_poker_table(
     table_id: str,
     req: JoinPokerTableRequest,
     current_user: User = Depends(require_user),
@@ -138,6 +139,23 @@ def join_poker_table(
 
     if engine.get_player_by_id(str(current_user.id)):
         return {"message": "Already seated at table", "table_id": table.id}
+
+    # A seat record without a live seat means the table was restarted while the
+    # player sat at it: give them that seat back instead of charging again.
+    lingering = db.query(PokerPlayer).filter(
+        PokerPlayer.table_id == table.id,
+        PokerPlayer.user_id == current_user.id,
+    ).first()
+    if lingering and not table.is_practice:
+        ok, msg = engine.add_player(
+            user_id=str(current_user.id),
+            username=current_user.username or current_user.email.split('@')[0],
+            buy_in_amount=lingering.stack,
+        )
+        if not ok:
+            raise HTTPException(status_code=400, detail=msg)
+        await _announce_seat(engine)
+        return {"message": "Seat restored", "table_id": table.id}
 
     # Real-money wallet debit via WalletService
     if not table.is_practice:
@@ -187,7 +205,16 @@ def join_poker_table(
     db.add(db_player)
     db.commit()
 
+    await _announce_seat(engine)
     return {"message": "Successfully joined table", "table_id": table.id}
+
+
+async def _announce_seat(engine) -> None:
+    try:
+        from ..websocket.poker_ws import on_seat_taken
+        await on_seat_taken(engine)
+    except Exception as e:
+        print(f"[POKER JOIN BROADCAST] {e}")
 
 @router.post("/tables/{table_id}/leave")
 async def leave_poker_table(
@@ -203,42 +230,23 @@ async def leave_poker_table(
     if not ok:
         raise HTTPException(status_code=400, detail=msg)
 
-    db_player = db.query(PokerPlayer).filter(
-        PokerPlayer.table_id == table_id,
-        PokerPlayer.user_id == current_user.id
-    ).first()
     table = db.query(PokerTable).filter(PokerTable.id == table_id).first()
-    if table and not table.is_practice and remaining_stack > 0:
-        initial_buyin = db_player.stack if db_player else remaining_stack
-        gross_profit = max(0, remaining_stack - initial_buyin)
-        stake_returned = min(remaining_stack, initial_buyin)
-        calc, _ = settle_winning_bet(
-            db=db,
-            user_id=current_user.id,
-            original_bet=stake_returned,
-            gross_profit=gross_profit,
-            reference_type="poker_leave",
-            reference_id=f"poker_leave_{uuid.uuid4()}",
-            game_slug="poker",
-            metadata={"table_id": table_id, "remaining_stack": remaining_stack},
-        )
-        remaining_stack = calc.total_return
-        db.commit()
-
-    db.query(PokerPlayer).filter(
-        PokerPlayer.table_id == table_id,
-        PokerPlayer.user_id == current_user.id
-    ).delete()
-    db.commit()
+    credited = cash_out_stack(db, table, table_id, current_user.id, remaining_stack)
+    returned_stack = remaining_stack if table and table.is_practice else credited
 
     # Notify remaining table players via WebSocket
     try:
-        from ..websocket.poker_ws import poker_ws_manager
+        from ..websocket.poker_ws import poker_ws_manager, run_bot_turns
         await poker_ws_manager.broadcast_table_state(engine)
+        # If leaving ended the hand (or passed the turn to a bot), run the usual
+        # settlement cooldown so the table moves on to the next hand, or back to
+        # WAITING with the pot cleared when nobody is left to play.
+        if engine.phase != 'WAITING':
+            asyncio.create_task(run_bot_turns(engine))
     except Exception as e:
         print(f"[POKER LEAVE BROADCAST] {e}")
 
-    return {"message": "Left table successfully", "returned_stack": remaining_stack}
+    return {"message": "Left table successfully", "returned_stack": returned_stack}
 
 @router.get("/history")
 def get_poker_history(

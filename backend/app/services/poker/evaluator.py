@@ -3,6 +3,18 @@ from itertools import combinations
 from .cards import Card
 from .hand_rank import HandCategory, HAND_CATEGORY_NAMES
 
+_RANK_NAMES = {14: "Ace", 13: "King", 12: "Queen", 11: "Jack", 10: "Ten", 9: "Nine", 8: "Eight",
+               7: "Seven", 6: "Six", 5: "Five", 4: "Four", 3: "Three", 2: "Two"}
+
+
+def _name(rank: int) -> str:
+    return _RANK_NAMES[rank]
+
+
+def _plural(rank: int) -> str:
+    return "Sixes" if rank == 6 else f"{_RANK_NAMES[rank]}s"
+
+
 class EvaluatedHand:
     def __init__(self, category: HandCategory, score_tuple: Tuple, best_five: List[Card], description: str):
         self.category = category
@@ -79,7 +91,7 @@ def evaluate_5card_hand(cards: List[Card]) -> EvaluatedHand:
             HandCategory.STRAIGHT_FLUSH,
             (int(HandCategory.STRAIGHT_FLUSH), straight_high),
             sorted_cards,
-            f"Straight Flush, {straight_high} High"
+            f"Straight Flush, {_name(straight_high)} High"
         )
 
     if by_freq[0][1] == 4:
@@ -89,7 +101,7 @@ def evaluate_5card_hand(cards: List[Card]) -> EvaluatedHand:
             HandCategory.FOUR_OF_A_KIND,
             (int(HandCategory.FOUR_OF_A_KIND), four_rank, kicker),
             sorted_cards,
-            f"Four of a Kind, {four_rank}s"
+            f"Four of a Kind, {_plural(four_rank)}"
         )
 
     if by_freq[0][1] == 3 and by_freq[1][1] == 2:
@@ -99,7 +111,7 @@ def evaluate_5card_hand(cards: List[Card]) -> EvaluatedHand:
             HandCategory.FULL_HOUSE,
             (int(HandCategory.FULL_HOUSE), three_rank, pair_rank),
             sorted_cards,
-            f"Full House, {three_rank}s full of {pair_rank}s"
+            f"Full House, {_plural(three_rank)} full of {_plural(pair_rank)}"
         )
 
     if is_flush:
@@ -107,7 +119,7 @@ def evaluate_5card_hand(cards: List[Card]) -> EvaluatedHand:
             HandCategory.FLUSH,
             (int(HandCategory.FLUSH), *ranks),
             sorted_cards,
-            f"Flush, {ranks[0]} High"
+            f"Flush, {_name(ranks[0])} High"
         )
 
     if is_straight:
@@ -115,7 +127,7 @@ def evaluate_5card_hand(cards: List[Card]) -> EvaluatedHand:
             HandCategory.STRAIGHT,
             (int(HandCategory.STRAIGHT), straight_high),
             sorted_cards,
-            f"Straight, {straight_high} High"
+            f"Straight, {_name(straight_high)} High"
         )
 
     if by_freq[0][1] == 3:
@@ -125,7 +137,7 @@ def evaluate_5card_hand(cards: List[Card]) -> EvaluatedHand:
             HandCategory.THREE_OF_A_KIND,
             (int(HandCategory.THREE_OF_A_KIND), three_rank, *kickers),
             sorted_cards,
-            f"Three of a Kind, {three_rank}s"
+            f"Three of a Kind, {_plural(three_rank)}"
         )
 
     if by_freq[0][1] == 2 and by_freq[1][1] == 2:
@@ -136,7 +148,7 @@ def evaluate_5card_hand(cards: List[Card]) -> EvaluatedHand:
             HandCategory.TWO_PAIR,
             (int(HandCategory.TWO_PAIR), high_pair, low_pair, kicker),
             sorted_cards,
-            f"Two Pair, {high_pair}s and {low_pair}s"
+            f"Two Pair, {_plural(high_pair)} and {_plural(low_pair)}"
         )
 
     if by_freq[0][1] == 2:
@@ -146,14 +158,14 @@ def evaluate_5card_hand(cards: List[Card]) -> EvaluatedHand:
             HandCategory.ONE_PAIR,
             (int(HandCategory.ONE_PAIR), pair_rank, *kickers),
             sorted_cards,
-            f"One Pair of {pair_rank}s"
+            f"Pair of {_plural(pair_rank)}"
         )
 
     return EvaluatedHand(
         HandCategory.HIGH_CARD,
         (int(HandCategory.HIGH_CARD), *ranks),
         sorted_cards,
-        f"High Card, {ranks[0]}"
+        f"High Card, {_name(ranks[0])}"
     )
 
 def evaluate_best_hand(cards: List[Card]) -> EvaluatedHand:

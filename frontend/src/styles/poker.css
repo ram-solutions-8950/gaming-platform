@@ -723,6 +723,26 @@
   border-color: transparent;
 }
 
+.poker-turn-clock {
+  align-self: center;
+  min-width: 2.4rem;
+  padding: 0.3rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 800;
+  text-align: center;
+  color: var(--bone);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  font-variant-numeric: tabular-nums;
+}
+
+.poker-turn-clock.urgent {
+  color: #fecaca;
+  background: rgba(220, 38, 38, 0.35);
+  border-color: rgba(248, 113, 113, 0.7);
+}
+
 .poker-action-buttons-group {
   display: flex;
   gap: 0.5rem;

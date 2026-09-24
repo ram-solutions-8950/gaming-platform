@@ -14,6 +14,8 @@ export interface PokerPlayerInfo {
   is_folded: boolean;
   is_all_in: boolean;
   is_sitting_out: boolean;
+  /** Dealt into the current hand; players seated mid-hand join from the next one. */
+  in_hand?: boolean;
   is_bot: boolean;
   last_action?: string | null;
   hole_cards?: string[] | null;
@@ -39,11 +41,19 @@ export interface PokerTableState {
   turn_duration?: number;
 }
 
+export interface PokerBustedInfo {
+  message: string;
+  min_buy_in: number | null;
+  max_buy_in: number | null;
+}
+
 export interface UsePokerSocketOptions {
   tableId: string;
   onHandStart?: () => void;
   onShowdown?: (winners: any[]) => void;
   onError?: (err: string) => void;
+  /** The server took this player's seat after they ran out of chips. */
+  onBusted?: (info: PokerBustedInfo) => void;
 }
 
 function getPokerWsUrl(tableId: string, token: string): string {
@@ -79,6 +89,12 @@ export function usePokerSocket(options: UsePokerSocketOptions) {
   const reconnectAttemptsRef = useRef<number>(0);
   const socketIdRef = useRef<number>(0);
   const isRefreshingRef = useRef<boolean>(false);
+  // Callbacks are read through a ref: the socket outlives any one render, and
+  // the handlers from the first render would otherwise be used forever.
+  const optionsRef = useRef(options);
+  optionsRef.current = options;
+  // Every broadcast during settlement repeats the winners; announce them once.
+  const announcedHandRef = useRef<string | null>(null);
 
   const connect = useCallback(() => {
     const currentToken = authStorage.getAccessToken();
@@ -122,20 +138,26 @@ export function usePokerSocket(options: UsePokerSocketOptions) {
         if (type === 'table_state' || type === 'sync') {
           const s: PokerTableState = msg.state;
           setTableState(s);
-          // If my player has hole_cards inside public state, store them
+          // The server always includes my own hole cards while I hold any, so
+          // mirror them — including clearing them once a finished hand is wiped.
           if (user) {
             const me = s.players?.find((p) => p.user_id === user.id);
-            if (me && me.hole_cards && me.hole_cards.length === 2) {
-              setMyHoleCards(me.hole_cards);
-            }
+            setMyHoleCards(me?.hole_cards?.length === 2 ? me.hole_cards : []);
           }
-          if ((s.phase === 'SHOWDOWN' || s.phase === 'SETTLEMENT') && s.winners_summary && s.winners_summary.length > 0) {
-            options.onShowdown?.(s.winners_summary);
+          if (
+            (s.phase === 'SHOWDOWN' || s.phase === 'SETTLEMENT') &&
+            s.winners_summary && s.winners_summary.length > 0 &&
+            announcedHandRef.current !== (s.hand_id ?? null)
+          ) {
+            announcedHandRef.current = s.hand_id ?? null;
+            optionsRef.current.onShowdown?.(s.winners_summary);
           }
+        } else if (type === 'busted') {
+          optionsRef.current.onBusted?.(msg as PokerBustedInfo);
         } else if (type === 'hole_cards') {
           // Private event delivered strictly to this client
           setMyHoleCards(msg.hole_cards || []);
-          options.onHandStart?.();
+          optionsRef.current.onHandStart?.();
         } else if (type === 'error') {
           if (
             msg.message?.toLowerCase().includes('authentication') ||
@@ -152,7 +174,7 @@ export function usePokerSocket(options: UsePokerSocketOptions) {
               }
             }
           }
-          options.onError?.(msg.message);
+          optionsRef.current.onError?.(msg.message);
         }
       } catch (e) {
         console.error('Error parsing Poker WS message:', e);
@@ -217,7 +239,7 @@ export function usePokerSocket(options: UsePokerSocketOptions) {
 
   const sendAction = useCallback((action: string, amount: number = 0) => {
     if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
-      options.onError?.('Not connected to game server');
+      optionsRef.current.onError?.('Not connected to game server');
       return;
     }
     const action_id = `pk_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;

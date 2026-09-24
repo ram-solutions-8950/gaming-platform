@@ -17,6 +17,7 @@ import app.websocket.teen_patti_ws as tpws
 tpws._BOT_JOIN_DELAY_SECONDS = 0.05
 tpws._START_COUNTDOWN_SECONDS = 0.05
 tpws._NEXT_HAND_DELAY_SECONDS = 0.05
+tpws._SHOWDOWN_REVEAL_SECONDS = 0.05
 
 
 def test_two_client_live_teen_patti_multiplayer(client, db):

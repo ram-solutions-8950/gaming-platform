@@ -113,6 +113,8 @@ def play_instant_hand(
             hand.show(hand.seats[active[0]].id)
         elif active:
             hand._finish_hand(active[0], reason="Time cap")
+    # This hand is played out in one request, so there is no reveal to hold.
+    hand.complete_showdown()
 
     winners = getattr(hand, "winner_seats", None)
     if not winners:

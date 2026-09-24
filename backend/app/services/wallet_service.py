@@ -45,10 +45,11 @@ def credit_wallet(
     if amount <= 0:
         raise ValueError("Credit amount must be positive")
 
+    # Check for a replay only once the wallet row is locked: a concurrent twin
+    # of this call has then either committed (and is found) or not started.
+    wallet = _lock_wallet(db, user_id)
     if _check_duplicate_reference(db, reference_type, reference_id):
         raise ValueError(f"Duplicate transaction reference: {reference_type}/{reference_id}")
-
-    wallet = _lock_wallet(db, user_id)
     balance_before = wallet.balance
     wallet.balance += amount
 
@@ -82,10 +83,9 @@ def debit_wallet(
     if amount <= 0:
         raise ValueError("Debit amount must be positive")
 
+    wallet = _lock_wallet(db, user_id)
     if _check_duplicate_reference(db, reference_type, reference_id):
         raise ValueError(f"Duplicate transaction reference: {reference_type}/{reference_id}")
-
-    wallet = _lock_wallet(db, user_id)
     if wallet.balance < amount:
         raise ValueError("Insufficient balance")
 

@@ -151,8 +151,14 @@ export const TeenPattiTable: React.FC<TeenPattiTableProps> = ({
         setShowdownDismissed(false);
         soundManager.play('betting_start');
         soundManager.play('card_deal');
-      } else if (p === 'showdown' || p === 'finished') {
+      } else if (p === 'showdown') {
+        // Hands go face-up for the reveal; the outcome (sound, balance, popup)
+        // waits for the server to move the hand to 'finished'.
         soundManager.play('betting_stop');
+        soundManager.play('card_deal');
+      } else if (p === 'finished') {
+        // A fold win skips the reveal and lands here straight from 'playing'.
+        if (lastPhaseRef.current !== 'showdown') soundManager.play('betting_stop');
         refreshWallet();
       }
       lastPhaseRef.current = p;
@@ -173,8 +179,12 @@ export const TeenPattiTable: React.FC<TeenPattiTableProps> = ({
     }
     lastBetRef.current = myBet;
 
-    // Showdown win/loss
-    if (gameState.winner_seat !== null && gameState.winner_seat !== lastWinnerSeatRef.current) {
+    // Win/loss, announced with the result rather than at the reveal
+    if (
+      gameState.phase === 'finished' &&
+      gameState.winner_seat !== null &&
+      gameState.winner_seat !== lastWinnerSeatRef.current
+    ) {
       const winner = gameState.seats[gameState.winner_seat];
       if (winner && winner.id === currentUserId) {
         soundManager.play('win_clap');
@@ -212,7 +222,9 @@ export const TeenPattiTable: React.FC<TeenPattiTableProps> = ({
     );
   }
 
-  const isShowdown = gameState.phase === 'showdown' || gameState.phase === 'finished';
+  // 'showdown' is the reveal: both hands face-up on the felt with nothing on top.
+  // The result popup belongs to 'finished', which the server sets after the hold.
+  const isResultStage = gameState.phase === 'finished';
   const isTargetOfSideShow = pendingSideShow && pendingSideShow.target === currentUserId;
   const requesterSeat = pendingSideShow ? gameState.seats.find((s) => s.id === pendingSideShow.requester) : null;
 
@@ -372,7 +384,7 @@ export const TeenPattiTable: React.FC<TeenPattiTableProps> = ({
       )}
 
       {/* Showdown Winner Overlay */}
-      {isShowdown && !showdownDismissed && gameState.winner_seat !== null && (
+      {isResultStage && !showdownDismissed && gameState.winner_seat !== null && (
         <ShowdownOverlay
           winnerSeat={gameState.winner_seat}
           reason={gameState.reason}

@@ -92,6 +92,10 @@ def _get_table_lock(table_id: str) -> asyncio.Lock:
 
 _BOT_JOIN_DELAY_SECONDS = 3.0
 _START_COUNTDOWN_SECONDS = 3.0
+# After a show: both hands stay face-up on the table (phase SHOWDOWN, no result
+# popup) for this long before the result is announced (phase FINISHED).
+_SHOWDOWN_REVEAL_SECONDS = 5.5
+# How long the result (FINISHED) stays up before the next hand is dealt.
 _NEXT_HAND_DELAY_SECONDS = 5.0
 _DISCONNECT_GRACE_SECONDS = 1.5
 _BOT_NAMES = ["Aryan", "Rohan", "Kabir", "Aditya", "Vikram", "Neha", "Priya", "Ananya"]
@@ -146,12 +150,25 @@ def _load_config(table_id: str) -> Tuple[GameConfig, str]:
         except Exception:
             table = None
         if table:
-            return GameConfig(
+            return _with_standard_limits(GameConfig(
                 boot_amount=table.boot_amount,
                 max_players=table.max_players,
                 turn_seconds=table.turn_seconds,
-            ), table.mode.value
-    return GameConfig(boot_amount=1000, max_players=2, turn_seconds=15), "real"
+            )), table.mode.value
+    return _with_standard_limits(GameConfig(boot_amount=1000, max_players=2, turn_seconds=15)), "real"
+
+
+# Standard Teen Patti limits: the chaal (stake) tops out at 128x the boot and
+# the pot at 1024x, after which the hand goes to a compulsory show. Without
+# them a player could open with any amount they like and price others out.
+CHAAL_LIMIT_BOOTS = 128
+POT_LIMIT_BOOTS = 1024
+
+
+def _with_standard_limits(cfg: GameConfig) -> GameConfig:
+    cfg.max_stake = cfg.boot_amount * CHAAL_LIMIT_BOOTS
+    cfg.pot_limit = cfg.boot_amount * POT_LIMIT_BOOTS
+    return cfg
 
 
 def _already_processed(table_id: str, action_id: Optional[str]) -> bool:
@@ -190,6 +207,85 @@ async def _broadcast_state(table_id: str) -> None:
         await manager.send_to_user(table_id, seat.id, payload)
 
 
+# Real-money stakes leave the wallet the moment they go into the pot (boot,
+# chaal, raise, show, side show). Settling a hand then only pays winners, so a
+# player can't bet and then empty their wallet before the hand is over.
+# hand key -> seat id -> amount collected so far in that hand.
+_collected: Dict[str, Dict[str, int]] = defaultdict(dict)
+
+
+def _hand_key(table_id: str) -> str:
+    return f"{table_id}:{_hand_number[table_id]}"
+
+
+def _is_real_table(table_id: str) -> bool:
+    return _load_config(table_id)[1] == "real"
+
+
+def _collect_stakes(table_id: str, hand: TeenPattiHand) -> None:
+    """Debit every real-money player for what they added to the pot since the
+    last collection. A bet a player can't cover comes back out of the pot and
+    the player is packed."""
+    if not _is_real_table(table_id):
+        return
+    key = _hand_key(table_id)
+    collected = _collected[key]
+    with _get_db_session() as db:
+        for idx, seat in enumerate(hand.seats):
+            owed = seat.total_bet - collected.get(seat.id, 0)
+            if _is_bot(seat.id) or owed <= 0:
+                continue
+            try:
+                debit_wallet(
+                    db=db,
+                    user_id=uuid.UUID(seat.id),
+                    amount=owed,
+                    tx_type=WalletTransactionType.GAME_ENTRY,
+                    reference_type="TEEN_PATTI_STAKE",
+                    reference_id=f"tp_stake_{key}_{seat.id}_{seat.total_bet}",
+                    metadata={"game": "teen-patti", "hand_key": key},
+                )
+                db.commit()
+                collected[seat.id] = seat.total_bet
+            except ValueError:
+                db.rollback()
+                seat.total_bet -= owed
+                hand.pot -= owed
+                if hand.phase == Phase.PLAYING and seat.is_in_hand:
+                    seat.status = PlayerStatus.PACKED
+                    active = hand._active_seats()
+                    if len(active) == 1:
+                        hand._finish_hand(winner_idx=active[0], reason="Opponent could not cover their bet")
+                    elif hand.current_turn == idx:
+                        hand._advance_turn()
+
+
+def refund_live_hands() -> None:
+    """On shutdown: a hand still being played is void, so every stake already
+    collected for it goes back to the player."""
+    from ..services.wager_service import reverse_wager
+    for table_id, hand in list(teen_patti_manager._games.items()):
+        if hand.phase not in (Phase.BOOT, Phase.PLAYING):
+            continue
+        key = _hand_key(table_id)
+        with _get_db_session() as db:
+            for seat_id, amount in _collected.pop(key, {}).items():
+                try:
+                    credit_wallet(
+                        db=db,
+                        user_id=uuid.UUID(seat_id),
+                        amount=amount,
+                        tx_type=WalletTransactionType.REFUND,
+                        reference_type="TEEN_PATTI_VOID",
+                        reference_id=f"tp_void_{key}_{seat_id}",
+                        metadata={"hand_key": key, "reason": "server_shutdown"},
+                    )
+                    reverse_wager(db, uuid.UUID(seat_id), amount, "teen-patti")
+                    db.commit()
+                except Exception:
+                    db.rollback()
+
+
 async def _start_hand(table_id: str) -> None:
     hand = teen_patti_manager.get(table_id)
     if hand is None or hand.phase != Phase.WAITING:
@@ -199,6 +295,20 @@ async def _start_hand(table_id: str) -> None:
     for s in list(hand.seats):
         if not _is_bot(s.id) and not manager.is_connected(table_id, s.id):
             hand.remove_seat(s.id)
+
+    # Everyone dealt in has to be able to pay the boot
+    if _is_real_table(table_id):
+        with _get_db_session() as db:
+            for s in list(hand.seats):
+                if _is_bot(s.id):
+                    continue
+                wallet = get_balance(db, uuid.UUID(s.id))
+                if not wallet or wallet.balance < hand.config.boot_amount:
+                    hand.remove_seat(s.id)
+                    await manager.send_to_user(table_id, s.id, {
+                        "type": "error",
+                        "message": "Insufficient balance for the boot. Add money to keep playing.",
+                    })
 
     connected_players = [s for s in hand.seats if s.id and (_is_bot(s.id) or manager.is_connected(table_id, s.id))]
     if len(connected_players) < 2:
@@ -223,6 +333,7 @@ async def _start_hand(table_id: str) -> None:
     _pending_side_show.pop(table_id, None)
 
     hand.start_hand(client_seed=f"tp_{table_id}_{_hand_number[table_id]}", nonce=_hand_number[table_id])
+    _collect_stakes(table_id, hand)
 
     try:
         with _get_db_session() as db:
@@ -441,55 +552,52 @@ def _settle_hand(table_id: str, hand: TeenPattiHand) -> None:
         hand_key = f"{table_id}:{_hand_number[table_id]}"
         s_seed_hash = server_seed_hash(hand.server_seed) if hand.server_seed else ""
 
-        # Enforce atomic savepoint transaction for all wallet entries in this deal
+        # Stakes were collected as they went into the pot (_collect_stakes);
+        # settling only pays each winner their share of it.
         sp = db.begin_nested()
         try:
+            winners = getattr(hand, "winner_seats", None)
+            if not winners:
+                winners = [hand.winner_seat] if hand.winner_seat is not None else []
             for i, s in enumerate(hand.seats):
-                if _is_bot(s.id):
+                if _is_bot(s.id) or i not in winners or not is_real:
                     continue
                 try:
                     uid = uuid.UUID(str(s.id))
                 except ValueError:
                     continue
-
-                # winner_seats holds one index normally and several on a split
-                # pot, so both settle through the same path.
-                winners = getattr(hand, "winner_seats", None)
-                if not winners:
-                    winners = [hand.winner_seat] if hand.winner_seat is not None else []
-                won_this = i in winners
-                if won_this and winners:
-                    share = hand.pot // len(winners)
-                    # Give any indivisible remainder to the first winner so the
-                    # pot is always paid out in full.
-                    if i == winners[0]:
-                        share += hand.pot - share * len(winners)
-                    payout = share
-                else:
-                    payout = 0
-
-                # Debit net stakes contributed by this user
-                if is_real and s.total_bet > 0:
-                    debit_wallet(
-                        db=db,
-                        user_id=uid,
-                        amount=s.total_bet,
-                        tx_type=WalletTransactionType.GAME_ENTRY,
-                        reference_type="TEEN_PATTI_STAKE",
-                        reference_id=f"tp_stake_{hand_key}_{s.id}",
-                    )
-
-                if is_real and won_this and payout > 0:
-                    gross_profit = max(0, payout - s.total_bet)
-                    calc, _ = settle_winning_bet(
+                share = hand.pot // len(winners)
+                # Any indivisible remainder goes to the first winner so the
+                # pot is always paid out in full.
+                if i == winners[0]:
+                    share += hand.pot - share * len(winners)
+                if share <= 0:
+                    continue
+                gross_profit = share - s.total_bet
+                ref = f"tp_payout_{hand_key}_{s.id}"
+                meta = {"hand_key": hand_key, "pot": hand.pot}
+                if gross_profit > 0:
+                    settle_winning_bet(
                         db=db,
                         user_id=uid,
                         original_bet=s.total_bet,
                         gross_profit=gross_profit,
                         reference_type="TEEN_PATTI_PAYOUT",
-                        reference_id=f"tp_payout_{hand_key}_{s.id}",
+                        reference_id=ref,
                         game_slug="teen-patti",
-                        metadata={"hand_key": hand_key, "pot": hand.pot},
+                        metadata=meta,
+                    )
+                else:
+                    # A split share smaller than the player's own stake: no
+                    # profit to charge a fee on, the share is simply returned.
+                    credit_wallet(
+                        db=db,
+                        user_id=uid,
+                        amount=share,
+                        tx_type=WalletTransactionType.GAME_WIN,
+                        reference_type="TEEN_PATTI_PAYOUT",
+                        reference_id=ref,
+                        metadata=meta,
                     )
             sp.commit()
         except Exception as e:
@@ -500,6 +608,8 @@ def _settle_hand(table_id: str, hand: TeenPattiHand) -> None:
             else:
                 logging.getLogger(__name__).error("TEEN_PATTI_SETTLEMENT_FAILED: table_id=%s error=%s", table_id, err_msg)
                 raise
+        finally:
+            _collected.pop(hand_key, None)
 
         # Store hand records
         for i, s in enumerate(hand.seats):
@@ -533,11 +643,24 @@ def _settle_hand(table_id: str, hand: TeenPattiHand) -> None:
 
 
 async def _schedule_next_hand(table_id: str) -> None:
+    """Paces the end of a hand: SHOWDOWN (hands face-up) -> FINISHED (result) -> next deal.
+
+    A fold win has nothing to reveal, so it starts at FINISHED.
+    """
+    lock = _get_table_lock(table_id)
     try:
+        hand = teen_patti_manager.get(table_id)
+        if hand is not None and hand.phase == Phase.SHOWDOWN:
+            await asyncio.sleep(_SHOWDOWN_REVEAL_SECONDS)
+            async with lock:
+                hand = teen_patti_manager.get(table_id)
+                if hand is None or hand.phase != Phase.SHOWDOWN:
+                    return
+                hand.complete_showdown()
+                await _broadcast_state(table_id)
         await asyncio.sleep(_NEXT_HAND_DELAY_SECONDS)
     except asyncio.CancelledError:
         return
-    lock = _get_table_lock(table_id)
     async with lock:
         hand = teen_patti_manager.get(table_id)
         if hand is not None and hand.phase == Phase.FINISHED:
@@ -573,9 +696,12 @@ async def _after_action(table_id: str) -> None:
     hand = teen_patti_manager.get(table_id)
     if hand is None:
         return
+    _collect_stakes(table_id, hand)
     await _broadcast_state(table_id)
 
-    if hand.phase == Phase.FINISHED:
+    # A show lands in SHOWDOWN, a fold win in FINISHED: either way the hand is
+    # decided, so settle now and let _schedule_next_hand pace the reveal.
+    if hand.phase in (Phase.SHOWDOWN, Phase.FINISHED):
         _cancel(_turn_timers, table_id)
         _cancel(_bot_timers, table_id)
         _cancel(_start_timers, table_id)
@@ -679,6 +805,10 @@ async def _handle_player_leave(table_id: str, user_id: str) -> None:
                     db.commit()
             except Exception:
                 pass
+    elif hand.phase in (Phase.SHOWDOWN, Phase.FINISHED):
+        # The hand is over but the table carries on. The timers cancelled above
+        # include the post-hand pacing, so restart it or the table never deals again.
+        _start_timers[table_id] = asyncio.create_task(_schedule_next_hand(table_id))
 
     # 6. Broadcast left event and updated table state
     await manager.broadcast(table_id, {"type": "event", "event": "left", "seat": user_id})
@@ -823,6 +953,10 @@ async def _handle_action(table_id: str, user_id: str, msg: dict) -> None:
 
     try:
         if action == "start":
+            if hand.phase == Phase.SHOWDOWN:
+                # Nobody can cut the reveal short for the rest of the table:
+                # "Deal now" only works once the result is up.
+                return
             if hand.phase == Phase.FINISHED:
                 _cancel(_start_timers, table_id)
                 hand.reset_for_next_hand()
@@ -879,9 +1013,11 @@ async def _handle_action(table_id: str, user_id: str, msg: dict) -> None:
                         next_stake = hand.config.max_stake
                     bet_cost = next_stake * mult
 
+                # Earlier stakes this hand are already collected: only the new
+                # bet has to be covered.
                 with _get_db_session() as db:
                     wallet = get_balance(db, uuid.UUID(user_id))
-                    if not wallet or wallet.balance < (seat.total_bet + bet_cost):
+                    if not wallet or wallet.balance < bet_cost:
                         await manager.send_to_user(table_id, user_id, {"type": "error", "message": "Insufficient balance to place bet"})
                         hand.pack(user_id)
                         await _broadcast_state(table_id)
@@ -892,6 +1028,14 @@ async def _handle_action(table_id: str, user_id: str, msg: dict) -> None:
         elif action == "pack":
             hand.pack(user_id)
         elif action == "show":
+            if is_real:
+                seat = hand.seats[seat_idx]
+                show_cost = hand.current_stake * (2 if seat.seen else 1)
+                with _get_db_session() as db:
+                    wallet = get_balance(db, uuid.UUID(user_id))
+                    if not wallet or wallet.balance < show_cost:
+                        await manager.send_to_user(table_id, user_id, {"type": "error", "message": "Insufficient balance to call a show"})
+                        return
             hand.show(user_id)
         elif action == "side_show":
             if is_real:
@@ -899,7 +1043,7 @@ async def _handle_action(table_id: str, user_id: str, msg: dict) -> None:
                 cost = hand.current_stake * 2
                 with _get_db_session() as db:
                     wallet = get_balance(db, uuid.UUID(user_id))
-                    if not wallet or wallet.balance < (seat.total_bet + cost):
+                    if not wallet or wallet.balance < cost:
                         await manager.send_to_user(table_id, user_id, {"type": "error", "message": "Insufficient balance to request side show"})
                         hand.pack(user_id)
                         await _broadcast_state(table_id)
