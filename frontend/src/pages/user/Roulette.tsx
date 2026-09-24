@@ -123,13 +123,14 @@ export function RoulettePage() {
             prevWinningNumRef.current = state.winning_number;
             // Check if user won
             const totalWin = state.my_bets.reduce((sum, b) => sum + (b.win_inr || 0), 0);
-            const totalBet = state.my_bets.reduce((sum, b) => sum + (b.amount_inr || 0), 0);
+            const totalBet = state.my_bets.reduce((sum, b) => sum + (b.amount_inr || 0), 0) || state.my_total_bet_inr || totalMyBet;
             if (totalWin > 0) {
               soundManager.play('win_clap');
               setToastMessage(`🎉 Won: ₹${totalWin.toFixed(2)} (Bet: ₹${totalBet.toFixed(0)})`);
               setTimeout(() => setToastMessage(null), 4500);
             } else if (totalBet > 0) {
-              setToastMessage(`Round Lost: Bet ₹${totalBet.toFixed(0)}`);
+              soundManager.play('loss');
+              setToastMessage(`❌ Round Lost: Bet ₹${totalBet.toFixed(0)}`);
               setTimeout(() => setToastMessage(null), 4500);
             }
             refreshBalance();
@@ -465,6 +466,14 @@ export function RoulettePage() {
     return serverState.my_bets.reduce((sum, b) => sum + (b.win_inr || 0), 0);
   }, [serverState]);
 
+  const userBetAmount = useMemo(() => {
+    if (serverState?.phase !== 'RESULT') return 0;
+    const serverBetSum = serverState?.my_bets?.reduce((sum, b) => sum + (b.amount_inr || 0), 0) || 0;
+    if (serverBetSum > 0) return serverBetSum;
+    if (serverState?.my_total_bet_inr && serverState.my_total_bet_inr > 0) return serverState.my_total_bet_inr;
+    return totalMyBet;
+  }, [serverState, totalMyBet]);
+
   return (
     <div className="roulette-screen" data-testid="roulette-screen">
       {/* ── Top Header Bar ── */}
@@ -617,6 +626,7 @@ export function RoulettePage() {
             winningColor={serverState?.winning_color ?? null}
             secondsLeft={serverState?.seconds_left ?? 0}
             userWinAmount={userWinAmount}
+            userBetAmount={userBetAmount}
           />
 
           <div className="roulette-felt-table">
@@ -980,7 +990,7 @@ export function RoulettePage() {
 
       {/* Floating Toast Notification */}
       {toastMessage && (
-        <div className="roulette-floating-toast">
+        <div className={`roulette-floating-toast ${toastMessage.includes('Lost') ? 'toast-loss' : ''}`}>
           {toastMessage}
         </div>
       )}

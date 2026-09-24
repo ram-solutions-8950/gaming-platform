@@ -355,6 +355,7 @@ export const TeenPattiTable: React.FC<TeenPattiTableProps> = ({
             isCurrentTurn={gameState.phase === 'playing' && gameState.current_turn === idx}
             isDealer={gameState.dealer_seat === idx}
             isViewer={seat.id === currentUserId}
+            viewerSeatIndex={gameState.seats.findIndex((s) => s.id === currentUserId)}
             turnSeconds={15}
             onSee={seeCards}
           />

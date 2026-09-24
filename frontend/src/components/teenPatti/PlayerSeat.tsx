@@ -12,39 +12,42 @@ interface PlayerSeatProps {
   isViewer: boolean;
   turnSeconds?: number;
   onSee?: () => void;
+  viewerSeatIndex?: number;
 }
 
-const TurnRing: React.FC<{ seconds: number; total: number; size: number }> = ({ seconds, total, size }) => {
-  const stroke = 3;
-  const radius = size / 2 - stroke / 2 - 1;
+const TurnRing: React.FC<{ seconds: number; total: number }> = ({ seconds, total }) => {
+  const stroke = 2.5;
+  const radius = 22 - stroke / 2 - 0.5; // ~20.25
   const circumference = 2 * Math.PI * radius;
   const progress = total > 0 ? Math.max(0, Math.min(1, seconds / total)) : 0;
   const urgent = seconds <= 5;
 
   return (
     <svg
-      viewBox={`0 0 ${size} ${size}`}
+      viewBox="0 0 44 44"
+      className="tp-turn-ring-svg"
       style={{
         position: 'absolute',
-        inset: -4,
-        width: size + 8,
-        height: size + 8,
-        transform: 'rotate(-90deg)',
+        top: '50%',
+        left: '50%',
+        width: 'calc(100% + 8px)',
+        height: 'calc(100% + 8px)',
+        transform: 'translate(-50%, -50%) rotate(-90deg)',
         pointerEvents: 'none',
         zIndex: 5,
       }}
     >
       <circle
-        cx={size / 2}
-        cy={size / 2}
+        cx="22"
+        cy="22"
         r={radius}
-        stroke="rgba(255,255,255,0.15)"
+        stroke="rgba(255,255,255,0.18)"
         strokeWidth={stroke}
         fill="none"
       />
       <circle
-        cx={size / 2}
-        cy={size / 2}
+        cx="22"
+        cy="22"
         r={radius}
         stroke={urgent ? '#ef4444' : '#ffd700'}
         strokeWidth={stroke}
@@ -54,7 +57,7 @@ const TurnRing: React.FC<{ seconds: number; total: number; size: number }> = ({ 
         strokeDashoffset={circumference * (1 - progress)}
         style={{
           transition: 'stroke-dashoffset 0.15s linear, stroke 0.3s ease',
-          filter: urgent ? 'drop-shadow(0 0 6px #ef4444)' : 'drop-shadow(0 0 6px #ffd700)',
+          filter: urgent ? 'drop-shadow(0 0 5px #ef4444)' : 'drop-shadow(0 0 5px #ffd700)',
         }}
       />
     </svg>
@@ -70,6 +73,7 @@ export const PlayerSeat: React.FC<PlayerSeatProps> = ({
   isViewer,
   turnSeconds = 15,
   onSee,
+  viewerSeatIndex,
 }) => {
   const [timeLeft, setTimeLeft] = useState<number>(turnSeconds);
 
@@ -93,19 +97,24 @@ export const PlayerSeat: React.FC<PlayerSeatProps> = ({
     return () => clearInterval(interval);
   }, [isCurrentTurn, seat.status, turnSeconds]);
 
-  // Determine relative seat positioning class
+  // Determine relative seat positioning class so viewer is always at bottom
+  const effectiveIdx = viewerSeatIndex !== undefined && viewerSeatIndex >= 0
+    ? (seatIndex - viewerSeatIndex + totalSeats) % totalSeats
+    : (isViewer ? 0 : seatIndex);
+
   let posClass = 'tp-seat-bottom';
   if (totalSeats === 2) {
-    posClass = isViewer ? 'tp-seat-bottom' : 'tp-seat-top';
+    posClass = effectiveIdx === 0 ? 'tp-seat-bottom' : 'tp-seat-top';
+  } else if (totalSeats === 3) {
+    const classes = ['tp-seat-bottom', 'tp-seat-top-right', 'tp-seat-top-left'];
+    posClass = classes[effectiveIdx % 3];
   } else if (totalSeats === 4) {
-    if (seatIndex === 0) posClass = 'tp-seat-bottom';
-    else if (seatIndex === 1) posClass = 'tp-seat-left';
-    else if (seatIndex === 2) posClass = 'tp-seat-top';
-    else posClass = 'tp-seat-right';
+    const classes = ['tp-seat-bottom', 'tp-seat-right', 'tp-seat-top', 'tp-seat-left'];
+    posClass = classes[effectiveIdx % 4];
   } else {
-    // Fallback for up to 6 seats
-    const classes = ['tp-seat-bottom', 'tp-seat-bottom-left', 'tp-seat-top-left', 'tp-seat-top', 'tp-seat-top-right', 'tp-seat-bottom-right'];
-    posClass = classes[seatIndex % classes.length];
+    // 5 or 6 seats layout
+    const classes = ['tp-seat-bottom', 'tp-seat-bottom-right', 'tp-seat-top-right', 'tp-seat-top', 'tp-seat-top-left', 'tp-seat-bottom-left'];
+    posClass = classes[effectiveIdx % classes.length];
   }
 
   const isPacked = seat.status === 'packed' || seat.status === 'lost_side_show';
@@ -114,46 +123,45 @@ export const PlayerSeat: React.FC<PlayerSeatProps> = ({
 
   return (
     <div className={`tp-seat ${posClass} ${isCurrentTurn ? 'tp-seat-active' : ''} ${isPacked ? 'tp-seat-packed' : ''}`}>
-      <div className="tp-avatar-wrapper">
-        {isCurrentTurn && seat.status === 'active' && (
-          <TurnRing seconds={timeLeft} total={turnSeconds} size={60} />
-        )}
-        {seat.name.charAt(0).toUpperCase()}
-        {isDealer && (
-          <span style={{
-            position: 'absolute', bottom: -5, right: -5, background: '#d4af37', color: '#111',
-            borderRadius: '50%', width: 20, height: 20, fontSize: '0.65rem', fontWeight: 900,
-            display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid #fff', zIndex: 10
-          }}>
-            D
-          </span>
-        )}
+      <div className="tp-seat-player-row">
+        <div className="tp-avatar-wrapper">
+          {isCurrentTurn && seat.status === 'active' && (
+            <TurnRing seconds={timeLeft} total={turnSeconds} />
+          )}
+          {seat.name.charAt(0).toUpperCase()}
+          {isDealer && (
+            <span className="tp-dealer-badge">
+              D
+            </span>
+          )}
+        </div>
+
+        <div className="tp-seat-meta">
+          <div className="tp-seat-name" title={seat.name}>{seat.name}</div>
+          <div className="tp-seat-meta-sub">
+            {seat.status === 'active' ? (
+              <span className={`tp-seat-status-badge ${seat.seen ? 'tp-badge-seen' : 'tp-badge-blind'}`}>
+                {seat.seen ? 'Seen' : 'Blind'}
+              </span>
+            ) : isWinner ? (
+              <span className="tp-seat-status-badge tp-badge-won flex items-center gap-0.5">
+                <Crown size={9} className="text-white fill-white shrink-0" />
+                <span>Won</span>
+              </span>
+            ) : seat.status === 'show_loser' ? (
+              <span className="tp-seat-status-badge tp-badge-packed">Lost</span>
+            ) : (
+              <span className="tp-seat-status-badge tp-badge-packed">Packed</span>
+            )}
+
+            {seat.total_bet > 0 && (
+              <span className="tp-seat-bet-val">
+                ₹{(seat.total_bet / 100).toFixed(0)}
+              </span>
+            )}
+          </div>
+        </div>
       </div>
-
-      <div className="tp-seat-name">{seat.name}</div>
-
-      <div className="flex items-center gap-1">
-        {seat.status === 'active' ? (
-          <span className={`tp-seat-status-badge ${seat.seen ? 'tp-badge-seen' : 'tp-badge-blind'}`}>
-            {seat.seen ? 'Seen' : 'Blind'}
-          </span>
-        ) : isWinner ? (
-          <span className="tp-seat-status-badge tp-badge-won flex items-center gap-1">
-            <Crown size={10} className="text-white fill-white shrink-0" />
-            <span>Winner</span>
-          </span>
-        ) : seat.status === 'show_loser' ? (
-          <span className="tp-seat-status-badge tp-badge-packed">Lost</span>
-        ) : (
-          <span className="tp-seat-status-badge tp-badge-packed">Packed</span>
-        )}
-      </div>
-
-      {seat.total_bet > 0 && (
-        <span style={{ fontSize: '0.75rem', color: '#ffd700', fontWeight: 700 }}>
-          Bet: ₹{(seat.total_bet / 100).toFixed(0)}
-        </span>
-      )}
 
       {seat.card_count > 0 && (
         <div
@@ -165,7 +173,7 @@ export const PlayerSeat: React.FC<PlayerSeatProps> = ({
         >
           {canTapToSee && (
             <div className="tp-tap-see-pill animate-bounce">
-              <Eye size={11} />
+              <Eye size={10} />
               <span>Tap to See</span>
             </div>
           )}

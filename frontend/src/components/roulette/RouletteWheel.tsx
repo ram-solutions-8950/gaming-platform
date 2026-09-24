@@ -7,6 +7,7 @@ export interface RouletteWheelProps {
   winningColor: string | null;
   secondsLeft: number;
   userWinAmount?: number;
+  userBetAmount?: number;
 }
 
 // European Roulette wheel sequence clockwise (0-36)
@@ -27,6 +28,7 @@ export const RouletteWheel: React.FC<RouletteWheelProps> = ({
   winningColor,
   secondsLeft,
   userWinAmount = 0,
+  userBetAmount = 0,
 }) => {
   const isVisible = phase !== 'BETTING';
 
@@ -308,6 +310,12 @@ export const RouletteWheel: React.FC<RouletteWheelProps> = ({
                 <span className="win-sparkle">✨</span>
                 <span>YOU WON ₹{userWinAmount.toFixed(2)}</span>
                 <span className="win-sparkle">✨</span>
+              </div>
+            ) : userBetAmount > 0 ? (
+              <div className="wheel-lose-pill">
+                <span className="lose-sparkle">❌</span>
+                <span>YOU LOST ₹{userBetAmount.toFixed(2)}</span>
+                <span className="lose-sparkle">❌</span>
               </div>
             ) : (
               <div className="wheel-waiting-pill">
