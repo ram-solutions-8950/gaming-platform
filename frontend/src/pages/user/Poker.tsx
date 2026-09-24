@@ -289,6 +289,7 @@ export function PokerPage() {
           currentUserId={currentUserId}
           myBetPaise={tableState.players?.find((p) => p.user_id === currentUserId)?.total_bet_in_hand || 0}
           onClose={() => setShowResultModal(false)}
+          onBackToLobby={handleLeaveTable}
         />
       )}
 

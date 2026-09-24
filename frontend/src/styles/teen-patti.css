@@ -119,47 +119,10 @@
   font-weight: 600;
 }
 
-/* Seats Positioning around Table */
-.tp-seat {
-  position: absolute;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  width: 140px;
-  z-index: 20;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
+/* Seats, nameplates and card fans are laid out in
+   components/teenPatti/TeenPattiTable.css; this file only themes them. */
 
-/* 4-seat coordinates */
-.tp-seat-bottom { bottom: 8px; left: 50%; transform: translateX(-50%); }
-.tp-seat-top    { top: 8px; left: 50%; transform: translateX(-50%); }
-.tp-seat-left   { left: 14px; top: 52%; transform: translateY(-50%); }
-.tp-seat-right  { right: 14px; top: 52%; transform: translateY(-50%); }
-
-/* 6-seat coordinates fallback */
-.tp-seat-top-left     { top: 46px; left: 12%; }
-.tp-seat-top-right    { top: 46px; right: 12%; }
-.tp-seat-bottom-left  { bottom: 12px; left: 12%; }
-.tp-seat-bottom-right { bottom: 12px; right: 12%; }
-
-/* Seat Avatar Circle & Turn Glow */
-.tp-avatar-wrapper {
-  position: relative;
-  width: 60px;
-  height: 60px;
-  border-radius: 50%;
-  background: #1e293b;
-  border: 3px solid #64748b;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 800;
-  font-size: 1.1rem;
-  box-shadow: 0 6px 16px rgba(0,0,0,0.6);
-  transition: all 0.25s ease;
-}
-
+/* Seat Avatar Turn Glow */
 .tp-seat-active .tp-avatar-wrapper {
   border-color: #ffd700;
   box-shadow: 0 0 20px #ffd700, 0 0 40px rgba(255, 215, 0, 0.5);
@@ -177,41 +140,13 @@
   50% { transform: scale(1.06); box-shadow: 0 0 25px #ffd700, 0 0 35px rgba(255, 215, 0, 0.6); }
 }
 
-.tp-seat-name {
-  font-size: 0.8rem;
-  font-weight: 700;
-  color: #f1f5f9;
-  background: rgba(15, 23, 42, 0.85);
-  padding: 2px 10px;
-  border-radius: 12px;
-  border: 1px solid rgba(255,255,255,0.1);
-  max-width: 120px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.tp-seat-status-badge {
-  font-size: 0.7rem;
-  font-weight: 800;
-  text-transform: uppercase;
-  padding: 1px 8px;
-  border-radius: 10px;
-}
-
 .tp-badge-seen { background: #0284c7; color: #fff; }
 .tp-badge-blind { background: #d97706; color: #fff; }
 .tp-badge-packed { background: #475569; color: #cbd5e1; }
 .tp-badge-won { background: #16a34a; color: #fff; box-shadow: 0 0 10px #22c55e; }
 
-/* 3-Card Fan Rendering */
-.tp-card-fan {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-top: 4px;
-}
-
+/* Playing cards (in-table fans are sized/tilted in TeenPattiTable.css;
+   these apply to the result popup) */
 .tp-card {
   width: 44px;
   height: 64px;
@@ -426,63 +361,6 @@
     border-radius: 174px;
   }
 
-  /* Center Pot: true center with compact styling */
-  .tp-center-pot {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: 78px;
-    min-height: 26px;
-    padding: 0.1rem 0.3rem;
-    border-radius: 8px;
-    z-index: 10;
-  }
-
-  .tp-pot-label { font-size: 0.4rem; letter-spacing: 0.6px; }
-  .tp-pot-amount { font-size: 0.74rem; }
-  .tp-stake-info { font-size: 0.4rem; margin-top: 0; }
-
-  .tp-seat {
-    width: 60px;
-    gap: 0px;
-    z-index: 25;
-  }
-
-  .tp-avatar-wrapper {
-    width: 18px;
-    height: 18px;
-    font-size: 0.48rem;
-    border-width: 1.5px;
-  }
-
-  .tp-seat-name {
-    font-size: 0.42rem;
-    padding: 0px 3px;
-    line-height: 1.1;
-    max-width: 52px;
-  }
-
-  .tp-seat-status-badge {
-    font-size: 0.38rem;
-    padding: 0px 2px;
-    line-height: 1.1;
-  }
-
-  .tp-seat-top    { top: 2px; left: 50%; transform: translateX(-50%); }
-  .tp-seat-top .tp-card-fan { margin-top: -3px; }
-
-  .tp-seat-bottom { bottom: 2px; left: 50%; transform: translateX(-50%); }
-  .tp-seat-bottom .tp-card-fan { margin-top: -3px; }
-
-  .tp-seat-left   { left: 12px; top: 50%; transform: translateY(-50%); }
-  .tp-seat-right  { right: 12px; top: 50%; transform: translateY(-50%); }
-
-  .tp-seat-top-left     { top: 44px; left: 12%; }
-  .tp-seat-top-right    { top: 44px; right: 12%; }
-  .tp-seat-bottom-left  { bottom: 6px; left: 12%; }
-  .tp-seat-bottom-right { bottom: 6px; right: 12%; }
-
   .tp-card {
     width: 26px;
     height: 38px;
@@ -502,8 +380,6 @@
   .tp-card-back {
     font-size: 0.75rem;
   }
-
-  .tp-card-fan { margin-top: 0px; }
 
   .tp-action-dock {
     width: min(92vw, 640px);
@@ -537,24 +413,6 @@
     min-height: 160px;
     border-width: 5px;
   }
-
-  .tp-center-pot {
-    top: 48%;
-    transform: translate(-50%, -50%) scale(0.85);
-  }
-
-  .tp-seat { width: 62px; }
-
-  .tp-avatar-wrapper {
-    width: 22px;
-    height: 22px;
-    font-size: 0.54rem;
-  }
-
-  .tp-seat-top    { top: 5px; }
-  .tp-seat-bottom { bottom: 6px; }
-  .tp-seat-left   { left: 10px; top: 50%; }
-  .tp-seat-right  { right: 10px; top: 50%; }
 
   .tp-card {
     width: 26px;

@@ -171,12 +171,6 @@ export const PlayerSeat: React.FC<PlayerSeatProps> = ({
           tabIndex={canTapToSee ? 0 : undefined}
           title={canTapToSee ? 'Click or tap to view your cards' : undefined}
         >
-          {canTapToSee && (
-            <div className="tp-tap-see-pill animate-bounce">
-              <Eye size={10} />
-              <span>Tap to See</span>
-            </div>
-          )}
           {seat.cards ? (
             seat.cards.map((c, i) => <PlayingCard key={i} cardCode={c} />)
           ) : (
@@ -185,6 +179,14 @@ export const PlayerSeat: React.FC<PlayerSeatProps> = ({
               <PlayingCard hidden />
               <PlayingCard hidden />
             </>
+          )}
+          {/* Keep this after the cards: the fan tilts cards by :nth-child, so
+              anything placed before them shifts every card's tilt. */}
+          {canTapToSee && (
+            <div className="tp-tap-see-pill">
+              <Eye size={10} />
+              <span>Tap to See</span>
+            </div>
           )}
         </div>
       )}

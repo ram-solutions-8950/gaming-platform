@@ -62,7 +62,7 @@ export const ShowdownOverlay: React.FC<ShowdownOverlayProps> = ({
 
   return (
     <div className="tp-modal-overlay animate-fade-in" style={{ zIndex: 120 }}>
-      <div className="tp-modal-box relative" style={{ maxWidth: 440, padding: '24px 20px', textAlign: 'center' }}>
+      <div className="tp-modal-box tp-result-box relative">
         {/* Dismiss / Close Button */}
         {onDismiss && (
           <button
@@ -77,46 +77,26 @@ export const ShowdownOverlay: React.FC<ShowdownOverlayProps> = ({
 
         {/* Win / Loss Outcome Title */}
         {isDoubleLoss ? (
-          <h2 style={{ fontSize: '1.5rem', fontWeight: 900, color: '#ef4444', textTransform: 'uppercase', margin: '0 0 6px' }}>
+          <h2 className="tp-result-title" style={{ color: '#ef4444' }}>
             ❌ BOTH PLAYERS LOST
           </h2>
         ) : isMeWinner ? (
-          <h2 style={{ fontSize: '1.5rem', fontWeight: 900, color: '#4ade80', textTransform: 'uppercase', margin: '0 0 6px' }}>
+          <h2 className="tp-result-title" style={{ color: '#4ade80' }}>
             🎉 YOU WON!
           </h2>
         ) : (
-          <h2 style={{ fontSize: '1.5rem', fontWeight: 900, color: '#ef4444', textTransform: 'uppercase', margin: '0 0 6px' }}>
+          <h2 className="tp-result-title" style={{ color: '#ef4444' }}>
             ❌ YOU LOST
           </h2>
         )}
 
         {/* Net Amount Result: Positive for winner, Negative for loser */}
-        <div style={{
-          fontSize: '1.6rem',
-          fontWeight: 900,
-          color: isMeWinner ? '#22c55e' : '#f87171',
-          margin: '0 0 8px'
-        }}>
+        <div className="tp-result-amount" style={{ color: isMeWinner ? '#22c55e' : '#f87171' }}>
           {isMeWinner ? `+₹${(potAmount / 100).toFixed(0)}` : `-₹${(myBet / 100).toFixed(0)}`}
         </div>
 
         {/* Explicit Bet & Result Details */}
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            gap: 12,
-            background: 'rgba(15, 23, 42, 0.75)',
-            border: '1px solid rgba(255, 255, 255, 0.1)',
-            borderRadius: 12,
-            padding: '6px 14px',
-            margin: '0 auto 12px',
-            width: 'fit-content',
-            fontSize: '0.8rem',
-            fontWeight: 700,
-          }}
-        >
+        <div className="tp-result-bet">
           {mySeat && (
             <span style={{ color: '#94a3b8' }}>
               Your Bet: <span style={{ color: '#ffd700' }}>₹{(myBet / 100).toFixed(0)}</span>
@@ -133,14 +113,14 @@ export const ShowdownOverlay: React.FC<ShowdownOverlayProps> = ({
         </div>
 
         {reason && (
-          <p style={{ color: '#94a3b8', fontSize: '0.82rem', margin: '0 0 12px' }}>
+          <p className="tp-result-reason">
             {reason}
           </p>
         )}
 
         {/* Winning Cards */}
         {winner && winner.cards && (
-          <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', margin: '10px 0 16px' }}>
+          <div className="tp-result-cards">
             {winner.cards.map((c, i) => (
               <PlayingCard key={i} cardCode={c} />
             ))}
@@ -149,41 +129,24 @@ export const ShowdownOverlay: React.FC<ShowdownOverlayProps> = ({
 
         {/* Countdown Indicator */}
         {isOpponentLeft ? (
-          <div style={{ color: '#fbbf24', fontSize: '0.82rem', fontWeight: 700, margin: '8px 0 16px' }}>
+          <div className="tp-result-countdown">
             {countdown > 0
               ? `⏳ Opponent left the match. Returning to lobby in ${countdown}s...`
               : 'Returning to lobby...'}
           </div>
         ) : (
-          <div style={{ color: '#fbbf24', fontSize: '0.8rem', fontWeight: 700, margin: '8px 0 16px' }}>
+          <div className="tp-result-countdown">
             {countdown > 0 ? `⏱ Next hand dealing automatically in ${countdown}s...` : '⏱ Dealing next hand...'}
           </div>
         )}
 
         {/* Action Buttons: Leave Table or Deal Now */}
-        <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginTop: 4 }}>
+        <div className="tp-result-actions">
           {onLeaveTable && (
             <button
               type="button"
               onClick={onLeaveTable}
-              className={`tp-btn ${isOpponentLeft ? 'tp-btn-chaal' : ''}`}
-              style={{
-                ...(isOpponentLeft
-                  ? { padding: '10px 24px', fontSize: '0.9rem', fontWeight: 800 }
-                  : {
-                      background: 'rgba(239, 68, 68, 0.2)',
-                      border: '1px solid rgba(239, 68, 68, 0.5)',
-                      color: '#fca5a5',
-                      padding: '9px 18px',
-                      borderRadius: 12,
-                      fontSize: '0.85rem',
-                      fontWeight: 700,
-                    }),
-                display: 'flex',
-                alignItems: 'center',
-                gap: 6,
-                cursor: 'pointer',
-              }}
+              className={`tp-btn tp-result-btn ${isOpponentLeft ? 'tp-btn-chaal' : 'tp-result-btn-leave'}`}
             >
               <LogOut size={15} />
               <span>{isOpponentLeft ? 'Back to Lobby' : 'Leave Table'}</span>
@@ -194,17 +157,7 @@ export const ShowdownOverlay: React.FC<ShowdownOverlayProps> = ({
             <button
               type="button"
               onClick={onNextHand}
-              className="tp-btn tp-btn-chaal"
-              style={{
-                minWidth: 140,
-                padding: '9px 20px',
-                fontSize: '0.85rem',
-                fontWeight: 800,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 6,
-                cursor: 'pointer',
-              }}
+              className="tp-btn tp-btn-chaal tp-result-btn"
             >
               <Play size={15} fill="currentColor" />
               <span>Deal Hand Now</span>

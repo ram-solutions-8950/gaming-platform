@@ -13,9 +13,11 @@ interface PokerResultProps {
   currentUserId?: string | null;
   myBetPaise?: number;
   onClose: () => void;
+  /** Leave the table for the poker lobby instead of staying seated. */
+  onBackToLobby?: () => void;
 }
 
-export function PokerResult({ winners, currentUserId, myBetPaise, onClose }: PokerResultProps) {
+export function PokerResult({ winners, currentUserId, myBetPaise, onClose, onBackToLobby }: PokerResultProps) {
   if (!winners || winners.length === 0) return null;
 
   const myWin = currentUserId ? winners.find((w) => w.user_id === currentUserId) : null;
@@ -61,13 +63,24 @@ export function PokerResult({ winners, currentUserId, myBetPaise, onClose }: Pok
             </div>
           ))}
         </div>
-        <button
-          type="button"
-          onClick={onClose}
-          className="w-full mt-4 py-2 bg-amber-500 hover:bg-amber-400 text-gray-950 font-bold rounded-lg text-sm transition shadow"
-        >
-          Continue
-        </button>
+        <div className="mt-4 flex gap-2.5">
+          {onBackToLobby && (
+            <button
+              type="button"
+              onClick={onBackToLobby}
+              className="flex-1 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-lg text-sm transition border border-slate-600"
+            >
+              Back to Lobby
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex-1 py-2 bg-amber-500 hover:bg-amber-400 text-gray-950 font-bold rounded-lg text-sm transition shadow"
+          >
+            Continue
+          </button>
+        </div>
       </div>
     </div>
   );

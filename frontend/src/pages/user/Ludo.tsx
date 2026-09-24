@@ -5,6 +5,7 @@ import { walletService } from '../../services/wallet';
 import { ludoService } from '../../services/ludo';
 import type { LudoMatchState, LudoTokenStyle, LudoColor } from '../../types/ludo';
 import { LudoBoard, type ActiveMoveAnimation } from '../../components/ludo/LudoBoard';
+import { resolveMoveAnimation } from '../../components/ludo/moveAnimation';
 import { LudoDice } from '../../components/ludo/LudoDice';
 import { LudoPlayerPanel } from '../../components/ludo/LudoPlayerPanel';
 import { LudoLobby } from '../../components/ludo/LudoLobby';
@@ -79,6 +80,13 @@ export const Ludo: React.FC = () => {
   // Step-by-step Move Animation Pipeline
   const [activeMove, setActiveMove] = useState<ActiveMoveAnimation | null>(null);
   const pendingMatchStateRef = useRef<LudoMatchState | null>(null);
+
+  // Latest match state for the game WebSocket handler, which is created once
+  // when the socket opens and would otherwise only ever see that render's state.
+  const matchStateRef = useRef<LudoMatchState | null>(null);
+  useEffect(() => {
+    matchStateRef.current = matchState;
+  }, [matchState]);
 
   const handleSelectTokenStyle = (newStyle: LudoTokenStyle) => {
     setTokenStyle(newStyle);
@@ -408,29 +416,27 @@ export const Ludo: React.FC = () => {
 
           const moveData = msg.data;
           const targetState = msg.state as LudoMatchState;
-          const movingColor = matchState?.current_turn_color || targetState.current_turn_color;
-          const movingPlayer = matchState?.players.find((p) => p.color === movingColor);
-          const oldToken = movingPlayer?.tokens.find((t) => t.token_index === moveData?.token_index);
-          const fromPos = oldToken ? oldToken.position : -1;
-          const toPos = moveData?.new_position ?? (oldToken ? oldToken.position : 0);
-          const isCapture = Boolean(moveData?.captured);
-          const isHome = Boolean(moveData?.is_home);
+          // Compare against the newest state this client holds: a move whose
+          // walk is still playing already carries the state after it.
+          const previousPending = pendingMatchStateRef.current;
+          const move = resolveMoveAnimation(
+            previousPending ?? matchStateRef.current,
+            targetState,
+            moveData,
+            Math.random().toString()
+          );
 
-          if (fromPos !== toPos) {
+          if (move) {
+            // Land any move still walking so the board is current before the next one.
+            if (previousPending) setMatchState(previousPending);
             pendingMatchStateRef.current = targetState;
-            setActiveMove({
-              id: Math.random().toString(),
-              playerColor: movingColor || 'RED',
-              playerId: movingPlayer?.id || '',
-              tokenIndex: moveData?.token_index ?? 0,
-              fromPosition: fromPos,
-              toPosition: toPos,
-              isCapture,
-              capturedToken: moveData?.captured,
-              isHome,
-            });
+            setActiveMove(move);
           } else {
-            // Immediate sync if no coordinate progression
+            // Nothing to walk (e.g. state already synced by polling): show the
+            // new state now, and drop any older pending state so it can't
+            // overwrite this one when its walk ends.
+            pendingMatchStateRef.current = null;
+            setActiveMove(null);
             setMatchState(targetState);
             setTimerSeconds(targetState.remaining_timer_seconds ?? 10);
             setDiceDisplayValue(targetState.last_dice_roll);
@@ -546,6 +552,9 @@ export const Ludo: React.FC = () => {
       pollIntervalRef.current = setInterval(async () => {
         try {
           const fresh = await ludoService.getMatchState(matchState.id);
+          // A move is still walking and its end applies the state after it; a
+          // poll now would jump pawns (e.g. a captured one) ahead of the walk.
+          if (pendingMatchStateRef.current) return;
           setMatchState(fresh);
           setTimerSeconds(fresh.remaining_timer_seconds ?? 10);
         } catch {}
@@ -972,7 +981,10 @@ export const Ludo: React.FC = () => {
               />
 
               {/* Interactive Quick Reaction & Taunt Bar (BUG-002: Responsive scroll / compact layout) */}
-              <div className="mt-1 sm:mt-1.5 max-w-[95vw] sm:max-w-none overflow-x-auto no-scrollbar flex items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1 bg-slate-900/95 backdrop-blur-md rounded-full border border-slate-700/70 shadow-lg shrink-0 z-20">
+              {/* Never wider than the board column: on narrow screens it scrolls
+                  sideways instead of being clipped on both sides. Start-aligned so
+                  overflow is reachable; when everything fits it hugs its content. */}
+              <div className="mt-1 sm:mt-1.5 max-w-full overflow-x-auto no-scrollbar flex items-center justify-start gap-1 sm:gap-1.5 px-2 sm:px-3 py-1 bg-slate-900/95 backdrop-blur-md rounded-full border border-slate-700/70 shadow-lg shrink-0 z-20">
                 <span className="text-[10px] text-amber-400 font-bold uppercase tracking-wider hidden sm:inline mr-0.5">
                   Chat:
                 </span>

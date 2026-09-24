@@ -171,45 +171,64 @@
   flex-shrink: 1;
 }
 
-.tp-center-pot {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
-  z-index: 20;
-  width: clamp(130px, 15vw, 190px);
-  min-height: 80px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  box-sizing: border-box;
-}
-
 /* Action dock — ensure it stays within viewport */
 .tp-action-dock {
   flex-shrink: 0;
 }
 
-/* ── Seat Player Info & Turn Loader (concentric & responsive) ── */
+/* ─────────────────────────────────────────────────────────
+   SEATS, CARD FANS & POT
+   One set of rules for every screen; the breakpoints further down only
+   change these sizes. The fan and pot rules are scoped to .tp-table-oval
+   because styles/teen-patti.css (imported after this file) still sizes and
+   tilts .tp-card for the result popup and styles the pot for desktop.
+   ───────────────────────────────────────────────────────── */
+.tp-table-oval {
+  --tp-avatar: 40px;
+  --tp-name-size: 0.9rem;
+  --tp-badge-size: 0.62rem;
+  --tp-card-w: 44px;
+  --tp-card-h: 64px;
+  --tp-seat-gap: 8px;   /* nameplate ↔ cards */
+  --tp-seat-edge: 14px; /* top/bottom seats ↔ rim */
+  --tp-seat-side: 20px; /* left/right seats ↔ rim */
+  --tp-pot-pad: 8px 22px;
+  --tp-pot-label: 0.7rem;
+  --tp-pot-amount: 1.5rem;
+  --tp-pot-stake: 0.72rem;
+}
+
 .tp-seat {
   position: absolute;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 3px;
+  gap: var(--tp-seat-gap);
+  width: max-content;
   z-index: 20;
   transition: all 0.25s ease;
 }
 
+/* Seat positions (the viewer is always at the bottom) */
+.tp-seat-top    { top: var(--tp-seat-edge); left: 50%; transform: translateX(-50%); }
+.tp-seat-bottom { bottom: var(--tp-seat-edge); left: 50%; transform: translateX(-50%); }
+.tp-seat-left   { left: var(--tp-seat-side); top: 50%; transform: translateY(-50%); }
+.tp-seat-right  { right: var(--tp-seat-side); top: 50%; transform: translateY(-50%); }
+/* Corner seats sit a little lower/higher: the rim curves away there */
+.tp-seat-top-left     { top: calc(var(--tp-seat-edge) + 6%); left: 13%; }
+.tp-seat-top-right    { top: calc(var(--tp-seat-edge) + 6%); right: 13%; }
+.tp-seat-bottom-left  { bottom: calc(var(--tp-seat-edge) + 3%); left: 13%; }
+.tp-seat-bottom-right { bottom: calc(var(--tp-seat-edge) + 3%); right: 13%; }
+
+/* Nameplate: avatar + name + status/bet badges */
 .tp-seat-player-row {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
   background: rgba(15, 23, 42, 0.92);
   border: 1.5px solid rgba(255, 255, 255, 0.16);
-  border-radius: 20px;
-  padding: 2px 8px 2px 2px;
+  border-radius: 999px;
+  padding: 3px 12px 3px 3px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
   transition: all 0.25s ease;
   white-space: nowrap;
@@ -230,17 +249,17 @@
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: 1px;
+  gap: 2px;
   min-width: 0;
   text-align: left;
 }
 
 .tp-seat-name {
-  font-size: 0.68rem;
+  font-size: var(--tp-name-size);
   font-weight: 700;
   color: #f1f5f9;
-  line-height: 1.1;
-  max-width: 75px;
+  line-height: 1.15;
+  max-width: 8.5em;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -249,35 +268,36 @@
 .tp-seat-meta-sub {
   display: flex;
   align-items: center;
-  gap: 3px;
+  gap: 4px;
   line-height: 1;
 }
 
 .tp-seat-status-badge {
-  font-size: 0.54rem;
+  font-size: var(--tp-badge-size);
   font-weight: 800;
   text-transform: uppercase;
+  letter-spacing: 0.02em;
   padding: 1px 5px;
-  border-radius: 6px;
-  line-height: 1.1;
+  border-radius: 5px;
+  line-height: 1.2;
 }
 
 .tp-seat-bet-val {
-  font-size: 0.54rem;
+  font-size: var(--tp-badge-size);
   font-weight: 800;
   color: #ffd700;
   background: rgba(255, 215, 0, 0.15);
   border: 1px solid rgba(255, 215, 0, 0.4);
   border-radius: 5px;
   padding: 0 4px;
-  line-height: 1.1;
+  line-height: 1.2;
   white-space: nowrap;
 }
 
 .tp-avatar-wrapper {
   position: relative;
-  width: 30px;
-  height: 30px;
+  width: var(--tp-avatar);
+  height: var(--tp-avatar);
   border-radius: 50%;
   background: #1e293b;
   border: 2px solid #64748b;
@@ -285,7 +305,7 @@
   align-items: center;
   justify-content: center;
   font-weight: 800;
-  font-size: 0.8rem;
+  font-size: calc(var(--tp-avatar) * 0.42);
   color: #fff;
   flex-shrink: 0;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
@@ -296,17 +316,19 @@
   border-color: #ffd700;
 }
 
+/* Dealer chip hangs off the avatar's lower-right edge, clear of the initial */
 .tp-dealer-badge {
   position: absolute;
-  bottom: -3px;
-  right: -3px;
+  bottom: -4px;
+  right: -6px;
   background: #d4af37;
   color: #111;
   border-radius: 50%;
-  width: 14px;
-  height: 14px;
-  font-size: 0.52rem;
+  width: calc(var(--tp-avatar) * 0.46);
+  height: calc(var(--tp-avatar) * 0.46);
+  font-size: calc(var(--tp-avatar) * 0.3);
   font-weight: 900;
+  line-height: 1;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -325,6 +347,65 @@
   pointer-events: none;
   z-index: 6;
 }
+
+/* Three cards fanned like a held hand: each tucks under the next, tilted
+   about its bottom edge, so every card's rank corner stays visible. */
+.tp-table-oval .tp-card-fan {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  margin: 0;
+  /* Room for the outer cards' tilt, so the fan's box matches what you see */
+  padding: 0 calc(var(--tp-card-w) * 0.14);
+}
+
+.tp-table-oval .tp-card-fan > .tp-card {
+  width: var(--tp-card-w);
+  height: var(--tp-card-h);
+  flex-shrink: 0;
+  padding: calc(var(--tp-card-w) * 0.08);
+  border-radius: calc(var(--tp-card-w) * 0.13);
+  transform-origin: 50% 100%;
+  z-index: auto;
+}
+
+.tp-table-oval .tp-card-fan > .tp-card + .tp-card {
+  margin-left: calc(var(--tp-card-w) * -0.24);
+}
+
+.tp-table-oval .tp-card-fan > .tp-card:nth-child(1) { transform: translateY(2px) rotate(-9deg); }
+.tp-table-oval .tp-card-fan > .tp-card:nth-child(2) { transform: none; }
+.tp-table-oval .tp-card-fan > .tp-card:nth-child(3) { transform: translateY(2px) rotate(9deg); }
+
+.tp-table-oval .tp-card-fan .tp-card-corner { font-size: calc(var(--tp-card-w) * 0.3); }
+.tp-table-oval .tp-card-fan .tp-card-center { font-size: calc(var(--tp-card-w) * 0.46); }
+.tp-table-oval .tp-card-fan .tp-card-back { font-size: calc(var(--tp-card-w) * 0.5); }
+
+/* Pot: sized to its content so the stake line never wraps */
+.tp-table-oval .tp-center-pot {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 10;
+  width: auto;
+  min-width: 0;
+  min-height: 0;
+  padding: var(--tp-pot-pad);
+  border-radius: 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  white-space: nowrap;
+  box-sizing: border-box;
+}
+
+.tp-table-oval .tp-pot-label { font-size: var(--tp-pot-label); letter-spacing: 1.5px; line-height: 1.2; }
+.tp-table-oval .tp-pot-amount { font-size: var(--tp-pot-amount); line-height: 1.15; }
+.tp-table-oval .tp-stake-info { font-size: var(--tp-pot-stake); line-height: 1.2; margin-top: 1px; }
 
 /* ─────────────────────────────────────────────────────────
    MOBILE LANDSCAPE (max-height 600px)
@@ -393,114 +474,20 @@
     border-radius: 174px;
   }
 
-  /* Center Pot: true center with compact styling */
-  .tp-center-pot {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: 78px;
-    min-height: 24px;
-    padding: 0.1rem 0.3rem;
-    border-radius: 8px;
-    z-index: 10;
-  }
-
-  .tp-pot-label {
-    font-size: 0.4rem;
-    letter-spacing: 0.6px;
-  }
-
-  .tp-pot-amount {
-    font-size: 0.74rem;
-  }
-
-  .tp-stake-info {
-    font-size: 0.4rem;
-    margin-top: 0;
-  }
-
-  /* Seats: compact scaling */
-  .tp-seat {
-    width: auto;
-    min-width: 60px;
-    max-width: 140px;
-    gap: 2px;
-    z-index: 25;
-  }
-
-  .tp-avatar-wrapper {
-    width: 26px;
-    height: 26px;
-    font-size: 0.72rem;
-    border-width: 1.5px;
-  }
-
-  .tp-seat-name {
-    font-size: 0.58rem;
-    max-width: 64px;
-  }
-
-  .tp-seat-status-badge {
-    font-size: 0.46rem;
-    padding: 0px 3px;
-  }
-
-  .tp-seat-bet-val {
-    font-size: 0.46rem;
-    padding: 0px 3px;
-  }
-
-  /* Seat positions in 4-seat layout */
-  .tp-seat-top {
-    top: 4px;
-    left: 50%;
-    transform: translateX(-50%);
-  }
-
-  .tp-seat-top .tp-card-fan {
-    margin-top: 1px;
-  }
-
-  .tp-seat-bottom {
-    bottom: 4px;
-    left: 50%;
-    transform: translateX(-50%);
-  }
-
-  .tp-seat-bottom .tp-card-fan {
-    margin-top: 1px;
-  }
-
-  .tp-seat-left {
-    left: 14px;
-    top: 50%;
-    transform: translateY(-50%);
-  }
-
-  .tp-seat-right {
-    right: 14px;
-    top: 50%;
-    transform: translateY(-50%);
-  }
-
-  /* 6-seat layout positions */
-  .tp-seat-top-left     { top: 14px; left: 16%; }
-  .tp-seat-top-right    { top: 14px; right: 16%; }
-  .tp-seat-bottom-left  { bottom: 8px; left: 16%; }
-  .tp-seat-bottom-right { bottom: 8px; right: 16%; }
-
-  /* Card fan size in landscape */
-  .tp-card {
-    width: 16px;
-    height: 24px;
-    border-radius: 2px;
-    padding: 1px;
-    font-size: 0.4rem;
-  }
-
-  .tp-card-fan {
-    margin-top: 2px;
+  /* Seats, cards & pot */
+  .tp-table-oval {
+    --tp-avatar: 26px;
+    --tp-name-size: 0.64rem;
+    --tp-badge-size: 0.5rem;
+    --tp-card-w: 25px;
+    --tp-card-h: 36px;
+    --tp-seat-gap: 5px;
+    --tp-seat-edge: 11px;
+    --tp-seat-side: 14px;
+    --tp-pot-pad: 4px 12px;
+    --tp-pot-label: 0.46rem;
+    --tp-pot-amount: 0.86rem;
+    --tp-pot-stake: 0.5rem;
   }
 
   /* Action Controls Dock */
@@ -542,36 +529,20 @@
     border-width: 5px;
   }
 
-  .tp-center-pot {
-    top: 50%;
-    transform: translate(-50%, -50%) scale(0.9);
-  }
-
-  .tp-seat {
-    width: auto;
-    max-width: 125px;
-  }
-
-  .tp-avatar-wrapper {
-    width: 24px;
-    height: 24px;
-    font-size: 0.68rem;
-  }
-
-  .tp-seat-name {
-    font-size: 0.54rem;
-    max-width: 56px;
-  }
-
-  .tp-seat-top    { top: 3px; }
-  .tp-seat-bottom { bottom: 3px; }
-  .tp-seat-left   { left: 10px; top: 50%; }
-  .tp-seat-right  { right: 10px; top: 50%; }
-
-  .tp-card {
-    width: 15px;
-    height: 22px;
-    font-size: 0.38rem;
+  /* Seats, cards & pot */
+  .tp-table-oval {
+    --tp-avatar: 24px;
+    --tp-name-size: 0.6rem;
+    --tp-badge-size: 0.47rem;
+    --tp-card-w: 23px;
+    --tp-card-h: 33px;
+    --tp-seat-gap: 4px;
+    --tp-seat-edge: 10px;
+    --tp-seat-side: 10px;
+    --tp-pot-pad: 3px 10px;
+    --tp-pot-label: 0.42rem;
+    --tp-pot-amount: 0.8rem;
+    --tp-pot-stake: 0.46rem;
   }
 
   .tp-action-dock {
@@ -710,24 +681,37 @@
   transform: scale(1.08) translateY(-3px);
 }
 
-.tp-tap-see-pill {
+/* Sits on the lower edge of the face-down cards instead of on the nameplate,
+   leaving most of the cards visible. Centred with auto margins (not a
+   transform, so the nudge animation can't pull it off-centre); the equal
+   negative insets let it stay centred when it is wider than small cards. */
+.tp-table-oval .tp-tap-see-pill {
   position: absolute;
-  top: -13px;
-  left: 50%;
-  transform: translateX(-50%);
+  left: -48px;
+  right: -48px;
+  bottom: -5px;
+  margin: 0 auto;
+  width: max-content;
   background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
   color: #fff;
-  font-size: 0.52rem;
+  font-size: 0.48rem;
   font-weight: 800;
   padding: 1px 6px;
   border-radius: 8px;
+  border: 1px solid rgba(186, 230, 253, 0.6);
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: 3px;
   white-space: nowrap;
-  box-shadow: 0 2px 6px rgba(2, 132, 199, 0.5);
+  box-shadow: 0 2px 8px rgba(2, 132, 199, 0.6);
   z-index: 30;
   pointer-events: none;
+  animation: tp-see-nudge 1.2s ease-in-out infinite;
+}
+
+@keyframes tp-see-nudge {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-2px); }
 }
 
 /* Pot Bump Pulse */
@@ -771,6 +755,111 @@
 .tp-flying-chip-3 { --from-x: 120px; --from-y: 0px; }
 
 
+/* ─────────────────────────────────────────────────────────
+   HAND RESULT POPUP (ShowdownOverlay)
+   Compound selectors beat .tp-modal-box / .tp-btn in styles/teen-patti.css,
+   which is imported after this file.
+   ───────────────────────────────────────────────────────── */
+.tp-modal-box.tp-result-box {
+  width: min(440px, calc(100% - 24px));
+  max-width: 440px;
+  /* Never taller than the screen; scrolls only as a last resort */
+  max-height: calc(100% - 16px);
+  overflow-y: auto;
+  padding: 24px 20px;
+  text-align: center;
+  box-sizing: border-box;
+}
+
+.tp-result-title {
+  font-size: 1.5rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  line-height: 1.2;
+  margin: 0 0 6px;
+}
+
+.tp-result-amount {
+  font-size: 1.6rem;
+  font-weight: 900;
+  line-height: 1.2;
+  margin: 0 0 8px;
+}
+
+.tp-result-bet {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  background: rgba(15, 23, 42, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 6px 14px;
+  margin: 0 auto 12px;
+  width: fit-content;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.tp-result-reason {
+  color: #94a3b8;
+  font-size: 0.82rem;
+  margin: 0 0 12px;
+}
+
+.tp-result-cards {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin: 10px 0 16px;
+}
+
+.tp-result-countdown {
+  color: #fbbf24;
+  font-size: 0.8rem;
+  font-weight: 700;
+  margin: 8px 0 16px;
+}
+
+.tp-result-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  margin-top: 4px;
+}
+
+/* Icon beside the label (plain .tp-btn stacks them, which made these tall) */
+.tp-btn.tp-result-btn {
+  flex-direction: row;
+  gap: 6px;
+  min-width: 140px;
+  padding: 9px 20px;
+  border-radius: 12px;
+  font-size: 0.85rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.tp-btn.tp-result-btn-leave {
+  min-width: 0;
+  background: rgba(239, 68, 68, 0.2);
+  border: 1px solid rgba(239, 68, 68, 0.5);
+  color: #fca5a5;
+  font-weight: 700;
+}
+
+/* Landscape phones: the full-size popup was taller than a 360px screen */
+@media (orientation: landscape) and (max-height: 450px) {
+  .tp-modal-box.tp-result-box { padding: 14px 18px 12px; }
+  .tp-result-title { font-size: 1.15rem; margin-bottom: 2px; }
+  .tp-result-amount { font-size: 1.3rem; margin-bottom: 6px; }
+  .tp-result-bet { padding: 4px 12px; font-size: 0.72rem; margin-bottom: 6px; }
+  .tp-result-reason { font-size: 0.74rem; margin-bottom: 4px; }
+  .tp-result-cards { margin: 6px 0 8px; }
+  .tp-result-countdown { font-size: 0.72rem; margin: 4px 0 10px; }
+  .tp-btn.tp-result-btn { min-width: 120px; padding: 7px 16px; font-size: 0.78rem; }
+}
+
 /* Showdown: the winning hand glows while both hands sit face-up on the felt */
 .tp-card-fan-winner {
   filter: drop-shadow(0 0 6px rgba(250, 204, 21, 0.9)) drop-shadow(0 0 14px rgba(250, 204, 21, 0.45));
@@ -783,4 +872,5 @@
 
 @media (prefers-reduced-motion: reduce) {
   .tp-card-fan-winner { animation: none; }
+  .tp-table-oval .tp-tap-see-pill { animation: none; }
 }
