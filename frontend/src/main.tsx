@@ -4,6 +4,10 @@ import './index.css'
 import App from './App.tsx'
 import { lockLandscape } from './utils/nativeOrientation'
 
+// Pages are loaded on demand (see App.tsx). After a web deploy their file names
+// change, so a tab still running the old build can't fetch them: reload it.
+window.addEventListener('vite:preloadError', () => window.location.reload());
+
 // Enforce default fixed landscape orientation across Android APK & browser
 lockLandscape().catch(() => {});
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef, useMemo } from 'react';
 import type { LudoColor, LudoPlayer, LudoToken, LudoTokenStyle } from '../../types/ludo';
 import { soundManager } from '../../services/soundManager';
 
@@ -170,7 +170,12 @@ const clusterSlot = (count: number, idx: number, isHome: boolean) => {
   return isHome ? { ...slot, scale: Math.min(slot.scale, HOME_MAX_SCALE) } : slot;
 };
 
-const easeInOut = (t: number) => (t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2);
+// The walking pawn is drawn in its own small <svg> (this viewBox, in pawn-local
+// units) that moves as a whole. Its size is 100 × 110 board units, so a
+// translate of N% of its own width is N board units.
+const WALKER_VIEWBOX = '-50 -60 100 110';
+const walkerTransform = (x: number, y: number, lift = 0) =>
+  `translate(${x - 50}%, ${((y - lift - 60) / 110) * 100}%)`;
 
 interface StepRipple {
   id: string;
@@ -185,12 +190,13 @@ interface ImpactEffect {
   cy: number;
 }
 
-// Where the walking token is on the current animation frame.
-interface WalkFrame {
+// A move being animated: the walking pawn leaves the pawn layer and hops
+// through these board points in its own layer (the walker).
+interface Walk {
   moveId: string;
-  x: number;
-  y: number;
-  lift: number;
+  color: LudoColor;
+  waypoints: Array<[number, number]>;
+  hopMs: number;
 }
 
 // -----------------------------------------------------------------
@@ -381,16 +387,6 @@ const renderPawnGraphic = (
         />
         {/* Diamond Sparkle Glint */}
         <circle cx={cx - 5} cy={cy - 54} r="3" fill="#ffffff" />
-        <text
-          x={cx}
-          y={cy - 46}
-          fontSize="14"
-          fill="#ffffff"
-          textAnchor="middle"
-          filter="drop-shadow(0 0 4px #fff)"
-        >
-          ✦
-        </text>
       </g>
     );
   }
@@ -438,21 +434,6 @@ const renderPawnGraphic = (
         opacity="0.45"
       />
 
-      {/* Embossed Golden Crown Insignia on Body */}
-      <text
-        x={cx}
-        y={cy - 4}
-        textAnchor="middle"
-        fontSize="15"
-        fontWeight="900"
-        fill="#fef08a"
-        stroke="#b45309"
-        strokeWidth="0.8"
-        filter="drop-shadow(0 1px 2px rgba(0,0,0,0.8))"
-      >
-        👑
-      </text>
-
       {/* Polished Gold Collar Ring */}
       <ellipse
         cx={cx}
@@ -497,13 +478,9 @@ const renderPawnGraphic = (
         fill="url(#goldCollar)"
         stroke="#78350f"
         strokeWidth="1.2"
-        filter="drop-shadow(0 2px 4px rgba(0,0,0,0.5))"
       />
-      {/* Crown Finials: Spheres & Star */}
+      {/* Crown Finials */}
       <circle cx={cx} cy={cy - 73} r="4" fill="url(#goldCollar)" stroke="#78350f" strokeWidth="0.8" />
-      <text x={cx} y={cy - 71} fontSize="7" fill="#ffffff" textAnchor="middle" fontWeight="bold">
-        ★
-      </text>
       <circle cx={cx - 12} cy={cy - 66} r="3" fill="url(#goldCollar)" stroke="#78350f" strokeWidth="0.6" />
       <circle cx={cx + 12} cy={cy - 66} r="3" fill="url(#goldCollar)" stroke="#78350f" strokeWidth="0.6" />
 
@@ -531,34 +508,10 @@ const arrowPoints = (cx: number, cy: number, size: number) =>
 const renderBoardArt = () => (
   <>
     <defs>
-      {/* 3D Pawn Drop Shadow Filter */}
-      <filter id="pawnDropShadow" x="-50%" y="-40%" width="200%" height="200%">
-        <feGaussianBlur in="SourceAlpha" stdDeviation="5" />
-        <feOffset dx="0" dy="8" result="offsetblur" />
-        <feFlood floodColor="#000000" floodOpacity="0.55" />
-        <feComposite in2="offsetblur" operator="in" />
-        <feMerge>
-          <feMergeNode />
-          <feMergeNode in="SourceGraphic" />
-        </feMerge>
-      </filter>
-
-      {/* Active Legal Token Glow Filter */}
-      <filter id="goldLegalGlow" x="-50%" y="-50%" width="200%" height="200%">
-        <feGaussianBlur in="SourceAlpha" stdDeviation="10" result="blur" />
-        <feFlood floodColor="#f59e0b" floodOpacity="0.95" result="goldColor" />
-        <feComposite in="goldColor" in2="blur" operator="in" result="goldGlow" />
-        <feMerge>
-          <feMergeNode in="goldGlow" />
-          <feMergeNode in="SourceGraphic" />
-        </feMerge>
-      </filter>
-
       {/* Rounded board outline; the yards are square and get their outer corner from this. */}
       <clipPath id="ludoBoardClip">
         <rect width="1500" height="1500" rx="28" />
       </clipPath>
-
       {/* Yard Background Depth Gradients */}
       <radialGradient id="yardRedGrad" cx="30%" cy="30%" r="70%">
         <stop offset="0%" stopColor="#ef4444" />
@@ -588,50 +541,14 @@ const renderBoardArt = () => (
         <stop offset="100%" stopColor="#e2e8f0" />
       </linearGradient>
 
-      {/* Metallic Polished Gold Collar Ring */}
-      <linearGradient id="goldCollar" x1="0%" y1="0%" x2="100%" y2="0%">
+      {/* Gold rim of the centre medallion */}
+      <linearGradient id="boardGold" x1="0%" y1="0%" x2="100%" y2="0%">
         <stop offset="0%" stopColor="#78350f" />
         <stop offset="25%" stopColor="#f59e0b" />
         <stop offset="50%" stopColor="#fef08a" />
         <stop offset="75%" stopColor="#d97706" />
         <stop offset="100%" stopColor="#451a03" />
       </linearGradient>
-
-      {/* 3D Translucent Jewel Glass Shading: Red (Ruby) */}
-      <radialGradient id="redHeadGrad" cx="35%" cy="30%" r="70%">
-        <stop offset="0%" stopColor="#ffffff" />
-        <stop offset="18%" stopColor="#fca5a5" />
-        <stop offset="45%" stopColor="#e11d48" />
-        <stop offset="75%" stopColor="#9f1239" />
-        <stop offset="100%" stopColor="#4c0519" />
-      </radialGradient>
-
-      {/* 3D Translucent Jewel Glass Shading: Green (Emerald) */}
-      <radialGradient id="greenHeadGrad" cx="35%" cy="30%" r="70%">
-        <stop offset="0%" stopColor="#ffffff" />
-        <stop offset="18%" stopColor="#a7f3d0" />
-        <stop offset="45%" stopColor="#059669" />
-        <stop offset="75%" stopColor="#065f46" />
-        <stop offset="100%" stopColor="#022c22" />
-      </radialGradient>
-
-      {/* 3D Translucent Jewel Glass Shading: Yellow (Topaz/Amber) */}
-      <radialGradient id="yellowHeadGrad" cx="35%" cy="30%" r="70%">
-        <stop offset="0%" stopColor="#ffffff" />
-        <stop offset="18%" stopColor="#fef08a" />
-        <stop offset="45%" stopColor="#d97706" />
-        <stop offset="75%" stopColor="#b45309" />
-        <stop offset="100%" stopColor="#451a03" />
-      </radialGradient>
-
-      {/* 3D Translucent Jewel Glass Shading: Blue (Sapphire) */}
-      <radialGradient id="blueHeadGrad" cx="35%" cy="30%" r="70%">
-        <stop offset="0%" stopColor="#ffffff" />
-        <stop offset="18%" stopColor="#bfdbfe" />
-        <stop offset="45%" stopColor="#2563eb" />
-        <stop offset="75%" stopColor="#1e40af" />
-        <stop offset="100%" stopColor="#0f172a" />
-      </radialGradient>
     </defs>
 
     <g clipPath="url(#ludoBoardClip)">
@@ -776,7 +693,7 @@ const renderBoardArt = () => (
             transform={`rotate(${deg} 750 750)`}
           />
         ))}
-        <circle cx="750" cy="750" r="48" fill="#ffffff" stroke="url(#goldCollar)" strokeWidth="5" />
+        <circle cx="750" cy="750" r="48" fill="#ffffff" stroke="url(#boardGold)" strokeWidth="5" />
         <circle cx="750" cy="750" r="39" fill="#fef3c7" stroke="#fbbf24" strokeWidth="1.5" opacity="0.95" />
         <text x="750" y="764" fontSize="38" textAnchor="middle">
           👑
@@ -789,7 +706,57 @@ const renderBoardArt = () => (
   </>
 );
 
-export const LudoBoard: React.FC<Props> = ({
+// Gradients used by the pawn artwork (defined in the pawn layer's own <svg>).
+const renderPawnDefs = () => (
+  <defs>
+      {/* Metallic Polished Gold Collar Ring */}
+      <linearGradient id="goldCollar" x1="0%" y1="0%" x2="100%" y2="0%">
+        <stop offset="0%" stopColor="#78350f" />
+        <stop offset="25%" stopColor="#f59e0b" />
+        <stop offset="50%" stopColor="#fef08a" />
+        <stop offset="75%" stopColor="#d97706" />
+        <stop offset="100%" stopColor="#451a03" />
+      </linearGradient>
+
+      {/* 3D Translucent Jewel Glass Shading: Red (Ruby) */}
+      <radialGradient id="redHeadGrad" cx="35%" cy="30%" r="70%">
+        <stop offset="0%" stopColor="#ffffff" />
+        <stop offset="18%" stopColor="#fca5a5" />
+        <stop offset="45%" stopColor="#e11d48" />
+        <stop offset="75%" stopColor="#9f1239" />
+        <stop offset="100%" stopColor="#4c0519" />
+      </radialGradient>
+
+      {/* 3D Translucent Jewel Glass Shading: Green (Emerald) */}
+      <radialGradient id="greenHeadGrad" cx="35%" cy="30%" r="70%">
+        <stop offset="0%" stopColor="#ffffff" />
+        <stop offset="18%" stopColor="#a7f3d0" />
+        <stop offset="45%" stopColor="#059669" />
+        <stop offset="75%" stopColor="#065f46" />
+        <stop offset="100%" stopColor="#022c22" />
+      </radialGradient>
+
+      {/* 3D Translucent Jewel Glass Shading: Yellow (Topaz/Amber) */}
+      <radialGradient id="yellowHeadGrad" cx="35%" cy="30%" r="70%">
+        <stop offset="0%" stopColor="#ffffff" />
+        <stop offset="18%" stopColor="#fef08a" />
+        <stop offset="45%" stopColor="#d97706" />
+        <stop offset="75%" stopColor="#b45309" />
+        <stop offset="100%" stopColor="#451a03" />
+      </radialGradient>
+
+      {/* 3D Translucent Jewel Glass Shading: Blue (Sapphire) */}
+      <radialGradient id="blueHeadGrad" cx="35%" cy="30%" r="70%">
+        <stop offset="0%" stopColor="#ffffff" />
+        <stop offset="18%" stopColor="#bfdbfe" />
+        <stop offset="45%" stopColor="#2563eb" />
+        <stop offset="75%" stopColor="#1e40af" />
+        <stop offset="100%" stopColor="#0f172a" />
+      </radialGradient>
+  </defs>
+);
+
+const LudoBoardView: React.FC<Props> = ({
   players,
   currentTurnColor,
   legalTokenIndices,
@@ -804,7 +771,9 @@ export const LudoBoard: React.FC<Props> = ({
   const [boardShaking, setBoardShaking] = useState<boolean>(false);
   const [stepRipples, setStepRipples] = useState<StepRipple[]>([]);
   const [impactEffects, setImpactEffects] = useState<ImpactEffect[]>([]);
-  const [walkFrame, setWalkFrame] = useState<WalkFrame | null>(null);
+  const [walk, setWalk] = useState<Walk | null>(null);
+  const walkerPawnRef = useRef<SVGSVGElement>(null);
+  const walkerShadowRef = useRef<SVGSVGElement>(null);
 
   const onMoveAnimationEndRef = useRef(onMoveAnimationEnd);
   useEffect(() => {
@@ -812,6 +781,7 @@ export const LudoBoard: React.FC<Props> = ({
   }, [onMoveAnimationEnd]);
 
   const boardArt = useMemo(() => renderBoardArt(), []);
+  const pawnDefs = useMemo(() => renderPawnDefs(), []);
 
   // One artwork per colour/highlight, drawn at (0, 0) and positioned by its
   // parent group, so every pawn of a colour shares the same element.
@@ -867,23 +837,21 @@ export const LudoBoard: React.FC<Props> = ({
   };
 
   // -----------------------------------------------------------------
-  // Walking animation: the token glides square by square with a small hop,
-  // driven by requestAnimationFrame so every frame lands exactly on the path.
+  // Walking animation: the token hops square by square along its path.
   // -----------------------------------------------------------------
   useEffect(() => {
     if (!activeMove) {
-      setWalkFrame(null);
+      setWalk(null);
       return;
     }
 
-    const move = activeMove;
-    const color = move.playerColor;
-    const waypoints: Array<[number, number]> = [stepToPoint(move.fromPosition, color, move.tokenIndex)];
-    if (move.fromPosition < 0) {
-      waypoints.push(stepToPoint(0, color, move.tokenIndex));
+    const color = activeMove.playerColor;
+    const waypoints: Array<[number, number]> = [stepToPoint(activeMove.fromPosition, color, activeMove.tokenIndex)];
+    if (activeMove.fromPosition < 0) {
+      waypoints.push(stepToPoint(0, color, activeMove.tokenIndex));
     } else {
-      for (let s = move.fromPosition + 1; s <= move.toPosition; s++) {
-        waypoints.push(stepToPoint(s, color, move.tokenIndex));
+      for (let s = activeMove.fromPosition + 1; s <= activeMove.toPosition; s++) {
+        waypoints.push(stepToPoint(s, color, activeMove.tokenIndex));
       }
     }
 
@@ -892,78 +860,90 @@ export const LudoBoard: React.FC<Props> = ({
       return;
     }
 
-    const hopMs = move.fromPosition < 0 ? YARD_EXIT_MS : HOP_MS;
-    const timers: number[] = [];
-    let hop = 0;
-    let hopStart = performance.now();
-    let raf = 0;
+    setWalk({
+      moveId: activeMove.id,
+      color,
+      waypoints,
+      hopMs: activeMove.fromPosition < 0 ? YARD_EXIT_MS : HOP_MS,
+    });
+  }, [activeMove]);
 
-    const land = (x: number, y: number) => {
-      if (move.isCapture) {
-        soundManager.play('ludo_capture');
-        setBoardShaking(true);
-        timers.push(window.setTimeout(() => setBoardShaking(false), 420));
-        addImpact('CAPTURE', x, y, 600);
-        try {
-          navigator.vibrate?.([50, 40, 70]);
-        } catch {}
-      } else if (move.isHome) {
-        soundManager.play('ludo_home');
-        addImpact('HOME', x, y, 800);
-      } else if (
-        move.toPosition <= 50 &&
-        STAR_TRACK_INDICES.includes(trackIndexOf(color, move.toPosition))
-      ) {
-        soundManager.play('ludo_safe');
-        addImpact('SAFE', x, y, 550);
-      } else {
-        soundManager.play('ludo_land');
+  // One keyframe animation moves the walker's own layer through the whole path,
+  // so the compositor runs the walk: no re-render or repaint per frame, which
+  // is what made moves stutter on low-end phones.
+  useLayoutEffect(() => {
+    const move = activeMove;
+    const pawnEl = walkerPawnRef.current;
+    const shadowEl = walkerShadowRef.current;
+    if (!walk || !move || walk.moveId !== move.id || !pawnEl || !shadowEl) return;
+
+    const { waypoints, hopMs } = walk;
+    const hops = waypoints.length - 1;
+    const pawnFrames: Keyframe[] = [];
+    const shadowFrames: Keyframe[] = [];
+    waypoints.forEach(([x, y], i) => {
+      // Rise out of each square, peak halfway, drop into the next one; the
+      // shadow stays on the board.
+      pawnFrames.push({ offset: i / hops, transform: walkerTransform(x, y), easing: 'ease-out' });
+      shadowFrames.push({ offset: i / hops, transform: walkerTransform(x, y), easing: 'ease-out' });
+      if (i < hops) {
+        const [nx, ny] = waypoints[i + 1];
+        const mx = (x + nx) / 2;
+        const my = (y + ny) / 2;
+        pawnFrames.push({ offset: (i + 0.5) / hops, transform: walkerTransform(mx, my, HOP_HEIGHT), easing: 'ease-in' });
+        shadowFrames.push({ offset: (i + 0.5) / hops, transform: walkerTransform(mx, my), easing: 'ease-in' });
       }
+    });
+    const timing: KeyframeAnimationOptions = { duration: hops * hopMs, fill: 'forwards' };
+    const pawnAnim = pawnEl.animate(pawnFrames, timing);
+    const shadowAnim = shadowEl.animate(shadowFrames, timing);
 
+    const timers: number[] = [];
+    soundManager.play('ludo_step');
+    for (let i = 1; i < hops; i++) {
       timers.push(
         window.setTimeout(() => {
-          setWalkFrame(null);
-          onMoveAnimationEndRef.current?.();
-        }, 140)
+          addRipple(waypoints[i][0], waypoints[i][1]);
+          soundManager.play('ludo_step');
+        }, i * hopMs)
       );
-    };
+    }
 
-    const tick = (now: number) => {
-      const [x0, y0] = waypoints[hop];
-      const [x1, y1] = waypoints[hop + 1];
-      const t = Math.min(1, Math.max(0, (now - hopStart) / hopMs));
-      const eased = easeInOut(t);
-      setWalkFrame({
-        moveId: move.id,
-        x: x0 + (x1 - x0) * eased,
-        y: y0 + (y1 - y0) * eased,
-        lift: 4 * t * (1 - t) * HOP_HEIGHT,
-      });
-
-      if (t < 1) {
-        raf = requestAnimationFrame(tick);
-        return;
-      }
-
-      hop += 1;
-      hopStart = now;
-      addRipple(x1, y1);
-      if (hop < waypoints.length - 1) {
-        soundManager.play('ludo_step');
-        raf = requestAnimationFrame(tick);
-      } else {
-        land(x1, y1);
-      }
-    };
-
-    soundManager.play('ludo_step');
-    raf = requestAnimationFrame(tick);
+    const [x, y] = waypoints[hops];
+    pawnAnim.finished
+      .then(() => {
+        addRipple(x, y);
+        if (move.isCapture) {
+          soundManager.play('ludo_capture');
+          setBoardShaking(true);
+          timers.push(window.setTimeout(() => setBoardShaking(false), 420));
+          addImpact('CAPTURE', x, y, 600);
+          try {
+            navigator.vibrate?.([50, 40, 70]);
+          } catch {}
+        } else if (move.isHome) {
+          soundManager.play('ludo_home');
+          addImpact('HOME', x, y, 800);
+        } else if (
+          move.toPosition <= 50 &&
+          STAR_TRACK_INDICES.includes(trackIndexOf(walk.color, move.toPosition))
+        ) {
+          soundManager.play('ludo_safe');
+          addImpact('SAFE', x, y, 550);
+        } else {
+          soundManager.play('ludo_land');
+        }
+        timers.push(window.setTimeout(() => onMoveAnimationEndRef.current?.(), 140));
+      })
+      // Cancelled: a newer move or unmount took over.
+      .catch(() => {});
 
     return () => {
-      cancelAnimationFrame(raf);
+      pawnAnim.cancel();
+      shadowAnim.cancel();
       timers.forEach((id) => clearTimeout(id));
     };
-  }, [activeMove]);
+  }, [walk]);
 
   // -----------------------------------------------------------------
   // Destination preview for the hovered token, or the only movable one
@@ -1026,10 +1006,13 @@ export const LudoBoard: React.FC<Props> = ({
   // -----------------------------------------------------------------
   // Token placement: every token's final board position, cluster scale and state
   // -----------------------------------------------------------------
+  const isInFlight = Boolean(walk && activeMove && walk.moveId === activeMove.id);
   const renderedTokens = players
     .flatMap((player) =>
-      player.tokens.map((token) => {
+      player.tokens.flatMap((token) => {
         const walking = isWalkingToken(player.color, token.token_index);
+        // In flight: drawn by the walker layer instead.
+        if (walking && isInFlight) return [];
         const isTurnColor = currentTurnColor === player.color;
         const isLegal = Boolean(
           isMyTurn && isTurnColor && !activeMove && legalTokenIndices.includes(token.token_index)
@@ -1038,14 +1021,9 @@ export const LudoBoard: React.FC<Props> = ({
         let x: number;
         let y: number;
         let scale = 1;
-        let lift = 0;
 
         if (walking && activeMove) {
-          if (walkFrame && walkFrame.moveId === activeMove.id) {
-            ({ x, y, lift } = walkFrame);
-          } else {
-            [x, y] = stepToPoint(activeMove.fromPosition, player.color, token.token_index);
-          }
+          [x, y] = stepToPoint(activeMove.fromPosition, player.color, token.token_index);
         } else {
           const cellKey = cellKeyOf(token, player.color);
           [x, y] = stepToPoint(effectiveStep(token), player.color, token.token_index);
@@ -1062,18 +1040,19 @@ export const LudoBoard: React.FC<Props> = ({
           }
         }
 
-        return {
-          key: `tok-${player.id}-${token.token_index}`,
-          color: player.color,
-          tokenIndex: token.token_index,
-          x,
-          y,
-          scale,
-          lift,
-          walking,
-          isLegal,
-          dimmed: Boolean(isMyTurn && isTurnColor && !activeMove && !isLegal && legalTokenIndices.length > 0),
-        };
+        return [
+          {
+            key: `tok-${player.id}-${token.token_index}`,
+            color: player.color,
+            tokenIndex: token.token_index,
+            x,
+            y,
+            scale,
+            walking,
+            isLegal,
+            dimmed: Boolean(isMyTurn && isTurnColor && !activeMove && !isLegal && legalTokenIndices.length > 0),
+          },
+        ];
       })
     )
     // Paint back-to-front: lower pawns overlap the ones above them, movable
@@ -1083,187 +1062,212 @@ export const LudoBoard: React.FC<Props> = ({
         Number(a.walking) - Number(b.walking) || Number(a.isLegal) - Number(b.isLegal) || a.y - b.y
     );
 
+  const legalRings = renderedTokens.filter((t) => t.isLegal);
+
   return (
     <div
       className={`ludo-board-wrapper relative w-full max-w-[min(90vw,calc(100dvh-var(--safe-top)-var(--safe-bottom)-100px),430px)] aspect-square rounded-2xl p-1.5 sm:p-2 bg-slate-900 border-2 border-amber-500/40 shadow-2xl overflow-hidden flex items-center justify-center shrink-0 ${
         boardShaking ? 'animate-board-impact' : ''
       }`}
     >
-      <svg viewBox="0 0 1500 1500" className="w-full h-full select-none rounded-xl drop-shadow-lg">
-        {boardArt}
+      <div className="ludo-board-stage">
+        {/* Static board: painted once, never repainted by moving or pulsing pawns */}
+        <svg viewBox="0 0 1500 1500" className="w-full h-full select-none rounded-xl" aria-hidden="true">
+          {boardArt}
+        </svg>
 
-        {/* Destination preview: squares crossed, then the landing square */}
-        {preview && (
-          <g className="pointer-events-none">
-            {preview.trail.map(([px, py], i) => (
-              <circle
-                key={`trail-${i}`}
-                cx={px}
-                cy={py}
-                r="11"
-                fill={COLOR_HEX[preview.color]}
-                stroke="#ffffff"
-                strokeWidth="4"
-                opacity="0.9"
-              />
-            ))}
+        {/* Under the pawns: pulsing rings on movable pawns and footstep ripples.
+            HTML animated with transform/opacity runs on the compositor, so
+            neither costs a repaint. */}
+        <div className="ludo-board-under" aria-hidden="true">
+          {legalRings.map((t) => (
+            <span
+              key={`ring-${t.key}`}
+              className="ludo-legal-ring"
+              style={{
+                left: `${t.x / 15}%`,
+                top: `${(t.y + PAWN_GROUND_Y * t.scale) / 15}%`,
+                width: `${(88 * t.scale) / 15}%`,
+                height: `${(34 * t.scale) / 15}%`,
+              }}
+            />
+          ))}
+          {stepRipples.map((rip) => (
+            <span
+              key={rip.id}
+              className="ludo-step-ripple"
+              style={{ left: `${rip.cx / 15}%`, top: `${(rip.cy + PAWN_GROUND_Y) / 15}%` }}
+            />
+          ))}
+        </div>
 
-            {preview.isHome ? (
-              <polygon
-                points={HOME_TRIANGLE_POINTS[preview.color]}
-                fill="rgba(254, 240, 138, 0.55)"
-                stroke="#fbbf24"
-                strokeWidth="6"
-                className="animate-dest-pulse"
-              />
-            ) : (
-              <g>
-                <rect
-                  x={preview.x - 45}
-                  y={preview.y - 45}
-                  width="90"
-                  height="90"
-                  rx="14"
-                  fill={
-                    preview.isCapture
-                      ? 'rgba(239, 68, 68, 0.45)'
-                      : preview.isSafe
-                        ? 'rgba(16, 185, 129, 0.4)'
-                        : 'rgba(245, 158, 11, 0.4)'
-                  }
-                  stroke={preview.isCapture ? '#dc2626' : preview.isSafe ? '#059669' : '#f59e0b'}
+        {/* Pawns, move preview and effects: a separate layer (see .ludo-board-dynamic),
+            so a moving pawn repaints only this, not the ~400 shapes of the board. */}
+        <svg viewBox="0 0 1500 1500" className="ludo-board-dynamic select-none">
+          {pawnDefs}
+
+          {/* Destination preview: squares crossed, then the landing square */}
+          {preview && (
+            <g className="pointer-events-none">
+              {preview.trail.map(([px, py], i) => (
+                <circle
+                  key={`trail-${i}`}
+                  cx={px}
+                  cy={py}
+                  r="11"
+                  fill={COLOR_HEX[preview.color]}
+                  stroke="#ffffff"
+                  strokeWidth="4"
+                  opacity="0.9"
+                />
+              ))}
+
+              {preview.isHome ? (
+                <polygon
+                  points={HOME_TRIANGLE_POINTS[preview.color]}
+                  fill="rgba(254, 240, 138, 0.55)"
+                  stroke="#fbbf24"
                   strokeWidth="6"
                   className="animate-dest-pulse"
                 />
-                {preview.isCapture && (
-                  // Crosshair ticks on each edge: reads as a target even at phone size.
-                  <g stroke="#dc2626" strokeWidth="8" strokeLinecap="round">
-                    <line x1={preview.x} y1={preview.y - 44} x2={preview.x} y2={preview.y - 26} />
-                    <line x1={preview.x} y1={preview.y + 26} x2={preview.x} y2={preview.y + 44} />
-                    <line x1={preview.x - 44} y1={preview.y} x2={preview.x - 26} y2={preview.y} />
-                    <line x1={preview.x + 26} y1={preview.y} x2={preview.x + 44} y2={preview.y} />
-                  </g>
-                )}
-              </g>
-            )}
-          </g>
-        )}
-
-        {/* Footstep ripples under the pawns */}
-        <g className="pointer-events-none">
-          {stepRipples.map((rip) => (
-            <circle
-              key={rip.id}
-              cx={rip.cx}
-              cy={rip.cy + PAWN_GROUND_Y - 10}
-              r="20"
-              fill="none"
-              stroke="#fbbf24"
-              strokeWidth="4"
-              className="animate-step-ripple"
-            />
-          ))}
-        </g>
-
-        {/* Pawns (Tokens) Layer — each drawn in its square's local space
-            (origin = where the token stands), then moved and scaled as a whole. */}
-        <g>
-          {renderedTokens.map((t) => {
-            const isHovered = t.isLegal && hoveredTokenIndex === t.tokenIndex;
-            return (
-              <g
-                key={t.key}
-                transform={`translate(${t.x} ${t.y}) scale(${t.scale})`}
-                opacity={t.dimmed ? 0.5 : 1}
-                pointerEvents={t.isLegal ? 'auto' : 'none'}
-                role={t.isLegal ? 'button' : undefined}
-                aria-label={t.isLegal ? `Move ${t.color.toLowerCase()} token ${t.tokenIndex + 1}` : undefined}
-                style={t.isLegal ? { cursor: 'pointer', touchAction: 'manipulation' } : undefined}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (!t.isLegal) return;
-                  setHoveredTokenIndex(null);
-                  onTokenClick(t.tokenIndex);
-                }}
-                onPointerEnter={(e) => {
-                  // Touch has no hover; a tap moves the token straight away.
-                  if (t.isLegal && e.pointerType === 'mouse') setHoveredTokenIndex(t.tokenIndex);
-                }}
-                onPointerLeave={() => {
-                  setHoveredTokenIndex((prev) => (prev === t.tokenIndex ? null : prev));
-                }}
-              >
-                {/* Pulsing ring on the ground marks a token that can move */}
-                {t.isLegal && (
-                  <ellipse
-                    className="ludo-legal-ring"
-                    cx="0"
-                    cy={PAWN_GROUND_Y}
-                    rx="44"
-                    ry="17"
-                    fill="rgba(251, 191, 36, 0.35)"
-                    stroke="#fbbf24"
-                    strokeWidth="5"
+              ) : (
+                <g>
+                  <rect
+                    x={preview.x - 45}
+                    y={preview.y - 45}
+                    width="90"
+                    height="90"
+                    rx="14"
+                    fill={
+                      preview.isCapture
+                        ? 'rgba(239, 68, 68, 0.45)'
+                        : preview.isSafe
+                          ? 'rgba(16, 185, 129, 0.4)'
+                          : 'rgba(245, 158, 11, 0.4)'
+                    }
+                    stroke={preview.isCapture ? '#dc2626' : preview.isSafe ? '#059669' : '#f59e0b'}
+                    strokeWidth="6"
+                    className="animate-dest-pulse"
                   />
-                )}
+                  {preview.isCapture && (
+                    // Crosshair ticks on each edge: reads as a target even at phone size.
+                    <g stroke="#dc2626" strokeWidth="8" strokeLinecap="round">
+                      <line x1={preview.x} y1={preview.y - 44} x2={preview.x} y2={preview.y - 26} />
+                      <line x1={preview.x} y1={preview.y + 26} x2={preview.x} y2={preview.y + 44} />
+                      <line x1={preview.x - 44} y1={preview.y} x2={preview.x - 26} y2={preview.y} />
+                      <line x1={preview.x + 26} y1={preview.y} x2={preview.x + 44} y2={preview.y} />
+                    </g>
+                  )}
+                </g>
+              )}
+            </g>
+          )}
 
-                {/* Ground contact shadow; stays on the board while the pawn hops */}
-                <ellipse
-                  cx="0"
-                  cy={PAWN_GROUND_Y}
-                  rx={26 - t.lift * 0.25}
-                  ry={8.5 - t.lift * 0.08}
-                  fill="rgba(2, 6, 23, 0.45)"
-                />
+          {/* Pawns (Tokens) Layer — each drawn in its square's local space
+              (origin = where the token stands), then moved and scaled as a whole. */}
+          <g>
+            {renderedTokens.map((t) => {
+              const isHovered = t.isLegal && hoveredTokenIndex === t.tokenIndex;
+              return (
+                <g
+                  key={t.key}
+                  transform={`translate(${t.x} ${t.y}) scale(${t.scale})`}
+                  opacity={t.dimmed ? 0.5 : 1}
+                  pointerEvents={t.isLegal ? 'auto' : 'none'}
+                  role={t.isLegal ? 'button' : undefined}
+                  aria-label={t.isLegal ? `Move ${t.color.toLowerCase()} token ${t.tokenIndex + 1}` : undefined}
+                  style={t.isLegal ? { cursor: 'pointer', touchAction: 'manipulation' } : undefined}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (!t.isLegal) return;
+                    setHoveredTokenIndex(null);
+                    onTokenClick(t.tokenIndex);
+                  }}
+                  onPointerEnter={(e) => {
+                    // Touch has no hover; a tap moves the token straight away.
+                    if (t.isLegal && e.pointerType === 'mouse') setHoveredTokenIndex(t.tokenIndex);
+                  }}
+                  onPointerLeave={() => {
+                    setHoveredTokenIndex((prev) => (prev === t.tokenIndex ? null : prev));
+                  }}
+                >
+                  {/* Ground contact shadow */}
+                  <ellipse cx="0" cy={PAWN_GROUND_Y} rx="26" ry="8.5" fill="rgba(2, 6, 23, 0.45)" />
 
-                <g className={t.isLegal ? 'ludo-pawn-bob' : undefined}>
-                  <g
-                    transform={`translate(0 ${PAWN_SETTLE_Y - t.lift}) scale(${PAWN_FIT_SCALE * (isHovered ? 1.1 : 1)})`}
-                    filter={t.isLegal ? 'url(#goldLegalGlow)' : 'url(#pawnDropShadow)'}
-                  >
+                  <g transform={`translate(0 ${PAWN_SETTLE_Y}) scale(${PAWN_FIT_SCALE * (isHovered ? 1.1 : 1)})`}>
                     {pawnArt[`${t.color}_${t.isLegal}`]}
                   </g>
-                </g>
 
-                {/* Enlarged touch target covering the whole pawn */}
-                {t.isLegal && <circle cx="0" cy="-6" r="56" fill="none" pointerEvents="all" />}
-              </g>
-            );
-          })}
-        </g>
-
-        {/* Landing impacts drawn over the pawns */}
-        <g className="pointer-events-none">
-          {impactEffects.map((imp) => {
-            if (imp.type === 'CAPTURE') {
-              return (
-                <g key={imp.id} transform={`translate(${imp.cx}, ${imp.cy})`}>
-                  <circle cx="0" cy="0" r="30" fill="none" stroke="#ef4444" strokeWidth="8" className="animate-capture-burst" />
-                  <circle cx="0" cy="0" r="50" fill="none" stroke="#fbbf24" strokeWidth="4" className="animate-capture-burst" />
-                  <text x="0" y="14" fontSize="44" textAnchor="middle">
-                    💥
-                  </text>
+                  {/* Enlarged touch target covering the whole pawn */}
+                  {t.isLegal && <circle cx="0" cy="-6" r="56" fill="none" pointerEvents="all" />}
                 </g>
               );
-            }
-            if (imp.type === 'HOME') {
+            })}
+          </g>
+
+          {/* Landing impacts drawn over the pawns */}
+          <g className="pointer-events-none">
+            {impactEffects.map((imp) => {
+              if (imp.type === 'CAPTURE') {
+                return (
+                  <g key={imp.id} transform={`translate(${imp.cx}, ${imp.cy})`}>
+                    <circle cx="0" cy="0" r="30" fill="none" stroke="#ef4444" strokeWidth="8" className="animate-capture-burst" />
+                    <circle cx="0" cy="0" r="50" fill="none" stroke="#fbbf24" strokeWidth="4" className="animate-capture-burst" />
+                    <text x="0" y="14" fontSize="44" textAnchor="middle">
+                      💥
+                    </text>
+                  </g>
+                );
+              }
+              if (imp.type === 'HOME') {
+                return (
+                  <g key={imp.id} transform={`translate(${imp.cx}, ${imp.cy})`}>
+                    <circle cx="0" cy="0" r="40" fill="none" stroke="#fbbf24" strokeWidth="6" className="animate-capture-burst" />
+                    <text x="0" y="14" fontSize="44" textAnchor="middle">
+                      🌟
+                    </text>
+                  </g>
+                );
+              }
               return (
                 <g key={imp.id} transform={`translate(${imp.cx}, ${imp.cy})`}>
-                  <circle cx="0" cy="0" r="40" fill="none" stroke="#fbbf24" strokeWidth="6" className="animate-capture-burst" />
-                  <text x="0" y="14" fontSize="44" textAnchor="middle">
-                    🌟
-                  </text>
+                  <circle cx="0" cy="0" r="30" fill="none" stroke="#10b981" strokeWidth="5" className="animate-capture-burst" />
                 </g>
               );
-            }
-            return (
-              <g key={imp.id} transform={`translate(${imp.cx}, ${imp.cy})`}>
-                <circle cx="0" cy="0" r="30" fill="none" stroke="#10b981" strokeWidth="5" className="animate-capture-burst" />
+            })}
+          </g>
+        </svg>
+
+        {/* The walking pawn and its shadow, each its own small layer moved by
+            the walk animation (see the useLayoutEffect above). */}
+        {walk && isInFlight && (
+          <>
+            <svg
+              ref={walkerShadowRef}
+              className="ludo-walker"
+              viewBox={WALKER_VIEWBOX}
+              style={{ transform: walkerTransform(...walk.waypoints[0]) }}
+              aria-hidden="true"
+            >
+              <ellipse cx="0" cy={PAWN_GROUND_Y} rx="26" ry="8.5" fill="rgba(2, 6, 23, 0.45)" />
+            </svg>
+            <svg
+              ref={walkerPawnRef}
+              className="ludo-walker"
+              viewBox={WALKER_VIEWBOX}
+              style={{ transform: walkerTransform(...walk.waypoints[0]) }}
+              aria-hidden="true"
+            >
+              <g transform={`translate(0 ${PAWN_SETTLE_Y}) scale(${PAWN_FIT_SCALE})`}>
+                {pawnArt[`${walk.color}_false`]}
               </g>
-            );
-          })}
-        </g>
-      </svg>
+            </svg>
+          </>
+        )}
+      </div>
     </div>
   );
 };
+
+// Skips re-rendering when the page updates unrelated state (turn timer, chat, …).
+export const LudoBoard = React.memo(LudoBoardView);

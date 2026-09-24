@@ -21,6 +21,12 @@ import { ArrowLeft, HelpCircle, MessageSquare } from 'lucide-react';
 import '../../styles/ludo.css';
 import { getApiErrorMessage } from '../../utils/apiError';
 
+// Whether two snapshots describe the same game, ignoring the server's turn
+// countdown (which differs on every poll).
+const isSameMatchState = (a: LudoMatchState | null, b: LudoMatchState | null) =>
+  Boolean(a && b) &&
+  JSON.stringify({ ...a, remaining_timer_seconds: 0 }) === JSON.stringify({ ...b, remaining_timer_seconds: 0 });
+
 interface FloatingReaction {
   id: string;
   emoji: string;
@@ -555,8 +561,10 @@ export const Ludo: React.FC = () => {
           // A move is still walking and its end applies the state after it; a
           // poll now would jump pawns (e.g. a captured one) ahead of the walk.
           if (pendingMatchStateRef.current) return;
-          setMatchState(fresh);
           setTimerSeconds(fresh.remaining_timer_seconds ?? 10);
+          // Most polls return the same game: keep the current object so the
+          // board and everything derived from the state don't re-render.
+          if (!isSameMatchState(fresh, matchStateRef.current)) setMatchState(fresh);
         } catch {}
       }, 3000);
     }
@@ -656,15 +664,17 @@ export const Ludo: React.FC = () => {
     }
   };
 
-  const handleMoveToken = async (tokenIndex: number) => {
-    if (!matchState) return;
+  // Stable across renders, so the memoized board isn't re-rendered because of it.
+  const handleMoveToken = useCallback(async (tokenIndex: number) => {
+    const matchId = matchStateRef.current?.id;
+    if (!matchId) return;
     try {
-      await ludoService.moveToken(matchState.id, tokenIndex);
+      await ludoService.moveToken(matchId, tokenIndex);
       setDiceStatusNotice(null);
     } catch (e: any) {
       console.error('Move error', e);
     }
-  };
+  }, []);
 
   const handleExitLobby = async () => {
     if (searching) {
@@ -860,7 +870,7 @@ export const Ludo: React.FC = () => {
       {matchState && (
         <div className="ludo-active-match w-full max-w-7xl h-full flex flex-col gap-1 sm:gap-2 items-center justify-between overflow-hidden">
           {/* Header Bar with Total Balance & Contextual Back Button (BUG-003) */}
-          <div className="ludo-game-header w-full flex items-center justify-between gap-1.5 sm:gap-3 px-2 sm:px-3 py-1 sm:py-1.5 bg-slate-900/95 backdrop-blur-md rounded-xl border border-slate-800 shadow-md shrink-0">
+          <div className="ludo-game-header w-full flex items-center justify-between gap-1.5 sm:gap-3 px-2 sm:px-3 py-1 sm:py-1.5 bg-slate-900/95 rounded-xl border border-slate-800 shadow-md shrink-0">
             <div className="flex items-center gap-2 sm:gap-3 shrink-0">
               {matchState.status !== 'COMPLETED' && (
                 <button
@@ -975,7 +985,8 @@ export const Ludo: React.FC = () => {
                 onTokenClick={handleMoveToken}
                 isMyTurn={isMyTurn}
                 tokenStyle={tokenStyle}
-                diceValue={diceDisplayValue ?? matchState.last_dice_roll}
+                // The roll animation cycles random faces; the board only needs the result.
+                diceValue={rollingDice ? null : diceDisplayValue ?? matchState.last_dice_roll}
                 activeMove={activeMove}
                 onMoveAnimationEnd={handleMoveAnimationEnd}
               />
@@ -984,7 +995,7 @@ export const Ludo: React.FC = () => {
               {/* Never wider than the board column: on narrow screens it scrolls
                   sideways instead of being clipped on both sides. Start-aligned so
                   overflow is reachable; when everything fits it hugs its content. */}
-              <div className="mt-1 sm:mt-1.5 max-w-full overflow-x-auto no-scrollbar flex items-center justify-start gap-1 sm:gap-1.5 px-2 sm:px-3 py-1 bg-slate-900/95 backdrop-blur-md rounded-full border border-slate-700/70 shadow-lg shrink-0 z-20">
+              <div className="mt-1 sm:mt-1.5 max-w-full overflow-x-auto no-scrollbar flex items-center justify-start gap-1 sm:gap-1.5 px-2 sm:px-3 py-1 bg-slate-900/95 rounded-full border border-slate-700/70 shadow-lg shrink-0 z-20">
                 <span className="text-[10px] text-amber-400 font-bold uppercase tracking-wider hidden sm:inline mr-0.5">
                   Chat:
                 </span>
@@ -1017,7 +1028,7 @@ export const Ludo: React.FC = () => {
 
               {/* Quick Chat Popup Menu */}
               {showQuickChatMenu && (
-                <div className="absolute bottom-11 sm:bottom-12 z-30 flex flex-wrap items-center justify-center gap-1.5 p-2 bg-slate-900/95 backdrop-blur-xl border border-amber-500/40 rounded-2xl shadow-2xl max-w-xs sm:max-w-sm animate-fade-in">
+                <div className="absolute bottom-11 sm:bottom-12 z-30 flex flex-wrap items-center justify-center gap-1.5 p-2 bg-slate-900/95 border border-amber-500/40 rounded-2xl shadow-2xl max-w-xs sm:max-w-sm animate-fade-in">
                   {[
                     '🍀 Good luck!',
                     '👏 Well played!',

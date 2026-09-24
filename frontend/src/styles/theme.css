@@ -1184,7 +1184,8 @@ html, body {
     box-sizing: border-box !important;
   }
 
-  .ludo-active-match .ludo-board-wrapper svg {
+  /* Board layers only: the walking pawn's small layers size themselves */
+  .ludo-active-match .ludo-board-wrapper svg:not(.ludo-walker) {
     width: 100% !important;
     height: 100% !important;
     max-width: 100% !important;

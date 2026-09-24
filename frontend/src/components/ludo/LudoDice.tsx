@@ -169,7 +169,7 @@ export const LudoDice: React.FC<Props> = ({
   const haloColor = currentTurnColor ? COLOR_GLOW_STYLES[currentTurnColor] : 'rgba(251, 191, 36, 0.3)';
 
   return (
-    <div className="ludo-dice-box w-full max-w-[205px] sm:max-w-[225px] flex flex-col items-center gap-2.5 p-3 bg-gradient-to-b from-slate-900/95 via-[#0b1120]/95 to-slate-950/95 backdrop-blur-xl rounded-3xl border border-amber-500/25 shadow-[0_12px_36px_rgba(0,0,0,0.85)] shrink-0">
+    <div className="ludo-dice-box w-full max-w-[205px] sm:max-w-[225px] flex flex-col items-center gap-2.5 p-3 bg-gradient-to-b from-slate-900/95 via-[#0b1120]/95 to-slate-950/95 rounded-3xl border border-amber-500/25 shadow-[0_12px_36px_rgba(0,0,0,0.85)] shrink-0">
       {/* Turn & Countdown Timer Bar */}
       <div className="w-full flex items-center justify-between px-3 py-1.5 bg-slate-950/90 rounded-xl border border-white/10 text-[11px] shadow-inner">
         <div className="flex items-center gap-2 min-w-0">

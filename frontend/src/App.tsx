@@ -1,5 +1,5 @@
 import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense, type ComponentType } from 'react';
 import './index.css';
 import { setNativeLandscape } from './utils/nativeOrientation';
 import { AuthLayout } from './layouts/AuthLayout';
@@ -10,37 +10,61 @@ import { LoginPage } from './pages/auth/Login';
 import { SignupPage } from './pages/auth/Signup';
 import { DownloadPage } from './pages/Download';
 import { DashboardPage } from './pages/user/Dashboard';
-import { ProfilePage } from './pages/user/Profile';
-import { WalletPage } from './pages/user/Wallet';
-import { TransactionsPage } from './pages/user/Transactions';
-import { DepositPage } from './pages/user/Deposit';
-import { WithdrawalPage } from './pages/user/Withdrawal';
-import { DragonTigerPage } from './pages/user/DragonTiger';
-import { AndarBaharPage } from './pages/user/AndarBahar';
-import { RummyPage } from './pages/user/Rummy';
-import { TeenPatti } from './pages/user/TeenPatti';
-import { Ludo } from './pages/user/Ludo';
-import { AviatorPage } from './pages/user/Aviator';
-import { PokerPage } from './pages/user/Poker';
-import { RoulettePage } from './pages/user/Roulette';
-import { ChickenRoadPage } from './pages/user/ChickenRoad';
-import { Triple777Page } from './pages/user/Triple777';
-import { GameCatalogPage } from './pages/user/GameCatalog';
-import { AdminDashboardPage } from './pages/admin/AdminDashboard';
-import { AdminUsersPage } from './pages/admin/AdminUsers';
-import { AdminTransactionsPage } from './pages/admin/AdminTransactions';
-import { AdminDepositsPage } from './pages/admin/AdminDeposits';
-import { AdminWithdrawalsPage } from './pages/admin/AdminWithdrawals';
-import { AdminPaymentSettingsPage } from './pages/admin/AdminPaymentSettings';
-import { AdminFeesPage } from './pages/admin/Fees';
-import { AdminGameControlPage } from './pages/admin/AdminGameControl';
-import { AdminGamesPage } from './pages/admin/Games';
 import { LoadingScreen } from './components/common/LoadingScreen';
 import { useAuthStore } from './store/authStore';
 import { authService } from './services/auth';
 import { authStorage } from './services/authStorage';
 import { soundManager } from './services/soundManager';
 import { isNativePlatform } from './utils/platform';
+
+// Shown while a page's code loads on its first visit: instant in the app,
+// a moment on a slow web connection.
+function PageLoading() {
+  return (
+    <div className="h-full w-full flex items-center justify-center bg-black">
+      <div className="w-8 h-8 rounded-full border-2 border-amber-400/30 border-t-amber-400 animate-spin" />
+    </div>
+  );
+}
+
+// Each page's code is loaded when the page is first opened, so opening one game
+// doesn't download, parse and keep every other game (and the admin panel) in memory.
+function lazyPage<M extends Record<string, unknown>>(load: () => Promise<M>, exportName: keyof M) {
+  const Page = lazy(() => load().then((m) => ({ default: m[exportName] as ComponentType })));
+  return function LazyPage() {
+    return (
+      <Suspense fallback={<PageLoading />}>
+        <Page />
+      </Suspense>
+    );
+  };
+}
+
+const ProfilePage = lazyPage(() => import('./pages/user/Profile'), 'ProfilePage');
+const WalletPage = lazyPage(() => import('./pages/user/Wallet'), 'WalletPage');
+const TransactionsPage = lazyPage(() => import('./pages/user/Transactions'), 'TransactionsPage');
+const DepositPage = lazyPage(() => import('./pages/user/Deposit'), 'DepositPage');
+const WithdrawalPage = lazyPage(() => import('./pages/user/Withdrawal'), 'WithdrawalPage');
+const DragonTigerPage = lazyPage(() => import('./pages/user/DragonTiger'), 'DragonTigerPage');
+const AndarBaharPage = lazyPage(() => import('./pages/user/AndarBahar'), 'AndarBaharPage');
+const RummyPage = lazyPage(() => import('./pages/user/Rummy'), 'RummyPage');
+const TeenPatti = lazyPage(() => import('./pages/user/TeenPatti'), 'TeenPatti');
+const Ludo = lazyPage(() => import('./pages/user/Ludo'), 'Ludo');
+const AviatorPage = lazyPage(() => import('./pages/user/Aviator'), 'AviatorPage');
+const PokerPage = lazyPage(() => import('./pages/user/Poker'), 'PokerPage');
+const RoulettePage = lazyPage(() => import('./pages/user/Roulette'), 'RoulettePage');
+const ChickenRoadPage = lazyPage(() => import('./pages/user/ChickenRoad'), 'ChickenRoadPage');
+const Triple777Page = lazyPage(() => import('./pages/user/Triple777'), 'Triple777Page');
+const GameCatalogPage = lazyPage(() => import('./pages/user/GameCatalog'), 'GameCatalogPage');
+const AdminDashboardPage = lazyPage(() => import('./pages/admin/AdminDashboard'), 'AdminDashboardPage');
+const AdminUsersPage = lazyPage(() => import('./pages/admin/AdminUsers'), 'AdminUsersPage');
+const AdminTransactionsPage = lazyPage(() => import('./pages/admin/AdminTransactions'), 'AdminTransactionsPage');
+const AdminDepositsPage = lazyPage(() => import('./pages/admin/AdminDeposits'), 'AdminDepositsPage');
+const AdminWithdrawalsPage = lazyPage(() => import('./pages/admin/AdminWithdrawals'), 'AdminWithdrawalsPage');
+const AdminPaymentSettingsPage = lazyPage(() => import('./pages/admin/AdminPaymentSettings'), 'AdminPaymentSettingsPage');
+const AdminFeesPage = lazyPage(() => import('./pages/admin/Fees'), 'AdminFeesPage');
+const AdminGameControlPage = lazyPage(() => import('./pages/admin/AdminGameControl'), 'AdminGameControlPage');
+const AdminGamesPage = lazyPage(() => import('./pages/admin/Games'), 'AdminGamesPage');
 
 function ProtectedRoute({ adminOnly = false }: { adminOnly?: boolean }) {
   const { user, isLoading } = useAuthStore();
