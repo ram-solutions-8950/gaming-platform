@@ -1,5 +1,5 @@
 import React from 'react';
-import corona888Logo from '../../assets/corona888-logo.webp';
+import corona888Logo from '../../assets/corona888-emblem.webp';
 import '../../styles/casino-logo.css';
 
 interface CasinoLogoProps {

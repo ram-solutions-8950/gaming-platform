@@ -369,6 +369,9 @@
    â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 @media (orientation: portrait) {
   .auth-page-wrapper {
+    background-image:
+      linear-gradient(rgba(3, 6, 16, 0.25), rgba(3, 6, 16, 0.45)),
+      url('../assets/corona888-logo-port.webp');
     align-items: center;
     justify-content: center;
     padding-bottom: max(var(--safe-bottom), 20px);

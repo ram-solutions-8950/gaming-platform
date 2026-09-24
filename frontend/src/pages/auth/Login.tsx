@@ -7,7 +7,6 @@ import { useAuthStore } from '../../store/authStore';
 import { GlitterRain } from '../../components/common/GlitterRain';
 import { isNativePlatform } from '../../utils/platform';
 import { soundManager } from '../../services/soundManager';
-import splashBg from '../../assets/corona888-logo.webp';
 import '../../styles/login-page.css';
 import { getApiErrorMessage } from '../../utils/apiError';
 
@@ -74,12 +73,7 @@ export function LoginPage() {
   };
 
   return (
-    <div
-      className="auth-page-wrapper"
-      style={{
-        backgroundImage: `linear-gradient(rgba(3, 6, 16, 0.40), rgba(3, 6, 16, 0.65)), url(${splashBg})`,
-      }}
-    >
+    <div className="auth-page-wrapper">
       <GlitterRain />
 
       <div className="casino-login-card">

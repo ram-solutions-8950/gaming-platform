@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import splashBg from '../../assets/corona888-logo.webp';
 import '../../styles/loading-screen.css';
 
 interface LoadingScreenProps {
@@ -45,7 +44,6 @@ export function LoadingScreen({
   return (
     <div
       className={`casino-loading-screen ${isFadingOut ? 'fade-out' : ''}`}
-      style={{ backgroundImage: `url(${splashBg})` }}
     >
       {/* Clean loading indicator at the bottom */}
       <div className="splash-loading-container">
