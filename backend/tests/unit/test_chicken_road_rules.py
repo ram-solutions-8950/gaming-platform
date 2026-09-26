@@ -3,7 +3,8 @@ Unit tests for Chicken Road game schemas and bet constraints.
 """
 import pytest
 from pydantic import ValidationError
-from app.routers.chicken_road import StartGameIn, DIFFICULTY_MULTIPLIERS, ActiveChickenRound
+from app.routers.chicken_road import StartGameIn, DIFFICULTY_MULTIPLIERS, _advance
+from app.models.chicken_road import ChickenRoadRound
 import uuid
 
 def test_start_game_allowed_bets():
@@ -38,11 +39,11 @@ def test_difficulty_multipliers():
         for i in range(len(mults) - 1):
             assert mults[i] < mults[i + 1]
 
-def test_active_round_initialization():
-    """Verify ActiveChickenRound initializes correctly."""
-    user_id = uuid.uuid4()
-    round_obj = ActiveChickenRound("test-round-1", user_id, 10000, "MEDIUM")
-    assert round_obj.round_id == "test-round-1"
-    assert round_obj.current_lane == 0
-    assert round_obj.status == "ACTIVE"
-    assert round_obj.total_lanes == 10
+def test_advance_stops_at_the_hit_lane():
+    """Progress goes through the draw: the chicken never gets past its hit lane."""
+    rnd = ChickenRoadRound(id=uuid.uuid4(), user_id=uuid.uuid4(), difficulty="MEDIUM",
+                           multipliers=DIFFICULTY_MULTIPLIERS["MEDIUM"], bet_amount=10000,
+                           hit_lane=4, current_lane=0, status="ACTIVE")
+    assert _advance(rnd, 3) and rnd.current_lane == 3
+    assert not _advance(rnd, 10)
+    assert (rnd.status, rnd.lost_lane, rnd.current_lane) == ("LOST", 4, 3)

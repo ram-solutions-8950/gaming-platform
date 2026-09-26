@@ -90,9 +90,9 @@ async def lifespan(app: FastAPI):
     from .websocket.poker_ws import cash_out_all_tables
     from .websocket.teen_patti_ws import refund_live_hands
     from .websocket.rummy_ws import refund_live_deals
-    from .routers.chicken_road import void_active_rounds
     from .services.roulette.engine import refund_open_round
-    for settle_in_flight in (refund_live_hands, refund_live_deals, void_active_rounds, refund_open_round):
+    # Chicken Road rounds are kept in the database and resume after a restart.
+    for settle_in_flight in (refund_live_hands, refund_live_deals, refund_open_round):
         try:
             settle_in_flight()
         except Exception as exc:

@@ -200,6 +200,14 @@ def test_admin_can_read_and_set_game_commissions(client, db):
 
 # ═══ 2. Chicken Road: the bet is committed ═══════════════════════════════
 
+@pytest.fixture(autouse=True)
+def _chicken_survives_unless_set(monkeypatch):
+    """Chicken Road outcomes are a random draw; these tests are about the
+    rules, so the chicken survives every lane unless a test says otherwise."""
+    import app.routers.chicken_road as chicken_road
+    monkeypatch.setattr(chicken_road, "draw_hit_lane", lambda multipliers: None)
+
+
 def test_cannot_cash_out_before_crossing_a_lane(client, db):
     headers, user, wallet = _make_user(db, "chicken")
 
@@ -251,8 +259,11 @@ def test_cashout_after_one_lane_pays_that_lane_multiplier(client, db):
     assert res.json()["data"]["multiplier"] == 1.03
 
 
-def test_cannot_finish_without_crossing_every_lane(client, db):
-    """start -> finish would otherwise pay the full final multiplier for free."""
+def test_finishing_without_crossing_still_faces_every_lane(client, db, monkeypatch):
+    """start -> finish must not pay the final multiplier for free: every lane
+    on the way is still ruled by the server's draw."""
+    import app.routers.chicken_road as chicken_road
+    monkeypatch.setattr(chicken_road, "draw_hit_lane", lambda multipliers: 4)
     headers, user, _ = _make_user(db, "chicken")
 
     res = client.post(
@@ -268,14 +279,14 @@ def test_cannot_finish_without_crossing_every_lane(client, db):
         json={"round_id": round_id},
         headers=headers,
     )
-    assert res.status_code == 400
-    assert "lanes crossed" in res.json()["error"]["message"].lower()
+    data = res.json()["data"]
+    assert data["status"] == "LOST" and data["lane_index"] == 4
 
     db.expire_all()
     assert get_balance(db, user.id).balance == balance_after_bet
 
 
-def test_partial_progress_still_cannot_finish(client, db):
+def test_partial_progress_cashes_out_at_the_lane_reached(client, db):
     headers, user, _ = _make_user(db, "chicken")
 
     res = client.post(
@@ -292,14 +303,6 @@ def test_partial_progress_still_cannot_finish(client, db):
             headers=headers,
         )
 
-    res = client.post(
-        "/api/v1/games/chicken-road/finish",
-        json={"round_id": round_id},
-        headers=headers,
-    )
-    assert res.status_code == 400
-
-    # Cashing out at the lane actually reached is still allowed.
     res = client.post(
         "/api/v1/games/chicken-road/cashout",
         json={"round_id": round_id, "lane_index": 5},

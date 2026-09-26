@@ -18,7 +18,7 @@ from app.models.user import User, UserRole, UserStatus
 from app.models.wallet import Wallet
 from app.models.transaction import WalletTransaction, WalletTransactionType, WalletTransactionStatus
 from app.security.jwt import create_access_token
-from app.routers.chicken_road import ACTIVE_ROUNDS, USER_ACTIVE_ROUND, DIFFICULTY_MULTIPLIERS
+from app.routers.chicken_road import DIFFICULTY_MULTIPLIERS
 
 
 @pytest.fixture(autouse=True)

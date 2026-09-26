@@ -14,6 +14,7 @@ from .ludo import LudoMatch, LudoPlayer, LudoToken, LudoMatchmakingQueue, LudoMa
 from .rummy import RummyTable, RummyRound, RummyMatchmakingQueue, RummyTableMode, RummyTableStatus
 from .teen_patti import TeenPattiTable, TeenPattiHandHistory, TeenPattiTableMode, TeenPattiTableStatus
 from .aviator import AviatorRound, AviatorBet, AviatorRoundStatus, AviatorBetStatus
+from .chicken_road import ChickenRoadRound, ChickenRoadRoundStatus
 from .poker import PokerTable, PokerHand, PokerPlayer, PokerAction
 from .referral import Referral, ReferralSettings, ReferralStatus
 from .wager import WagerRequirement
@@ -47,6 +48,7 @@ __all__ = [
     "RummyTable", "RummyRound", "RummyMatchmakingQueue", "RummyTableMode", "RummyTableStatus",
     "TeenPattiTable", "TeenPattiHandHistory", "TeenPattiTableMode", "TeenPattiTableStatus",
     "AviatorRound", "AviatorBet", "AviatorRoundStatus", "AviatorBetStatus",
+    "ChickenRoadRound", "ChickenRoadRoundStatus",
     "PokerTable", "PokerHand", "PokerPlayer", "PokerAction",
     "Referral", "ReferralSettings", "ReferralStatus",
     "WagerRequirement",

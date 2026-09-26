@@ -15,6 +15,7 @@ export interface ChickenRoadState {
   multipliers?: number[];
   difficulty_multipliers?: Record<Difficulty, number[]>;
   potential_win?: number;
+  cashout_amount?: number;
   wallet_balance?: number;
 }
 
@@ -29,6 +30,7 @@ export interface StartResponse {
   next_multiplier: number;
   multipliers: number[];
   potential_win: number;
+  cashout_amount?: number;
   wallet_balance: number;
 }
 
@@ -50,6 +52,7 @@ export interface CrossLaneResponse {
   current_multiplier: number;
   next_multiplier: number;
   potential_win: number;
+  cashout_amount?: number;
 }
 
 export interface FinishResponse {
