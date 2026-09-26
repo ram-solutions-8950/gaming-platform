@@ -33,6 +33,9 @@ const DEFAULT_MULTIPLIERS: Record<Difficulty, number[]> = {
 
 const QUICK_BETS = [10, 20, 50, 100];
 
+// The loss modal covers the road, so it waits for the car to hit the chicken.
+const LOSS_MODAL_DELAY_MS = 1200;
+
 export function ChickenRoadPage() {
   const navigate = useNavigate();
 
@@ -48,6 +51,7 @@ export function ChickenRoadPage() {
 
   const [winAmount, setWinAmount] = useState<number>(0);
   const [lossLane, setLossLane] = useState<number | null>(null);
+  const [showLossModal, setShowLossModal] = useState<boolean>(false);
   const [isActionLoading, setIsActionLoading] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [showHowToPlay, setShowHowToPlay] = useState<boolean>(false);
@@ -235,12 +239,19 @@ export function ChickenRoadPage() {
     currentLaneRef.current = laneReached;
     setCurrentLane(laneReached);
     setCurrentMultiplier(laneReached > 0 ? multipliers[laneReached - 1] || 1.0 : 1.0);
+    setShowLossModal(false);
     setGameState('LOST');
     setLossLane(laneIndex);
     soundManager.play('loss');
     activeRoundIdRef.current = null;
     crossLanePromiseRef.current = null;
   }, [multipliers]);
+
+  useEffect(() => {
+    if (gameState !== 'LOST') return;
+    const timer = window.setTimeout(() => setShowLossModal(true), LOSS_MODAL_DELAY_MS);
+    return () => window.clearTimeout(timer);
+  }, [gameState]);
 
   // The chicken stepped into the next lane: the server decides whether it made it.
   const handleLaneCross = useCallback(async (laneIndex: number) => {
@@ -426,7 +437,7 @@ export function ChickenRoadPage() {
 
             <div className="cr-hud-pill">
               <span className="cr-hud-label">Points:</span>
-              <span className="cr-hud-val text-amber-400 font-mono">
+              <span className="cr-hud-val cr-hud-val--points text-amber-400 font-mono">
                 {currentLane * 100} / 1000 Pts
               </span>
             </div>
@@ -537,7 +548,7 @@ export function ChickenRoadPage() {
           )}
 
           {/* Loss Modal */}
-          {gameState === 'LOST' && (
+          {gameState === 'LOST' && showLossModal && (
             <div className="cr-overlay-backdrop">
               <div className="cr-arcade-modal cr-arcade-modal--lost">
                 <div className="cr-modal-badge">💥</div>
