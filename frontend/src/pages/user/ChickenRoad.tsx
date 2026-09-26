@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import type { PointerEvent as ReactPointerEvent, MouseEvent as ReactMouseEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -88,13 +87,19 @@ export function ChickenRoadPage() {
   const [showHowToPlay, setShowHowToPlay] = useState<boolean>(false);
   const [showExitConfirm, setShowExitConfirm] = useState<boolean>(false);
 
-  // Mobile steering button state
-  const [externalSteer, setExternalSteer] = useState<'left' | 'right' | null>(null);
+  // Step signal for discrete stepping (1 tap = 1 lane)
+  const [stepSignal, setStepSignal] = useState<{ direction: 'left' | 'right'; timestamp: number } | null>(null);
+
+  const handleStep = useCallback((direction: 'left' | 'right') => {
+    if (gameState !== 'ACTIVE' || isActionLoading) return;
+    setStepSignal({ direction, timestamp: Date.now() });
+  }, [gameState, isActionLoading]);
 
   // Synchronous refs to prevent race conditions and closure staleness
   const activeRoundIdRef = useRef<string | null>(null);
   const currentLaneRef = useRef<number>(0);
   const crossLanePromiseRef = useRef<Promise<any> | null>(null);
+  const initialMountRef = useRef<boolean>(true);
   // Bumped whenever a round starts or ends here, so a sync that was already in
   // flight doesn't overwrite it with what the server said before.
   const roundEpochRef = useRef<number>(0);
@@ -113,11 +118,12 @@ export function ChickenRoadPage() {
     setShowLossModal(false);
   }, []);
 
-  // Brings the page in line with the server: resumes a round still in play,
-  // otherwise returns to the betting screen. Resolves to whether a round is in
-  // play, or null when the server couldn't be reached.
+  // Brings the page in line with the server. On initial app/page mount, if there was
+  // an unfinished round left open from an abandoned session, forfeit it and restart fresh.
   const syncState = useCallback(async (): Promise<boolean | null> => {
     const epoch = roundEpochRef.current;
+    const isFirstMount = initialMountRef.current;
+    initialMountRef.current = false;
     try {
       const [walletData, gameStateData] = await Promise.all([
         walletService.getWallet().catch(() => null),
@@ -131,6 +137,20 @@ export function ChickenRoadPage() {
       if (!gameStateData) return null;
 
       if (gameStateData.status === 'ACTIVE' && gameStateData.round_id) {
+        // If loading fresh after app was killed or exited, forfeit the abandoned round
+        // and restart in READY state as requested
+        if (isFirstMount) {
+          try {
+            await chickenRoadService.forfeit(gameStateData.round_id);
+          } catch {}
+          resetRound();
+          const refreshedWallet = await walletService.getWallet().catch(() => null);
+          if (refreshedWallet && typeof refreshedWallet.balance === 'number') {
+            setBalance(refreshedWallet.balance / 100);
+          }
+          return false;
+        }
+
         if (gameStateData.multipliers) {
           setMultipliers(gameStateData.multipliers);
         }
@@ -240,31 +260,7 @@ export function ChickenRoadPage() {
     };
   }, []);
 
-  // A held steer button must not outlive the round (or the app being
-  // backgrounded), or the chicken would walk off on its own.
-  useEffect(() => {
-    setExternalSteer(null);
-  }, [gameState]);
 
-  useEffect(() => {
-    const release = () => setExternalSteer(null);
-    window.addEventListener('blur', release);
-    return () => window.removeEventListener('blur', release);
-  }, []);
-
-  const steerHandlers = (direction: 'left' | 'right') => ({
-    onPointerDown: (e: ReactPointerEvent<HTMLButtonElement>) => {
-      try {
-        e.currentTarget.setPointerCapture(e.pointerId);
-      } catch {}
-      setExternalSteer(direction);
-    },
-    onPointerUp: () => setExternalSteer(null),
-    onPointerCancel: () => setExternalSteer(null),
-    onPointerLeave: () => setExternalSteer(null),
-    onLostPointerCapture: () => setExternalSteer(null),
-    onContextMenu: (e: ReactMouseEvent) => e.preventDefault(),
-  });
 
   // The stake and difficulty are fixed from the moment PLAY is pressed.
   const betLocked = gameState !== 'READY' || isActionLoading;
@@ -365,6 +361,16 @@ export function ChickenRoadPage() {
     activeRoundIdRef.current = null;
     crossLanePromiseRef.current = null;
   }, [multipliers]);
+
+  const handleCollision = useCallback((laneIndex: number) => {
+    const roundId = activeRoundIdRef.current;
+    showLoss(laneIndex, Math.max(0, laneIndex - 1));
+    if (roundId) {
+      chickenRoadService.reportCollision(roundId, laneIndex).catch((err) => {
+        console.error('Failed to report collision:', err);
+      });
+    }
+  }, [showLoss]);
 
   useEffect(() => {
     if (gameState !== 'LOST') return;
@@ -523,6 +529,22 @@ export function ChickenRoadPage() {
     setErrorMessage(null);
   };
 
+  // Exit Game: forfeit active round as LOST and leave
+  const handleExitGame = async () => {
+    setShowExitConfirm(false);
+    const roundId = activeRoundIdRef.current;
+    if (gameState === 'ACTIVE' && roundId) {
+      try {
+        await chickenRoadService.forfeit(roundId);
+      } catch (err) {
+        console.error('Failed to forfeit on exit:', err);
+      }
+    }
+    resetRound();
+    lockLandscape().catch(() => {});
+    navigate('/dashboard');
+  };
+
   // The stake is committed on start: cashing out is only possible once the
   // chicken has actually crossed a lane (the server enforces this too).
   const hasCrossedALane = Math.max(currentLane, currentLaneRef.current) > 0;
@@ -623,7 +645,8 @@ export function ChickenRoadPage() {
             difficulty={difficulty}
             onLaneCross={handleLaneCross}
             onFinish={handleFinish}
-            externalSteer={externalSteer}
+            onCollision={handleCollision}
+            stepSignal={stepSignal}
             movementLocked={isActionLoading}
           />
 
@@ -632,7 +655,7 @@ export function ChickenRoadPage() {
             <button
               type="button"
               className="cr-steer-btn"
-              {...steerHandlers('left')}
+              onClick={() => handleStep('left')}
               aria-label="Steer Left"
             >
               <ChevronLeft size={28} />
@@ -641,7 +664,7 @@ export function ChickenRoadPage() {
             <button
               type="button"
               className="cr-steer-btn"
-              {...steerHandlers('right')}
+              onClick={() => handleStep('right')}
               aria-label="Steer Right"
             >
               <ChevronRight size={28} />
@@ -738,7 +761,7 @@ export function ChickenRoadPage() {
                 </h2>
                 <p className="text-xs text-slate-300 m-0">
                   {gameState === 'ACTIVE'
-                    ? 'A round is in progress. It stays open while you are away: come back to continue or cash out.'
+                    ? 'A round is in progress. Leaving will forfeit your current bet. Are you sure you want to exit?'
                     : 'Are you sure you want to exit the game?'}
                 </p>
                 <div className="flex gap-3 w-full mt-2">
@@ -751,11 +774,7 @@ export function ChickenRoadPage() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => {
-                      setShowExitConfirm(false);
-                      lockLandscape().catch(() => {});
-                      navigate('/dashboard');
-                    }}
+                    onClick={handleExitGame}
                     className="flex-1 py-2.5 px-4 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold text-sm transition active:scale-95 cursor-pointer shadow"
                   >
                     Leave

@@ -107,6 +107,11 @@ export const chickenRoadService = {
     return res.data.data;
   },
 
+  async forfeit(round_id: string): Promise<LostResponse> {
+    const res = await api.post('/games/chicken-road/forfeit', { round_id });
+    return res.data.data;
+  },
+
   async cashout(round_id: string, lane_index?: number): Promise<CashoutResponse | LostResponse> {
     const res = await api.post('/games/chicken-road/cashout', { round_id, lane_index });
     return res.data.data;

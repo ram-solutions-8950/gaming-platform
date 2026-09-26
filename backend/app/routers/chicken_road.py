@@ -192,6 +192,10 @@ class CrossLaneIn(BaseModel):
     lane_index: int = Field(..., ge=1, le=20)
 
 
+class ForfeitIn(BaseModel):
+    round_id: str
+
+
 class FinishIn(BaseModel):
     round_id: str
     lane_index: Optional[int] = Field(None, ge=1, le=20, description="Optional crossed lane index to settle a racing cross-lane call")
@@ -209,12 +213,23 @@ class CashoutIn(BaseModel):
 
 @router.get("/state")
 def get_game_state(
+    forfeit_active: bool = False,
     db: Session = Depends(get_db),
     user: User = Depends(require_user),
 ):
     """Retrieve active game state if player is mid-round."""
     rnd = _active_round(db, user)
     if rnd:
+        if forfeit_active:
+            rnd.status = RoundStatus.LOST
+            rnd.lost_lane = rnd.current_lane or 1
+            rnd.settled_at = _now()
+            db.commit()
+            return success_response({
+                "status": "READY",
+                "difficulty_multipliers": DIFFICULTY_MULTIPLIERS,
+                "wallet_balance": _balance(db, user),
+            })
         return success_response({
             **_progress(db, rnd),
             "difficulty": rnd.difficulty,
@@ -226,6 +241,27 @@ def get_game_state(
     return success_response({
         "status": "READY",
         "difficulty_multipliers": DIFFICULTY_MULTIPLIERS,
+        "wallet_balance": _balance(db, user),
+    })
+
+
+@router.post("/forfeit")
+def forfeit_game(
+    data: ForfeitIn,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_user),
+):
+    """Player forfeits an active round (e.g. exited or abandoned game). Settle as LOST."""
+    rnd = _lock_active_round(db, data.round_id, user)
+    rnd.status = RoundStatus.LOST
+    rnd.lost_lane = rnd.current_lane or 1
+    rnd.settled_at = _now()
+    db.commit()
+
+    return success_response({
+        "round_id": str(rnd.id),
+        "status": "LOST",
+        "message": "Round forfeited.",
         "wallet_balance": _balance(db, user),
     })
 

@@ -249,3 +249,20 @@ def test_cashout_with_lane_index_ensures_proper_multiplier(client, auth_user, db
     assert data["multiplier"] == 1.03
     assert data["won_amount"] >= 10.00
 
+
+def test_forfeit_round(client, auth_user, db: Session):
+    """Test that forfeiting an active round settles it as LOST without payout."""
+    headers, user, wallet = auth_user
+
+    res = client.post("/api/v1/games/chicken-road/start", json={"bet_amount": 10, "difficulty": "MEDIUM"}, headers=headers)
+    assert res.status_code == 200
+    round_id = res.json()["data"]["round_id"]
+
+    res_forfeit = client.post("/api/v1/games/chicken-road/forfeit", json={"round_id": round_id}, headers=headers)
+    assert res_forfeit.status_code == 200
+    assert res_forfeit.json()["data"]["status"] == "LOST"
+
+    res_state = client.get("/api/v1/games/chicken-road/state", headers=headers)
+    assert res_state.status_code == 200
+    assert res_state.json()["data"]["status"] == "READY"
+
