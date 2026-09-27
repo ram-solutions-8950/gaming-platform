@@ -412,3 +412,76 @@ def test_current_round_api_reports_15_seconds_countdown(client, db: Session, aut
     # Remaining seconds must be <= 15.0 and > 13.0
     assert 0.0 < body["seconds_remaining"] <= 15.0
 
+
+
+# ─── House rule: the side with less bet on it wins ───────────────────────────
+
+@pytest.fixture
+def second_user(db: Session):
+    user = User(
+        id=uuid4(),
+        name="DT User 2",
+        username=f"dtuser2_{str(uuid4())[:8]}",
+        email=f"dtuser2_{str(uuid4())[:8]}@example.com",
+        password_hash="fakehash",
+        role=UserRole.USER,
+        status=UserStatus.ACTIVE,
+    )
+    db.add(user)
+    db.add(Wallet(id=uuid4(), user_id=user.id, balance=10000000))
+    db.commit()
+    return user
+
+
+@pytest.mark.parametrize("dragon_amount, tiger_amount, winner", [
+    (50000, 10000, "TIGER"),
+    (10000, 50000, "DRAGON"),
+    (10000, 0, "TIGER"),
+    (0, 20000, "DRAGON"),
+])
+def test_side_with_less_bet_wins(db: Session, auth_user, second_user, fee_config, dt_game, dragon_amount, tiger_amount, winner):
+    _, user, _ = auth_user
+    for _ in range(20):
+        rd = engine.create_round(db)
+        if dragon_amount:
+            engine.place_bet(db, user.id, rd.id, "DRAGON", dragon_amount, game_id=dt_game.id)
+        if tiger_amount:
+            engine.place_bet(db, second_user.id, rd.id, "TIGER", tiger_amount, game_id=dt_game.id)
+        settled = engine.settle_round(db, rd.id)
+        assert settled.result_data["result"] == winner
+        # The cards dealt show that result.
+        from app.services.game_engines.dragon_tiger_cards import determine_result
+        assert determine_result(settled.result_data["dragon_card"], settled.result_data["tiger_card"]) == winner
+
+
+def test_level_totals_leave_the_result_to_the_draw(db: Session, auth_user, second_user, fee_config, dt_game):
+    _, user, _ = auth_user
+    results = set()
+    for _ in range(40):
+        rd = engine.create_round(db)
+        engine.place_bet(db, user.id, rd.id, "DRAGON", 10000, game_id=dt_game.id)
+        engine.place_bet(db, second_user.id, rd.id, "TIGER", 10000, game_id=dt_game.id)
+        results.add(engine.settle_round(db, rd.id).result_data["result"])
+    assert {"DRAGON", "TIGER"} <= results
+
+
+def test_rule_can_be_switched_off(db: Session, auth_user, fee_config, dt_game):
+    _, user, _ = auth_user
+    dt_game.config = {**dt_game.config, "lower_total_wins": False}
+    flag_modified(dt_game, "config")
+    db.commit()
+    results = set()
+    for _ in range(40):
+        rd = engine.create_round(db)
+        engine.place_bet(db, user.id, rd.id, "DRAGON", 10000, game_id=dt_game.id)
+        results.add(engine.settle_round(db, rd.id).result_data["result"])
+    # With the rule on, a lone Dragon bet would make Tiger win every time.
+    assert "DRAGON" in results
+
+
+def test_explicit_cards_still_decide(db: Session, auth_user, fee_config, dt_game):
+    _, user, _ = auth_user
+    rd = engine.create_round(db)
+    engine.place_bet(db, user.id, rd.id, "DRAGON", 10000, game_id=dt_game.id)
+    settled = engine.settle_round(db, rd.id, dragon_card="K-S", tiger_card="7-H")
+    assert settled.result_data["result"] == "DRAGON"

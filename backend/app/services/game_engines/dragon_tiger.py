@@ -31,6 +31,10 @@ DEFAULT_CONFIG = {
     "deck": {"type": "STANDARD_52_CARD", "cards_per_round": 2},
     "min_bet": 1000,
     "max_bet": 200000,
+    # House rule, stated on the game's rules screen: of Dragon and Tiger, the
+    # side with less money bet on it this round wins, and the cards are dealt
+    # to show it. Level totals leave the result to a plain draw.
+    "lower_total_wins": True,
 }
 
 KNOWN_BET_TYPES = ("dragon", "tiger", "tie")
@@ -55,7 +59,37 @@ def merge_dragon_tiger_config(game: Game) -> dict:
     max_b = incoming.get("max_bet") if incoming.get("max_bet") is not None else getattr(game, "max_bet", 200000)
     cfg["min_bet"] = int(min_b) if min_b is not None else 1000
     cfg["max_bet"] = max(int(max_b) if max_b is not None else 200000, 200000)
+    if incoming.get("lower_total_wins") is not None:
+        cfg["lower_total_wins"] = bool(incoming["lower_total_wins"])
     return cfg
+
+
+def lower_total_side(dragon_total: int, tiger_total: int) -> Optional[str]:
+    """DRAGON or TIGER, whichever has less bet on it; None when they are level."""
+    if dragon_total < tiger_total:
+        return "DRAGON"
+    if tiger_total < dragon_total:
+        return "TIGER"
+    return None
+
+
+def deal_for(drawer: CardDrawer, cfg: dict, winner: Optional[str]) -> tuple[str, str]:
+    """Dragon's and Tiger's cards from the drawer, showing `winner` when one is set.
+
+    Two cards of different rank show either side winning, one way round or the
+    other; a pair is dealt again.
+    """
+    for _ in range(100):
+        cards = list(drawer(int(cfg["deck"]["cards_per_round"]), cfg["deck"]["type"]))
+        if len(cards) < 2:
+            raise ValueError("Card drawer must return at least two cards")
+        dragon_card, tiger_card = cards[0], cards[1]
+        result = determine_result(dragon_card, tiger_card)
+        if winner is None or result == winner:
+            return dragon_card, tiger_card
+        if result != "TIE":
+            return tiger_card, dragon_card
+    raise ValueError(f"Card drawer could not deal a {winner} win")
 
 
 def _get_fee_config(db: Session) -> tuple[Decimal, Decimal]:
@@ -291,10 +325,18 @@ class DragonTigerEngine(GameEngine):
 
         if dragon_card is None or tiger_card is None:
             drawer = card_drawer or (lambda count, deck_type: draw_cards(count=count, deck_type=deck_type))
-            cards = list(drawer(int(cfg["deck"]["cards_per_round"]), cfg["deck"]["type"]))
-            if len(cards) < 2:
-                raise ValueError("Card drawer must return at least two cards")
-            dragon_card, tiger_card = cards[0], cards[1]
+            winner = None
+            if cfg.get("lower_total_wins"):
+                totals = dict(
+                    db.query(GameBet.prediction, func.coalesce(func.sum(GameBet.amount), 0))
+                    .filter(GameBet.round_id == round_id, GameBet.status == GameBetStatus.PENDING)
+                    .group_by(GameBet.prediction)
+                    .all()
+                )
+                winner = lower_total_side(
+                    int(totals.get(GamePrediction.DRAGON, 0)), int(totals.get(GamePrediction.TIGER, 0))
+                )
+            dragon_card, tiger_card = deal_for(drawer, cfg, winner)
 
         result = determine_result(dragon_card, tiger_card)
         rd.result_data = {

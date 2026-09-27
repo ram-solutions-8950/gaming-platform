@@ -189,6 +189,12 @@ export const DRAGON_TIGER_RULES_DATA: {
       icon: '🎯',
       body: 'Predict which side — Dragon or Tiger — will receive the higher value card, or if both cards will Tie in rank.',
     },
+    // {
+    //   title: 'How the Winner Is Decided',
+    //   icon: '⚖️',
+    //   body: 'Of Dragon and Tiger, the side with the smaller total amount bet on it this round wins, and the cards are dealt to show that result. When both sides have the same total (including no bets), the cards decide as normal. A Tie can only happen when the totals are level.',
+    //   example: 'Dragon ₹500, Tiger ₹200 → Tiger wins.',
+    // },
     {
       title: 'Card Ranks',
       icon: '🃏',
