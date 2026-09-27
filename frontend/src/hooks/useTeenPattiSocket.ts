@@ -4,6 +4,7 @@ import { authStorage } from '../services/authStorage';
 import { authService } from '../services/auth';
 import type { TeenPattiGameState } from '../services/teenPatti';
 import { getWebSocketUrl } from '../utils/ws';
+import { isInsufficientBalanceMessage, showInsufficientBalance } from '../store/insufficientBalanceStore';
 
 export interface UseTeenPattiSocketOptions {
   tableId: string | null;
@@ -50,6 +51,8 @@ export function useTeenPattiSocket({ tableId, onEvent, onError }: UseTeenPattiSo
 
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
+    // Why the server turned this connection away, when it said so before closing it.
+    let rejectedFor: string | null = null;
 
     ws.onopen = () => {
       if (!isMountedRef.current || intentionalLeaveRef.current) {
@@ -77,6 +80,8 @@ export function useTeenPattiSocket({ tableId, onEvent, onError }: UseTeenPattiSo
           }
           onEvent?.(msg);
         } else if (msg.type === 'error') {
+          rejectedFor = msg.message ?? '';
+          if (isInsufficientBalanceMessage(msg.message)) showInsufficientBalance();
           if (
             msg.message?.toLowerCase().includes('authentication') ||
             msg.message?.toLowerCase().includes('log in again')
@@ -105,6 +110,9 @@ export function useTeenPattiSocket({ tableId, onEvent, onError }: UseTeenPattiSo
     };
 
     ws.onclose = async (event: CloseEvent) => {
+      // A socket this hook has since replaced or shut: reconnecting for it would
+      // replace the live one, whose close would reconnect again, and so on.
+      if (wsRef.current !== ws) return;
       setIsConnected(false);
       setIsConnecting(false);
 
@@ -113,7 +121,12 @@ export function useTeenPattiSocket({ tableId, onEvent, onError }: UseTeenPattiSo
       }
 
       if (event.code === 1008) {
-        // Attempt one silent refresh if closed due to policy / auth
+        // Turned away by the server, which said why (it's on screen): a table
+        // that has ended or is full, a hand already under way, too little
+        // balance. Every retry would be turned away too. A rejected login is
+        // refreshed and retried by the error handler above.
+        if (rejectedFor !== null) return;
+        // Turned away without a word: one silent refresh, in case it was the login.
         if (!isRefreshingRef.current) {
           isRefreshingRef.current = true;
           const refreshed = await authService.refreshSession().catch(() => false);

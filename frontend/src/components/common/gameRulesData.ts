@@ -267,17 +267,17 @@ export const CHICKEN_ROAD_RULES_DATA: {
     {
       title: 'Objective',
       icon: '🎯',
-      body: 'Guide your brave chicken across traffic lanes one step at a time, accumulating multiplier payouts with every lane successfully crossed!',
+      body: 'Guide your brave chicken across the road one lane at a time. Every lane it makes it into raises your multiplier — cash out before it gets hit!',
     },
     {
       title: 'Crossing Lanes',
       icon: '🛣️',
-      body: 'Each lane you step into raises your win multiplier — and is a new chance to get hit. Whether the chicken makes it across a lane is decided by the game server the moment it steps in, never by how you steer. You can Cash Out after any lane you have crossed.',
+      body: 'Press PLAY to place your bet, then tap GO: the chicken hops exactly one lane per tap. If the lane is safe, a barrier drops and stops the traffic, and the multiplier on that lane is yours. Whether a lane is safe is decided by the game server the moment the chicken hops in. You can Cash Out after any lane you have crossed.',
     },
     {
       title: 'The Crash (Squash)',
       icon: '🚗',
-      body: 'If the chicken is hit before you cash out, the round is lost. Reach the far side and you are paid the top multiplier.',
+      body: 'If the lane is not safe, a car runs the chicken over and the round is lost. Make it through the last lane and you are paid the top multiplier.',
       isPositive: false,
     },
     {

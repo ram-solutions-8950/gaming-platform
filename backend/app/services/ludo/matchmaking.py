@@ -232,10 +232,18 @@ class LudoMatchmakingService:
             f"entry_fee={entry_fee} prize_pool={prize_pool}"
         )
 
+        # Seats go clockwise from the top-left yard. A two-player match is
+        # green against blue, both on the left side of the board; green
+        # always moves first.
+        if player_count == 2:
+            colors = [LudoColor.GREEN, LudoColor.BLUE]
+        else:
+            colors = [LudoColor.GREEN, LudoColor.RED, LudoColor.YELLOW, LudoColor.BLUE]
+
         # Create match
         match = LudoMatch(
             status=LudoMatchStatus.IN_PROGRESS,
-            current_turn_color=LudoColor.RED,
+            current_turn_color=colors[0],
             turn_timeout_seconds=10,
             turn_started_at=datetime.now(timezone.utc),
             entry_fee=entry_fee,
@@ -244,12 +252,6 @@ class LudoMatchmakingService:
         )
         self.db.add(match)
         self.db.flush()  # get match.id
-
-        # Color assignments
-        if player_count == 2:
-            colors = [LudoColor.RED, LudoColor.YELLOW]
-        else:
-            colors = [LudoColor.RED, LudoColor.GREEN, LudoColor.YELLOW, LudoColor.BLUE]
 
         # Create players + tokens + debit wallets
         for idx, uid in enumerate(matched_user_ids):

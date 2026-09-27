@@ -162,11 +162,58 @@
    without repainting the board. */
 .ludo-legal-ring {
   position: absolute;
-  border: 2px solid #fbbf24;
+  border: 3px solid #fbbf24;
   border-radius: 50%;
-  background: rgba(251, 191, 36, 0.35);
+  background: rgba(251, 191, 36, 0.45);
+  box-shadow: 0 0 10px rgba(251, 191, 36, 0.9);
   transform: translate(-50%, -50%);
   animation: ludoLegalRing 1.1s ease-out infinite;
+}
+
+.ludo-board-over {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* Arrow over a movable pawn; its bottom tip sits just above the pawn's head. */
+.ludo-legal-arrow {
+  position: absolute;
+  width: 5%;
+  transform: translate(-50%, -100%);
+  animation: ludoLegalArrow 0.6s ease-in-out infinite alternate;
+  will-change: transform;
+}
+
+.ludo-legal-arrow svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.5));
+}
+
+@keyframes ludoLegalArrow {
+  from {
+    transform: translate(-50%, -100%);
+  }
+  to {
+    transform: translate(-50%, -160%);
+  }
+}
+
+/* Below a pawn on the top row, pointing up at it. */
+.ludo-legal-arrow--below {
+  transform: translate(-50%, 0) rotate(180deg);
+  animation-name: ludoLegalArrowBelow;
+}
+
+@keyframes ludoLegalArrowBelow {
+  from {
+    transform: translate(-50%, 0) rotate(180deg);
+  }
+  to {
+    transform: translate(-50%, 60%) rotate(180deg);
+  }
 }
 
 /* The walking pawn (and its shadow): a small layer the walk animation moves

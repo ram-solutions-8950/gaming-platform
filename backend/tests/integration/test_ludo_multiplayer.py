@@ -98,8 +98,8 @@ def test_two_players_same_tier_match(db, test_users_with_wallets):
     # Verify colors
     p1 = next(p for p in match.players if p.user_id == u1.id)
     p2 = next(p for p in match.players if p.user_id == u2.id)
-    assert p1.color == LudoColor.RED
-    assert p2.color == LudoColor.YELLOW
+    assert p1.color == LudoColor.GREEN
+    assert p2.color == LudoColor.BLUE
 
     # Verify tokens
     assert len(p1.tokens) == 4
@@ -315,15 +315,14 @@ def test_matched_response_contains_player_data(db, test_users_with_wallets):
     assert str(u2.id) in user_ids
 
     colors = {p["color"] for p in res["players"]}
-    assert "RED" in colors
-    assert "YELLOW" in colors
+    assert colors == {"GREEN", "BLUE"}
 
 
 # =====================================================================
-# 12. RED/YELLOW assignment correct
+# 12. GREEN/BLUE assignment correct
 # =====================================================================
 
-def test_correct_red_yellow_assignment(db, test_users_with_wallets):
+def test_correct_green_blue_assignment(db, test_users_with_wallets):
     u1, u2 = test_users_with_wallets[0], test_users_with_wallets[1]
     svc = LudoMatchmakingService(db)
 
@@ -335,9 +334,9 @@ def test_correct_red_yellow_assignment(db, test_users_with_wallets):
     p1 = next(p for p in match.players if p.user_id == u1.id)
     p2 = next(p for p in match.players if p.user_id == u2.id)
 
-    # First joiner (waiting) = RED, second joiner (triggering) = YELLOW
-    assert p1.color == LudoColor.RED
-    assert p2.color == LudoColor.YELLOW
+    # First joiner (waiting) = GREEN, second joiner (triggering) = BLUE: both on the left side
+    assert p1.color == LudoColor.GREEN
+    assert p2.color == LudoColor.BLUE
 
 
 # =====================================================================
@@ -366,7 +365,8 @@ def test_four_player_matchmaking_colors(db, test_users_with_wallets):
     match_id = uuid.UUID(res["match_id"])
     match = db.query(LudoMatch).filter(LudoMatch.id == match_id).first()
     colors = [p.color for p in match.players]
-    assert colors == [LudoColor.RED, LudoColor.GREEN, LudoColor.YELLOW, LudoColor.BLUE]
+    # Seats run clockwise from the top-left yard, green first.
+    assert colors == [LudoColor.GREEN, LudoColor.RED, LudoColor.YELLOW, LudoColor.BLUE]
 
 
 # =====================================================================
@@ -519,60 +519,60 @@ def test_ten_second_timeout_and_three_timeout_forfeit(db, test_users_with_wallet
 
     engine = LudoEngine(db)
     match = engine.get_match(match_id)
-    assert match.current_turn_color == LudoColor.RED
+    assert match.current_turn_color == LudoColor.GREEN
 
-    # Simulate 10 seconds elapsed for Red
+    # Simulate 10 seconds elapsed for Green
     match.turn_started_at = datetime.now(timezone.utc) - timedelta(seconds=11)
     db.commit()
 
-    # Timeout 1: Red times out
+    # Timeout 1: Green times out
     t1 = engine.handle_timeout(match_id)
     assert t1["status"] == "TIMEOUT"
-    assert t1["timed_out_color"] == LudoColor.RED.value
+    assert t1["timed_out_color"] == LudoColor.GREEN.value
     assert t1["consecutive_timeouts"] == 1
     assert not t1["forfeited"]
-    assert match.current_turn_color == LudoColor.YELLOW
+    assert match.current_turn_color == LudoColor.BLUE
 
-    # Yellow plays normally (resets timeouts)
+    # Blue plays normally (resets timeouts)
     match.turn_started_at = datetime.now(timezone.utc) - timedelta(seconds=11)
     db.commit()
 
-    # Timeout 1 for Yellow
+    # Timeout 1 for Blue
     t_y = engine.handle_timeout(match_id)
-    assert t_y["timed_out_color"] == LudoColor.YELLOW.value
-    assert match.current_turn_color == LudoColor.RED
+    assert t_y["timed_out_color"] == LudoColor.BLUE.value
+    assert match.current_turn_color == LudoColor.GREEN
 
-    # Timeout 2 for Red
+    # Timeout 2 for Green
     match.turn_started_at = datetime.now(timezone.utc) - timedelta(seconds=11)
     db.commit()
     t2 = engine.handle_timeout(match_id)
-    assert t2["timed_out_color"] == LudoColor.RED.value
+    assert t2["timed_out_color"] == LudoColor.GREEN.value
     assert t2["consecutive_timeouts"] == 2
     assert not t2["forfeited"]
-    assert match.current_turn_color == LudoColor.YELLOW
+    assert match.current_turn_color == LudoColor.BLUE
 
-    # Skip Yellow back to Red
+    # Skip Blue back to Green
     match.turn_started_at = datetime.now(timezone.utc) - timedelta(seconds=11)
     db.commit()
     engine.handle_timeout(match_id)
-    assert match.current_turn_color == LudoColor.RED
+    assert match.current_turn_color == LudoColor.GREEN
 
-    # Timeout 3 for Red → FORFEIT!
+    # Timeout 3 for Green → FORFEIT!
     match.turn_started_at = datetime.now(timezone.utc) - timedelta(seconds=11)
     db.commit()
     t3 = engine.handle_timeout(match_id)
-    assert t3["timed_out_color"] == LudoColor.RED.value
+    assert t3["timed_out_color"] == LudoColor.GREEN.value
     assert t3["consecutive_timeouts"] == 3
     assert t3["forfeited"]
     assert t3["game_over"]
     assert t3["winner_user_id"] == str(u2.id)
 
-    # Verify match completed and Yellow (Player 2) was settled
+    # Verify match completed and Blue (Player 2) was settled
     match = engine.get_match(match_id)
     assert match.status == LudoMatchStatus.COMPLETED
     assert match.is_settled
 
-    # Yellow's balance: 49000 (after debit) + prize_pool(1800) - winning_fee on profit(800*10%=80)
+    # Blue's balance: 49000 (after debit) + prize_pool(1800) - winning_fee on profit(800*10%=80)
     # = 49000 + 1720 = 50720  (with default 10% winning fee from test DB)
     w2 = get_balance(db, u2.id)
     # The winning fee is admin-controlled, so just verify winner received less than or equal to pool
@@ -600,5 +600,5 @@ def test_three_consecutive_sixes_ends_turn(db, test_users_with_wallets):
         assert res_roll["roll"] == 6
         assert res_roll["turn_ended"]
         assert res_roll["reason"] == "THREE_CONSECUTIVE_SIXES"
-        # Turn transferred to Yellow
-        assert match.current_turn_color == LudoColor.YELLOW
+        # Turn transferred to Blue
+        assert match.current_turn_color == LudoColor.BLUE

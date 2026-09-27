@@ -24,8 +24,8 @@
   padding-right: max(var(--safe-right), 0px);
   padding-top: var(--safe-top);
   padding-bottom: 0;
-  /* Side gutter shared by the header, the bottom panel and the steering
-     buttons so their edges line up. The padding above already keeps the
+  /* Side gutter shared by the header, the bottom panel and the GO button
+     so their edges line up. The padding above already keeps the
      whole game clear of the safe-area insets; nothing inside adds them again. */
   --cr-gutter: clamp(8px, 1.5vw, 12px);
 }
@@ -336,47 +336,66 @@
   background: #1E641D;
 }
 
-/* Floating Mobile Steering Touch Controls */
-.cr-mobile-controls {
+/* GO: one tap hops the chicken exactly one lane. Bottom-right of the road,
+   under the right thumb in landscape. */
+.cr-go-wrap {
   position: absolute;
-  bottom: var(--cr-gutter);
-  left: var(--cr-gutter);
   right: var(--cr-gutter);
-  display: flex;
-  justify-content: space-between;
-  pointer-events: none;
+  bottom: var(--cr-gutter);
   z-index: 20;
+  pointer-events: none;
 }
 
-.cr-steer-btn {
+.cr-go-btn {
   pointer-events: auto;
-  width: clamp(40px, 7vw, 48px);
-  height: clamp(40px, 7vw, 48px);
+  width: clamp(58px, 9vw, 74px);
+  height: clamp(58px, 9vw, 74px);
   border-radius: 50%;
-  background: rgba(48, 48, 48, 0.80);
-  border: 2px solid rgba(255, 255, 255, 0.3);
-  color: #FFFFFF;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  gap: 1px;
+  background: linear-gradient(160deg, #4ADE80 0%, #16A34A 100%);
+  border: 3px solid rgba(255, 255, 255, 0.85);
+  color: #FFFFFF;
+  font-size: clamp(15px, 2.2vw, 18px);
+  font-weight: 900;
+  letter-spacing: 1px;
+  line-height: 1;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.5), inset 0 -4px 0 rgba(0, 0, 0, 0.18);
   cursor: pointer;
-  transition: transform 0.1s ease, background 0.1s ease;
-  /* Held to walk: a finger drifting on the button mustn't turn into a scroll
-     (which cancels the press) or a long-press menu. */
-  touch-action: none;
+  /* No double-tap zoom delay, no long-press menu. */
+  touch-action: manipulation;
   user-select: none;
   -webkit-user-select: none;
   -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.1s ease, filter 0.15s ease;
 }
 
-.cr-steer-btn:active {
-  transform: scale(0.92);
-  background: rgba(255, 255, 255, 0.25);
-  border-color: #FBBF24;
-  color: #FBBF24;
+.cr-go-btn:active:not(:disabled) {
+  transform: scale(0.9);
+}
+
+/* While a hop is being ruled on: extra taps do nothing, and it looks it. */
+.cr-go-btn:disabled {
+  filter: grayscale(0.85) brightness(0.7);
+  cursor: default;
+}
+
+.cr-go-btn--ready {
+  animation: cr-go-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes cr-go-pulse {
+  0%, 100% {
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.5), inset 0 -4px 0 rgba(0, 0, 0, 0.18), 0 0 0 0 rgba(74, 222, 128, 0.65);
+  }
+  50% {
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.5), inset 0 -4px 0 rgba(0, 0, 0, 0.18), 0 0 0 12px rgba(74, 222, 128, 0);
+  }
 }
 
 .cr-error-banner {
@@ -924,9 +943,10 @@
     border-radius: 7px;
   }
 
-  .cr-steer-btn {
-    width: 38px;
-    height: 38px;
+  .cr-go-btn {
+    width: 56px;
+    height: 56px;
+    font-size: 15px;
   }
 }
 

@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from "react";
 import { getWebSocketUrl } from "../utils/ws";
+import { isInsufficientBalanceMessage, showInsufficientBalance } from "../store/insufficientBalanceStore";
 
 export interface MatchmakingCriteria {
   name: string;
@@ -76,6 +77,7 @@ export function useRummyMatchmaking(token: string | null): MatchmakingResult {
             stopTicking();
             setStatus("idle");
           } else if (msg.type === "error") {
+            if (isInsufficientBalanceMessage(msg.message)) showInsufficientBalance();
             stopTicking();
             setErrorMessage(msg.message);
             setStatus("error");

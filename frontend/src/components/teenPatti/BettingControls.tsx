@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import type { TeenPattiGameState } from '../../services/teenPatti';
 import { Minus, Plus } from 'lucide-react';
 
@@ -63,6 +63,14 @@ export const BettingControls: React.FC<BettingControlsProps> = ({
       return prev;
     });
   }, [minChaalCost, isBlind, gameState.current_stake]);
+
+  // Each hand starts again from the table's base stake: the amount a player
+  // raised to in the last hand must not carry over into the next one.
+  const prevPhaseRef = useRef(gameState.phase);
+  useEffect(() => {
+    if (isPlaying && prevPhaseRef.current !== 'playing') setCustomBet(minChaalCost);
+    prevPhaseRef.current = gameState.phase;
+  }, [gameState.phase, isPlaying, minChaalCost]);
 
   const handleIncrement = () => {
     setCustomBet((prev) => Math.min(maxBet, prev + stepSize));

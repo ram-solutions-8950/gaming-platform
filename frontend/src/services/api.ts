@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { authStorage } from './authStorage';
 import { isNativePlatform } from '../utils/platform';
+import { isInsufficientBalanceMessage, showInsufficientBalance } from '../store/insufficientBalanceStore';
 
 const configuredApiUrl = import.meta.env.VITE_API_URL?.trim();
 
@@ -109,6 +110,19 @@ api.interceptors.response.use(
           window.location.href = '/login';
         }
       }
+    }
+
+    // A bet or table entry the wallet can't cover: tell the player, whichever
+    // game it came from. Withdrawals and the admin panel explain it in place.
+    const message = error.response?.data?.error?.message ?? error.response?.data?.detail;
+    const url: string = original?.url ?? '';
+    if (
+      isInsufficientBalanceMessage(message) &&
+      !url.includes('/admin') &&
+      !url.includes('/withdraw') &&
+      !window.location.pathname.startsWith('/admin')
+    ) {
+      showInsufficientBalance();
     }
 
     return Promise.reject(error);

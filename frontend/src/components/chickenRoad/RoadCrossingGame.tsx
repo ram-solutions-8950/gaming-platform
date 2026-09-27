@@ -1,81 +1,138 @@
-import React, { useRef, useEffect, useCallback } from 'react';
+import React, { useEffect, useImperativeHandle, useRef, useState } from 'react';
 import type { Difficulty, GameStatus } from '../../services/chickenRoad';
+import { soundManager } from '../../services/soundManager';
+
+/** How a hop into a lane ended, as the road plays it out. */
+export type StepOutcome = 'safe' | 'hit' | 'won' | 'error';
+
+export interface RoadCrossingHandle {
+  /** The chicken is standing still in a round in play, ready for its next hop. */
+  canStep(): boolean;
+  /**
+   * Hops the chicken into `lane` and plays out the server's verdict on it: a
+   * barrier drops and holds the traffic back (safe), a car runs it over (hit),
+   * it goes on over the finish line (won), or it hops back where it came from
+   * because no verdict is coming (error). Resolves with that outcome once it
+   * has been shown.
+   */
+  step(lane: number, verdict: Promise<StepOutcome>): Promise<StepOutcome>;
+}
 
 interface RoadCrossingGameProps {
   gameState: GameStatus;
   multipliers: number[];
+  // Lanes the server has the chicken across: where it stands between hops.
   currentLane: number;
   difficulty: Difficulty;
-  // Settles once the server has ruled on the lane; rejects if no ruling is coming.
-  onLaneCross: (laneIndex: number) => Promise<unknown> | void;
-  // Rejects when the round couldn't be settled; the chicken steps back off the line.
-  onFinish: () => Promise<unknown> | void;
-  onCollision?: (laneIndex: number) => void;
-  stepSignal?: { direction: 'left' | 'right'; timestamp: number } | null;
-  // The chicken stands still, e.g. while a cash-out is being settled.
-  movementLocked?: boolean;
+  ref?: React.Ref<RoadCrossingHandle>;
 }
 
-// World Geometry for Horizontal Road Crossing
+// World geometry. The road runs left to right; its lanes are vertical and the
+// traffic in every lane drives down the screen.
 const WORLD_HEIGHT = 450;
+const ROAD_TOP = 45;
+const ROAD_BOTTOM = WORLD_HEIGHT - 45;
 const START_ZONE_WIDTH = 130;
 const LANE_WIDTH = 130;
-const FINISH_ZONE_WIDTH = 150;
-// The chicken always crosses along this horizontal line.
+const FINISH_ZONE_WIDTH = 170;
+// The chicken crosses along this line, standing on the manhole in the middle of each lane.
 const CROSSING_Y = WORLD_HEIGHT / 2;
+const CHICKEN_TOP = CROSSING_Y - 24; // comb
+const CHICKEN_BOTTOM = CROSSING_Y + 20; // feet
+// A safe lane's barrier stands just above the chicken, and the traffic stops behind it.
+const BARRIER_Y = CROSSING_Y - 44;
+const STOP_LINE = BARRIER_Y - 10; // front bumper of a car stopped at the barrier
 
-// The car sent at a chicken the server ruled hit.
-const RUSH_SPEED = 14;
-const HIT_FALLBACK_MS = 900;
+// Traffic, in world units and 60 fps frames.
+const CAR_GAP = 12; // bumper to bumper in a queue
+const CAR_ACCEL = 0.3;
+const CAR_BRAKE = 0.9;
+const RUSH_SPEED = 17; // the car sent at a chicken the server ruled hit
+const RUSH_ACCEL = 1.3;
+const FRAME_MS = 1000 / 60;
 
-interface Vehicle {
-  id: number;
-  lane: number;
-  x: number;
-  y: number;
-  width: number; // horizontal width
-  height: number; // vertical length
-  speed: number; // cruising speed
-  vel: number; // current speed
-  rushing: boolean; // sent at the chicken after the server ruled it hit
-  direction: 1 | -1; // 1 = moving DOWN, -1 = moving UP
-  type: 'taxi' | 'truck' | 'sportscar' | 'suv' | 'van' | 'sedan' | 'bus';
-  color: string;
-  roofColor: string;
-  wheelColor: string;
-}
-
-const laneCenterX = (lane: number) => START_ZONE_WIDTH + (lane - 0.5) * LANE_WIDTH;
-
-const checkpointX = (lane: number, totalLanes: number) => {
-  if (lane <= 0) return 65;
-  if (lane <= totalLanes) return START_ZONE_WIDTH + lane * LANE_WIDTH;
-  return START_ZONE_WIDTH + totalLanes * LANE_WIDTH + 65;
+// Cruising speed climbs from the first lane to the last; a new car turns up
+// in each lane every gapMs.
+const TRAFFIC: Record<Difficulty, { speed: [number, number]; gapMs: [number, number] }> = {
+  MEDIUM: { speed: [5.4, 7.6], gapMs: [800, 2200] },
+  HARD: { speed: [6.8, 9.4], gapMs: [600, 1700] },
 };
 
-// Lane whose path a chicken at x stands in; 0 between lanes or off the road.
-function laneAt(x: number, totalLanes: number): number {
-  const lane = Math.floor((x - START_ZONE_WIDTH) / LANE_WIDTH) + 1;
-  if (lane < 1 || lane > totalLanes) return 0;
-  return lane;
+const HOP_MS = 380;
+const HOP_HEIGHT = 30;
+// Share of a hop after which the chicken is inside the next lane's traffic.
+const HOP_ENTRY = 0.55;
+const BARRIER_DROP_MS = 280;
+
+interface VehicleLook {
+  type: 'taxi' | 'sport' | 'sedan' | 'suv' | 'truck' | 'van' | 'bus';
+  width: number;
+  length: number;
+  color: string;
+  roof: string;
 }
 
-// Nearest car in the lane heading towards the chicken.
-function nextCarTo(cars: Vehicle[]): Vehicle | null {
-  let next: Vehicle | null = null;
-  for (const v of cars) {
-    const isHeading = v.direction === 1 ? v.y < CROSSING_Y : v.y > CROSSING_Y;
-    if (isHeading) {
-      if (!next) {
-        next = v;
-      } else {
-        const distCurrent = Math.abs(v.y - CROSSING_Y);
-        const distNext = Math.abs(next.y - CROSSING_Y);
-        if (distCurrent < distNext) next = v;
-      }
-    }
-  }
-  return next;
+const VEHICLE_LOOKS: VehicleLook[] = [
+  { type: 'taxi', width: 36, length: 74, color: '#FBBF24', roof: '#F59E0B' },
+  { type: 'sport', width: 34, length: 70, color: '#EF4444', roof: '#DC2626' },
+  { type: 'sedan', width: 35, length: 76, color: '#3B82F6', roof: '#2563EB' },
+  { type: 'suv', width: 38, length: 80, color: '#8B5CF6', roof: '#7C3AED' },
+  { type: 'truck', width: 42, length: 98, color: '#10B981', roof: '#059669' },
+  { type: 'van', width: 38, length: 84, color: '#F8FAFC', roof: '#CBD5E1' },
+  { type: 'bus', width: 40, length: 104, color: '#F97316', roof: '#EA580C' },
+];
+
+interface Vehicle {
+  y: number; // centre
+  vel: number;
+  look: VehicleLook;
+  // Sent at the chicken after the server ruled it hit.
+  rushing: boolean;
+  // Too close to stop when the chicken started its hop into this lane: it
+  // drives on through, and the hop waits until it is by.
+  passThrough: boolean;
+}
+
+interface Lane {
+  index: number; // 1-based
+  speed: number;
+  // Leader (furthest down the road) first.
+  cars: Vehicle[];
+  spawnInMs: number;
+  // A hop into this lane is under way: cars that can still stop wait short of the chicken's path.
+  held: boolean;
+  // When the barrier of a lane crossed safely came down; null while it has none.
+  barrierAt: number | null;
+  // The chicken was run over here.
+  hit: boolean;
+}
+
+type ChickenMode = 'alive' | 'dead' | 'won';
+
+interface Chicken {
+  // The spot it stands on: 0 is the start pavement, totalLanes + 1 the finish.
+  lane: number;
+  x: number;
+  lift: number; // height above the road during a hop
+  landedAt: number;
+  mode: ChickenMode;
+  modeAt: number;
+}
+
+interface PendingStep {
+  lane: number;
+  phase: 'clearing' | 'hop' | 'wait' | 'hit' | 'finish' | 'back' | 'settle';
+  verdict: StepOutcome | null;
+  hopStart: number;
+  hopFrom: number;
+  hopTo: number;
+  // The hop to the finish pad has started.
+  finishing: boolean;
+  killer: Vehicle | null;
+  deadline: number;
+  settleAt: number;
+  outcome: StepOutcome;
+  resolve: (outcome: StepOutcome) => void;
 }
 
 interface Particle {
@@ -85,1231 +142,1153 @@ interface Particle {
   vy: number;
   color: string;
   size: number;
-  alpha: number;
   rotation: number;
   vRot: number;
   life: number;
   maxLife: number;
 }
 
-interface Pothole {
+interface Floater {
   x: number;
   y: number;
-  radius: number;
-  lane: number;
+  text: string;
+  color: string;
+  born: number;
 }
 
-// Web Audio sound synth for zero-latency rich game audio
-class SoundManager {
-  private ctx: AudioContext | null = null;
-
-  private init() {
-    if (!this.ctx) {
-      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-      if (AudioCtx) {
-        this.ctx = new AudioCtx();
-      }
-    }
-    if (this.ctx && this.ctx.state === 'suspended') {
-      this.ctx.resume().catch(() => null);
-    }
-  }
-
-  playStep() {
-    try {
-      this.init();
-      if (!this.ctx) return;
-      const osc = this.ctx.createOscillator();
-      const gain = this.ctx.createGain();
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(440, this.ctx.currentTime);
-      osc.frequency.exponentialRampToValueAtTime(880, this.ctx.currentTime + 0.05);
-      gain.gain.setValueAtTime(0.04, this.ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.05);
-      osc.connect(gain);
-      gain.connect(this.ctx.destination);
-      osc.start();
-      osc.stop(this.ctx.currentTime + 0.05);
-    } catch {
-      // Audio might be blocked
-    }
-  }
-
-  playLaneCross() {
-    try {
-      this.init();
-      if (!this.ctx) return;
-      const now = this.ctx.currentTime;
-      const freqs = [523.25, 659.25, 783.99, 1046.5]; // C5, E5, G5, C6
-      freqs.forEach((freq, i) => {
-        const osc = this.ctx!.createOscillator();
-        const gain = this.ctx!.createGain();
-        osc.type = 'triangle';
-        osc.frequency.setValueAtTime(freq, now + i * 0.04);
-        gain.gain.setValueAtTime(0.08, now + i * 0.04);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.04 + 0.18);
-        osc.connect(gain);
-        gain.connect(this.ctx!.destination);
-        osc.start(now + i * 0.04);
-        osc.stop(now + i * 0.04 + 0.18);
-      });
-    } catch {
-      // Audio might be blocked
-    }
-  }
-
-  playCollision() {
-    try {
-      this.init();
-      if (!this.ctx) return;
-      const now = this.ctx.currentTime;
-      const osc = this.ctx.createOscillator();
-      const gain = this.ctx.createGain();
-      osc.type = 'sawtooth';
-      osc.frequency.setValueAtTime(150, now);
-      osc.frequency.exponentialRampToValueAtTime(40, now + 0.35);
-      gain.gain.setValueAtTime(0.25, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
-      osc.connect(gain);
-      gain.connect(this.ctx.destination);
-      osc.start(now);
-      osc.stop(now + 0.35);
-    } catch {
-      // Audio might be blocked
-    }
-  }
-
-  playWin() {
-    try {
-      this.init();
-      if (!this.ctx) return;
-      const now = this.ctx.currentTime;
-      const melody = [523.25, 659.25, 783.99, 1046.5, 1318.51];
-      melody.forEach((freq, i) => {
-        const osc = this.ctx!.createOscillator();
-        const gain = this.ctx!.createGain();
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(freq, now + i * 0.08);
-        gain.gain.setValueAtTime(0.12, now + i * 0.08);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.08 + 0.3);
-        osc.connect(gain);
-        gain.connect(this.ctx!.destination);
-        osc.start(now + i * 0.08);
-        osc.stop(now + i * 0.08 + 0.3);
-      });
-    } catch {
-      // Audio might be blocked
-    }
-  }
+interface RoadState {
+  gameState: GameStatus;
+  multipliers: number[];
+  totalLanes: number;
+  difficulty: Difficulty;
+  lanes: Lane[];
+  chicken: Chicken;
+  step: PendingStep | null;
+  particles: Particle[];
+  floaters: Floater[];
+  cameraX: number;
+  shake: number;
 }
 
-const sounds = new SoundManager();
+const laneCenterX = (lane: number) => START_ZONE_WIDTH + (lane - 0.5) * LANE_WIDTH;
+const finishStartX = (totalLanes: number) => START_ZONE_WIDTH + totalLanes * LANE_WIDTH;
+const worldWidthFor = (totalLanes: number) => finishStartX(totalLanes) + FINISH_ZONE_WIDTH;
 
-const RoadCrossingGameComponent: React.FC<RoadCrossingGameProps> = ({
-  gameState,
-  multipliers,
-  currentLane,
-  difficulty,
-  onLaneCross,
-  onFinish,
-  onCollision,
-  stepSignal,
-  movementLocked = false,
-}) => {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const containerRectRef = useRef<{ width: number; height: number }>({ width: 844, height: 270 });
+// Where the chicken stands on spot `lane` (0 = start pavement, totalLanes + 1 = finish).
+function spotX(lane: number, totalLanes: number): number {
+  if (lane <= 0) return START_ZONE_WIDTH / 2;
+  if (lane > totalLanes) return finishStartX(totalLanes) + FINISH_ZONE_WIDTH * 0.52;
+  return laneCenterX(lane);
+}
 
-  const callbacksRef = useRef({ onLaneCross, onFinish, onCollision });
-  callbacksRef.current = { onLaneCross, onFinish, onCollision };
-  useEffect(() => {
-    callbacksRef.current = { onLaneCross, onFinish, onCollision };
-  }, [onLaneCross, onFinish, onCollision]);
+const rand = (min: number, max: number) => min + Math.random() * (max - min);
+const front = (v: Vehicle) => v.y + v.look.length / 2;
+const rear = (v: Vehicle) => v.y - v.look.length / 2;
+const stoppingDistance = (vel: number) => (vel * vel) / (2 * CAR_BRAKE);
+const easeInOut = (p: number) => (1 - Math.cos(Math.PI * p)) / 2;
 
+function easeOutBounce(p: number): number {
+  const n = 7.5625;
+  const d = 2.75;
+  if (p < 1 / d) return n * p * p;
+  if (p < 2 / d) return n * (p -= 1.5 / d) * p + 0.75;
+  if (p < 2.5 / d) return n * (p -= 2.25 / d) * p + 0.9375;
+  return n * (p -= 2.625 / d) * p + 0.984375;
+}
+
+function newVehicle(y: number, vel: number): Vehicle {
+  const look = VEHICLE_LOOKS[Math.floor(Math.random() * VEHICLE_LOOKS.length)];
+  return { y, vel, look, rushing: false, passThrough: false };
+}
+
+// Fills every lane with traffic already on the move, so the road never starts empty.
+function buildLanes(totalLanes: number, difficulty: Difficulty): Lane[] {
+  const cfg = TRAFFIC[difficulty] ?? TRAFFIC.MEDIUM;
+  const lanes: Lane[] = [];
+  for (let index = 1; index <= totalLanes; index++) {
+    const progress = totalLanes > 1 ? (index - 1) / (totalLanes - 1) : 0;
+    const speed = cfg.speed[0] + (cfg.speed[1] - cfg.speed[0]) * progress + rand(-0.4, 0.4);
+    const cars: Vehicle[] = [];
+    let y = WORLD_HEIGHT + rand(0, 160);
+    while (y > -60) {
+      const car = newVehicle(y, speed);
+      cars.push(car);
+      y -= car.look.length + CAR_GAP + (speed * rand(cfg.gapMs[0], cfg.gapMs[1])) / FRAME_MS;
+    }
+    lanes.push({ index, speed, cars, spawnInMs: rand(0, cfg.gapMs[1]), held: false, barrierAt: null, hit: false });
+  }
+  return lanes;
+}
+
+function createRoadState(gameState: GameStatus, multipliers: number[], difficulty: Difficulty): RoadState {
   const totalLanes = multipliers.length || 10;
-  const roadWidth = totalLanes * LANE_WIDTH;
-  const worldWidth = START_ZONE_WIDTH + roadWidth + FINISH_ZONE_WIDTH;
-  const fixedY = CROSSING_Y;
-
-  // Game internal state references
-  const stateRef = useRef({
+  return {
     gameState,
-    difficulty,
-    currentLane,
     multipliers,
     totalLanes,
-    worldWidth,
-    worldHeight: WORLD_HEIGHT,
-    // Chicken hero state (horizontal X-axis movement on fixed Y line)
-    chicken: {
-      x: 65, // starts on left sidewalk
-      y: fixedY,
-      vx: 0,
-      width: 44,
-      height: 44,
-      facing: 1, // 1: facing right, -1: facing left
-      stepAnim: 0,
-      isHit: false,
-      isWon: false,
-    },
-    // Camera
+    difficulty,
+    lanes: buildLanes(totalLanes, difficulty),
+    chicken: { lane: 0, x: spotX(0, totalLanes), lift: 0, landedAt: 0, mode: 'alive', modeAt: 0 },
+    step: null,
+    particles: [],
+    floaters: [],
     cameraX: 0,
-    movementLocked,
-    // Lanes and vehicles
-    vehicles: [] as Vehicle[],
-    laneTraffic: [] as Vehicle[][], // vehicles by lane (index 0 = lane 1)
-    potholes: [] as Pothole[],
-    particles: [] as Particle[],
-    screenShake: 0,
-    // Set when the server rules a hit; the render loop sends a car at the
-    // chicken and plays the crash on impact, or by hitDeadline at the latest.
-    hitPending: false,
-    hitDeadline: 0,
-    highestLaneCrossed: 0,
-    // Lane the chicken stepped onto whose ruling hasn't arrived yet; 0 if none.
-    verdictLane: 0,
-    targetLane: currentLane || 0,
-    lastStepSoundAnim: 0,
-    lastFrameTime: performance.now(),
-  });
+    shake: 0,
+  };
+}
 
-  // Keep stateRef in sync with props
-  useEffect(() => {
-    stateRef.current.gameState = gameState;
-    stateRef.current.difficulty = difficulty;
-    stateRef.current.multipliers = multipliers;
-    stateRef.current.totalLanes = totalLanes;
-    stateRef.current.worldWidth = worldWidth;
-  }, [gameState, difficulty, multipliers, totalLanes, worldWidth]);
+// Moves one lane's traffic a frame on. Cars keep their distance to the car
+// ahead; in a held or barred lane they stop at the stop line, unless they
+// were already too close to stop; a rushing car drives at the chicken.
+function updateLane(lane: Lane, dt: number, dtMs: number, gapMs: [number, number]) {
+  const blocked = lane.held || lane.barrierAt !== null;
+  let limitAhead = Infinity;
+  for (const car of lane.cars) {
+    let limit = limitAhead;
+    if (blocked && !car.rushing && !car.passThrough && front(car) <= STOP_LINE + 0.5) {
+      limit = Math.min(limit, STOP_LINE);
+    }
+    const target = car.rushing ? RUSH_SPEED : lane.speed;
+    car.vel = car.vel < target
+      ? Math.min(target, car.vel + (car.rushing ? RUSH_ACCEL : CAR_ACCEL) * dt)
+      : Math.max(target, car.vel - CAR_BRAKE * dt);
+    let move = car.vel * dt;
+    if (limit !== Infinity) {
+      const room = Math.max(0, limit - front(car));
+      car.vel = Math.min(car.vel, Math.sqrt(2 * CAR_BRAKE * room));
+      move = Math.min(move, room);
+    }
+    car.y += move;
+    limitAhead = rear(car) - CAR_GAP;
+  }
 
-  // Handle discrete step commands from touch buttons or external props
-  const lastStepTimestampRef = useRef<number>(0);
-  useEffect(() => {
-    if (!stepSignal || stepSignal.timestamp <= lastStepTimestampRef.current) return;
-    lastStepTimestampRef.current = stepSignal.timestamp;
-    const s = stateRef.current;
-    if (s.gameState !== 'ACTIVE' || s.chicken.isHit || s.chicken.isWon || s.movementLocked) return;
+  while (lane.cars.length > 0 && rear(lane.cars[0]) > WORLD_HEIGHT + 20) lane.cars.shift();
 
-    const targetX = checkpointX(s.targetLane, s.totalLanes);
-    if (Math.abs(s.chicken.x - targetX) > 4) return;
+  lane.spawnInMs -= dtMs;
+  if (lane.spawnInMs <= 0) {
+    const last = lane.cars[lane.cars.length - 1];
+    const car = newVehicle(0, lane.speed);
+    car.y = -car.look.length / 2 - 10;
+    // A queue backed up to the top of the road holds new cars back.
+    if (!last || rear(last) - CAR_GAP > front(car)) {
+      lane.cars.push(car);
+      lane.spawnInMs = rand(gapMs[0], gapMs[1]);
+    } else {
+      lane.spawnInMs = 300;
+    }
+  }
+}
 
-    if (stepSignal.direction === 'right') {
-      if (s.targetLane < s.totalLanes + 1) {
-        s.targetLane += 1;
+// Web Audio synth: zero latency, and silent when the player has muted the app.
+class RoadSounds {
+  private ctx: AudioContext | null = null;
+
+  private context(): AudioContext | null {
+    if (soundManager.isMuted()) return null;
+    try {
+      if (!this.ctx) {
+        const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+        if (AudioCtx) this.ctx = new AudioCtx();
       }
-    } else if (stepSignal.direction === 'left') {
-      if (s.targetLane > 0) {
-        s.targetLane -= 1;
+      if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume().catch(() => null);
+    } catch {
+      return null;
+    }
+    return this.ctx;
+  }
+
+  private tone(freq: number, endFreq: number, type: OscillatorType, volume: number, delay: number, duration: number) {
+    const ctx = this.context();
+    if (!ctx) return;
+    try {
+      const start = ctx.currentTime + delay;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = type;
+      osc.frequency.setValueAtTime(freq, start);
+      osc.frequency.exponentialRampToValueAtTime(endFreq, start + duration);
+      gain.gain.setValueAtTime(volume, start);
+      gain.gain.exponentialRampToValueAtTime(0.001, start + duration);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(start);
+      osc.stop(start + duration);
+    } catch {
+      // Audio may be blocked until the first user gesture.
+    }
+  }
+
+  private noise(volume: number, duration: number) {
+    const ctx = this.context();
+    if (!ctx) return;
+    try {
+      const buffer = ctx.createBuffer(1, Math.floor(ctx.sampleRate * duration), ctx.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < data.length; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / data.length);
+      const src = ctx.createBufferSource();
+      const gain = ctx.createGain();
+      src.buffer = buffer;
+      gain.gain.setValueAtTime(volume, ctx.currentTime);
+      src.connect(gain);
+      gain.connect(ctx.destination);
+      src.start();
+    } catch {
+      // Audio may be blocked until the first user gesture.
+    }
+  }
+
+  hop() {
+    this.tone(420, 900, 'square', 0.035, 0, 0.09);
+  }
+
+  land() {
+    this.tone(200, 90, 'sine', 0.09, 0, 0.08);
+  }
+
+  safe() {
+    this.tone(150, 100, 'square', 0.05, 0, 0.07); // barrier clack
+    [659.25, 783.99, 1046.5].forEach((f, i) => this.tone(f, f, 'triangle', 0.07, 0.05 + i * 0.05, 0.16));
+  }
+
+  honk() {
+    this.tone(392, 392, 'square', 0.05, 0, 0.16);
+    this.tone(494, 494, 'square', 0.04, 0, 0.16);
+  }
+
+  crash() {
+    this.noise(0.25, 0.35);
+    this.tone(160, 40, 'sawtooth', 0.22, 0, 0.4);
+  }
+
+  win() {
+    [523.25, 659.25, 783.99, 1046.5, 1318.51].forEach((f, i) => this.tone(f, f, 'sine', 0.12, i * 0.08, 0.3));
+  }
+}
+
+const sounds = new RoadSounds();
+
+function spawnBurst(s: RoadState, x: number, y: number, colors: string[], count: number, force: number, life: number) {
+  for (let i = 0; i < count; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = force * (0.4 + Math.random() * 0.8);
+    s.particles.push({
+      x,
+      y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed - force * 0.4,
+      color: colors[Math.floor(Math.random() * colors.length)],
+      size: 3 + Math.random() * 5,
+      rotation: Math.random() * Math.PI * 2,
+      vRot: (Math.random() - 0.5) * 0.3,
+      life: 0,
+      maxLife: life * (0.7 + Math.random() * 0.6),
+    });
+  }
+}
+
+const FEATHERS = ['#FFFFFF', '#FEF9C3', '#FDE047', '#F97316', '#EF4444'];
+const SPARKLES = ['#FBBF24', '#FDE68A', '#34D399', '#FFFFFF'];
+const CONFETTI = ['#F43F5E', '#FBBF24', '#34D399', '#60A5FA', '#A78BFA', '#FFFFFF'];
+
+function canStepNow(s: RoadState): boolean {
+  return s.gameState === 'ACTIVE' && !s.step && s.chicken.mode === 'alive' && s.chicken.lane < s.totalLanes;
+}
+
+// How long a hop into this lane has to wait for the cars too close to stop
+// to drive by, so none of them ever touches the chicken.
+function clearanceDelayMs(lane: Lane): number {
+  let clearMs = 0;
+  for (const car of lane.cars) {
+    if (!car.passThrough || rear(car) >= CHICKEN_BOTTOM + 6) continue;
+    const frames = (CHICKEN_BOTTOM + 6 - rear(car)) / Math.max(car.vel, 1);
+    clearMs = Math.max(clearMs, frames * FRAME_MS);
+  }
+  return Math.min(1500, Math.max(0, clearMs - HOP_MS * HOP_ENTRY));
+}
+
+// Sends the nearest car coming down the lane at the chicken standing in it
+// (a fresh one from the top of the road when none is close).
+function sendKiller(lane: Lane): Vehicle {
+  lane.held = false;
+  lane.barrierAt = null;
+  lane.hit = true;
+  let killer: Vehicle | null = null;
+  for (const car of lane.cars) {
+    if (front(car) < CHICKEN_TOP && (!killer || car.y > killer.y)) killer = car;
+  }
+  if (!killer || front(killer) < CHICKEN_TOP - 320) {
+    killer = newVehicle(0, lane.speed);
+    killer.y = ROAD_TOP - 20 - killer.look.length / 2;
+    const at = lane.cars.findIndex((car) => car.y < killer!.y);
+    lane.cars.splice(at === -1 ? lane.cars.length : at, 0, killer);
+  }
+  killer.rushing = true;
+  killer.passThrough = true;
+  sounds.honk();
+  return killer;
+}
+
+// The round starts over: the chicken back on the start pavement, the road open.
+function resetRoad(s: RoadState) {
+  if (s.step) {
+    s.step.resolve('error');
+    s.step = null;
+  }
+  s.chicken = { lane: 0, x: spotX(0, s.totalLanes), lift: 0, landedAt: 0, mode: 'alive', modeAt: 0 };
+  for (const lane of s.lanes) {
+    lane.held = false;
+    lane.barrierAt = null;
+    lane.hit = false;
+    for (const car of lane.cars) {
+      car.rushing = false;
+      car.passThrough = false;
+    }
+  }
+  s.floaters = [];
+  s.shake = 0;
+}
+
+// Puts the chicken on the lane the server has it on (a round picked up again),
+// with a barrier across every lane it has crossed.
+function placeChicken(s: RoadState, laneIndex: number) {
+  const lane = Math.max(0, Math.min(s.totalLanes, laneIndex));
+  s.chicken.lane = lane;
+  s.chicken.x = spotX(lane, s.totalLanes);
+  s.chicken.lift = 0;
+  for (const l of s.lanes) {
+    l.held = false;
+    l.hit = false;
+    l.barrierAt = l.index <= lane ? -Infinity : null;
+  }
+  const standing = s.lanes[lane - 1];
+  if (standing) {
+    standing.cars = standing.cars.filter((car) => front(car) <= STOP_LINE || rear(car) > CHICKEN_BOTTOM + 10);
+  }
+}
+
+// Advances the hop in progress, if any, one frame and plays out its verdict.
+function updateStep(s: RoadState, now: number) {
+  const step = s.step;
+  if (!step) return;
+  const chicken = s.chicken;
+  const lane = s.lanes[step.lane - 1];
+
+  const hopProgress = () => Math.min(1, Math.max(0, (now - step.hopStart) / HOP_MS));
+  const moveAlongHop = () => {
+    const p = hopProgress();
+    chicken.x = step.hopFrom + (step.hopTo - step.hopFrom) * easeInOut(p);
+    chicken.lift = Math.sin(Math.PI * p) * HOP_HEIGHT;
+    return p >= 1;
+  };
+  const finish = (outcome: StepOutcome, afterMs: number) => {
+    step.outcome = outcome;
+    step.settleAt = now + afterMs;
+    step.phase = 'settle';
+  };
+
+  switch (step.phase) {
+    case 'clearing':
+      if (step.verdict === 'error') {
+        lane.held = false;
+        s.step = null;
+        step.resolve('error');
+        return;
       }
-    }
-  }, [stepSignal]);
-
-  // Keep chicken position synced without overriding player input during ACTIVE game
-  useEffect(() => {
-    const s = stateRef.current;
-    if (gameState === 'READY') {
-      // Start zone — place chicken in the middle of the start pad
-      s.chicken.x = 65;
-      s.chicken.vx = 0;
-      s.highestLaneCrossed = 0;
-      s.verdictLane = 0;
-      s.targetLane = 0;
-      s.lastStepSoundAnim = 0;
-    } else if (
-      gameState === 'ACTIVE' &&
-      currentLane > 0
-    ) {
-      s.chicken.x = checkpointX(currentLane, s.totalLanes);
-      s.chicken.vx = 0;
-      s.targetLane = Math.max(s.targetLane, currentLane);
-    }
-    s.chicken.y = fixedY;
-    s.currentLane = currentLane;
-    // Keep multiplier ring "crossed" state in sync
-    if (currentLane > s.highestLaneCrossed) {
-      s.highestLaneCrossed = currentLane;
-    }
-    if (currentLane > s.targetLane) {
-      s.targetLane = currentLane;
-    }
-  }, [currentLane, fixedY, gameState]);
-
-  useEffect(() => {
-    if (gameState === 'READY') {
-      // Reset chicken position to left starting zone
-      const s = stateRef.current;
-      s.chicken.x = 65;
-      s.chicken.y = fixedY;
-      s.chicken.vx = 0;
-      s.chicken.facing = 1;
-      s.chicken.stepAnim = 0;
-      s.chicken.isHit = false;
-      s.chicken.isWon = false;
-      s.highestLaneCrossed = 0;
-      s.verdictLane = 0;
-      s.targetLane = 0;
-      s.lastStepSoundAnim = 0;
-      s.cameraX = 0;
-      s.particles = [];
-      s.potholes = [];
-      s.screenShake = 0;
-      s.hitPending = false;
-      s.hitDeadline = 0;
-      s.vehicles.forEach((v) => {
-        v.rushing = false;
-      });
-    } else if (gameState === 'LOST') {
-      // The server's draw decided the hit; the render loop sends a car at the chicken.
-      const s = stateRef.current;
-      if (!s.chicken.isHit && !s.hitPending) {
-        s.chicken.vx = 0;
-        s.hitPending = true;
-        s.hitDeadline = 0;
+      if (now >= step.hopStart) {
+        step.phase = 'hop';
+        step.hopStart = now;
+        sounds.hop();
       }
-    } else if (gameState === 'WON') {
-      stateRef.current.chicken.isWon = true;
+      return;
+
+    case 'hop':
+      if (!moveAlongHop()) return;
+      chicken.lane = step.lane;
+      chicken.lift = 0;
+      chicken.landedAt = now;
+      sounds.land();
+      step.phase = 'wait';
+      return;
+
+    case 'wait': {
+      if (step.verdict === null) return;
+      if (step.verdict === 'hit') {
+        step.killer = sendKiller(lane);
+        step.deadline = now + 1500;
+        step.phase = 'hit';
+        return;
+      }
+      if (step.verdict === 'error') {
+        // The lane stays held until the chicken is out of it.
+        step.phase = 'back';
+        step.hopFrom = chicken.x;
+        step.hopTo = spotX(step.lane - 1, s.totalLanes);
+        step.hopStart = now;
+        sounds.hop();
+        return;
+      }
+      // Safe: the barrier comes down and the traffic stops behind it.
+      lane.barrierAt = now;
+      const mult = s.multipliers[step.lane - 1];
+      if (mult) s.floaters.push({ x: chicken.x, y: BARRIER_Y - 26, text: `${mult.toFixed(2)}x`, color: '#FDE68A', born: now });
+      spawnBurst(s, chicken.x, CROSSING_Y, SPARKLES, 14, 3, 32);
+      sounds.safe();
+      if (step.verdict === 'won') {
+        step.phase = 'finish';
+        step.hopFrom = chicken.x;
+        step.hopTo = spotX(s.totalLanes + 1, s.totalLanes);
+        step.hopStart = now + BARRIER_DROP_MS + 120;
+        return;
+      }
+      finish('safe', 60);
+      return;
     }
-  }, [gameState, fixedY]);
 
-  useEffect(() => {
-    stateRef.current.movementLocked = movementLocked;
-  }, [movementLocked]);
+    case 'hit': {
+      const killer = step.killer;
+      const impact = !killer || front(killer) >= CHICKEN_TOP + 8 || !lane.cars.includes(killer);
+      if (!impact && now < step.deadline) return;
+      chicken.mode = 'dead';
+      chicken.modeAt = now;
+      chicken.lift = 0;
+      s.shake = 16;
+      spawnBurst(s, chicken.x, CROSSING_Y, FEATHERS, 34, 6, 60);
+      sounds.crash();
+      finish('hit', 750);
+      return;
+    }
 
-  // Generate Vertical Traffic (Vehicles Travelling UP / DOWN across vertical lanes)
-  const generateTraffic = useCallback(() => {
-    const vehicles: Vehicle[] = [];
-    let idCounter = 1;
+    case 'finish':
+      if (now < step.hopStart) return;
+      if (!step.finishing) {
+        step.finishing = true;
+        sounds.hop();
+      }
+      if (!moveAlongHop()) return;
+      chicken.lane = s.totalLanes + 1;
+      chicken.lift = 0;
+      chicken.mode = 'won';
+      chicken.modeAt = now;
+      spawnBurst(s, chicken.x, CROSSING_Y - 20, CONFETTI, 60, 6, 80);
+      sounds.win();
+      finish('won', 600);
+      return;
 
-    const vehicleTemplates: {
-      type: Vehicle['type'];
-      width: number;
-      height: number;
-      color: string;
-      roofColor: string;
-      wheelColor: string;
-    }[] = [
-      { type: 'taxi', width: 36, height: 74, color: '#FBBF24', roofColor: '#F59E0B', wheelColor: '#1E293B' },
-      { type: 'sportscar', width: 34, height: 72, color: '#EF4444', roofColor: '#DC2626', wheelColor: '#0F172A' },
-      { type: 'sedan', width: 35, height: 76, color: '#3B82F6', roofColor: '#2563EB', wheelColor: '#1E293B' },
-      { type: 'suv', width: 38, height: 80, color: '#8B5CF6', roofColor: '#7C3AED', wheelColor: '#0F172A' },
-      { type: 'truck', width: 42, height: 96, color: '#10B981', roofColor: '#059669', wheelColor: '#0F172A' },
-      { type: 'van', width: 38, height: 84, color: '#F8FAFC', roofColor: '#E2E8F0', wheelColor: '#1E293B' },
-      { type: 'bus', width: 40, height: 104, color: '#F97316', roofColor: '#EA580C', wheelColor: '#0F172A' },
-    ];
+    case 'back':
+      if (!moveAlongHop()) return;
+      lane.held = false;
+      chicken.lane = step.lane - 1;
+      chicken.lift = 0;
+      chicken.landedAt = now;
+      finish('error', 0);
+      return;
 
-    const speedMultipliers: Record<Difficulty, number> = {
-      MEDIUM: 1.15,
-      HARD:   1.45,
-    };
+    case 'settle':
+      if (now < step.settleAt) return;
+      s.step = null;
+      step.resolve(step.outcome);
+      return;
+  }
+}
 
-    const vehicleCountByDifficulty: Record<Difficulty, number> = {
-      MEDIUM: 2,
-      HARD:   3,
-    };
+// ─── Drawing ───────────────────────────────────────────────────────────────
 
-    const speedFactor = speedMultipliers[difficulty] || 1.0;
-    const numVehicles = vehicleCountByDifficulty[difficulty] || 2;
-    const VEHICLE_SAFE_GAP = 40;
+function drawBackdrop(ctx: CanvasRenderingContext2D, s: RoadState, viewLeft: number, viewWidth: number) {
+  const worldWidth = worldWidthFor(s.totalLanes);
+  const left = Math.min(0, viewLeft) - 20;
+  const right = Math.max(worldWidth, viewLeft + viewWidth) + 20;
 
-    for (let lane = 1; lane <= totalLanes; lane++) {
-      // Alternating vertical direction: odd lanes move DOWN, even lanes move UP
-      const direction: 1 | -1 = lane % 2 === 1 ? 1 : -1;
-      const laneX = laneCenterX(lane);
+  ctx.fillStyle = '#1E641D';
+  ctx.fillRect(left, 0, right - left, WORLD_HEIGHT);
 
-      const laneProgress = totalLanes > 1 ? (lane - 1) / (totalLanes - 1) : 0;
-      const baseSpeed = (1.8 + laneProgress * 0.8 + Math.random() * 0.25) * speedFactor;
-      const laneSpacing = (WORLD_HEIGHT + 240) / numVehicles;
+  // Lawn stripes and trees along both verges.
+  ctx.fillStyle = '#287A25';
+  const firstStripe = Math.floor(left / 100) * 100;
+  for (let x = firstStripe; x < right; x += 100) {
+    ctx.fillRect(x, 0, 50, ROAD_TOP);
+    ctx.fillRect(x, ROAD_BOTTOM, 50, WORLD_HEIGHT - ROAD_BOTTOM);
+  }
+  for (let x = 60; x < worldWidth; x += 150) {
+    for (const y of [22, WORLD_HEIGHT - 22]) {
+      ctx.fillStyle = '#166534';
+      ctx.beginPath();
+      ctx.arc(x, y, 18, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#22C55E';
+      ctx.beginPath();
+      ctx.arc(x, y - 3, 13, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
 
-      for (let i = 0; i < numVehicles; i++) {
-        const template = vehicleTemplates[(lane + i * 2) % vehicleTemplates.length];
-        const idealY =
-          direction === 1
-            ? -100 + i * laneSpacing
-            : WORLD_HEIGHT + 100 - i * laneSpacing;
+  // Start pavement.
+  const roadHeight = ROAD_BOTTOM - ROAD_TOP;
+  ctx.fillStyle = '#595959';
+  ctx.fillRect(0, ROAD_TOP, START_ZONE_WIDTH, roadHeight);
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  for (let y = ROAD_TOP + 35; y < ROAD_BOTTOM; y += 35) {
+    ctx.moveTo(0, y);
+    ctx.lineTo(START_ZONE_WIDTH, y);
+  }
+  ctx.moveTo(START_ZONE_WIDTH / 2, ROAD_TOP);
+  ctx.lineTo(START_ZONE_WIDTH / 2, ROAD_BOTTOM);
+  ctx.stroke();
+  ctx.font = '900 13px Inter, sans-serif';
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('START', START_ZONE_WIDTH / 2, CROSSING_Y - 52);
 
-        const maxJitter = Math.max(0, Math.min(15, (laneSpacing - template.height - VEHICLE_SAFE_GAP) / 2));
-        const jitter = maxJitter > 0 ? (Math.random() * 2 - 1) * maxJitter : 0;
-        const startY = idealY + jitter;
+  // Asphalt.
+  const roadLeft = START_ZONE_WIDTH;
+  const roadWidth = s.totalLanes * LANE_WIDTH;
+  ctx.fillStyle = '#5E5E5E';
+  ctx.fillRect(roadLeft, ROAD_TOP, roadWidth, roadHeight);
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.07)';
+  for (let lane = 1; lane <= s.totalLanes; lane += 2) {
+    ctx.fillRect(roadLeft + (lane - 1) * LANE_WIDTH, ROAD_TOP, LANE_WIDTH, roadHeight);
+  }
 
-        vehicles.push({
-          id: idCounter++,
+  // Kerbs.
+  ctx.fillStyle = '#D0D0D0';
+  ctx.fillRect(roadLeft, ROAD_TOP - 8, roadWidth, 8);
+  ctx.fillRect(roadLeft, ROAD_BOTTOM, roadWidth, 8);
+  ctx.fillStyle = '#8A8A8A';
+  ctx.fillRect(roadLeft, ROAD_TOP - 2, roadWidth, 2);
+  ctx.fillRect(roadLeft, ROAD_BOTTOM, roadWidth, 2);
+
+  // Hazard line between the pavement and the road.
+  ctx.strokeStyle = '#FBBF24';
+  ctx.lineWidth = 4;
+  ctx.setLineDash([12, 10]);
+  ctx.beginPath();
+  ctx.moveTo(roadLeft, ROAD_TOP);
+  ctx.lineTo(roadLeft, ROAD_BOTTOM);
+  ctx.stroke();
+
+  // Dashed lane dividers.
+  ctx.strokeStyle = 'rgba(240, 240, 240, 0.85)';
+  ctx.lineWidth = 3;
+  ctx.setLineDash([22, 18]);
+  ctx.beginPath();
+  for (let lane = 1; lane < s.totalLanes; lane++) {
+    const x = roadLeft + lane * LANE_WIDTH;
+    ctx.moveTo(x, ROAD_TOP + 8);
+    ctx.lineTo(x, ROAD_BOTTOM - 8);
+  }
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Traffic direction arrows.
+  ctx.font = '14px Inter, sans-serif';
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+  for (let lane = 1; lane <= s.totalLanes; lane++) {
+    ctx.fillText('▼', laneCenterX(lane), ROAD_TOP + 22);
+    ctx.fillText('▼', laneCenterX(lane), ROAD_BOTTOM - 20);
+  }
+
+  // Finish: chequered line, then a golden pad for the chicken to land on.
+  const finishX = finishStartX(s.totalLanes);
+  ctx.fillStyle = '#1B4D21';
+  ctx.fillRect(finishX, ROAD_TOP, FINISH_ZONE_WIDTH, roadHeight);
+  const square = 15;
+  for (let col = 0; col < 3; col++) {
+    for (let row = 0; row * square < roadHeight; row++) {
+      ctx.fillStyle = (col + row) % 2 === 0 ? '#FFFFFF' : '#1E293B';
+      ctx.fillRect(finishX + col * square, ROAD_TOP + row * square, square, Math.min(square, roadHeight - row * square));
+    }
+  }
+  const padX = spotX(s.totalLanes + 1, s.totalLanes);
+  const pad = ctx.createRadialGradient(padX, CROSSING_Y, 4, padX, CROSSING_Y, 38);
+  pad.addColorStop(0, '#FDE68A');
+  pad.addColorStop(0.7, '#F59E0B');
+  pad.addColorStop(1, '#B45309');
+  ctx.fillStyle = pad;
+  ctx.beginPath();
+  ctx.arc(padX, CROSSING_Y, 34, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = '#FEF3C7';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.font = '900 14px Inter, sans-serif';
+  ctx.fillStyle = '#FCD34D';
+  ctx.fillText('FINISH', padX, CROSSING_Y - 58);
+  const top = s.multipliers[s.totalLanes - 1];
+  if (top && s.chicken.lane <= s.totalLanes) {
+    ctx.font = '900 13px Inter, sans-serif';
+    ctx.fillStyle = '#78350F';
+    ctx.fillText(`${top.toFixed(2)}x`, padX, CROSSING_Y + 1);
+  }
+}
+
+// The manhole cover in the middle of each lane, with the multiplier it pays.
+function drawManholes(ctx: CanvasRenderingContext2D, s: RoadState, now: number) {
+  const active = s.gameState === 'ACTIVE' && s.chicken.mode === 'alive';
+  const nextLane = active ? (s.step ? s.step.lane : s.chicken.lane + 1) : -1;
+  const pulse = 0.5 + 0.5 * Math.sin(now / 220);
+
+  for (const lane of s.lanes) {
+    const x = laneCenterX(lane.index);
+    const y = CROSSING_Y;
+    const crossed = lane.barrierAt !== null;
+    const isNext = lane.index === nextLane;
+    const mult = s.multipliers[lane.index - 1] ?? 1 + lane.index * 0.05;
+
+    if (crossed || isNext) {
+      ctx.fillStyle = crossed ? 'rgba(250, 204, 21, 0.22)' : `rgba(255, 255, 255, ${0.1 + pulse * 0.15})`;
+      ctx.beginPath();
+      ctx.arc(x, y, 33 + (isNext ? pulse * 3 : 0), 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+    ctx.beginPath();
+    ctx.arc(x, y + 3, 28, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.arc(x, y, 27, 0, Math.PI * 2);
+    ctx.fillStyle = lane.hit ? '#450A0A' : crossed ? '#14532D' : '#353535';
+    ctx.fill();
+    ctx.lineWidth = isNext ? 3 : 2.5;
+    ctx.strokeStyle = lane.hit ? '#EF4444' : crossed ? '#FACC15' : isNext ? `rgba(255, 255, 255, ${0.6 + pulse * 0.4})` : '#5A5A5A';
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.arc(x, y, 21, 0, Math.PI * 2);
+    ctx.fillStyle = lane.hit ? '#2A0505' : crossed ? '#0F3D21' : '#262626';
+    ctx.fill();
+
+    ctx.fillStyle = crossed ? '#FACC15' : '#7A7A7A';
+    for (let a = 0; a < Math.PI * 2; a += Math.PI / 3) {
+      ctx.beginPath();
+      ctx.arc(x + Math.cos(a) * 24, y + Math.sin(a) * 24, 1.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.font = '900 13px Inter, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = lane.hit ? '#FCA5A5' : crossed ? '#FDE68A' : '#EDEDED';
+    ctx.fillText(`${mult.toFixed(2)}x`, x, y + 1);
+  }
+}
+
+// Striped road block across a lane crossed safely; it drops in with a bounce.
+function drawBarriers(ctx: CanvasRenderingContext2D, s: RoadState, now: number) {
+  for (const lane of s.lanes) {
+    if (lane.barrierAt === null) continue;
+    const p = Math.min(1, Math.max(0, (now - lane.barrierAt) / BARRIER_DROP_MS));
+    const x = laneCenterX(lane.index);
+    const y = BARRIER_Y - (1 - easeOutBounce(p)) * 70;
+    const w = 72;
+    const h = 13;
+
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, p * 3);
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+    ctx.fillRect(x - w / 2 + 3, y - h / 2 + 4, w, h);
+    ctx.fillStyle = '#374151';
+    ctx.fillRect(x - w / 2 + 3, y + h / 2 - 1, 5, 9);
+    ctx.fillRect(x + w / 2 - 8, y + h / 2 - 1, 5, 9);
+
+    ctx.beginPath();
+    ctx.roundRect(x - w / 2, y - h / 2, w, h, 3);
+    ctx.fillStyle = '#FACC15';
+    ctx.fill();
+    ctx.clip();
+    ctx.fillStyle = '#111827';
+    for (let sx = x - w / 2 - h; sx < x + w / 2; sx += 16) {
+      ctx.beginPath();
+      ctx.moveTo(sx, y + h / 2);
+      ctx.lineTo(sx + 8, y + h / 2);
+      ctx.lineTo(sx + 8 + h, y - h / 2);
+      ctx.lineTo(sx + h, y - h / 2);
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.restore();
+
+    // Warning lamps.
+    const blink = Math.floor(now / 400) % 2 === 0;
+    ctx.fillStyle = blink ? '#F87171' : '#7F1D1D';
+    ctx.beginPath();
+    ctx.arc(x - w / 2 + 6, y - h / 2 - 3, 3, 0, Math.PI * 2);
+    ctx.arc(x + w / 2 - 6, y - h / 2 - 3, 3, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+function drawVehicle(ctx: CanvasRenderingContext2D, v: Vehicle, x: number) {
+  const { width: w, length: l, color, roof, type } = v.look;
+  ctx.save();
+  ctx.translate(x, v.y);
+
+  // Headlight beams on the asphalt ahead, fading out.
+  const beam = ctx.createLinearGradient(0, l / 2, 0, l / 2 + 50);
+  beam.addColorStop(0, 'rgba(254, 240, 138, 0.2)');
+  beam.addColorStop(1, 'rgba(254, 240, 138, 0)');
+  ctx.fillStyle = beam;
+  ctx.beginPath();
+  ctx.moveTo(-w * 0.4, l / 2);
+  ctx.lineTo(-w * 0.9, l / 2 + 50);
+  ctx.lineTo(w * 0.9, l / 2 + 50);
+  ctx.lineTo(w * 0.4, l / 2);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+  ctx.beginPath();
+  ctx.roundRect(-w / 2 + 3, -l / 2 + 4, w, l, 8);
+  ctx.fill();
+
+  ctx.fillStyle = '#111827';
+  ctx.fillRect(-w / 2 - 2, -l / 2 + 10, 6, 14);
+  ctx.fillRect(-w / 2 - 2, l / 2 - 24, 6, 14);
+  ctx.fillRect(w / 2 - 4, -l / 2 + 10, 6, 14);
+  ctx.fillRect(w / 2 - 4, l / 2 - 24, 6, 14);
+
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.roundRect(-w / 2, -l / 2, w, l, 8);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  // Windscreen at the front (bottom), rear window behind the roof.
+  ctx.fillStyle = 'rgba(15, 23, 42, 0.88)';
+  ctx.beginPath();
+  ctx.roundRect(-w * 0.35, l * 0.1, w * 0.7, l * 0.22, 4);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.roundRect(-w * 0.32, -l * 0.34, w * 0.64, l * 0.12, 3);
+  ctx.fill();
+  ctx.fillStyle = roof;
+  ctx.beginPath();
+  ctx.roundRect(-w * 0.3, -l * 0.2, w * 0.6, l * 0.28, 3);
+  ctx.fill();
+
+  if (type === 'taxi') {
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(-9, -l * 0.08 - 4, 18, 8);
+    ctx.fillStyle = '#000000';
+    ctx.font = '700 6px Inter, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('TAXI', 0, -l * 0.08);
+  }
+
+  ctx.fillStyle = '#FEF08A';
+  ctx.fillRect(-w / 2 + 4, l / 2 - 3, 7, 3);
+  ctx.fillRect(w / 2 - 11, l / 2 - 3, 7, 3);
+  ctx.fillStyle = '#EF4444';
+  ctx.fillRect(-w / 2 + 4, -l / 2, 7, 3);
+  ctx.fillRect(w / 2 - 11, -l / 2, 7, 3);
+
+  ctx.restore();
+}
+
+function drawTraffic(ctx: CanvasRenderingContext2D, s: RoadState) {
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(START_ZONE_WIDTH, ROAD_TOP, s.totalLanes * LANE_WIDTH, ROAD_BOTTOM - ROAD_TOP);
+  ctx.clip();
+  for (const lane of s.lanes) {
+    const x = laneCenterX(lane.index);
+    for (const car of lane.cars) {
+      if (front(car) < ROAD_TOP - 10 || rear(car) > ROAD_BOTTOM + 10) continue;
+      drawVehicle(ctx, car, x);
+    }
+  }
+  ctx.restore();
+}
+
+function drawChicken(ctx: CanvasRenderingContext2D, s: RoadState, now: number) {
+  const ch = s.chicken;
+  const x = ch.x;
+
+  if (ch.mode === 'dead') {
+    // Flattened on the road where the car ran it over.
+    ctx.save();
+    ctx.translate(x, CROSSING_Y + 6);
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+    ctx.beginPath();
+    ctx.ellipse(0, 4, 30, 10, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#FEF9C3';
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 27, 9, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#CA8A04';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.fillStyle = '#EF4444';
+    ctx.beginPath();
+    ctx.ellipse(-4, -8, 9, 3, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#F97316';
+    ctx.beginPath();
+    ctx.moveTo(24, -2);
+    ctx.lineTo(33, 1);
+    ctx.lineTo(24, 4);
+    ctx.fill();
+    ctx.strokeStyle = '#0F172A';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(10, -4);
+    ctx.lineTo(16, 2);
+    ctx.moveTo(16, -4);
+    ctx.lineTo(10, 2);
+    ctx.stroke();
+    ctx.restore();
+    if (now - ch.modeAt < 600) {
+      ctx.font = '38px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('💥', x, CROSSING_Y - 8);
+    }
+    return;
+  }
+
+  // Hopping in place on the finish pad, or breathing while it waits.
+  const celebrating = ch.mode === 'won';
+  const lift = celebrating ? Math.abs(Math.sin((now - ch.modeAt) / 170)) * 16 : ch.lift;
+  const sinceLanding = now - ch.landedAt;
+  const squash = !celebrating && ch.lift === 0 && sinceLanding < 160 ? 1 - sinceLanding / 160 : 0;
+  const breathe = ch.lift === 0 && !celebrating ? Math.sin(now / 320) * 0.025 : 0;
+  const airborne = lift > 2;
+
+  // Shadow on the road, smaller while it is in the air.
+  const k = 1 - Math.min(1, lift / HOP_HEIGHT) * 0.4;
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+  ctx.beginPath();
+  ctx.ellipse(x, CROSSING_Y + 18, 18 * k, 8 * k, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.save();
+  ctx.translate(x, CROSSING_Y - lift);
+  ctx.scale(1 + squash * 0.14, 1 - squash * 0.16 + breathe);
+
+  // Feet, tucked up in the air.
+  ctx.fillStyle = '#EA580C';
+  ctx.beginPath();
+  if (airborne) {
+    ctx.ellipse(-6, 14, 5, 3, -0.4, 0, Math.PI * 2);
+    ctx.ellipse(6, 14, 5, 3, 0.4, 0, Math.PI * 2);
+  } else {
+    ctx.ellipse(-8, 17, 5, 3, 0, 0, Math.PI * 2);
+    ctx.ellipse(8, 17, 5, 3, 0, 0, Math.PI * 2);
+  }
+  ctx.fill();
+
+  ctx.fillStyle = '#FEF08A';
+  ctx.beginPath();
+  ctx.ellipse(-14, 2, 8, 12, 0.4, 0, Math.PI * 2);
+  ctx.fill();
+
+  const body = ctx.createRadialGradient(2, -3, 4, 0, 0, 20);
+  body.addColorStop(0, '#FFFFFF');
+  body.addColorStop(0.7, '#FEF9C3');
+  body.addColorStop(1, '#FDE047');
+  ctx.fillStyle = body;
+  ctx.beginPath();
+  ctx.arc(0, 0, 18, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = '#CA8A04';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  // Wings, spread in the air.
+  ctx.fillStyle = '#FEF08A';
+  ctx.beginPath();
+  if (airborne || celebrating) {
+    ctx.ellipse(-4, -2, 11, 6, -0.7, 0, Math.PI * 2);
+  } else {
+    ctx.ellipse(-2, 3, 10, 6, -0.1, 0, Math.PI * 2);
+  }
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.fillStyle = '#EF4444';
+  ctx.beginPath();
+  ctx.arc(2, -18, 5.5, 0, Math.PI * 2);
+  ctx.arc(-3, -16, 4.5, 0, Math.PI * 2);
+  ctx.arc(7, -16, 4.5, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = '#0F172A';
+  ctx.beginPath();
+  ctx.arc(8, -4, 3.5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#FFFFFF';
+  ctx.beginPath();
+  ctx.arc(9, -5, 1.2, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = 'rgba(244, 63, 94, 0.4)';
+  ctx.beginPath();
+  ctx.arc(6, 2, 3, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = '#F97316';
+  ctx.beginPath();
+  ctx.moveTo(14, -2);
+  ctx.lineTo(22, 2);
+  ctx.lineTo(14, 6);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.fillStyle = '#DC2626';
+  ctx.beginPath();
+  ctx.arc(14, 8, 2.5, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.restore();
+}
+
+function drawEffects(ctx: CanvasRenderingContext2D, s: RoadState, now: number) {
+  for (const p of s.particles) {
+    ctx.save();
+    ctx.translate(p.x, p.y);
+    ctx.rotate(p.rotation);
+    ctx.globalAlpha = Math.max(0, 1 - p.life / p.maxLife);
+    ctx.fillStyle = p.color;
+    ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size);
+    ctx.restore();
+  }
+
+  // The multiplier just won, rising off the barrier on a dark pill.
+  ctx.font = '900 15px Inter, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  for (const f of s.floaters) {
+    const age = (now - f.born) / 900;
+    const y = f.y - age * 34;
+    const w = ctx.measureText(f.text).width + 16;
+    ctx.globalAlpha = Math.max(0, 1 - age * age);
+    ctx.fillStyle = 'rgba(17, 24, 39, 0.85)';
+    ctx.beginPath();
+    ctx.roundRect(f.x - w / 2, y - 11, w, 22, 11);
+    ctx.fill();
+    ctx.fillStyle = f.color;
+    ctx.fillText(f.text, f.x, y + 1);
+  }
+  ctx.globalAlpha = 1;
+}
+
+const RoadCrossingGameComponent = ({ gameState, multipliers, currentLane, difficulty, ref }: RoadCrossingGameProps) => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const viewRef = useRef({ width: 0, height: 0 });
+  // The road's mutable world, shared by the render loop and the handlers below.
+  const [s] = useState(() => createRoadState(gameState, multipliers, difficulty));
+
+  const totalLanes = multipliers.length || 10;
+
+  useImperativeHandle(ref, () => ({
+    canStep: () => canStepNow(s),
+    step: (lane, verdict) => {
+      if (!canStepNow(s) || lane !== s.chicken.lane + 1) return Promise.resolve<StepOutcome>('error');
+      return new Promise<StepOutcome>((resolve) => {
+        const target = s.lanes[lane - 1];
+        // Cars that can still stop wait short of the chicken's path; those
+        // that can't drive on, and the hop waits for them to pass.
+        for (const car of target.cars) {
+          car.passThrough = front(car) > STOP_LINE - stoppingDistance(car.vel) - 2;
+        }
+        target.held = true;
+        const now = performance.now();
+        const pending: PendingStep = {
           lane,
-          x: laneX,
-          y: startY,
-          width: template.width,
-          height: template.height,
-          speed: baseSpeed,
-          vel: baseSpeed,
-          rushing: false,
-          direction,
-          type: template.type,
-          color: template.color,
-          roofColor: template.roofColor,
-          wheelColor: template.wheelColor,
-        });
+          phase: 'clearing',
+          verdict: null,
+          hopStart: now + clearanceDelayMs(target),
+          hopFrom: s.chicken.x,
+          hopTo: spotX(lane, s.totalLanes),
+          finishing: false,
+          killer: null,
+          deadline: 0,
+          settleAt: 0,
+          outcome: 'error',
+          resolve,
+        };
+        s.step = pending;
+        verdict.then(
+          (v) => {
+            if (s.step === pending) pending.verdict = v;
+          },
+          () => {
+            if (s.step === pending) pending.verdict = 'error';
+          },
+        );
+      });
+    },
+  }), [s]);
+
+  // A new payout table or difficulty means a new road.
+  useEffect(() => {
+    s.multipliers = multipliers;
+    if (s.totalLanes !== totalLanes || s.difficulty !== difficulty) {
+      if (s.step) {
+        s.step.resolve('error');
+        s.step = null;
       }
+      s.totalLanes = totalLanes;
+      s.difficulty = difficulty;
+      s.lanes = buildLanes(totalLanes, difficulty);
+      s.chicken.x = spotX(Math.min(s.chicken.lane, totalLanes + 1), totalLanes);
     }
-
-    stateRef.current.vehicles = vehicles;
-    stateRef.current.laneTraffic = Array.from({ length: totalLanes }, (_, i) =>
-      vehicles.filter((v) => v.lane === i + 1)
-    );
-  }, [difficulty, totalLanes]);
+  }, [s, multipliers, totalLanes, difficulty]);
 
   useEffect(() => {
-    generateTraffic();
-  }, [generateTraffic]);
-
-  // Static pothole generator - kept empty to prevent unfair invisible collisions on fixed horizontal track
-  const generatePotholes = useCallback(() => {
-    stateRef.current.potholes = [];
-  }, []);
-
-  // Regenerate potholes fresh every time a new game starts
-  useEffect(() => {
-    if (gameState === 'ACTIVE') {
-      generatePotholes();
+    s.gameState = gameState;
+    const now = performance.now();
+    if (gameState === 'READY') {
+      resetRoad(s);
+    } else if (gameState === 'WON' && s.chicken.mode === 'alive') {
+      // Cashed out: a little victory dance where it stands.
+      s.chicken.mode = 'won';
+      s.chicken.modeAt = now;
+      spawnBurst(s, s.chicken.x, CROSSING_Y - 20, CONFETTI, 50, 6, 80);
+      sounds.win();
+    } else if (gameState === 'LOST' && s.chicken.mode === 'alive' && !s.step && s.chicken.lane >= 1) {
+      // Lost without a hop in play (settled elsewhere): the car still comes.
+      const lane = s.lanes[s.chicken.lane - 1];
+      const killer = sendKiller(lane);
+      s.step = {
+        lane: lane.index,
+        phase: 'hit',
+        verdict: 'hit',
+        hopStart: now,
+        hopFrom: s.chicken.x,
+        hopTo: s.chicken.x,
+        finishing: false,
+        killer,
+        deadline: now + 1500,
+        settleAt: 0,
+        outcome: 'hit',
+        resolve: () => {},
+      };
     }
-  }, [gameState, generatePotholes]);
+  }, [s, gameState]);
 
-  // Keyboard and touch listeners
+  // Between hops the chicken stands where the server has it (a round picked up again).
   useEffect(() => {
-    const isLeftKey = (e: KeyboardEvent) =>
-      ['ArrowLeft', 'KeyA'].includes(e.code) || ['ArrowLeft', 'a', 'A'].includes(e.key);
-    const isRightKey = (e: KeyboardEvent) =>
-      ['ArrowRight', 'KeyD'].includes(e.code) || ['ArrowRight', 'd', 'D'].includes(e.key);
+    if (gameState !== 'ACTIVE' || s.step || s.chicken.mode !== 'alive') return;
+    if (s.chicken.lane !== currentLane) placeChicken(s, currentLane);
+  }, [s, gameState, currentLane]);
 
-    const triggerStep = (dir: 'left' | 'right') => {
-      const s = stateRef.current;
-      if (s.gameState !== 'ACTIVE' || s.chicken.isHit || s.chicken.isWon || s.movementLocked) return;
-      const targetX = checkpointX(s.targetLane, s.totalLanes);
-      if (Math.abs(s.chicken.x - targetX) > 4) return;
-      if (dir === 'right' && s.targetLane < s.totalLanes + 1) {
-        s.targetLane += 1;
-      } else if (dir === 'left' && s.targetLane > 0) {
-        s.targetLane -= 1;
-      }
-    };
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.repeat) return;
-      if (isRightKey(e)) {
-        e.preventDefault();
-        triggerStep('right');
-      } else if (isLeftKey(e)) {
-        e.preventDefault();
-        triggerStep('left');
-      }
-    };
-
-    // Canvas touch drag / swipe support horizontally
-    let touchStartX: number | null = null;
-    const handleTouchStart = (e: TouchEvent) => {
-      if (e.touches.length > 0) {
-        touchStartX = e.touches[0].clientX;
-      }
-    };
-
-    const handleTouchEnd = (e: TouchEvent) => {
-      if (touchStartX === null || e.changedTouches.length === 0) return;
-      const currentX = e.changedTouches[0].clientX;
-      const diffX = currentX - touchStartX;
-      touchStartX = null;
-      if (diffX > 25) {
-        triggerStep('right');
-      } else if (diffX < -25) {
-        triggerStep('left');
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-
-    const canvasEl = containerRef.current;
-    if (canvasEl) {
-      canvasEl.addEventListener('touchstart', handleTouchStart, { passive: true });
-      canvasEl.addEventListener('touchend', handleTouchEnd, { passive: true });
-    }
-
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-      if (canvasEl) {
-        canvasEl.removeEventListener('touchstart', handleTouchStart);
-        canvasEl.removeEventListener('touchend', handleTouchEnd);
-      }
-    };
-  }, []);
-
-  // Main Canvas Render Loop
+  // Render loop.
   useEffect(() => {
-    let animId: number;
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    const container = containerRef.current;
+    if (!canvas || !container) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Set canvas dimensions with high-DPI scaling only when dimensions change
-    const updateCanvasSize = () => {
-      if (!containerRef.current || !canvas) return;
-      const rect = containerRef.current.getBoundingClientRect();
-      if (rect.width > 0 && rect.height > 0) {
-        containerRectRef.current = { width: rect.width, height: rect.height };
-      }
+    // Size the canvas buffer to the container, which Android WebViews can
+    // resize (safe-area insets settling, system bars) without a window resize.
+    const measure = () => {
+      const rect = container.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0) return;
+      viewRef.current = { width: rect.width, height: rect.height };
       const dpr = window.devicePixelRatio || 1;
-      const targetW = Math.round(rect.width * dpr);
-      const targetH = Math.round(rect.height * dpr);
-      if (canvas.width !== targetW || canvas.height !== targetH) {
-        canvas.width = targetW;
-        canvas.height = targetH;
-      }
-      const styleW = `${rect.width}px`;
-      const styleH = `${rect.height}px`;
-      if (canvas.style.width !== styleW) canvas.style.width = styleW;
-      if (canvas.style.height !== styleH) canvas.style.height = styleH;
-    };
-
-    updateCanvasSize();
-    window.addEventListener('resize', updateCanvasSize);
-    window.addEventListener('orientationchange', updateCanvasSize);
-
-    // Observe the container itself (not just window resize) — Android
-    // WebViews can change the container's actual box size (safe-area insets
-    // settling after mount, system bar show/hide, split-screen) without
-    // firing a window 'resize' event, which previously left the canvas's
-    // raster buffer stale relative to its true on-screen size and caused
-    // the bottom of the game to appear clipped.
-    let resizeObserver: ResizeObserver | null = null;
-    if (typeof ResizeObserver !== 'undefined' && containerRef.current) {
-      resizeObserver = new ResizeObserver(() => updateCanvasSize());
-      resizeObserver.observe(containerRef.current);
-    }
-
-    // Re-measure shortly after mount in case Android's system bars / safe
-    // area haven't settled to their final size on the very first layout pass
-    const settleTimer = window.setTimeout(updateCanvasSize, 300);
-
-    // Particle spawn helper
-    const spawnFeathers = (x: number, y: number) => {
-      const colors = ['#FFFFFF', '#FEF08A', '#FDE047', '#F97316', '#EF4444'];
-      for (let i = 0; i < 32; i++) {
-        const angle = Math.random() * Math.PI * 2;
-        const speed = 2 + Math.random() * 6;
-        stateRef.current.particles.push({
-          x,
-          y,
-          vx: Math.cos(angle) * speed,
-          vy: Math.sin(angle) * speed - 2,
-          color: colors[Math.floor(Math.random() * colors.length)],
-          size: 5 + Math.random() * 6,
-          alpha: 1.0,
-          rotation: Math.random() * Math.PI * 2,
-          vRot: (Math.random() - 0.5) * 0.3,
-          life: 0,
-          maxLife: 45 + Math.random() * 25,
-        });
+      const w = Math.round(rect.width * dpr);
+      const h = Math.round(rect.height * dpr);
+      if (canvas.width !== w || canvas.height !== h) {
+        canvas.width = w;
+        canvas.height = h;
       }
     };
+    measure();
+    const observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(measure) : null;
+    observer?.observe(container);
+    window.addEventListener('resize', measure);
+    window.addEventListener('orientationchange', measure);
+    const settleTimer = window.setTimeout(measure, 300);
 
-    const spawnStarBurst = (x: number, y: number) => {
-      const colors = ['#FBBF24', '#FCD34D', '#10B981', '#34D399', '#FFFFFF'];
-      for (let i = 0; i < 20; i++) {
-        const angle = Math.random() * Math.PI * 2;
-        const speed = 1.5 + Math.random() * 4;
-        stateRef.current.particles.push({
-          x,
-          y,
-          vx: Math.cos(angle) * speed,
-          vy: Math.sin(angle) * speed - 1.5,
-          color: colors[Math.floor(Math.random() * colors.length)],
-          size: 4 + Math.random() * 4,
-          alpha: 1.0,
-          rotation: Math.random() * Math.PI * 2,
-          vRot: (Math.random() - 0.5) * 0.2,
-          life: 0,
-          maxLife: 30 + Math.random() * 15,
-        });
-      }
-    };
+    let animId = 0;
+    let lastTime = performance.now();
 
-    const renderLoop = (time: number) => {
-      const s = stateRef.current;
-      const dt = Math.min(32, time - s.lastFrameTime) / 16.666;
-      s.lastFrameTime = time;
+    const frame = (time: number) => {
+      animId = requestAnimationFrame(frame);
+      const view = viewRef.current;
+      if (view.width <= 0 || view.height <= 0) return;
 
-      const dpr = window.devicePixelRatio || 1;
-      const rect = containerRectRef.current;
-      const viewScale = rect.height > 0 ? rect.height / WORLD_HEIGHT : 1;
-      // Guard: skip frame if canvas has no size yet
-      if (rect.width <= 0 || rect.height <= 0) {
-        animId = requestAnimationFrame(renderLoop);
-        return;
-      }
-      const viewWidthInWorld = rect.width / viewScale;
+      const dtMs = Math.min(40, Math.max(0, time - lastTime));
+      lastTime = time;
+      const dt = dtMs / FRAME_MS;
+      const now = performance.now();
 
-      // ──────────────────────────────────────────
-      // 1. UPDATE GAME PHYSICS & MOVEMENT
-      // ──────────────────────────────────────────
+      // 1. Simulation.
+      updateStep(s, now);
+      const gapMs = (TRAFFIC[s.difficulty] ?? TRAFFIC.MEDIUM).gapMs;
+      for (const lane of s.lanes) updateLane(lane, dt, dtMs, gapMs);
 
-      // Update vertical traffic: continuous natural cruising, cars NEVER stop or yield
-      s.vehicles.forEach((v) => {
-        const spd = v.rushing ? RUSH_SPEED : v.speed;
-        v.y += spd * v.direction * dt;
-      });
-
-      // Wrap-around respawn, validated against same-lane neighbors
-      s.vehicles.forEach((v) => {
-        const goingDown = v.direction === 1;
-        const pastEdge = goingDown ? v.y > WORLD_HEIGHT + 120 : v.y < -120;
-        if (!pastEdge) return;
-
-        const resetY = goingDown ? -120 : WORLD_HEIGHT + 120;
-        let nearestGap = Infinity;
-        for (const other of s.vehicles) {
-          if (other === v || other.lane !== v.lane || other.direction !== v.direction) continue;
-          const gap = Math.abs(other.y - resetY);
-          if (gap < nearestGap) nearestGap = gap;
-        }
-
-        const minGap = Math.max(v.height, 40) + 40;
-        if (nearestGap >= minGap) {
-          v.y = resetY;
-        }
-      });
-
-      // Update chicken if ACTIVE (Horizontal movement only)
-      if (s.gameState === 'ACTIVE' && !s.chicken.isHit && !s.chicken.isWon) {
-        if (s.movementLocked) {
-          s.chicken.vx = 0;
-        }
-
-        const targetX = checkpointX(s.targetLane, s.totalLanes);
-        const diffX = targetX - s.chicken.x;
-
-        if (Math.abs(diffX) > 1 && !s.movementLocked) {
-          const dir = Math.sign(diffX);
-          s.chicken.facing = dir;
-          s.chicken.stepAnim += 0.28 * dt;
-          if (Math.floor(s.chicken.stepAnim) !== Math.floor(s.lastStepSoundAnim)) {
-            s.lastStepSoundAnim = s.chicken.stepAnim;
-            sounds.playStep();
-          }
-
-          const moveSpeed = 5.2;
-          const step = dir * Math.min(Math.abs(diffX), moveSpeed * dt);
-          s.chicken.x += step;
-        } else {
-          s.chicken.x = targetX;
-          s.chicken.vx = 0;
-        }
-
-        // Clamp inside world boundaries
-        s.chicken.x = Math.max(35, Math.min(s.worldWidth - 40, s.chicken.x));
-        s.chicken.y = fixedY;
-
-        // Lane crossing detection as chicken lands on checkpoint
-        if (s.targetLane > s.highestLaneCrossed && s.targetLane <= s.totalLanes) {
-          if (Math.abs(s.chicken.x - targetX) <= 4) {
-            s.highestLaneCrossed = s.targetLane;
-            s.verdictLane = s.targetLane;
-            sounds.playLaneCross();
-            spawnStarBurst(s.chicken.x, s.chicken.y);
-            Promise.resolve(callbacksRef.current.onLaneCross(s.targetLane)).catch(() => {});
-          }
-        }
-
-        // Check safe zones
-        const finishStartX = START_ZONE_WIDTH + s.totalLanes * LANE_WIDTH;
-
-        // Check if chicken reached the RIGHT Finish Safe Zone (Green Point)
-        if (s.targetLane > s.totalLanes && s.chicken.x >= finishStartX && !s.chicken.isWon) {
-          s.chicken.isWon = true;
-          sounds.playWin();
-          spawnStarBurst(s.chicken.x, s.chicken.y);
-          Promise.resolve(callbacksRef.current.onFinish()).catch(() => {
-            if (s.gameState === 'ACTIVE' && !s.chicken.isHit && !s.hitPending) {
-              s.chicken.isWon = false;
-              s.chicken.x = finishStartX - 2;
-              s.chicken.vx = 0;
-            }
-          });
-        }
-
-        // ──────────────────────────────────────────
-        // ACCURATE VEHICLE COLLISION DETECTION
-        // Active whenever chicken is crossing on the road surface
-        // ──────────────────────────────────────────
-        const onRoad = s.chicken.x > START_ZONE_WIDTH + 15 && s.chicken.x < finishStartX + 15;
-        if (onRoad && !s.chicken.isWon && !s.chicken.isHit) {
-          const chickenBox = {
-            left: s.chicken.x - 12,
-            right: s.chicken.x + 12,
-            top: s.chicken.y - 12,
-            bottom: s.chicken.y + 12,
-          };
-
-          for (const v of s.vehicles) {
-            const vBox = {
-              left: v.x - v.width / 2 + 2,
-              right: v.x + v.width / 2 - 2,
-              top: v.y - v.height / 2 + 5,
-              bottom: v.y + v.height / 2 - 5,
-            };
-
-            if (
-              chickenBox.left < vBox.right &&
-              chickenBox.right > vBox.left &&
-              chickenBox.top < vBox.bottom &&
-              chickenBox.bottom > vBox.top
-            ) {
-              s.chicken.isHit = true;
-              s.screenShake = 16;
-              spawnFeathers(s.chicken.x, s.chicken.y);
-              sounds.playCollision();
-              callbacksRef.current.onCollision?.(v.lane);
-              break;
-            }
-          }
-        }
-      }
-
-      // The server ruled the chicken hit: send the nearest oncoming car in its
-      // lane at it, and crash on impact (straight away if no car can reach it).
-      if (s.hitPending) {
-        const hitLane = laneAt(s.chicken.x, s.totalLanes);
-        const hitLaneCars = s.laneTraffic[hitLane - 1] || [];
-        if (!s.hitDeadline) {
-          const car = nextCarTo(hitLaneCars);
-          if (car) car.rushing = true;
-          s.hitDeadline = time + (car ? HIT_FALLBACK_MS : 0);
-        }
-        // A car has driven onto the chicken's body.
-        const impact = hitLaneCars.some((v) => Math.abs(v.y - s.chicken.y) < v.height / 2 + 12);
-        if (impact || time >= s.hitDeadline) {
-          s.hitPending = false;
-          s.chicken.isHit = true;
-          s.screenShake = 16;
-          spawnFeathers(s.chicken.x, s.chicken.y);
-          sounds.playCollision();
-          s.vehicles.forEach((v) => {
-            v.rushing = false;
-          });
-        }
-      }
-
-      // Smooth horizontal camera follow (chicken positioned ~30% from the left)
-      if (s.gameState === 'READY') {
-        s.cameraX = 0;
-      } else {
-        const targetCamX = s.chicken.x - viewWidthInWorld * 0.32;
-        const maxCamX = Math.max(0, s.worldWidth - viewWidthInWorld);
-        const clampedCamX = Math.max(0, Math.min(maxCamX, targetCamX));
-        s.cameraX += (clampedCamX - s.cameraX) * 0.12 * dt;
-      }
-
-      // Update screen shake
-      if (s.screenShake > 0) {
-        s.screenShake *= 0.88;
-        if (s.screenShake < 0.2) s.screenShake = 0;
-      }
-
-      // Update particles
       for (let i = s.particles.length - 1; i >= 0; i--) {
         const p = s.particles[i];
         p.x += p.vx * dt;
         p.y += p.vy * dt;
-        p.vy += 0.12 * dt; // gravity
+        p.vy += 0.15 * dt;
+        p.vx *= 0.98;
         p.rotation += p.vRot * dt;
         p.life += dt;
-        p.alpha = Math.max(0, 1 - p.life / p.maxLife);
-        if (p.life >= p.maxLife) {
-          s.particles.splice(i, 1);
-        }
+        if (p.life >= p.maxLife) s.particles.splice(i, 1);
+      }
+      s.floaters = s.floaters.filter((f) => now - f.born < 900);
+      if (s.chicken.mode === 'won' && now - s.chicken.modeAt < 2400 && Math.random() < 0.08) {
+        spawnBurst(s, s.chicken.x + rand(-60, 60), ROAD_TOP + 20, CONFETTI, 6, 3, 70);
+      }
+      if (s.shake > 0) {
+        s.shake *= Math.pow(0.88, dt);
+        if (s.shake < 0.2) s.shake = 0;
       }
 
-      // 0. Paint complete canvas with solid grass color before world transforms (prevents black compositor flicker)
+      // 2. Camera: keeps the chicken about a third of the way across the screen.
+      const scale = view.height / WORLD_HEIGHT;
+      const viewWidth = view.width / scale;
+      const maxCam = Math.max(0, worldWidthFor(s.totalLanes) - viewWidth);
+      const targetCam = s.gameState === 'READY' ? 0 : Math.max(0, Math.min(maxCam, s.chicken.x - viewWidth * 0.34));
+      s.cameraX += (targetCam - s.cameraX) * Math.min(1, 0.12 * dt);
+
+      // 3. Drawing.
+      const dpr = window.devicePixelRatio || 1;
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.fillStyle = '#1E641D';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
+      const shakeX = s.shake ? (Math.random() - 0.5) * s.shake : 0;
+      const shakeY = s.shake ? (Math.random() - 0.5) * s.shake : 0;
+      ctx.setTransform(dpr * scale, 0, 0, dpr * scale, (-s.cameraX + shakeX) * dpr * scale, shakeY * dpr * scale);
 
-      // ──────────────────────────────────────────
-      // 3. DRAWING & RENDERING (Horizontal Road Arcade)
-      // ──────────────────────────────────────────
-      ctx.save();
-      ctx.scale(dpr * viewScale, dpr * viewScale);
-
-      // Screen shake offset
-      const shakeX = s.screenShake ? (Math.random() - 0.5) * s.screenShake : 0;
-      const shakeY = s.screenShake ? (Math.random() - 0.5) * s.screenShake : 0;
-      ctx.translate(-s.cameraX + shakeX, shakeY);
-
-      // 1. Top and Bottom Roadside Grass Shoulders (#1E641D base) - extend generously beyond world margins
-      ctx.fillStyle = '#1E641D';
-      ctx.fillRect(-viewWidthInWorld - 200, 0, s.worldWidth + viewWidthInWorld * 2 + 400, WORLD_HEIGHT);
-
-      // Subtle grass lawn stripes on top and bottom
-      ctx.fillStyle = '#287A25';
-      for (let x = 0; x < s.worldWidth; x += 50) {
-        if ((x / 50) % 2 === 0) {
-          ctx.fillRect(x, 0, 50, 45);
-          ctx.fillRect(x, WORLD_HEIGHT - 45, 50, 45);
-        }
-      }
-
-      // 2. Road Surface Asphalt (#686868 textured)
-      const roadTop = 45;
-      const roadBottom = WORLD_HEIGHT - 45;
-      const roadHeight = roadBottom - roadTop;
-
-      ctx.fillStyle = '#666666';
-      ctx.fillRect(START_ZONE_WIDTH, roadTop, s.totalLanes * LANE_WIDTH, roadHeight);
-
-      // Subtle asphalt grain texture bands (#505050)
-      ctx.fillStyle = 'rgba(30, 30, 30, 0.12)';
-      for (let x = START_ZONE_WIDTH; x < START_ZONE_WIDTH + s.totalLanes * LANE_WIDTH; x += 28) {
-        if ((x / 28) % 2 === 0) {
-          ctx.fillRect(x, roadTop, 14, roadHeight);
-        }
-      }
-
-      // 3. Concrete Curbs & Road Edge Borders (#D0D0D0 curb accents)
-      // Top Road Curb
-      ctx.fillStyle = '#D0D0D0';
-      ctx.fillRect(START_ZONE_WIDTH, roadTop - 8, s.totalLanes * LANE_WIDTH, 8);
-      ctx.fillStyle = '#777777';
-      ctx.fillRect(START_ZONE_WIDTH, roadTop - 2, s.totalLanes * LANE_WIDTH, 2);
-
-      // Bottom Road Curb
-      ctx.fillStyle = '#D0D0D0';
-      ctx.fillRect(START_ZONE_WIDTH, roadBottom, s.totalLanes * LANE_WIDTH, 8);
-      ctx.fillStyle = '#777777';
-      ctx.fillRect(START_ZONE_WIDTH, roadBottom, s.totalLanes * LANE_WIDTH, 2);
-
-      // Curb Joint Notches
-      ctx.strokeStyle = 'rgba(0, 0, 0, 0.35)';
-      ctx.lineWidth = 1.5;
-      for (let x = START_ZONE_WIDTH; x < START_ZONE_WIDTH + s.totalLanes * LANE_WIDTH; x += 32) {
-        ctx.beginPath();
-        ctx.moveTo(x, roadTop - 8);
-        ctx.lineTo(x, roadTop);
-        ctx.moveTo(x, roadBottom);
-        ctx.lineTo(x, roadBottom + 8);
-        ctx.stroke();
-      }
-
-      // 4. Left Start Zone (Sidewalk & Starting Pad)
-      ctx.fillStyle = '#555555';
-      ctx.fillRect(0, roadTop, START_ZONE_WIDTH, roadHeight);
-
-      // Starting Sidewalk Yellow Hazard Border (#FBBF24)
-      ctx.strokeStyle = '#FBBF24';
-      ctx.lineWidth = 3.5;
-      ctx.setLineDash([12, 10]);
-      ctx.beginPath();
-      ctx.moveTo(START_ZONE_WIDTH, roadTop);
-      ctx.lineTo(START_ZONE_WIDTH, roadBottom);
-      ctx.stroke();
-      ctx.setLineDash([]);
-
-      // Start sidewalk tile markings
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
-      ctx.lineWidth = 1;
-      for (let y = roadTop; y < roadBottom; y += 35) {
-        ctx.beginPath();
-        ctx.moveTo(0, y);
-        ctx.lineTo(START_ZONE_WIDTH, y);
-        ctx.stroke();
-      }
-
-      // Start Zone Sign
-      ctx.save();
-      ctx.font = '900 13px Inter, sans-serif';
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.35)';
-      ctx.textAlign = 'center';
-      ctx.fillText('START', START_ZONE_WIDTH / 2, fixedY - 35);
-      ctx.restore();
-
-      // 5. Right Finish Zone (Checkered Flag Strip & Banner)
-      const finishStartX = START_ZONE_WIDTH + s.totalLanes * LANE_WIDTH;
-      ctx.fillStyle = '#1B4D21';
-      ctx.fillRect(finishStartX, roadTop, FINISH_ZONE_WIDTH, roadHeight);
-
-      // Checkered Finish Strip
-      const checkerSize = 15;
-      const numCheckerCols = 3;
-      for (let col = 0; col < numCheckerCols; col++) {
-        for (let row = 0; row < roadHeight / checkerSize; row++) {
-          ctx.fillStyle = (col + row) % 2 === 0 ? '#FFFFFF' : '#1E293B';
-          ctx.fillRect(
-            finishStartX + col * checkerSize,
-            roadTop + row * checkerSize,
-            checkerSize,
-            checkerSize
-          );
-        }
-      }
-
-      // Finish Banner
-      ctx.save();
-      ctx.font = '900 15px Inter, sans-serif';
-      ctx.fillStyle = '#FCD34D';
-      ctx.textAlign = 'center';
-      ctx.shadowColor = 'rgba(0, 0, 0, 0.7)';
-      ctx.shadowBlur = 8;
-      ctx.fillText('🏁 FINISH 🏆', finishStartX + FINISH_ZONE_WIDTH / 2 + 15, fixedY - 4);
-      ctx.restore();
-
-
-
-      // 6. Vertical Traffic Lanes & Horizontal Multiplier Checkpoints
-      for (let lane = 1; lane <= s.totalLanes; lane++) {
-        const laneLeftX = START_ZONE_WIDTH + (lane - 1) * LANE_WIDTH;
-        const laneCenterX = laneLeftX + LANE_WIDTH / 2;
-        const dividerX = laneLeftX + LANE_WIDTH;
-
-        // Vertical lane divider dashed white markings (#E8E8E8)
-        if (lane < s.totalLanes) {
-          ctx.strokeStyle = '#E8E8E8';
-          ctx.lineWidth = 3;
-          ctx.setLineDash([20, 16]);
-          ctx.beginPath();
-          ctx.moveTo(dividerX, roadTop + 10);
-          ctx.lineTo(dividerX, fixedY - 32);
-          ctx.moveTo(dividerX, fixedY + 32);
-          ctx.lineTo(dividerX, roadBottom - 10);
-          ctx.stroke();
-          ctx.setLineDash([]);
-        }
-
-        // Direction Arrow in lane (pointing UP or DOWN)
-        const dir = lane % 2 === 1 ? '▼' : '▲';
-        ctx.font = '14px Inter, sans-serif';
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.22)';
-        ctx.textAlign = 'center';
-        ctx.fillText(dir, laneCenterX, roadTop + 25);
-        ctx.fillText(dir, laneCenterX, roadBottom - 20);
-
-        // Pothole / Manhole Multiplier Checkpoint embedded in asphalt
-        const mult = s.multipliers[lane - 1] || 1.0 + lane * 0.05;
-        const isCrossed = s.highestLaneCrossed >= lane;
-        const markerX = dividerX;
-        const markerY = fixedY;
-
-        ctx.save();
-        // Drop shadow on asphalt
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
-        ctx.beginPath();
-        ctx.arc(markerX, markerY + 2, 28, 0, Math.PI * 2);
-        ctx.fill();
-
-        // Outer Metallic Ring with Bevel
-        ctx.beginPath();
-        ctx.arc(markerX, markerY, 26, 0, Math.PI * 2);
-        if (isCrossed) {
-          ctx.fillStyle = '#1A3822';
-          ctx.shadowColor = '#34D399';
-          ctx.shadowBlur = 16;
-        } else {
-          ctx.fillStyle = '#3A3A3A';
-          ctx.shadowColor = 'rgba(0, 0, 0, 0.6)';
-          ctx.shadowBlur = 5;
-        }
-        ctx.fill();
-        ctx.strokeStyle = isCrossed ? '#34D399' : '#555555';
-        ctx.lineWidth = 2.5;
-        ctx.stroke();
-
-        // Inner Metal Plate
-        ctx.beginPath();
-        ctx.arc(markerX, markerY, 20, 0, Math.PI * 2);
-        ctx.fillStyle = isCrossed ? '#102A18' : '#282828';
-        ctx.fill();
-        ctx.strokeStyle = isCrossed ? 'rgba(52, 211, 153, 0.6)' : '#444444';
-        ctx.lineWidth = 1.5;
-        ctx.stroke();
-
-        // 6 Perimeter Hex Bolt Accents
-        for (let a = 0; a < Math.PI * 2; a += Math.PI / 3) {
-          const bx = markerX + Math.cos(a) * 23;
-          const by = markerY + Math.sin(a) * 23;
-          ctx.fillStyle = isCrossed ? '#34D399' : '#777777';
-          ctx.beginPath();
-          ctx.arc(bx, by, 1.5, 0, Math.PI * 2);
-          ctx.fill();
-        }
-
-        // Multiplier Text
-        ctx.font = '900 13px Inter, sans-serif';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillStyle = isCrossed ? '#6EE7B7' : '#E6E6E6';
-        ctx.shadowBlur = 0;
-        ctx.fillText(`${mult.toFixed(2)}x`, markerX, markerY);
-        ctx.restore();
-      }
-
-      // 7. Decorative Trees along Top & Bottom Lawns
-      for (let x = 60; x < s.worldWidth; x += 150) {
-        // Top Tree
-        ctx.beginPath();
-        ctx.arc(x, 22, 18, 0, Math.PI * 2);
-        ctx.fillStyle = '#166534';
-        ctx.fill();
-        ctx.beginPath();
-        ctx.arc(x, 19, 13, 0, Math.PI * 2);
-        ctx.fillStyle = '#22C55E';
-        ctx.fill();
-
-        // Bottom Tree
-        ctx.beginPath();
-        ctx.arc(x, WORLD_HEIGHT - 22, 18, 0, Math.PI * 2);
-        ctx.fillStyle = '#166534';
-        ctx.fill();
-        ctx.beginPath();
-        ctx.arc(x, WORLD_HEIGHT - 25, 13, 0, Math.PI * 2);
-        ctx.fillStyle = '#22C55E';
-        ctx.fill();
-      }
-
-      // ──────────────────────────────────────────
-      // 4. DRAW VERTICAL VEHICLES (Moving UP/DOWN)
-      // ──────────────────────────────────────────
-      ctx.save();
-      ctx.beginPath();
-      ctx.rect(START_ZONE_WIDTH, roadTop, s.totalLanes * LANE_WIDTH, roadHeight);
-      ctx.clip();
-      s.vehicles.forEach((v) => {
-        ctx.save();
-        ctx.translate(v.x, v.y);
-
-        const lightDir = v.direction; // 1 = DOWN, -1 = UP
-
-        // Headlight Light Cones projected vertically onto asphalt
-        const lightGrad = ctx.createRadialGradient(
-          0,
-          lightDir * (v.height / 2 + 5),
-          2,
-          0,
-          lightDir * (v.height / 2 + 75),
-          65
-        );
-        lightGrad.addColorStop(0, 'rgba(254, 240, 138, 0.38)');
-        lightGrad.addColorStop(1, 'rgba(254, 240, 138, 0)');
-        ctx.fillStyle = lightGrad;
-        ctx.beginPath();
-        ctx.moveTo(-v.width * 0.4, lightDir * (v.height / 2));
-        ctx.lineTo(-v.width * 1.2, lightDir * (v.height / 2 + 75));
-        ctx.lineTo(v.width * 1.2, lightDir * (v.height / 2 + 75));
-        ctx.lineTo(v.width * 0.4, lightDir * (v.height / 2));
-        ctx.closePath();
-        ctx.fill();
-
-        // Vehicle Drop Shadow
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
-        ctx.beginPath();
-        ctx.roundRect(-v.width / 2 + 3, -v.height / 2 + 4, v.width, v.height, 8);
-        ctx.fill();
-
-        // Wheels on left & right sides
-        const wheelW = 6;
-        const wheelH = 14;
-        ctx.fillStyle = v.wheelColor;
-        // Left wheels
-        ctx.fillRect(-v.width / 2 - 2, -v.height / 2 + 10, wheelW, wheelH);
-        ctx.fillRect(-v.width / 2 - 2, v.height / 2 - 24, wheelW, wheelH);
-        // Right wheels
-        ctx.fillRect(v.width / 2 - 4, -v.height / 2 + 10, wheelW, wheelH);
-        ctx.fillRect(v.width / 2 - 4, v.height / 2 - 24, wheelW, wheelH);
-
-        // Vehicle Chassis Body
-        ctx.fillStyle = v.color;
-        ctx.beginPath();
-        ctx.roundRect(-v.width / 2, -v.height / 2, v.width, v.height, 8);
-        ctx.fill();
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
-        ctx.lineWidth = 1.5;
-        ctx.stroke();
-
-        // Windshield Glass (oriented toward front)
-        const windshieldY = lightDir === 1 ? v.height * 0.08 : -v.height * 0.32;
-        ctx.fillStyle = 'rgba(15, 23, 42, 0.88)';
-        ctx.beginPath();
-        ctx.roundRect(-v.width * 0.35, windshieldY, v.width * 0.7, v.height * 0.35, 4);
-        ctx.fill();
-
-        // Roof Top
-        ctx.fillStyle = v.roofColor;
-        ctx.beginPath();
-        ctx.roundRect(-v.width * 0.25, windshieldY + (lightDir === 1 ? 4 : 4), v.width * 0.5, v.height * 0.22, 3);
-        ctx.fill();
-
-        // Taxi Sign on roof if taxi
-        if (v.type === 'taxi') {
-          ctx.fillStyle = '#FFFFFF';
-          ctx.fillRect(-8, -4, 16, 8);
-          ctx.fillStyle = '#000000';
-          ctx.font = '700 6px Inter, sans-serif';
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'middle';
-          ctx.fillText('TAXI', 0, 0);
-        }
-
-        // Headlights (Front edge in travel direction)
-        ctx.fillStyle = '#FEF08A';
-        const frontY = lightDir === 1 ? v.height / 2 - 3 : -v.height / 2;
-        ctx.fillRect(-v.width / 2 + 4, frontY, 6, 3);
-        ctx.fillRect(v.width / 2 - 10, frontY, 6, 3);
-
-        // Tail Lights (Rear edge)
-        ctx.fillStyle = '#EF4444';
-        const rearY = lightDir === 1 ? -v.height / 2 : v.height / 2 - 3;
-        ctx.fillRect(-v.width / 2 + 4, rearY, 6, 3);
-        ctx.fillRect(v.width / 2 - 10, rearY, 6, 3);
-
-        ctx.restore();
-      });
-      ctx.restore();
-
-      // ──────────────────────────────────────────
-      // 5. DRAW CHICKEN HERO (Facing RIGHT on fixed horizontal crossing line)
-      // ──────────────────────────────────────────
-      const ch = s.chicken;
-      ctx.save();
-      ctx.translate(ch.x, ch.y);
-
-      // Soft oval drop shadow under feet
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.38)';
-      ctx.beginPath();
-      ctx.ellipse(0, 18, 18, 9, 0, 0, Math.PI * 2);
-      ctx.fill();
-
-      if (ch.isHit) {
-        // Hit / Crash state
-        ctx.font = '36px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText('💥', 0, -2);
-      } else {
-        // Walking bob and foot waddle
-        const bob = Math.sin(ch.stepAnim * Math.PI * 2) * 3;
-        const footWiggle = Math.cos(ch.stepAnim * Math.PI * 2) * 5;
-        const leanAngle = ch.vx * 0.04;
-
-        ctx.rotate(leanAngle);
-
-        // Feet (Orange)
-        ctx.fillStyle = '#EA580C';
-        ctx.beginPath();
-        ctx.ellipse(-8 + footWiggle, 16, 5, 3, 0, 0, Math.PI * 2);
-        ctx.ellipse(8 - footWiggle, 16, 5, 3, 0, 0, Math.PI * 2);
-        ctx.fill();
-
-        // Fluffy Tail Feathers on left side (behind chicken moving right)
-        ctx.fillStyle = '#FEF08A';
-        ctx.beginPath();
-        ctx.ellipse(-14, 2 + bob, 8, 12, 0.4, 0, Math.PI * 2);
-        ctx.fill();
-
-        // Main Body (Fluffy White-Cream Gradient)
-        const bodyGrad = ctx.createRadialGradient(2, -3 + bob, 4, 0, 0 + bob, 20);
-        bodyGrad.addColorStop(0, '#FFFFFF');
-        bodyGrad.addColorStop(0.7, '#FEF9C3');
-        bodyGrad.addColorStop(1, '#FDE047');
-        ctx.fillStyle = bodyGrad;
-        ctx.beginPath();
-        ctx.arc(0, bob, 18, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.strokeStyle = '#CA8A04';
-        ctx.lineWidth = 1.5;
-        ctx.stroke();
-
-        // Wings (Flapping on side)
-        const wingFlap = Math.abs(Math.sin(ch.stepAnim * Math.PI * 2)) * 4;
-        ctx.fillStyle = '#FEF08A';
-        ctx.beginPath();
-        ctx.ellipse(-2, 3 + bob, 10, 6 + wingFlap, -0.1, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.stroke();
-
-        // Red Comb / Crest on head
-        ctx.fillStyle = '#EF4444';
-        // Center peak
-        ctx.beginPath();
-        ctx.arc(2, -18 + bob, 5.5, 0, Math.PI * 2);
-        ctx.fill();
-        // Left peak
-        ctx.beginPath();
-        ctx.arc(-3, -16 + bob, 4.5, 0, Math.PI * 2);
-        ctx.fill();
-        // Right peak
-        ctx.beginPath();
-        ctx.arc(7, -16 + bob, 4.5, 0, Math.PI * 2);
-        ctx.fill();
-
-        // Glossy Cartoon Eye (facing right)
-        ctx.fillStyle = '#0F172A';
-        ctx.beginPath();
-        ctx.arc(8, -4 + bob, 3.5, 0, Math.PI * 2);
-        ctx.fill();
-
-        // Eye specular highlight
-        ctx.fillStyle = '#FFFFFF';
-        ctx.beginPath();
-        ctx.arc(9, -5 + bob, 1.2, 0, Math.PI * 2);
-        ctx.fill();
-
-        // Cheeks (Blush)
-        ctx.fillStyle = 'rgba(244, 63, 94, 0.4)';
-        ctx.beginPath();
-        ctx.arc(6, 2 + bob, 3, 0, Math.PI * 2);
-        ctx.fill();
-
-        // Orange Beak (pointing right towards road crossing)
-        ctx.fillStyle = '#F97316';
-        ctx.beginPath();
-        ctx.moveTo(14, -2 + bob);
-        ctx.lineTo(22, 2 + bob);
-        ctx.lineTo(14, 6 + bob);
-        ctx.closePath();
-        ctx.fill();
-
-        // Red Wattle under beak
-        ctx.fillStyle = '#DC2626';
-        ctx.beginPath();
-        ctx.arc(14, 8 + bob, 2.5, 0, Math.PI * 2);
-        ctx.fill();
-      }
-
-      ctx.restore();
-
-      // ──────────────────────────────────────────
-      // 6. DRAW PARTICLES
-      // ──────────────────────────────────────────
-      s.particles.forEach((p) => {
-        ctx.save();
-        ctx.translate(p.x, p.y);
-        ctx.rotate(p.rotation);
-        ctx.globalAlpha = p.alpha;
-        ctx.fillStyle = p.color;
-        ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size);
-        ctx.restore();
-      });
-
-      ctx.restore();
-
-      // Request next frame
-      animId = requestAnimationFrame(renderLoop);
+      drawBackdrop(ctx, s, s.cameraX, viewWidth);
+      drawManholes(ctx, s, now);
+      if (s.chicken.mode === 'dead') drawChicken(ctx, s, now);
+      drawTraffic(ctx, s);
+      drawBarriers(ctx, s, now);
+      if (s.chicken.mode !== 'dead') drawChicken(ctx, s, now);
+      drawEffects(ctx, s, now);
     };
-
-    animId = requestAnimationFrame(renderLoop);
+    animId = requestAnimationFrame(frame);
 
     return () => {
       cancelAnimationFrame(animId);
-      window.removeEventListener('resize', updateCanvasSize);
-      window.removeEventListener('orientationchange', updateCanvasSize);
-      if (resizeObserver) {
-        resizeObserver.disconnect();
-      }
+      observer?.disconnect();
+      window.removeEventListener('resize', measure);
+      window.removeEventListener('orientationchange', measure);
       window.clearTimeout(settleTimer);
     };
-  }, [fixedY]);
+  }, [s]);
+
+  // A step still playing out when the road goes away never gets to finish.
+  useEffect(() => () => {
+    if (s.step) {
+      s.step.resolve('error');
+      s.step = null;
+    }
+  }, [s]);
 
   return (
     <div ref={containerRef} className="chicken-road-canvas-container">

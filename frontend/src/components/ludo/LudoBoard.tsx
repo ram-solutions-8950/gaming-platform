@@ -39,71 +39,99 @@ const COLOR_HEX: Record<LudoColor, string> = {
 
 // 52 Common Track Cells in clockwise order (Grid 15x15, [column, row], 0..14)
 const TRACK_COORDINATES: Array<[number, number]> = [
-  [1, 6], [2, 6], [3, 6], [4, 6], [5, 6], // 0..4 (Red Start = 0)
+  [1, 6], [2, 6], [3, 6], [4, 6], [5, 6], // 0..4 (top-left start = 0)
   [6, 5], [6, 4], [6, 3], [6, 2], [6, 1], [6, 0], // 5..10 (6, 2 = Star 8)
   [7, 0], [8, 0], // 11, 12
-  [8, 1], [8, 2], [8, 3], [8, 4], [8, 5], // 13..17 (Green Start = 13)
+  [8, 1], [8, 2], [8, 3], [8, 4], [8, 5], // 13..17 (top-right start = 13)
   [9, 6], [10, 6], [11, 6], [12, 6], [13, 6], [14, 6], // 18..23 (12, 6 = Star 21)
   [14, 7], [14, 8], // 24, 25
-  [13, 8], [12, 8], [11, 8], [10, 8], [9, 8], // 26..30 (Yellow Start = 26)
+  [13, 8], [12, 8], [11, 8], [10, 8], [9, 8], // 26..30 (bottom-right start = 26)
   [8, 9], [8, 10], [8, 11], [8, 12], [8, 13], [8, 14], // 31..36 (8, 12 = Star 34)
   [7, 14], [6, 14], // 37, 38
-  [6, 13], [6, 12], [6, 11], [6, 10], [6, 9], // 39..43 (Blue Start = 39)
+  [6, 13], [6, 12], [6, 11], [6, 10], [6, 9], // 39..43 (bottom-left start = 39)
   [5, 8], [4, 8], [3, 8], [2, 8], [1, 8], [0, 8], // 44..49 (2, 8 = Star 47)
   [0, 7], [0, 6], // 50, 51
 ];
 
-// Private Home Paths (Steps 51..55)
-const HOME_PATHS: Record<LudoColor, Array<[number, number]>> = {
-  RED: [[1, 7], [2, 7], [3, 7], [4, 7], [5, 7]],
-  GREEN: [[7, 1], [7, 2], [7, 3], [7, 4], [7, 5]],
-  YELLOW: [[13, 7], [12, 7], [11, 7], [10, 7], [9, 7]],
-  BLUE: [[7, 13], [7, 12], [7, 11], [7, 10], [7, 9]],
+// Everything a colour owns sits by its corner of the board: its yard, its start
+// square, its home stretch and its home triangle. Corners run clockwise from
+// the top-left, where the common track starts.
+type Corner = 'topLeft' | 'topRight' | 'bottomRight' | 'bottomLeft';
+
+interface CornerGeometry {
+  yard: [number, number]; // top-left of the 600×600 yard, board units
+  sockets: Array<[number, number]>; // yard pedestals, [column, row]
+  startTrackIndex: number;
+  homePath: Array<[number, number]>; // steps 51..55, [column, row]
+  homeTriangle: string;
+  homeCentroid: [number, number]; // where finished tokens gather, clear of the centre medallion
+  heading: number; // direction out of the start square and into the home stretch (degrees, 0 = right)
+}
+
+const CORNER_GEOMETRY: Record<Corner, CornerGeometry> = {
+  topLeft: {
+    yard: [0, 0],
+    sockets: [[1.5, 1.5], [3.5, 1.5], [1.5, 3.5], [3.5, 3.5]],
+    startTrackIndex: 0,
+    homePath: [[1, 7], [2, 7], [3, 7], [4, 7], [5, 7]],
+    homeTriangle: '600,600 750,750 600,900',
+    homeCentroid: [650, 750],
+    heading: 0,
+  },
+  topRight: {
+    yard: [900, 0],
+    sockets: [[10.5, 1.5], [12.5, 1.5], [10.5, 3.5], [12.5, 3.5]],
+    startTrackIndex: 13,
+    homePath: [[7, 1], [7, 2], [7, 3], [7, 4], [7, 5]],
+    homeTriangle: '600,600 750,750 900,600',
+    homeCentroid: [750, 650],
+    heading: 90,
+  },
+  bottomRight: {
+    yard: [900, 900],
+    sockets: [[10.5, 10.5], [12.5, 10.5], [10.5, 12.5], [12.5, 12.5]],
+    startTrackIndex: 26,
+    homePath: [[13, 7], [12, 7], [11, 7], [10, 7], [9, 7]],
+    homeTriangle: '900,600 750,750 900,900',
+    homeCentroid: [850, 750],
+    heading: 180,
+  },
+  bottomLeft: {
+    yard: [0, 900],
+    sockets: [[1.5, 10.5], [3.5, 10.5], [1.5, 12.5], [3.5, 12.5]],
+    startTrackIndex: 39,
+    homePath: [[7, 13], [7, 12], [7, 11], [7, 10], [7, 9]],
+    homeTriangle: '600,900 750,750 900,900',
+    homeCentroid: [750, 850],
+    heading: 270,
+  },
 };
 
-// Yard Pedestals (4 for each color) — the centres of the sockets drawn in each yard
-const YARD_COORDINATES: Record<LudoColor, Array<[number, number]>> = {
-  RED: [[1.5, 1.5], [3.5, 1.5], [1.5, 3.5], [3.5, 3.5]],
-  GREEN: [[10.5, 1.5], [12.5, 1.5], [10.5, 3.5], [12.5, 3.5]],
-  YELLOW: [[10.5, 10.5], [12.5, 10.5], [10.5, 12.5], [12.5, 12.5]],
-  BLUE: [[1.5, 10.5], [3.5, 10.5], [1.5, 12.5], [3.5, 12.5]],
+// Green and blue take the left side of the board, green first
+// (mirrors START_OFFSETS in backend/app/services/ludo/board.py).
+const COLOR_CORNER: Record<LudoColor, Corner> = {
+  GREEN: 'topLeft',
+  RED: 'topRight',
+  YELLOW: 'bottomRight',
+  BLUE: 'bottomLeft',
 };
 
-// Centre home triangles (board units). Finished tokens gather on the centroid of
-// their colour's triangle, clear of the centre medallion.
-const HOME_TRIANGLE_POINTS: Record<LudoColor, string> = {
-  RED: '600,600 750,750 600,900',
-  GREEN: '600,600 750,750 900,600',
-  YELLOW: '900,600 750,750 900,900',
-  BLUE: '600,900 750,750 900,900',
-};
-const HOME_TRIANGLE_CENTROIDS: Record<LudoColor, [number, number]> = {
-  RED: [650, 750],
-  GREEN: [750, 650],
-  YELLOW: [850, 750],
-  BLUE: [750, 850],
-};
+const byColor = <T,>(pick: (g: CornerGeometry) => T) =>
+  Object.fromEntries(COLORS.map((c) => [c, pick(CORNER_GEOMETRY[COLOR_CORNER[c]])])) as Record<LudoColor, T>;
 
-const START_OFFSETS: Record<LudoColor, number> = {
-  RED: 0,
-  GREEN: 13,
-  YELLOW: 26,
-  BLUE: 39,
-};
+const HOME_PATHS = byColor((g) => g.homePath);
+const YARD_COORDINATES = byColor((g) => g.sockets);
+const YARD_ORIGINS = byColor((g) => g.yard);
+const HOME_TRIANGLE_POINTS = byColor((g) => g.homeTriangle);
+const HOME_TRIANGLE_CENTROIDS = byColor((g) => g.homeCentroid);
+const START_OFFSETS = byColor((g) => g.startTrackIndex);
 
 // Squares where nobody can be captured: every colour's start square plus the
 // four stars (mirrors SAFE_CELLS in backend/app/services/ludo/board.py).
 const STAR_TRACK_INDICES = [8, 21, 34, 47];
 const SAFE_TRACK_INDICES = new Set([0, 13, 26, 39, ...STAR_TRACK_INDICES]);
 
-// Direction each colour travels out of its start square, which is also the
-// direction it turns into its home stretch (degrees, 0 = pointing right).
-const COLOR_HEADING: Record<LudoColor, number> = {
-  RED: 0,
-  GREEN: 90,
-  YELLOW: 180,
-  BLUE: 270,
-};
+const COLOR_HEADING = byColor((g) => g.heading);
 
 // The pawn artwork is drawn ~100 units tall around its own (0, 0) anchor, with
 // the crown reaching far above it. Shrink it to fit inside one square and drop
@@ -558,17 +586,17 @@ const renderBoardArt = () => (
       {/* 4 Large Corner Yards with Clean Trays & Pedestals */}
       {(
         [
-          { color: 'RED', x: 0, y: 0, grad: 'yardRedGrad', socketFill: '#fee2e2', socketRing: '#fca5a5' },
-          { color: 'GREEN', x: 900, y: 0, grad: 'yardGreenGrad', socketFill: '#d1fae5', socketRing: '#86efac' },
-          { color: 'YELLOW', x: 900, y: 900, grad: 'yardYellowGrad', socketFill: '#fef3c7', socketRing: '#fde047' },
-          { color: 'BLUE', x: 0, y: 900, grad: 'yardBlueGrad', socketFill: '#dbeafe', socketRing: '#93c5fd' },
+          { color: 'RED', grad: 'yardRedGrad', socketFill: '#fee2e2', socketRing: '#fca5a5' },
+          { color: 'GREEN', grad: 'yardGreenGrad', socketFill: '#d1fae5', socketRing: '#86efac' },
+          { color: 'YELLOW', grad: 'yardYellowGrad', socketFill: '#fef3c7', socketRing: '#fde047' },
+          { color: 'BLUE', grad: 'yardBlueGrad', socketFill: '#dbeafe', socketRing: '#93c5fd' },
         ] as const
       ).map((yard) => (
         <g key={`yard-${yard.color}`}>
-          <rect x={yard.x} y={yard.y} width="600" height="600" fill={`url(#${yard.grad})`} />
+          <rect x={YARD_ORIGINS[yard.color][0]} y={YARD_ORIGINS[yard.color][1]} width="600" height="600" fill={`url(#${yard.grad})`} />
           <rect
-            x={yard.x + 85}
-            y={yard.y + 85}
+            x={YARD_ORIGINS[yard.color][0] + 85}
+            y={YARD_ORIGINS[yard.color][1] + 85}
             width="430"
             height="430"
             fill="url(#yardTrayGrad)"
@@ -1237,6 +1265,28 @@ const LudoBoardView: React.FC<Props> = ({
             })}
           </g>
         </svg>
+
+        {/* Over the pawns: a gold arrow bouncing above every pawn that can
+            move, so the choice stands out at a glance. Transform-only
+            animation, like the rings, so it never repaints the board. */}
+        <div className="ludo-board-over" aria-hidden="true">
+          {legalRings.map((t) => {
+            // On the top row there is no room above the pawn: point up at it from below.
+            const below = t.y - 60 * t.scale < 40;
+            const top = below ? t.y + (PAWN_GROUND_Y + 8) * t.scale : t.y - 60 * t.scale;
+            return (
+              <span
+                key={`arrow-${t.key}`}
+                className={`ludo-legal-arrow ${below ? 'ludo-legal-arrow--below' : ''}`}
+                style={{ left: `${t.x / 15}%`, top: `${top / 15}%` }}
+              >
+                <svg viewBox="0 0 24 20">
+                  <path d="M2 2 H22 L12 18 Z" fill="#fbbf24" stroke="#78350f" strokeWidth="2" strokeLinejoin="round" />
+                </svg>
+              </span>
+            );
+          })}
+        </div>
 
         {/* The walking pawn and its shadow, each its own small layer moved by
             the walk animation (see the useLayoutEffect above). */}

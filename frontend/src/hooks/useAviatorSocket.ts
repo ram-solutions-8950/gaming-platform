@@ -3,6 +3,7 @@ import { useAuthStore } from '../store/authStore';
 import { authStorage } from '../services/authStorage';
 import { authService } from '../services/auth';
 import { getWebSocketUrl } from '../utils/ws';
+import { isInsufficientBalanceMessage, showInsufficientBalance } from '../store/insufficientBalanceStore';
 
 export type AviatorPhase = 'BETTING' | 'FLYING' | 'CRASHED' | 'SETTLED' | 'COOLDOWN' | 'DISCONNECTED';
 
@@ -285,6 +286,7 @@ export function useAviatorSocket(options: UseAviatorSocketOptions = {}) {
             };
           });
         } else if (type === 'error') {
+          if (isInsufficientBalanceMessage(msg.message)) showInsufficientBalance();
           options.onError?.(msg.message);
         }
       } catch (e) {

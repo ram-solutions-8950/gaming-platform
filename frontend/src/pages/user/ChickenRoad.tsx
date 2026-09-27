@@ -6,21 +6,28 @@ import {
   Play,
   RotateCcw,
   HelpCircle,
-  ChevronLeft,
-  ChevronRight,
   Sparkles,
   Flame,
   LogOut,
+  Footprints,
 } from 'lucide-react';
 import {
   chickenRoadService,
+  type CrossLaneResponse,
   type Difficulty,
+  type FinishResponse,
   type GameStatus,
+  type LostResponse,
 } from '../../services/chickenRoad';
 import { walletService } from '../../services/wallet';
 import { getApiErrorMessage } from '../../utils/apiError';
-import { RoadCrossingGame } from '../../components/chickenRoad/RoadCrossingGame';
+import {
+  RoadCrossingGame,
+  type RoadCrossingHandle,
+  type StepOutcome,
+} from '../../components/chickenRoad/RoadCrossingGame';
 import { soundManager } from '../../services/soundManager';
+import { isInsufficientBalanceMessage, showInsufficientBalance } from '../../store/insufficientBalanceStore';
 import { lockLandscape } from '../../utils/nativeOrientation';
 import { GameRulesModal } from '../../components/common/GameRulesModal';
 import { CHICKEN_ROAD_RULES_DATA } from '../../components/common/gameRulesData';
@@ -33,10 +40,9 @@ const DEFAULT_MULTIPLIERS: Record<Difficulty, number[]> = {
 
 const QUICK_BETS = [10, 20, 50, 100];
 
-// The loss modal covers the road, so it waits for the car to hit the chicken.
-const LOSS_MODAL_DELAY_MS = 1200;
-
-
+// The road has already shown the car hitting the chicken; the loss modal
+// follows once the player has seen it lying there.
+const LOSS_MODAL_DELAY_MS = 500;
 
 function isRetryable(err: any): boolean {
   const status = err?.response?.status;
@@ -83,22 +89,18 @@ export function ChickenRoadPage() {
   const [lossLane, setLossLane] = useState<number | null>(null);
   const [showLossModal, setShowLossModal] = useState<boolean>(false);
   const [isActionLoading, setIsActionLoading] = useState<boolean>(false);
+  // A hop is under way: its lane is being ruled on or the road is still showing the ruling.
+  const [stepping, setStepping] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [showHowToPlay, setShowHowToPlay] = useState<boolean>(false);
   const [showExitConfirm, setShowExitConfirm] = useState<boolean>(false);
 
-  // Step signal for discrete stepping (1 tap = 1 lane)
-  const [stepSignal, setStepSignal] = useState<{ direction: 'left' | 'right'; timestamp: number } | null>(null);
-
-  const handleStep = useCallback((direction: 'left' | 'right') => {
-    if (gameState !== 'ACTIVE' || isActionLoading) return;
-    setStepSignal({ direction, timestamp: Date.now() });
-  }, [gameState, isActionLoading]);
-
   // Synchronous refs to prevent race conditions and closure staleness
+  const roadRef = useRef<RoadCrossingHandle>(null);
   const activeRoundIdRef = useRef<string | null>(null);
   const currentLaneRef = useRef<number>(0);
-  const crossLanePromiseRef = useRef<Promise<any> | null>(null);
+  const steppingRef = useRef<boolean>(false);
+  const crossLanePromiseRef = useRef<Promise<unknown> | null>(null);
   const initialMountRef = useRef<boolean>(true);
   // Bumped whenever a round starts or ends here, so a sync that was already in
   // flight doesn't overwrite it with what the server said before.
@@ -260,8 +262,6 @@ export function ChickenRoadPage() {
     };
   }, []);
 
-
-
   // The stake and difficulty are fixed from the moment PLAY is pressed.
   const betLocked = gameState !== 'READY' || isActionLoading;
 
@@ -300,7 +300,7 @@ export function ChickenRoadPage() {
       return;
     }
     if (betAmount > balance) {
-      setErrorMessage('Insufficient balance.');
+      showInsufficientBalance();
       return;
     }
 
@@ -338,7 +338,8 @@ export function ChickenRoadPage() {
       }
     } catch (err: any) {
       const msg = getApiErrorMessage(err, 'Failed to start game');
-      setErrorMessage(msg);
+      // A bet refused for lack of funds already has its popup.
+      if (!isInsufficientBalanceMessage(msg)) setErrorMessage(msg);
       // A round may be in play anyway (started from another tab, or started
       // here but the answer was lost): pick it up rather than stay stuck.
       syncState();
@@ -362,125 +363,108 @@ export function ChickenRoadPage() {
     crossLanePromiseRef.current = null;
   }, [multipliers]);
 
-  const handleCollision = useCallback((laneIndex: number) => {
-    const roundId = activeRoundIdRef.current;
-    showLoss(laneIndex, Math.max(0, laneIndex - 1));
-    if (roundId) {
-      chickenRoadService.reportCollision(roundId, laneIndex).catch((err) => {
-        console.error('Failed to report collision:', err);
-      });
-    }
-  }, [showLoss]);
-
   useEffect(() => {
     if (gameState !== 'LOST') return;
     const timer = window.setTimeout(() => setShowLossModal(true), LOSS_MODAL_DELAY_MS);
     return () => window.clearTimeout(timer);
   }, [gameState]);
 
-  // The chicken stepped into the next lane: the server decides whether it made
-  // it. The canvas holds the chicken on the lane until this settles, and lets
-  // it walk on if it rejects (no ruling is coming).
-  const handleLaneCross = useCallback((laneIndex: number): Promise<void> => {
-    const roundId = activeRoundIdRef.current;
-    if (!roundId) return Promise.reject(new Error('No round in play.'));
+  // The round is paid out: across the finish line, or cashed out.
+  const showWin = useCallback((wonAmount: number, multiplier: number, walletBalance?: number) => {
+    roundEpochRef.current += 1;
+    soundManager.play('win_clap');
+    setGameState('WON');
+    setWinAmount(wonAmount);
+    setCurrentMultiplier(multiplier);
+    if (walletBalance !== undefined) setBalance(walletBalance);
+    activeRoundIdRef.current = null;
+    crossLanePromiseRef.current = null;
+  }, []);
 
-    const request = (async () => {
-      try {
-        const res = await withRetry(
-          () => chickenRoadService.crossLane(roundId, laneIndex),
-          () => activeRoundIdRef.current === roundId,
-          (attempt) => {
-            if (attempt >= 2) {
-              setErrorMessage(`Reconnecting... (attempt ${attempt})`);
-            }
-          }
-        );
-        if (!res || res.round_id !== activeRoundIdRef.current) return;
-        if (res.status === 'LOST') {
-          showLoss(res.lane_index, res.current_lane);
-          return;
-        }
+  // GO: the chicken hops into the next lane, one lane per tap. The server
+  // rules on the lane while it hops, and the road plays the ruling out
+  // (barrier down, or a car) before the round moves on.
+  const handleGo = useCallback(async () => {
+    const roundId = activeRoundIdRef.current;
+    const road = roadRef.current;
+    if (!roundId || !road || gameState !== 'ACTIVE' || isActionLoading || steppingRef.current) return;
+    if (!road.canStep()) return;
+    const total = multipliers.length;
+    const lane = currentLaneRef.current + 1;
+    if (lane > total) return;
+
+    steppingRef.current = true;
+    setStepping(true);
+    setErrorMessage(null);
+
+    // The last lane is the finish: crossing it settles the round at the top multiplier.
+    const request = withRetry<CrossLaneResponse | FinishResponse | LostResponse>(
+      () => (lane === total
+        ? chickenRoadService.finishGame(roundId, lane)
+        : chickenRoadService.crossLane(roundId, lane)),
+      () => activeRoundIdRef.current === roundId,
+      (attempt) => {
+        if (attempt >= 2) setErrorMessage(`Reconnecting... (attempt ${attempt})`);
+      }
+    );
+    crossLanePromiseRef.current = request;
+    const verdict = request.then(
+      (res): StepOutcome => (res.status === 'LOST' ? 'hit' : res.status === 'WON' ? 'won' : 'safe'),
+      (): StepOutcome => 'error'
+    );
+
+    try {
+      await road.step(lane, verdict);
+      const res = await request;
+      if (activeRoundIdRef.current !== roundId) return;
+      setErrorMessage(null);
+      if (res.status === 'LOST') {
+        showLoss(res.lane_index, res.current_lane);
+      } else if (res.status === 'WON') {
+        currentLaneRef.current = total;
+        setCurrentLane(total);
+        showWin(res.won_amount, res.multiplier, res.wallet_balance);
+      } else {
         currentLaneRef.current = Math.max(currentLaneRef.current, res.current_lane);
         setCurrentLane(currentLaneRef.current);
         setCurrentMultiplier(res.current_multiplier);
         setNextMultiplier(res.next_multiplier);
-        if (typeof res.cashout_amount === 'number') {
-          setCashoutAmount(res.cashout_amount);
-        } else {
-          setCashoutAmount((roundBet || 10) * res.current_multiplier);
-        }
-        setErrorMessage(null);
+        setCashoutAmount(
+          typeof res.cashout_amount === 'number' ? res.cashout_amount : roundBet * res.current_multiplier
+        );
         soundManager.play('reveal_tick');
-      } catch (err) {
-        console.error('Failed to register lane cross:', err);
-        if (activeRoundIdRef.current === roundId) {
-          if (isRetryable(err)) {
-            setErrorMessage('Connection problem. Check your internet and keep going.');
-          } else {
-            reconcileRound();
-          }
-        }
-        throw err;
       }
-    })();
-    crossLanePromiseRef.current = request;
-    return request;
-  }, [showLoss, reconcileRound]);
-
-  // Finish safe line reached callback from canvas. Rejects when the round
-  // couldn't be settled, so the chicken can step back and try again.
-  const handleFinish = useCallback(async () => {
-    const roundId = activeRoundIdRef.current;
-    if (!roundId) return;
-
-    // Let an in-flight crossing land first: it may have ended the round.
-    if (crossLanePromiseRef.current) {
-      try {
-        await crossLanePromiseRef.current;
-      } catch {}
-    }
-    if (activeRoundIdRef.current !== roundId) return;
-
-    try {
-      const res = await withRetry(
-        () => chickenRoadService.finishGame(roundId, multipliers.length),
-        () => activeRoundIdRef.current === roundId,
-        (attempt) => {
-          if (attempt >= 2) {
-            setErrorMessage(`Reconnecting... (attempt ${attempt})`);
-          }
-        }
-      );
-      if (activeRoundIdRef.current !== roundId) return;
-      if (res.status === 'LOST') {
-        showLoss(res.lane_index, res.current_lane);
-        return;
-      }
-      roundEpochRef.current += 1;
-      soundManager.play('win_clap');
-      currentLaneRef.current = multipliers.length;
-      setCurrentLane(multipliers.length);
-      setGameState('WON');
-      setWinAmount(res.won_amount);
-      setCurrentMultiplier(res.multiplier);
-      if (res.wallet_balance !== undefined) {
-        setBalance(res.wallet_balance);
-      }
-      activeRoundIdRef.current = null;
-      crossLanePromiseRef.current = null;
     } catch (err) {
-      console.error('Failed to complete finish:', err);
-      setErrorMessage(getApiErrorMessage(err, 'Failed to complete the round.'));
-      reconcileRound();
-      throw err;
+      console.error('Failed to cross lane:', err);
+      if (activeRoundIdRef.current === roundId) {
+        setErrorMessage(getApiErrorMessage(err, 'Could not reach the game server.'));
+        reconcileRound();
+      }
+    } finally {
+      if (crossLanePromiseRef.current === request) crossLanePromiseRef.current = null;
+      steppingRef.current = false;
+      setStepping(false);
     }
-  }, [multipliers, showLoss, reconcileRound]);
+  }, [gameState, isActionLoading, multipliers.length, roundBet, showLoss, showWin, reconcileRound]);
+
+  // Keyboard: Space, Enter or the right / up arrow is GO.
+  useEffect(() => {
+    if (gameState !== 'ACTIVE') return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.repeat || showExitConfirm || showHowToPlay) return;
+      if (['Space', 'Enter', 'ArrowRight', 'ArrowUp', 'KeyD', 'KeyW'].includes(e.code)) {
+        e.preventDefault();
+        handleGo();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [gameState, showExitConfirm, showHowToPlay, handleGo]);
 
   // Cashout mid-game callback
   const handleCashout = async () => {
     const roundId = activeRoundIdRef.current;
-    if (!roundId || gameState !== 'ACTIVE' || isActionLoading) return;
+    if (!roundId || gameState !== 'ACTIVE' || isActionLoading || steppingRef.current) return;
     setIsActionLoading(true);
     try {
       // Let an in-flight crossing land first: it may have ended the round.
@@ -504,16 +488,8 @@ export function ChickenRoadPage() {
         showLoss(res.lane_index, res.current_lane);
         return;
       }
-      roundEpochRef.current += 1;
-      soundManager.play('win_clap');
-      setGameState('WON');
-      setWinAmount(res.won_amount);
-      setCurrentMultiplier(res.multiplier);
-      if (res.wallet_balance !== undefined) {
-        setBalance(res.wallet_balance);
-      }
-      activeRoundIdRef.current = null;
-      crossLanePromiseRef.current = null;
+      setErrorMessage(null);
+      showWin(res.won_amount, res.multiplier, res.wallet_balance);
     } catch (err: any) {
       const msg = getApiErrorMessage(err, 'Failed to cash out');
       setErrorMessage(msg);
@@ -548,6 +524,8 @@ export function ChickenRoadPage() {
   // The stake is committed on start: cashing out is only possible once the
   // chicken has actually crossed a lane (the server enforces this too).
   const hasCrossedALane = Math.max(currentLane, currentLaneRef.current) > 0;
+  const canCashOut = hasCrossedALane && !stepping && !isActionLoading;
+  const canGo = gameState === 'ACTIVE' && !stepping && !isActionLoading && currentLane < multipliers.length;
 
   return (
     <div className="cr-arcade-container">
@@ -639,37 +617,28 @@ export function ChickenRoadPage() {
           </div>
 
           <RoadCrossingGame
+            ref={roadRef}
             gameState={gameState}
             multipliers={multipliers}
             currentLane={currentLane}
             difficulty={difficulty}
-            onLaneCross={handleLaneCross}
-            onFinish={handleFinish}
-            onCollision={handleCollision}
-            stepSignal={stepSignal}
-            movementLocked={isActionLoading}
           />
 
-          {/* Floating Touch Controls (Mobile) */}
-          <div className="cr-mobile-controls">
-            <button
-              type="button"
-              className="cr-steer-btn"
-              onClick={() => handleStep('left')}
-              aria-label="Steer Left"
-            >
-              <ChevronLeft size={28} />
-            </button>
-
-            <button
-              type="button"
-              className="cr-steer-btn"
-              onClick={() => handleStep('right')}
-              aria-label="Steer Right"
-            >
-              <ChevronRight size={28} />
-            </button>
-          </div>
+          {/* GO: one tap, one lane */}
+          {gameState === 'ACTIVE' && (
+            <div className="cr-go-wrap">
+              <button
+                type="button"
+                className={`cr-go-btn ${canGo ? 'cr-go-btn--ready' : ''}`}
+                onClick={handleGo}
+                disabled={!canGo}
+                aria-label="Go: hop to the next lane"
+              >
+                <Footprints size={18} />
+                <span>GO</span>
+              </button>
+            </div>
+          )}
 
           {/* Win Modal */}
           {(gameState === 'WON' || (gameState as any) === 'CASHED_OUT') && (
@@ -891,15 +860,16 @@ export function ChickenRoadPage() {
           {gameState === 'ACTIVE' ? (
             <button
               type="button"
-              disabled={isActionLoading || !hasCrossedALane}
+              disabled={!canCashOut}
               onClick={handleCashout}
               className="cr-play-btn"
               style={
                 hasCrossedALane
                   ? {
-                      background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
-                      borderColor: '#34D399',
-                      boxShadow: '0 0 15px rgba(16, 185, 129, 0.4)',
+                      background: 'linear-gradient(135deg, #F59E0B 0%, #D97706 100%)',
+                      borderColor: '#FBBF24',
+                      boxShadow: '0 0 15px rgba(245, 158, 11, 0.45)',
+                      opacity: canCashOut ? 1 : 0.8,
                     }
                   : {
                       background: 'linear-gradient(135deg, #374151 0%, #1F2937 100%)',
@@ -912,14 +882,14 @@ export function ChickenRoadPage() {
               <span className="cr-btn-icon-slot">
                 <Coins
                   size={16}
-                  className={hasCrossedALane ? 'text-yellow-300 animate-bounce' : 'text-gray-400'}
+                  className={hasCrossedALane ? 'text-yellow-100' : 'text-gray-400'}
                 />
               </span>
               <span className="cr-btn-label">
                 {isActionLoading
                   ? 'CASHING OUT...'
                   : !hasCrossedALane
-                  ? 'CROSS A LANE TO CASH OUT'
+                  ? 'TAP GO TO CROSS'
                   : `CASH OUT ₹${(cashoutAmount || roundBet * currentMultiplier).toFixed(2)} (${currentMultiplier.toFixed(2)}x)`}
               </span>
             </button>

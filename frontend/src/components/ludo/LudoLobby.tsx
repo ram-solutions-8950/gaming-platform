@@ -93,7 +93,7 @@ export const LudoLobby: React.FC<Props> = ({
           >
             <span className="ludo-match-icon text-2xl">⚔️</span>
             <span className="ludo-match-title font-extrabold text-sm text-white">2 Players</span>
-            <span className="ludo-match-sub text-[11px] text-amber-400/90 font-semibold">RED vs YELLOW (Opposite)</span>
+            <span className="ludo-match-sub text-[11px] text-amber-400/90 font-semibold">GREEN vs BLUE</span>
           </button>
 
           <button

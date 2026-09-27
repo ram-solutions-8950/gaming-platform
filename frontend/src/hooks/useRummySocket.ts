@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getWebSocketUrl } from "../utils/ws";
+import { isInsufficientBalanceMessage, showInsufficientBalance } from "../store/insufficientBalanceStore";
 import { authStorage } from "../services/authStorage";
 import { authService } from "../services/auth";
 import type {
@@ -58,6 +59,7 @@ export function useRummySocket(tableId: string, token: string | null) {
         if (msg.type === "state") setState(msg.state);
         else if (msg.type === "hand") setHand(msg.cards);
         else if (msg.type === "error") {
+          if (isInsufficientBalanceMessage(msg.message)) showInsufficientBalance();
           if (
             (msg as any).code === "AUTH_REQUIRED" ||
             msg.message?.toLowerCase().includes("authentication") ||

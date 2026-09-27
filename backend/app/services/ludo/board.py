@@ -4,10 +4,13 @@ from ...models.ludo import LudoColor
 # Common track has 52 cells: 0 to 51
 TRACK_LENGTH = 52
 
-# Starting cell offset on common track for each color
+# Starting cell offset on the common track for each color. The track starts
+# by the top-left yard and runs clockwise: green top-left, red top-right,
+# yellow bottom-right, blue bottom-left (mirrors COLOR_CORNER in the
+# frontend's LudoBoard), so green and blue share the left side of the board.
 START_OFFSETS: Dict[LudoColor, int] = {
-    LudoColor.RED: 0,
-    LudoColor.GREEN: 13,
+    LudoColor.GREEN: 0,
+    LudoColor.RED: 13,
     LudoColor.YELLOW: 26,
     LudoColor.BLUE: 39,
 }

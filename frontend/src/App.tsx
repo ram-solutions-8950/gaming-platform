@@ -11,6 +11,8 @@ import { SignupPage } from './pages/auth/Signup';
 import { DownloadPage } from './pages/Download';
 import { DashboardPage } from './pages/user/Dashboard';
 import { LoadingScreen } from './components/common/LoadingScreen';
+import { InsufficientBalanceModal } from './components/common/InsufficientBalanceModal';
+import { useInsufficientBalanceStore } from './store/insufficientBalanceStore';
 import { useAuthStore } from './store/authStore';
 import { authService } from './services/auth';
 import { authStorage } from './services/authStorage';
@@ -84,6 +86,13 @@ function GlobalAndroidBackHandler() {
 
   useEffect(() => {
     const handleBackPressed = (): boolean => {
+      // 0. Back closes the low-balance popup before anything underneath it.
+      const lowBalance = useInsufficientBalanceStore.getState();
+      if (lowBalance.isOpen) {
+        lowBalance.close();
+        return true;
+      }
+
       // 1. If an active screen or game has its own handler (e.g. Ludo confirm modal), check it first
       if (typeof (window as any).__gameSpecificBackPressed === 'function') {
         try {
@@ -278,6 +287,7 @@ function App() {
       )}
       <BrowserRouter>
         <GlobalAndroidBackHandler />
+        <InsufficientBalanceModal />
         <Routes>
         {/* Dedicated standalone APK download routes - completely separate from game/dashboard layouts */}
         <Route path="/download-apk" element={<DownloadPage />} />

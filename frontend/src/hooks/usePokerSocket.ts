@@ -3,6 +3,7 @@ import { useAuthStore } from '../store/authStore';
 import { authStorage } from '../services/authStorage';
 import { authService } from '../services/auth';
 import { getWebSocketUrl } from '../utils/ws';
+import { isInsufficientBalanceMessage, showInsufficientBalance } from '../store/insufficientBalanceStore';
 
 export interface PokerPlayerInfo {
   user_id: string;
@@ -159,6 +160,7 @@ export function usePokerSocket(options: UsePokerSocketOptions) {
           setMyHoleCards(msg.hole_cards || []);
           optionsRef.current.onHandStart?.();
         } else if (type === 'error') {
+          if (isInsufficientBalanceMessage(msg.message)) showInsufficientBalance();
           if (
             msg.message?.toLowerCase().includes('authentication') ||
             msg.message?.toLowerCase().includes('token') ||
