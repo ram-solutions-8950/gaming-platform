@@ -31,10 +31,10 @@ const CELL = 100;
 const COLORS: LudoColor[] = ['RED', 'GREEN', 'YELLOW', 'BLUE'];
 
 const COLOR_HEX: Record<LudoColor, string> = {
-  RED: '#ef4444',
-  GREEN: '#10b981',
-  YELLOW: '#f59e0b',
-  BLUE: '#3b82f6',
+  RED: '#E52521',
+  GREEN: '#00A651',
+  YELLOW: '#FFD600',
+  BLUE: '#0084E6',
 };
 
 // 52 Common Track Cells in clockwise order (Grid 15x15, [column, row], 0..14)
@@ -107,11 +107,13 @@ const CORNER_GEOMETRY: Record<Corner, CornerGeometry> = {
   },
 };
 
-// Green and blue take the left side of the board, green first
-// (mirrors START_OFFSETS in backend/app/services/ludo/board.py).
+// Corner placement matching user's layout:
+// Top-Left: RED, Top-Right: GREEN, Bottom-Right: YELLOW, Bottom-Left: BLUE.
+// Opposite pairs: RED vs YELLOW, GREEN vs BLUE.
+// Side-wise pairs: RED & BLUE (left), GREEN & YELLOW (right), RED & GREEN (top), BLUE & YELLOW (bottom).
 const COLOR_CORNER: Record<LudoColor, Corner> = {
-  GREEN: 'topLeft',
-  RED: 'topRight',
+  RED: 'topLeft',
+  GREEN: 'topRight',
   YELLOW: 'bottomRight',
   BLUE: 'bottomLeft',
 };
@@ -275,7 +277,7 @@ const renderPawnGraphic = (
         {/* Center Chivalry Shield Badge */}
         <path
           d={`M ${cx},${cy - 16} L ${cx + 7},${cy - 9} L ${cx},${cy + 2} L ${cx - 7},${cy - 9} Z`}
-          fill="url(#goldCollar)"
+          fill="#fbbf24"
           stroke="#78350f"
           strokeWidth="0.8"
         />
@@ -287,7 +289,7 @@ const renderPawnGraphic = (
           cy={cy - 28}
           rx="13"
           ry="5"
-          fill="url(#goldCollar)"
+          fill="#fbbf24"
           stroke="#78350f"
           strokeWidth="1"
         />
@@ -429,7 +431,7 @@ const renderPawnGraphic = (
         cy={cy + 13}
         rx="27"
         ry="9.5"
-        fill="url(#goldCollar)"
+        fill="#fbbf24"
         stroke="#451a03"
         strokeWidth="1"
       />
@@ -537,95 +539,86 @@ const arrowPoints = (cx: number, cy: number, size: number) =>
 const renderBoardArt = () => (
   <>
     <defs>
-      {/* Rounded board outline; the yards are square and get their outer corner from this. */}
+      {/* Board boundary clip path */}
       <clipPath id="ludoBoardClip">
         <rect width="1500" height="1500" rx="28" />
       </clipPath>
-      {/* Yard Background Depth Gradients */}
-      <radialGradient id="yardRedGrad" cx="30%" cy="30%" r="70%">
-        <stop offset="0%" stopColor="#ef4444" />
-        <stop offset="70%" stopColor="#dc2626" />
-        <stop offset="100%" stopColor="#991b1b" />
-      </radialGradient>
-      <radialGradient id="yardGreenGrad" cx="30%" cy="30%" r="70%">
-        <stop offset="0%" stopColor="#10b981" />
-        <stop offset="70%" stopColor="#059669" />
-        <stop offset="100%" stopColor="#064e3b" />
-      </radialGradient>
-      <radialGradient id="yardYellowGrad" cx="30%" cy="30%" r="70%">
-        <stop offset="0%" stopColor="#fbbf24" />
-        <stop offset="70%" stopColor="#d97706" />
-        <stop offset="100%" stopColor="#78350f" />
-      </radialGradient>
-      <radialGradient id="yardBlueGrad" cx="30%" cy="30%" r="70%">
-        <stop offset="0%" stopColor="#3b82f6" />
-        <stop offset="70%" stopColor="#2563eb" />
-        <stop offset="100%" stopColor="#1e3a8a" />
-      </radialGradient>
-
-      {/* Luxury Yard Tray Gradient */}
-      <linearGradient id="yardTrayGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-        <stop offset="0%" stopColor="#ffffff" />
-        <stop offset="40%" stopColor="#f8fafc" />
-        <stop offset="100%" stopColor="#e2e8f0" />
-      </linearGradient>
-
-      {/* Gold rim of the centre medallion */}
-      <linearGradient id="boardGold" x1="0%" y1="0%" x2="100%" y2="0%">
-        <stop offset="0%" stopColor="#78350f" />
-        <stop offset="25%" stopColor="#f59e0b" />
-        <stop offset="50%" stopColor="#fef08a" />
-        <stop offset="75%" stopColor="#d97706" />
-        <stop offset="100%" stopColor="#451a03" />
-      </linearGradient>
     </defs>
 
     <g clipPath="url(#ludoBoardClip)">
-      {/* Board Background: Crisp Clean White */}
+      {/* Board Background: Pure Clean Crisp White */}
       <rect width="1500" height="1500" fill="#ffffff" />
 
-      {/* 4 Large Corner Yards with Clean Trays & Pedestals */}
+      {/* 4 Large Corner Yards with Simple Pure Colors & Concentric Spot Rings */}
       {(
         [
-          { color: 'RED', socketFill: '#fee2e2', socketRing: '#fca5a5' },
-          { color: 'GREEN', socketFill: '#d1fae5', socketRing: '#86efac' },
-          { color: 'YELLOW', socketFill: '#fef3c7', socketRing: '#fde047' },
-          { color: 'BLUE', socketFill: '#dbeafe', socketRing: '#93c5fd' },
+          { color: 'RED', label: 'Player 2', labelX: 42, labelY: 300, rot: -90 },
+          { color: 'GREEN', label: 'Player 3', labelX: 1200, labelY: 42, rot: 0 },
+          { color: 'YELLOW', label: 'Player 4', labelX: 1458, labelY: 1200, rot: 90 },
+          { color: 'BLUE', label: 'Player 1', labelX: 300, labelY: 1458, rot: 0 },
         ] as const
-      ).map((yard) => (
-        <g key={`yard-${yard.color}`}>
-          <rect x={YARD_ORIGINS[yard.color][0]} y={YARD_ORIGINS[yard.color][1]} width="600" height="600" fill={COLOR_HEX[yard.color]} />
-          <rect
-            x={YARD_ORIGINS[yard.color][0] + 85}
-            y={YARD_ORIGINS[yard.color][1] + 85}
-            width="430"
-            height="430"
-            fill="#ffffff"
-            rx="36"
-            stroke={COLOR_HEX[yard.color]}
-            strokeWidth="4"
-          />
-          {YARD_COORDINATES[yard.color].map((socket, idx) => {
-            const [sx, sy] = cellCenter(socket);
-            return (
-              <g key={`${yard.color}-sock-${idx}`}>
-                <circle cx={sx} cy={sy} r="54" fill={yard.socketFill} stroke={COLOR_HEX[yard.color]} strokeWidth="4" />
-                <circle cx={sx} cy={sy} r="44" fill="#ffffff" stroke={yard.socketRing} strokeWidth="2" />
-                <text x={sx} y={sy + 9} fontSize="26" textAnchor="middle" fill={COLOR_HEX[yard.color]} opacity="0.65">
-                  ★
-                </text>
-              </g>
-            );
-          })}
-        </g>
-      ))}
+      ).map((yard) => {
+        const [ox, oy] = YARD_ORIGINS[yard.color];
+        return (
+          <g key={`yard-${yard.color}`}>
+            {/* Outer Yard Solid Color */}
+            <rect
+              x={ox}
+              y={oy}
+              width="600"
+              height="600"
+              fill={COLOR_HEX[yard.color]}
+              stroke="#333333"
+              strokeWidth="2"
+            />
 
-      {/* Common Track Grid Cells */}
+            {/* Inner White Box */}
+            <rect
+              x={ox + 80}
+              y={oy + 80}
+              width="440"
+              height="440"
+              fill="#ffffff"
+              rx="28"
+              stroke="#333333"
+              strokeWidth="2"
+            />
+
+            {/* 4 Concentric Spot Rings matching classic Ludo Board */}
+            {YARD_COORDINATES[yard.color].map((socket, idx) => {
+              const [sx, sy] = cellCenter(socket);
+              return (
+                <g key={`${yard.color}-sock-${idx}`}>
+                  <circle cx={sx} cy={sy} r="52" fill="#ffffff" stroke={COLOR_HEX[yard.color]} strokeWidth="12" />
+                  <circle cx={sx} cy={sy} r="30" fill="#ffffff" stroke={COLOR_HEX[yard.color]} strokeWidth="6" />
+                  <circle cx={sx} cy={sy} r="14" fill={COLOR_HEX[yard.color]} />
+                </g>
+              );
+            })}
+
+            {/* Outer Player Label (Matching the Screenshot) */}
+            <text
+              x={yard.labelX}
+              y={yard.labelY}
+              fill="#ffffff"
+              fontSize="34"
+              fontWeight="900"
+              letterSpacing="2"
+              textAnchor="middle"
+              transform={yard.rot !== 0 ? `rotate(${yard.rot} ${yard.labelX} ${yard.labelY})` : undefined}
+              style={{ userSelect: 'none' }}
+            >
+              {yard.label}
+            </text>
+          </g>
+        );
+      })}
+
+      {/* Common Track Grid Cells: Pure white background with crisp grid borders */}
       {TRACK_COORDINATES.map((coord, i) => {
         const [gx, gy] = coord;
         const [cx, cy] = cellCenter(coord);
         const startColor = COLORS.find((c) => START_OFFSETS[c] === i);
-        // The square each colour leaves the common track from (its step 50).
         const entryColor = COLORS.find((c) => trackIndexOf(c, 50) === i);
         const isStar = STAR_TRACK_INDICES.includes(i);
 
@@ -636,32 +629,26 @@ const renderBoardArt = () => (
               y={gy * CELL}
               width={CELL}
               height={CELL}
-              fill={startColor ? COLOR_HEX[startColor] : isStar ? '#fef3c7' : '#ffffff'}
-              stroke="#94a3b8"
-              strokeWidth="2.5"
+              fill={startColor ? COLOR_HEX[startColor] : '#ffffff'}
+              stroke="#333333"
+              strokeWidth="2"
             />
             {isStar && (
-              <g>
-                <circle cx={cx} cy={cy} r="36" fill="none" stroke="#d97706" strokeWidth="2" strokeDasharray="6,4" opacity="0.8" />
-                <circle cx={cx} cy={cy} r="28" fill="#fef3c7" stroke="#f59e0b" strokeWidth="2.5" />
-                <text x={cx} y={cy + 14} fill="#b45309" fontSize="40" textAnchor="middle" fontWeight="bold">
-                  ★
-                </text>
-              </g>
+              <text x={cx} y={cy + 15} fill="#475569" fontSize="48" textAnchor="middle" fontWeight="bold">
+                ☆
+              </text>
             )}
             {startColor && (
               <polygon
-                points={arrowPoints(cx, cy, 52)}
+                points={arrowPoints(cx, cy, 48)}
                 fill="#ffffff"
-                opacity="0.95"
                 transform={`rotate(${COLOR_HEADING[startColor]} ${cx} ${cy})`}
               />
             )}
             {entryColor && (
               <polygon
-                points={arrowPoints(cx, cy, 44)}
+                points={arrowPoints(cx, cy, 38)}
                 fill={COLOR_HEX[entryColor]}
-                opacity="0.9"
                 transform={`rotate(${COLOR_HEADING[entryColor]} ${cx} ${cy})`}
               />
             )}
@@ -669,121 +656,44 @@ const renderBoardArt = () => (
         );
       })}
 
-      {/* Home Stretch Paths with Step Numbers */}
+      {/* Home Stretch Paths: 5 Pure Solid Color Squares Leading into Center */}
       {COLORS.map((color) =>
         HOME_PATHS[color].map((coord, i) => {
           const [gx, gy] = coord;
-          const [cx, cy] = cellCenter(coord);
           return (
-            <g key={`${color}-h-${i}`}>
-              <rect
-                x={gx * CELL}
-                y={gy * CELL}
-                width={CELL}
-                height={CELL}
-                fill={COLOR_HEX[color]}
-                stroke="#ffffff"
-                strokeWidth="2.5"
-                opacity="0.95"
-              />
-              <text x={cx} y={cy + 12} fill="#ffffff" opacity="0.85" fontSize="32" fontWeight="900" textAnchor="middle">
-                {i + 1}
-              </text>
-            </g>
+            <rect
+              key={`${color}-h-${i}`}
+              x={gx * CELL}
+              y={gy * CELL}
+              width={CELL}
+              height={CELL}
+              fill={COLOR_HEX[color]}
+              stroke="#333333"
+              strokeWidth="2"
+            />
           );
         })
       )}
 
-      {/* Center Home Triangles */}
+      {/* Center Home Triangles meeting cleanly at the exact center (pure simple colors, no gradients) */}
       {COLORS.map((color) => (
         <polygon
           key={`home-tri-${color}`}
           points={HOME_TRIANGLE_POINTS[color]}
           fill={COLOR_HEX[color]}
-          stroke="#ffffff"
-          strokeWidth="2.5"
+          stroke="#333333"
+          strokeWidth="2"
         />
       ))}
-
-      {/* Center Golden Medallion — small enough to leave each triangle's
-          centroid free for the tokens that finish there. */}
-      <g>
-        {[0, 45, 90, 135, 180, 225, 270, 315].map((deg) => (
-          <line
-            key={`ray-${deg}`}
-            x1="750"
-            y1="694"
-            x2="750"
-            y2="684"
-            stroke="#fef3c7"
-            strokeWidth="4"
-            strokeLinecap="round"
-            opacity="0.85"
-            transform={`rotate(${deg} 750 750)`}
-          />
-        ))}
-        <circle cx="750" cy="750" r="48" fill="#ffffff" stroke="url(#boardGold)" strokeWidth="5" />
-        <circle cx="750" cy="750" r="39" fill="#fef3c7" stroke="#fbbf24" strokeWidth="1.5" opacity="0.95" />
-        <text x="750" y="764" fontSize="38" textAnchor="middle">
-          👑
-        </text>
-      </g>
     </g>
 
-    {/* Board outline, drawn over the clipped content */}
-    <rect x="1.5" y="1.5" width="1497" height="1497" rx="27" fill="none" stroke="#94a3b8" strokeWidth="3" />
+    {/* Board outline */}
+    <rect x="1" y="1" width="1498" height="1498" rx="28" fill="none" stroke="#333333" strokeWidth="3" />
   </>
 );
 
-// Gradients used by the pawn artwork (defined in the pawn layer's own <svg>).
-const renderPawnDefs = () => (
-  <defs>
-      {/* Metallic Polished Gold Collar Ring */}
-      <linearGradient id="goldCollar" x1="0%" y1="0%" x2="100%" y2="0%">
-        <stop offset="0%" stopColor="#78350f" />
-        <stop offset="25%" stopColor="#f59e0b" />
-        <stop offset="50%" stopColor="#fef08a" />
-        <stop offset="75%" stopColor="#d97706" />
-        <stop offset="100%" stopColor="#451a03" />
-      </linearGradient>
-
-      {/* 3D Translucent Jewel Glass Shading: Red (Ruby) */}
-      <radialGradient id="redHeadGrad" cx="35%" cy="30%" r="70%">
-        <stop offset="0%" stopColor="#ffffff" />
-        <stop offset="18%" stopColor="#fca5a5" />
-        <stop offset="45%" stopColor="#e11d48" />
-        <stop offset="75%" stopColor="#9f1239" />
-        <stop offset="100%" stopColor="#4c0519" />
-      </radialGradient>
-
-      {/* 3D Translucent Jewel Glass Shading: Green (Emerald) */}
-      <radialGradient id="greenHeadGrad" cx="35%" cy="30%" r="70%">
-        <stop offset="0%" stopColor="#ffffff" />
-        <stop offset="18%" stopColor="#a7f3d0" />
-        <stop offset="45%" stopColor="#059669" />
-        <stop offset="75%" stopColor="#065f46" />
-        <stop offset="100%" stopColor="#022c22" />
-      </radialGradient>
-
-      {/* 3D Translucent Jewel Glass Shading: Yellow (Topaz/Amber) */}
-      <radialGradient id="yellowHeadGrad" cx="35%" cy="30%" r="70%">
-        <stop offset="0%" stopColor="#ffffff" />
-        <stop offset="18%" stopColor="#fef08a" />
-        <stop offset="45%" stopColor="#d97706" />
-        <stop offset="75%" stopColor="#b45309" />
-        <stop offset="100%" stopColor="#451a03" />
-      </radialGradient>
-
-      {/* 3D Translucent Jewel Glass Shading: Blue (Sapphire) */}
-      <radialGradient id="blueHeadGrad" cx="35%" cy="30%" r="70%">
-        <stop offset="0%" stopColor="#ffffff" />
-        <stop offset="18%" stopColor="#bfdbfe" />
-        <stop offset="45%" stopColor="#2563eb" />
-        <stop offset="75%" stopColor="#1e40af" />
-        <stop offset="100%" stopColor="#0f172a" />
-      </radialGradient>
-  </defs>
-);
+// Gradients removed — simple pure colors throughout
+const renderPawnDefs = () => <defs />;
 
 const LudoBoardView: React.FC<Props> = ({
   players,

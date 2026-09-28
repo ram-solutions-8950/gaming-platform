@@ -18,12 +18,14 @@ from app.services.ludo.rules import (
 )
 
 def test_opposite_colors_board_geometry():
-    # Green start is 0 (top-left)
-    assert get_absolute_position(0, LudoColor.GREEN) == 0
+    # Red start is 0 (top-left)
+    assert get_absolute_position(0, LudoColor.RED) == 0
     # Yellow start is 26 (opposite, 180 degrees from 0 on 52-cell track)
     assert get_absolute_position(0, LudoColor.YELLOW) == 26
-    # Distance between GREEN and YELLOW is exactly half the board (26 cells)
-    assert (get_absolute_position(0, LudoColor.YELLOW) - get_absolute_position(0, LudoColor.GREEN)) == 26
+    # Distance between RED and YELLOW is exactly half the board (26 cells)
+    assert (get_absolute_position(0, LudoColor.YELLOW) - get_absolute_position(0, LudoColor.RED)) == 26
+    # Distance between GREEN (13) and BLUE (39) is also exactly half the board (26 cells)
+    assert (get_absolute_position(0, LudoColor.BLUE) - get_absolute_position(0, LudoColor.GREEN)) == 26
 
 def test_safe_cells_identification():
     # 4 start cells are safe
@@ -58,7 +60,7 @@ def test_blockade_prevents_opponent_passing_or_landing():
     p1_id = uuid.uuid4()
     p2_id = uuid.uuid4()
 
-    # Player 1 (Green) has 2 tokens on step 5 (abs pos 5)
+    # Player 1 (Red) has 2 tokens on step 5 (abs pos 5)
     t1 = LudoToken(id=uuid.uuid4(), player_id=p1_id, token_index=0, position=5, is_home=False)
     t2 = LudoToken(id=uuid.uuid4(), player_id=p1_id, token_index=1, position=5, is_home=False)
 
@@ -67,14 +69,14 @@ def test_blockade_prevents_opponent_passing_or_landing():
     t_yellow = LudoToken(id=uuid.uuid4(), player_id=p2_id, token_index=0, position=27, is_home=False) # abs pos 1
 
     all_tokens = [t1, t2, t_yellow]
-    color_map = {str(p1_id): LudoColor.GREEN, str(p2_id): LudoColor.YELLOW}
+    color_map = {str(p1_id): LudoColor.RED, str(p2_id): LudoColor.YELLOW}
 
     # Blockade detected at abs pos 5
     blockades = find_blockades(all_tokens, color_map)
     assert 5 in blockades
-    assert blockades[5] == LudoColor.GREEN
+    assert blockades[5] == LudoColor.RED
 
-    # Yellow token at abs pos 1 rolling 4 wants to land on abs pos 5 (Green blockade) -> Illegal!
+    # Yellow token at abs pos 1 rolling 4 wants to land on abs pos 5 (Red blockade) -> Illegal!
     assert not can_move_token(t_yellow, 4, LudoColor.YELLOW, all_tokens, color_map)
 
     # Yellow token at abs pos 1 rolling 5 wants to jump past abs pos 5 to abs pos 6 -> Blocked!
@@ -86,10 +88,10 @@ def test_capture_on_non_safe_cell():
 
     # Yellow token at step 5: abs pos (26 + 5) % 52 = 31 (not safe)
     t_yellow = LudoToken(id=uuid.uuid4(), player_id=p2_id, token_index=0, position=5, is_home=False)
-    color_map = {str(p1_id): LudoColor.GREEN, str(p2_id): LudoColor.YELLOW}
+    color_map = {str(p1_id): LudoColor.RED, str(p2_id): LudoColor.YELLOW}
 
-    # Green lands on abs pos 31
-    captured = check_capture(31, LudoColor.GREEN, [t_yellow], color_map)
+    # Red lands on abs pos 31
+    captured = check_capture(31, LudoColor.RED, [t_yellow], color_map)
     assert captured is not None
     assert captured.player_id == p2_id
 
@@ -99,9 +101,9 @@ def test_no_capture_on_safe_cell():
 
     # Yellow token on safe cell 8 (Star cell)
     t_yellow = LudoToken(id=uuid.uuid4(), player_id=p2_id, token_index=0, position=34, is_home=False) # (26 + 34) % 52 = 8
-    color_map = {str(p1_id): LudoColor.GREEN, str(p2_id): LudoColor.YELLOW}
+    color_map = {str(p1_id): LudoColor.RED, str(p2_id): LudoColor.YELLOW}
 
-    captured = check_capture(8, LudoColor.GREEN, [t_yellow], color_map)
+    captured = check_capture(8, LudoColor.RED, [t_yellow], color_map)
     assert captured is None  # Cannot capture on star cell!
 
 def test_win_condition_four_tokens_home():

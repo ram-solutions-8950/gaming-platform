@@ -9,8 +9,8 @@ TRACK_LENGTH = 52
 # yellow bottom-right, blue bottom-left (mirrors COLOR_CORNER in the
 # frontend's LudoBoard), so green and blue share the left side of the board.
 START_OFFSETS: Dict[LudoColor, int] = {
-    LudoColor.GREEN: 0,
-    LudoColor.RED: 13,
+    LudoColor.RED: 0,
+    LudoColor.GREEN: 13,
     LudoColor.YELLOW: 26,
     LudoColor.BLUE: 39,
 }

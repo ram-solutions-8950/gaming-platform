@@ -754,7 +754,7 @@ export const Ludo: React.FC = () => {
   const isWinnerMe = Boolean(winnerPlayer && myPlayer && winnerPlayer.user_id === myPlayer.user_id);
 
   // Authentic 4-Corner mapping matching Board Yards:
-  // Top-Left: Green, Bottom-Left: Blue, Top-Right: Red, Bottom-Right: Yellow
+  // Top-Left: Red, Bottom-Left: Blue, Top-Right: Green, Bottom-Right: Yellow
   const redPlayer = matchState?.players.find((p) => p.color === 'RED');
   const greenPlayer = matchState?.players.find((p) => p.color === 'GREEN');
   const bluePlayer = matchState?.players.find((p) => p.color === 'BLUE');
@@ -940,24 +940,24 @@ export const Ludo: React.FC = () => {
 
           {/* Arena Stage: Centered Board flanked by Corner Player Panels & Corner Dice (BUG-003) */}
           <div className="ludo-arena-stage w-full flex-1 flex flex-row items-center justify-between gap-2 sm:gap-4 overflow-hidden min-h-0 px-1 sm:px-3">
-            {/* Left Column: Top-Left (GREEN) & Bottom-Left (BLUE) */}
+            {/* Left Column: Top-Left (RED) & Bottom-Left (BLUE) */}
             <div className="ludo-side-col-left h-full flex flex-col justify-between items-start w-[170px] sm:w-[210px] shrink-0 py-0.5">
-              {/* Top-Left: GREEN Player Panel & Dice (when Green's turn) */}
+              {/* Top-Left: RED Player Panel & Dice (when Red's turn) */}
               <div className="w-full flex flex-col gap-1.5 items-start">
-                {greenPlayer ? (
+                {redPlayer ? (
                   <div className="w-full">
                     <LudoPlayerPanel
-                      player={greenPlayer}
-                      isCurrentTurn={matchState.current_turn_color === 'GREEN'}
-                      isMe={greenPlayer.user_id === user?.id}
+                      player={redPlayer}
+                      isCurrentTurn={matchState.current_turn_color === 'RED'}
+                      isMe={redPlayer.user_id === user?.id}
                     />
                   </div>
                 ) : (
                   <div className="w-full p-2 bg-slate-900/40 border border-dashed border-slate-800 rounded-xl text-center text-[10px] text-slate-500">
-                    Empty Seat
+                    {matchState.players.length === 2 ? '2P Match' : 'Empty Seat'}
                   </div>
                 )}
-                {matchState.current_turn_color === 'GREEN' && diceElement}
+                {matchState.current_turn_color === 'RED' && diceElement}
               </div>
 
               {/* Bottom-Left: BLUE Player Panel & Dice (when Blue's turn) */}
@@ -973,7 +973,7 @@ export const Ludo: React.FC = () => {
                   </div>
                 ) : (
                   <div className="w-full p-2 bg-slate-900/40 border border-dashed border-slate-800 rounded-xl text-center text-[10px] text-slate-500">
-                    Empty Seat
+                    {matchState.players.length === 2 ? '2P Match' : 'Empty Seat'}
                   </div>
                 )}
               </div>
@@ -1054,16 +1054,16 @@ export const Ludo: React.FC = () => {
               )}
             </div>
 
-            {/* Right Column: Top-Right (RED) & Bottom-Right (YELLOW) */}
+            {/* Right Column: Top-Right (GREEN) & Bottom-Right (YELLOW) */}
             <div className="ludo-side-col-right h-full flex flex-col justify-between items-end w-[170px] sm:w-[210px] shrink-0 py-0.5">
-              {/* Top-Right: RED Player Panel & Dice (when Red's turn) */}
+              {/* Top-Right: GREEN Player Panel & Dice (when Green's turn) */}
               <div className="w-full flex flex-col gap-1.5 items-end">
-                {redPlayer ? (
+                {greenPlayer ? (
                   <div className="w-full">
                     <LudoPlayerPanel
-                      player={redPlayer}
-                      isCurrentTurn={matchState.current_turn_color === 'RED'}
-                      isMe={redPlayer.user_id === user?.id}
+                      player={greenPlayer}
+                      isCurrentTurn={matchState.current_turn_color === 'GREEN'}
+                      isMe={greenPlayer.user_id === user?.id}
                     />
                   </div>
                 ) : (
@@ -1071,7 +1071,7 @@ export const Ludo: React.FC = () => {
                     {matchState.players.length === 2 ? '2P Match' : 'Empty Seat'}
                   </div>
                 )}
-                {matchState.current_turn_color === 'RED' && diceElement}
+                {matchState.current_turn_color === 'GREEN' && diceElement}
               </div>
 
               {/* Bottom-Right: YELLOW Player Panel & Dice (when Yellow's turn) */}
