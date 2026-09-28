@@ -306,7 +306,7 @@ export function RoulettePage() {
     }
 
     if (balance < selectedChip) {
-      showInsufficientBalance();
+      showInsufficientBalance({ requiredAmount: selectedChip * 100, currentBalance: balance * 100 });
       setToastMessage('Insufficient balance!');
       setTimeout(() => setToastMessage(null), 1500);
       return;
@@ -317,6 +317,7 @@ export function RoulettePage() {
     // Optimistically update local state & balance
     soundManager.play('bet_coin');
     setBalance((prev) => Math.max(0, prev - selectedChip));
+    window.dispatchEvent(new Event('wallet-update'));
     setLocalBets((prev) => [...prev, newBet]);
     setBetHistoryStack((prev) => [...prev, newBet]);
 
@@ -328,12 +329,14 @@ export function RoulettePage() {
         amount: selectedChip,
       }]);
       await fetchState();
+      window.dispatchEvent(new Event('wallet-update'));
       // Server now reflects this bet in my_bets; drop the optimistic local
       // copy so betsByTarget doesn't double-count it
       setLocalBets((prev) => prev.filter((b) => b !== newBet));
     } catch (err: any) {
       // Revert if rejected
       setBalance((prev) => prev + selectedChip);
+      window.dispatchEvent(new Event('wallet-update'));
       setLocalBets((prev) => prev.filter((_, idx) => idx !== prev.length - 1));
       const msg = err.response?.data?.message || 'Failed to place bet';
       setToastMessage(msg);
@@ -401,7 +404,7 @@ export function RoulettePage() {
 
     const needed = previousRoundBets.reduce((sum, b) => sum + b.amount, 0);
     if (balance < needed) {
-      showInsufficientBalance();
+      showInsufficientBalance({ requiredAmount: needed * 100, currentBalance: balance * 100 });
       setToastMessage('Insufficient balance to repeat bet');
       setTimeout(() => setToastMessage(null), 1500);
       return;

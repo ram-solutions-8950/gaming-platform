@@ -6,6 +6,7 @@ import { SideShowDialog } from './SideShowDialog';
 import { ShowdownOverlay } from './ShowdownOverlay';
 import { soundManager } from '../../services/soundManager';
 import { walletService } from '../../services/wallet';
+import { showInsufficientBalance } from '../../store/insufficientBalanceStore';
 import { GameRulesModal } from '../common/GameRulesModal';
 import { TEEN_PATTI_RULES_DATA } from '../common/gameRulesData';
 import { HelpCircle, Crown, LogOut } from 'lucide-react';
@@ -26,18 +27,31 @@ export const TeenPattiTable: React.FC<TeenPattiTableProps> = ({
   const [showLobbyConfirm, setShowLobbyConfirm] = useState<boolean>(false);
   const [tableClosedEvent, setTableClosedEvent] = useState<{ reason: string; winnerSeat?: number } | null>(null);
 
+  const refreshWallet = useCallback(() => {
+    walletService
+      .getWallet()
+      .then((w) => {
+        setWalletBalance(w.balance || 0);
+        window.dispatchEvent(new Event('wallet-update'));
+      })
+      .catch(() => {});
+  }, []);
+
   const handleSocketEvent = useCallback((event: any) => {
     if (event.event === 'table_closed') {
       setTableClosedEvent({
         reason: event.reason || 'Opponent left the match. Match ended.',
         winnerSeat: event.winner_seat,
       });
+    } else if (event.event === 'wallet_balance' && typeof event.balance === 'number') {
+      setWalletBalance(event.balance);
+      window.dispatchEvent(new Event('wallet-update'));
+    } else if (event.event === 'hand_started') {
+      refreshWallet();
+    } else if (event.event === 'hand_over') {
+      refreshWallet();
     }
-  }, []);
-
-  const refreshWallet = useCallback(() => {
-    walletService.getWallet().then((w) => setWalletBalance(w.balance || 0)).catch(() => {});
-  }, []);
+  }, [refreshWallet]);
 
   useEffect(() => {
     refreshWallet();
@@ -60,6 +74,72 @@ export const TeenPattiTable: React.FC<TeenPattiTableProps> = ({
     errorMessage,
   } = useTeenPattiSocket({ tableId, onEvent: handleSocketEvent });
 
+  const handleChaalAction = useCallback((amount?: number) => {
+    const isBlind = !gameState?.seats.find((s) => s.id === currentUserId)?.seen;
+    const mult = isBlind ? 1 : 2;
+    const cost = amount || ((gameState?.current_stake || 1000) * mult);
+    const curBal = walletBalance ?? 0;
+    if (curBal < cost) {
+      showInsufficientBalance({ requiredAmount: cost, currentBalance: curBal });
+      return;
+    }
+    setWalletBalance((prev) => (prev !== null ? Math.max(0, prev - cost) : 0));
+    window.dispatchEvent(new Event('wallet-update'));
+    chaal(amount);
+  }, [gameState, currentUserId, walletBalance, chaal]);
+
+  const handleRaiseAction = useCallback(() => {
+    const isBlind = !gameState?.seats.find((s) => s.id === currentUserId)?.seen;
+    const mult = isBlind ? 1 : 2;
+    const cost = (gameState?.current_stake ? gameState.current_stake * 2 : 2000) * mult;
+    const curBal = walletBalance ?? 0;
+    if (curBal < cost) {
+      showInsufficientBalance({ requiredAmount: cost, currentBalance: curBal });
+      return;
+    }
+    setWalletBalance((prev) => (prev !== null ? Math.max(0, prev - cost) : 0));
+    window.dispatchEvent(new Event('wallet-update'));
+    raiseBet();
+  }, [gameState, currentUserId, walletBalance, raiseBet]);
+
+  const handleShowAction = useCallback(() => {
+    const isBlind = !gameState?.seats.find((s) => s.id === currentUserId)?.seen;
+    const mult = isBlind ? 1 : 2;
+    const cost = (gameState?.current_stake || 1000) * mult;
+    const curBal = walletBalance ?? 0;
+    if (curBal < cost) {
+      showInsufficientBalance({ requiredAmount: cost, currentBalance: curBal });
+      return;
+    }
+    setWalletBalance((prev) => (prev !== null ? Math.max(0, prev - cost) : 0));
+    window.dispatchEvent(new Event('wallet-update'));
+    show();
+  }, [gameState, currentUserId, walletBalance, show]);
+
+  const handleSideShowAction = useCallback(() => {
+    const cost = (gameState?.current_stake || 1000) * 2;
+    const curBal = walletBalance ?? 0;
+    if (curBal < cost) {
+      showInsufficientBalance({ requiredAmount: cost, currentBalance: curBal });
+      return;
+    }
+    setWalletBalance((prev) => (prev !== null ? Math.max(0, prev - cost) : 0));
+    window.dispatchEvent(new Event('wallet-update'));
+    sideShow();
+  }, [gameState, walletBalance, sideShow]);
+
+  const handleStartHandAction = useCallback(() => {
+    const bootCost = gameState?.boot_amount || gameState?.current_stake || 1000;
+    const curBal = walletBalance ?? 0;
+    if (curBal < bootCost) {
+      showInsufficientBalance({ requiredAmount: bootCost, currentBalance: curBal });
+      return;
+    }
+    setWalletBalance((prev) => (prev !== null ? Math.max(0, prev - bootCost) : 0));
+    window.dispatchEvent(new Event('wallet-update'));
+    startHand();
+  }, [gameState?.boot_amount, gameState?.current_stake, walletBalance, startHand]);
+
   const handleLeave = useCallback(() => {
     try {
       leaveTable();
@@ -69,8 +149,8 @@ export const TeenPattiTable: React.FC<TeenPattiTableProps> = ({
 
   const handleDealHandNow = useCallback(() => {
     setShowdownDismissed(true);
-    startHand();
-  }, [startHand]);
+    handleStartHandAction();
+  }, [handleStartHandAction]);
 
   const handleLeaveImmediately = useCallback(() => {
     setShowdownDismissed(true);
@@ -196,6 +276,7 @@ export const TeenPattiTable: React.FC<TeenPattiTableProps> = ({
     const myBet = mySeat?.total_bet || 0;
     if (myBet > lastBetRef.current) {
       soundManager.play('bet_coin');
+      refreshWallet();
     }
     lastBetRef.current = myBet;
 
@@ -390,12 +471,12 @@ export const TeenPattiTable: React.FC<TeenPattiTableProps> = ({
         gameState={gameState}
         currentUserId={currentUserId}
         onSee={seeCards}
-        onChaal={chaal}
-        onRaise={raiseBet}
+        onChaal={handleChaalAction}
+        onRaise={handleRaiseAction}
         onPack={pack}
-        onShow={show}
-        onSideShow={sideShow}
-        onStart={startHand}
+        onShow={handleShowAction}
+        onSideShow={handleSideShowAction}
+        onStart={handleStartHandAction}
       />
 
       {/* Side-Show Request Dialog */}

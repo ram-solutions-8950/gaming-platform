@@ -10,6 +10,7 @@ import RulesModal from "../../components/rummy/RulesModal";
 import { useRummyMatchmaking } from "../../hooks/useRummyMatchmaking";
 import { RummyApi, type RummyTableOut } from "../../services/rummy";
 import { authStorage } from "../../services/authStorage";
+import { showInsufficientBalance } from "../../store/insufficientBalanceStore";
 import api from "../../services/api";
 import { setNativeLandscape } from "../../utils/nativeOrientation";
 import "../../styles/rummy.css";
@@ -92,6 +93,10 @@ export function RummyPage() {
     setNativeLandscape().catch(() => {});
     fetchBalance();
     fetchTables();
+    const onWalletUpdate = () => {
+      fetchBalance();
+    };
+    window.addEventListener("wallet-update", onWalletUpdate);
     const timer = setInterval(() => {
       if (!activeTableId) {
         fetchTables();
@@ -99,6 +104,7 @@ export function RummyPage() {
     }, 5000);
     return () => {
       clearInterval(timer);
+      window.removeEventListener("wallet-update", onWalletUpdate);
     };
   }, [activeTableId]);
 
@@ -161,6 +167,14 @@ export function RummyPage() {
   }, [tiers, playerFilter]);
 
   const handleStartMatch = (tier: Tier) => {
+    const required = tier.entryFeePaise / 100;
+    if (tier.entryFeePaise > 0 && balance < required) {
+      showInsufficientBalance({
+        requiredAmount: required,
+        currentBalance: balance,
+      });
+      return;
+    }
     matchmaking.start({
       name: tier.name,
       mode: tier.pointValue === null ? "free" : "real_money",
@@ -453,6 +467,14 @@ export function RummyPage() {
                         <td className="py-3 px-3 text-right">
                           <button
                             onClick={() => {
+                              const req = (t.entry_fee_paise || 0) / 100;
+                              if (t.entry_fee_paise > 0 && balance < req) {
+                                showInsufficientBalance({
+                                  requiredAmount: req,
+                                  currentBalance: balance,
+                                });
+                                return;
+                              }
                               setSearchParams({ tableId: t.id });
                               setActiveTableId(t.id);
                             }}

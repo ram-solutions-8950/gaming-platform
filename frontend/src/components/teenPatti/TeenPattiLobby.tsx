@@ -5,6 +5,7 @@ import { GameRulesModal } from '../common/GameRulesModal';
 import { TEEN_PATTI_RULES_DATA } from '../common/gameRulesData';
 import { HelpCircle, Crown } from 'lucide-react';
 import { walletService } from '../../services/wallet';
+import { showInsufficientBalance } from '../../store/insufficientBalanceStore';
 import { getApiErrorMessage } from '../../utils/apiError';
 
 interface TeenPattiLobbyProps {
@@ -54,6 +55,10 @@ export const TeenPattiLobby: React.FC<TeenPattiLobbyProps> = ({ onJoinTable }) =
   }, []);
 
   const handleCreateTierTable = async (tier: typeof BOOT_TIERS[0]) => {
+    if (walletBalance !== null && walletBalance < tier.boot) {
+      showInsufficientBalance({ requiredAmount: tier.boot, currentBalance: walletBalance });
+      return;
+    }
     try {
       setJoinError('');
       setCreatingTable(true);

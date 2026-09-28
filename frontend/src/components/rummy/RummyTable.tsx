@@ -241,13 +241,26 @@ export default function GameTable({
   const [playAgainBusy, setPlayAgainBusy] = useState(false);
 
   const refreshWallet = useCallback(() => {
-    walletService.getWallet().then((w) => setWalletBalance(w.balance || 0)).catch(() => {});
+    walletService
+      .getWallet()
+      .then((w) => {
+        setWalletBalance(w.balance || 0);
+        window.dispatchEvent(new Event("wallet-update"));
+      })
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
     refreshWallet();
+    const onWalletUpdate = () => {
+      walletService.getWallet().then((w) => setWalletBalance(w.balance || 0)).catch(() => {});
+    };
+    window.addEventListener("wallet-update", onWalletUpdate);
     const timer = setInterval(refreshWallet, 5000);
-    return () => clearInterval(timer);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener("wallet-update", onWalletUpdate);
+    };
   }, [refreshWallet]);
 
   function handleBackToLobby() {

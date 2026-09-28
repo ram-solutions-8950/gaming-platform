@@ -11,6 +11,7 @@ import { soundManager } from '../../services/soundManager';
 import { setNativeLandscape } from '../../utils/nativeOrientation';
 import '../../styles/poker.css';
 import { getApiErrorMessage } from '../../utils/apiError';
+import { showInsufficientBalance } from '../../store/insufficientBalanceStore';
 
 export function PokerPage() {
   const { tableId: paramTableId } = useParams<{ tableId?: string }>();
@@ -80,9 +81,18 @@ export function PokerPage() {
     try {
       const w = await walletService.getWallet();
       setWalletBalancePaise(w.balance || 0);
+      window.dispatchEvent(new Event('wallet-update'));
     } catch (e) {
       console.error('Failed to fetch wallet', e);
     }
+  }, []);
+
+  useEffect(() => {
+    const onWalletUpdate = () => {
+      walletService.getWallet().then((w) => setWalletBalancePaise(w.balance || 0)).catch(() => {});
+    };
+    window.addEventListener('wallet-update', onWalletUpdate);
+    return () => window.removeEventListener('wallet-update', onWalletUpdate);
   }, []);
 
   const loadTables = useCallback(async () => {
@@ -137,14 +147,29 @@ export function PokerPage() {
   // the same explicit, confirmed buy-in as joining from the lobby.
   const takeSeat = async (buyInAmount: number) => {
     if (!activeTableId || seatBusy) return;
+    if (!activeTableInfo?.is_practice && walletBalancePaise < buyInAmount) {
+      showInsufficientBalance({
+        requiredAmount: buyInAmount / 100,
+        currentBalance: walletBalancePaise / 100,
+      });
+      return;
+    }
     setSeatBusy(true);
     try {
       await pokerService.joinTable(activeTableId, buyInAmount);
       setBustedBuyIn(null);
       refreshWallet();
     } catch (e: any) {
-      setActionErrorMessage(getApiErrorMessage(e, 'Failed to buy in'));
-      setTimeout(() => setActionErrorMessage(null), 3000);
+      const msg = getApiErrorMessage(e, 'Failed to buy in');
+      if (msg.toLowerCase().includes('insufficient') || msg.toLowerCase().includes('balance')) {
+        showInsufficientBalance({
+          requiredAmount: buyInAmount / 100,
+          currentBalance: walletBalancePaise / 100,
+        });
+      } else {
+        setActionErrorMessage(msg);
+        setTimeout(() => setActionErrorMessage(null), 3000);
+      }
     } finally {
       setSeatBusy(false);
     }
@@ -194,14 +219,30 @@ export function PokerPage() {
   const handleSelectTable = async (tableId: string, buyInAmount: number) => {
     setShowResultModal(false);
     setWinnersSummary([]);
+    const targetTable = tables.find((t) => t.id === tableId);
+    if (!targetTable?.is_practice && walletBalancePaise < buyInAmount) {
+      showInsufficientBalance({
+        requiredAmount: buyInAmount / 100,
+        currentBalance: walletBalancePaise / 100,
+      });
+      return;
+    }
     try {
       await pokerService.joinTable(tableId, buyInAmount);
       setActiveTableId(tableId);
       navigate(`/games/poker/${tableId}`);
       refreshWallet();
     } catch (e: any) {
-      setActionErrorMessage(getApiErrorMessage(e, 'Failed to join table'));
-      setTimeout(() => setActionErrorMessage(null), 3000);
+      const msg = getApiErrorMessage(e, 'Failed to join table');
+      if (msg.toLowerCase().includes('insufficient') || msg.toLowerCase().includes('balance')) {
+        showInsufficientBalance({
+          requiredAmount: buyInAmount / 100,
+          currentBalance: walletBalancePaise / 100,
+        });
+      } else {
+        setActionErrorMessage(msg);
+        setTimeout(() => setActionErrorMessage(null), 3000);
+      }
     }
   };
 

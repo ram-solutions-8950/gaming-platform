@@ -257,21 +257,22 @@ def _is_real_table(table_id: str) -> bool:
     return _load_config(table_id)[1] == "real"
 
 
-def _collect_stakes(table_id: str, hand: TeenPattiHand) -> None:
+def _collect_stakes(table_id: str, hand: TeenPattiHand) -> Dict[str, int]:
     """Debit every real-money player for what they added to the pot since the
     last collection. A bet a player can't cover comes back out of the pot and
     the player is packed."""
     if not _is_real_table(table_id):
-        return
+        return {}
     key = _hand_key(table_id)
     collected = _collected[key]
+    updated_balances: Dict[str, int] = {}
     with _get_db_session() as db:
         for idx, seat in enumerate(hand.seats):
             owed = seat.total_bet - collected.get(seat.id, 0)
             if _is_bot(seat.id) or owed <= 0:
                 continue
             try:
-                debit_wallet(
+                w = debit_wallet(
                     db=db,
                     user_id=uuid.UUID(seat.id),
                     amount=owed,
@@ -282,6 +283,8 @@ def _collect_stakes(table_id: str, hand: TeenPattiHand) -> None:
                 )
                 db.commit()
                 collected[seat.id] = seat.total_bet
+                if w is not None:
+                    updated_balances[seat.id] = w.balance_after
             except ValueError:
                 db.rollback()
                 seat.total_bet -= owed
@@ -293,6 +296,7 @@ def _collect_stakes(table_id: str, hand: TeenPattiHand) -> None:
                         hand._finish_hand(winner_idx=active[0], reason="Opponent could not cover their bet")
                     elif hand.current_turn == idx:
                         hand._advance_turn()
+    return updated_balances
 
 
 def refund_live_hands() -> None:
@@ -356,7 +360,13 @@ async def _start_hand(table_id: str) -> None:
     _pending_side_show.pop(table_id, None)
 
     hand.start_hand(client_seed=f"tp_{table_id}_{_hand_number[table_id]}", nonce=_hand_number[table_id])
-    _collect_stakes(table_id, hand)
+    _updated_bals = _collect_stakes(table_id, hand)
+    for _sid, _bal in _updated_bals.items():
+        await manager.send_to_user(table_id, _sid, {
+            "type": "event",
+            "event": "wallet_balance",
+            "balance": _bal,
+        })
 
     try:
         with _get_db_session() as db:
@@ -702,7 +712,13 @@ async def _after_action(table_id: str) -> None:
     hand = teen_patti_manager.get(table_id)
     if hand is None:
         return
-    _collect_stakes(table_id, hand)
+    _updated_bals = _collect_stakes(table_id, hand)
+    for _sid, _bal in _updated_bals.items():
+        await manager.send_to_user(table_id, _sid, {
+            "type": "event",
+            "event": "wallet_balance",
+            "balance": _bal,
+        })
     await _broadcast_state(table_id)
 
     # A show lands in SHOWDOWN, a fold win in FINISHED: either way the hand is
@@ -790,6 +806,9 @@ async def _handle_player_leave(table_id: str, user_id: str) -> None:
     if len(seated) < 2:
         await _close_table(table_id, reason="Opponent left the table. Match ended.")
         return
+
+    if hand.phase == Phase.FINISHED and table_id not in _start_timers:
+        _start_timers[table_id] = asyncio.create_task(_schedule_next_hand(table_id))
 
     await _broadcast_state(table_id)
 

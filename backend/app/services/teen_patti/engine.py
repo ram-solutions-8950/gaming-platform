@@ -547,6 +547,7 @@ class TeenPattiHand:
         return {
             "phase": self.phase.value,
             "pot": self.pot,
+            "boot_amount": self.config.boot_amount,
             "current_stake": self.current_stake,
             "current_turn": self.current_turn,
             "max_stake": self.config.max_stake,

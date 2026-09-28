@@ -798,10 +798,18 @@ export function DragonTigerPage() {
     if (!prediction || !round || !game || betting) return;
     if (round.status !== 'BETTING' || isBettingLocked || countdown <= 0) return;
     if (wallet && wallet.balance < amount * 100) {
-      showInsufficientBalance();
+      showInsufficientBalance({ requiredAmount: amount * 100, currentBalance: wallet.balance });
       return;
     }
     setBetting(true);
+
+    // Optimistically deduct in real-time immediately
+    if (wallet) {
+      const newBal = Math.max(0, wallet.balance - amount * 100);
+      setWallet((prev) => (prev ? { ...prev, balance: newBal, balance_inr: (newBal / 100).toFixed(2) } : prev));
+      window.dispatchEvent(new Event('wallet-update'));
+    }
+
     try {
       const placed = await gameService.placeBet(round.id, prediction, amount, game.id);
       setSelected(prediction);
@@ -814,7 +822,14 @@ export function DragonTigerPage() {
         { roundId: round.id, prediction, amount, placedAt: Date.now() },
       ]);
       await fetchAll();
+      window.dispatchEvent(new Event('wallet-update'));
     } catch (err: unknown) {
+      // Revert deduction on failure
+      if (wallet) {
+        const revertedBal = wallet.balance;
+        setWallet((prev) => (prev ? { ...prev, balance: revertedBal, balance_inr: (revertedBal / 100).toFixed(2) } : prev));
+        window.dispatchEvent(new Event('wallet-update'));
+      }
       const axiosErr = err as { response?: { data?: { error?: { message?: string } } } };
       console.error(axiosErr?.response?.data?.error?.message || 'Failed to place bet');
     } finally {

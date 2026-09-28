@@ -616,7 +616,7 @@ export function AndarBaharPage() {
     }
 
     if (stake > balance) {
-      showInsufficientBalance();
+      showInsufficientBalance({ requiredAmount: stake * 100, currentBalance: balance * 100 });
       setServerError("Insufficient wallet balance for this bet amount.");
       return;
     }
@@ -640,6 +640,7 @@ export function AndarBaharPage() {
       setMyBet(placedBet);
       myBetRef.current = placedBet;
       setBalance((b) => b - stake);
+      window.dispatchEvent(new Event('wallet-update'));
     } catch (err: any) {
       const msg = err.response?.data?.error?.message || err.message || "Failed to place bet";
       setServerError(msg);

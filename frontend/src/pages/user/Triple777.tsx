@@ -294,7 +294,7 @@ export function Triple777Page() {
   const handleSpin = useCallback(async (currentStake: number, isTurbo: boolean) => {
     if (spinLockRef.current) return;
     if (balanceRef.current < currentStake) {
-      showInsufficientBalance();
+      showInsufficientBalance({ requiredAmount: currentStake * 100, currentBalance: balanceRef.current * 100 });
       setErrorMessage('Insufficient balance to spin.');
       stopAutoSpin();
       return;
@@ -304,6 +304,11 @@ export function Triple777Page() {
     setSpinning(true);
     setErrorMessage(null);
     setShowResultPopup(false);
+
+    // Deduct stake in real-time immediately when spin button is pressed
+    setBalance((prev) => Math.max(0, prev - currentStake));
+    balanceRef.current = Math.max(0, balanceRef.current - currentStake);
+    window.dispatchEvent(new Event('wallet-update'));
 
     haptics.spin();
     soundManager.play('reel_spin');
@@ -324,6 +329,7 @@ export function Triple777Page() {
         setJackpot(response.jackpot_amount);
         setBalance(response.balance);
         balanceRef.current = response.balance;
+        window.dispatchEvent(new Event('wallet-update'));
         setSpinning(false);
         spinLockRef.current = false;
 
@@ -359,7 +365,7 @@ export function Triple777Page() {
               setAutoSummary({ totalWon: completedWon, totalSpins: completedCount });
             }
             if (response.balance < currentStake && remaining > 0) {
-              showInsufficientBalance();
+              showInsufficientBalance({ requiredAmount: currentStake * 100, currentBalance: response.balance * 100 });
               setErrorMessage('Auto spin stopped: Insufficient balance.');
             }
           } else {
@@ -377,6 +383,10 @@ export function Triple777Page() {
         }
       }, revealDelay);
     } catch (err: any) {
+      // Revert optimistic deduction on error
+      setBalance((prev) => prev + currentStake);
+      balanceRef.current += currentStake;
+      window.dispatchEvent(new Event('wallet-update'));
       const msg = getApiErrorMessage(err, 'Spin failed');
       setErrorMessage(msg);
       setSpinning(false);
@@ -396,7 +406,7 @@ export function Triple777Page() {
       stopAutoSpin();
     } else {
       if (balanceRef.current < stakeRef.current) {
-        showInsufficientBalance();
+        showInsufficientBalance({ requiredAmount: stakeRef.current * 100, currentBalance: balanceRef.current * 100 });
         setErrorMessage('Insufficient balance for auto spin.');
         return;
       }

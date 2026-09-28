@@ -12,6 +12,7 @@ import { soundManager } from '../../services/soundManager';
 import { setNativeLandscape } from '../../utils/nativeOrientation';
 import { GameRulesModal } from '../../components/common/GameRulesModal';
 import { AVIATOR_RULES_DATA } from '../../components/common/gameRulesData';
+import { showInsufficientBalance } from '../../store/insufficientBalanceStore';
 import { HelpCircle } from 'lucide-react';
 import '../../styles/aviator.css';
 
@@ -29,6 +30,7 @@ export function AviatorPage() {
     try {
       const w = await walletService.getWallet();
       setWalletBalancePaise(w.balance || 0);
+      window.dispatchEvent(new Event('wallet-update'));
     } catch (e) {
       console.error('Failed to fetch wallet balance', e);
     }
@@ -130,10 +132,15 @@ export function AviatorPage() {
   // Optimistically deduct balance on placing bet
   const handlePlaceBet = useCallback(
     (slot: 1 | 2, amountPaise: number, autoCashout?: number | null) => {
+      if (walletBalancePaise < amountPaise) {
+        showInsufficientBalance({ requiredAmount: amountPaise, currentBalance: walletBalancePaise });
+        return;
+      }
       setWalletBalancePaise((prev) => Math.max(0, prev - amountPaise));
+      window.dispatchEvent(new Event('wallet-update'));
       placeBet(slot, amountPaise, autoCashout);
     },
-    [placeBet]
+    [walletBalancePaise, placeBet]
   );
 
   return (

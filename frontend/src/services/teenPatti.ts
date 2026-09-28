@@ -56,6 +56,7 @@ export interface TeenPattiSeat {
 export interface TeenPattiGameState {
   phase: 'waiting' | 'boot' | 'playing' | 'showdown' | 'finished';
   pot: number;
+  boot_amount?: number;
   current_stake: number;
   current_turn: number;
   max_stake?: number | null;

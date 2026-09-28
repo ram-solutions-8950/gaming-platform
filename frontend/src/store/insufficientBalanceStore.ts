@@ -2,19 +2,28 @@ import { create } from 'zustand';
 
 interface InsufficientBalanceState {
   isOpen: boolean;
-  open: () => void;
+  requiredAmount?: number;
+  currentBalance?: number;
+  open: (opts?: { requiredAmount?: number; currentBalance?: number }) => void;
   close: () => void;
 }
 
 export const useInsufficientBalanceStore = create<InsufficientBalanceState>((set) => ({
   isOpen: false,
-  open: () => set({ isOpen: true }),
-  close: () => set({ isOpen: false }),
+  requiredAmount: undefined,
+  currentBalance: undefined,
+  open: (opts) =>
+    set({
+      isOpen: true,
+      requiredAmount: opts?.requiredAmount,
+      currentBalance: opts?.currentBalance,
+    }),
+  close: () => set({ isOpen: false, requiredAmount: undefined, currentBalance: undefined }),
 }));
 
 /** Tells the player a bet was refused for lack of funds. Callable from anywhere, in React or not. */
-export function showInsufficientBalance() {
-  useInsufficientBalanceStore.getState().open();
+export function showInsufficientBalance(opts?: { requiredAmount?: number; currentBalance?: number }) {
+  useInsufficientBalanceStore.getState().open(opts);
 }
 
 /**

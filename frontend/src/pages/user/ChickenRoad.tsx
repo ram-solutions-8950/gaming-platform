@@ -347,7 +347,7 @@ export function ChickenRoadPage() {
       return;
     }
     if (betAmount > balance) {
-      showInsufficientBalance();
+      showInsufficientBalance({ requiredAmount: betAmount * 100, currentBalance: balance * 100 });
       setErrorMessage('Insufficient balance.');
       return;
     }
@@ -356,6 +356,10 @@ export function ChickenRoadPage() {
     setErrorMessage(null);
     setWinAmount(0);
     setLossLane(null);
+
+    // Optimistically deduct in real-time immediately
+    setBalance((prev) => Math.max(0, prev - betAmount));
+    window.dispatchEvent(new Event('wallet-update'));
 
     try {
       const res = await chickenRoadService.startGame(betAmount, difficulty);
@@ -381,8 +385,7 @@ export function ChickenRoadPage() {
 
       if (res.wallet_balance !== undefined) {
         setBalance(res.wallet_balance);
-      } else {
-        setBalance((prev) => Math.max(0, prev - betAmount));
+        window.dispatchEvent(new Event('wallet-update'));
       }
     } catch (err: any) {
       const msg = getApiErrorMessage(err, 'Failed to start game');
@@ -514,6 +517,7 @@ export function ChickenRoadPage() {
       setCurrentMultiplier(res.multiplier);
       if (res.wallet_balance !== undefined) {
         setBalance(res.wallet_balance);
+        window.dispatchEvent(new Event('wallet-update'));
       }
       activeRoundIdRef.current = null;
       crossLanePromiseRef.current = null;
@@ -559,6 +563,7 @@ export function ChickenRoadPage() {
       setCurrentMultiplier(res.multiplier);
       if (res.wallet_balance !== undefined) {
         setBalance(res.wallet_balance);
+        window.dispatchEvent(new Event('wallet-update'));
       }
       activeRoundIdRef.current = null;
       crossLanePromiseRef.current = null;
