@@ -51,8 +51,10 @@ SPIN_LOCK = threading.Lock()
 USER_SPIN_HISTORY: Dict[uuid.UUID, List[dict]] = {}
 
 # --- Win-ratio control -------------------------------------------------------
-# House requirement: a player wins roughly 2 spins out of every 10.
-TARGET_WIN_RATIO = 0.20
+# House requirement: strictly 2 wins in every 10 games.
+GAMES_PER_CYCLE = 10
+WINS_PER_CYCLE = 2
+TARGET_WIN_RATIO = WINS_PER_CYCLE / GAMES_PER_CYCLE  # 0.20 (2 wins per 10 games)
 # Chance that an allowed win is a 3-of-a-kind rather than a 2-of-a-kind pair.
 THREE_MATCH_SHARE = 0.12
 
@@ -62,7 +64,7 @@ USER_SPIN_STATS: Dict[uuid.UUID, Dict[str, int]] = {}
 
 
 def _get_user_stats(db: Session, user_id: uuid.UUID) -> Dict[str, int]:
-    """Return {"spins", "wins"} for a user, seeding from the ledger if needed."""
+    """Return {"spins", "wins", "cycle_wins"} for a user, seeding from the ledger if needed."""
     stats = USER_SPIN_STATS.get(user_id)
     if stats is not None:
         return stats
@@ -76,7 +78,40 @@ def _get_user_stats(db: Session, user_id: uuid.UUID) -> Dict[str, int]:
         WalletTransaction.reference_type == "TRIPLE_777_WIN",
     ).count()
 
-    stats = {"spins": int(spins), "wins": int(wins)}
+    # Calculate wins already awarded in the current 10-game cycle
+    spins_in_cycle = spins % GAMES_PER_CYCLE
+    cycle_wins = 0
+    if spins_in_cycle > 0:
+        recent_entries = (
+            db.query(WalletTransaction)
+            .filter(
+                WalletTransaction.user_id == user_id,
+                WalletTransaction.reference_type == "TRIPLE_777_ENTRY",
+            )
+            .order_by(WalletTransaction.created_at.desc(), WalletTransaction.id.desc())
+            .limit(spins_in_cycle)
+            .all()
+        )
+        recent_round_ids = []
+        for entry in recent_entries:
+            if entry.reference_id and entry.reference_id.startswith("triple777_") and entry.reference_id.endswith("_entry"):
+                recent_round_ids.append(entry.reference_id[len("triple777_"):-len("_entry")])
+            elif entry.metadata_ and isinstance(entry.metadata_, dict) and "round_id" in entry.metadata_:
+                recent_round_ids.append(entry.metadata_["round_id"])
+
+        if recent_round_ids:
+            win_ref_ids = [f"triple777_{rid}_win" for rid in recent_round_ids]
+            cycle_wins = (
+                db.query(WalletTransaction)
+                .filter(
+                    WalletTransaction.user_id == user_id,
+                    WalletTransaction.reference_type == "TRIPLE_777_WIN",
+                    WalletTransaction.reference_id.in_(win_ref_ids),
+                )
+                .count()
+            )
+
+    stats = {"spins": int(spins), "wins": int(wins), "cycle_wins": int(cycle_wins)}
     USER_SPIN_STATS[user_id] = stats
     return stats
 
@@ -84,26 +119,22 @@ def _get_user_stats(db: Session, user_id: uuid.UUID) -> Dict[str, int]:
 def _should_win(stats: Dict[str, int]) -> bool:
     """Decide whether the upcoming spin is allowed to win.
 
-    The player is held to ``TARGET_WIN_RATIO`` (2 wins in 10) over their spin
-    history. ``deficit`` is how many wins they are behind that pace:
-
-    * a full win ahead of pace  -> the spin is forced to lose;
-    * within one win of pace    -> wins at roughly the base rate, so they land
-      at unpredictable positions instead of on a fixed cadence;
-    * a full win behind pace    -> probability climbs towards certainty so the
-      ratio is pulled back up.
+    House requirement: Exactly 2 wins in every 10 games.
+    In each 10-game block (games 1-10, 11-20, etc.), exactly 2 spins win.
+    The wins are distributed dynamically so positions within the 10 games remain
+    unpredictable while guaranteeing exactly 2 wins per 10 games.
     """
-    spins_after = stats["spins"] + 1
-    deficit = spins_after * TARGET_WIN_RATIO - stats["wins"]
+    spin_in_cycle = stats["spins"] % GAMES_PER_CYCLE
+    cycle_wins = 0 if spin_in_cycle == 0 else stats.get("cycle_wins", 0)
+    remaining_spins = GAMES_PER_CYCLE - spin_in_cycle
+    needed_wins = WINS_PER_CYCLE - cycle_wins
 
-    if deficit <= -1.0:
+    if needed_wins <= 0:
         return False
-    if deficit >= 1.0:
-        win_prob = min(1.0, 0.35 + 0.5 * deficit)
-    else:
-        win_prob = max(0.0, TARGET_WIN_RATIO * (1.0 + deficit))
+    if needed_wins >= remaining_spins:
+        return True
 
-    return random.random() < win_prob
+    return random.random() < (needed_wins / remaining_spins)
 
 
 def _pick_symbol(pool: List[str]) -> str:
@@ -315,9 +346,12 @@ def spin(
         }
 
         # Keep the win-ratio counters in step with what actually settled.
+        if stats["spins"] % GAMES_PER_CYCLE == 0:
+            stats["cycle_wins"] = 0
         stats["spins"] += 1
         if won:
             stats["wins"] += 1
+            stats["cycle_wins"] = stats.get("cycle_wins", 0) + 1
 
         if user.id not in USER_SPIN_HISTORY:
             USER_SPIN_HISTORY[user.id] = []

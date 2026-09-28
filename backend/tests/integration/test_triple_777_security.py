@@ -227,3 +227,40 @@ def test_concurrent_spins_wallet_consistency(client: TestClient, user_a_fixture)
 
     expected_end_paise = start_balance_paise - total_debits_paise + total_payouts_paise
     assert end_balance_paise == expected_end_paise
+
+
+def test_exactly_two_wins_in_ten_games(client: TestClient, db: Session):
+    """Verify that in every block of 10 spins, there are strictly 2 wins."""
+    rand = str(uuid4())[:8]
+    user = User(
+        id=uuid4(),
+        name="Ten Spins User",
+        username=f"t777_ten_{rand}",
+        email=f"t777_ten_{rand}@example.com",
+        password_hash="hash_ten",
+        role=UserRole.USER,
+        status=UserStatus.ACTIVE,
+    )
+    db.add(user)
+    wallet = Wallet(id=uuid4(), user_id=user.id, balance=500000)  # ₹5,000.00
+    db.add(wallet)
+    db.commit()
+    token = create_access_token(str(user.id), user.role.value)
+    auth_headers = {"Authorization": f"Bearer {token}"}
+
+    # Test 3 consecutive blocks of 10 spins
+    for block in range(3):
+        wins = 0
+        for _ in range(10):
+            res = client.post(
+                "/api/v1/games/triple-777/spin",
+                headers=auth_headers,
+                json={"stake": 10},
+            )
+            assert res.status_code == 200
+            data = res.json()["data"]
+            if data["won"]:
+                wins += 1
+
+        assert wins == 2, f"Block {block + 1} did not have exactly 2 wins; got {wins}"
+
