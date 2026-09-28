@@ -12,6 +12,8 @@ interface RoadCrossingGameProps {
   onFinish: () => Promise<unknown> | void;
   onCollision?: (laneIndex: number) => void;
   stepSignal?: { direction: 'left' | 'right'; timestamp: number } | null;
+  moveForwardActive?: boolean;
+  moveBackwardActive?: boolean;
   // The chicken stands still, e.g. while a cash-out is being settled.
   movementLocked?: boolean;
 }
@@ -25,7 +27,7 @@ const FINISH_ZONE_WIDTH = 150;
 const CROSSING_Y = WORLD_HEIGHT / 2;
 
 // The car sent at a chicken the server ruled hit.
-const RUSH_SPEED = 14;
+const RUSH_SPEED = 18;
 const HIT_FALLBACK_MS = 900;
 
 interface Vehicle {
@@ -49,7 +51,7 @@ const laneCenterX = (lane: number) => START_ZONE_WIDTH + (lane - 0.5) * LANE_WID
 
 const checkpointX = (lane: number, totalLanes: number) => {
   if (lane <= 0) return 65;
-  if (lane <= totalLanes) return START_ZONE_WIDTH + lane * LANE_WIDTH;
+  if (lane <= totalLanes) return laneCenterX(lane);
   return START_ZONE_WIDTH + totalLanes * LANE_WIDTH + 65;
 };
 
@@ -214,6 +216,8 @@ const RoadCrossingGameComponent: React.FC<RoadCrossingGameProps> = ({
   onFinish,
   onCollision,
   stepSignal,
+  moveForwardActive = false,
+  moveBackwardActive = false,
   movementLocked = false,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -240,6 +244,8 @@ const RoadCrossingGameComponent: React.FC<RoadCrossingGameProps> = ({
     totalLanes,
     worldWidth,
     worldHeight: WORLD_HEIGHT,
+    moveForward: moveForwardActive,
+    moveBackward: moveBackwardActive,
     // Chicken hero state (horizontal X-axis movement on fixed Y line)
     chicken: {
       x: 65, // starts on left sidewalk
@@ -280,7 +286,9 @@ const RoadCrossingGameComponent: React.FC<RoadCrossingGameProps> = ({
     stateRef.current.multipliers = multipliers;
     stateRef.current.totalLanes = totalLanes;
     stateRef.current.worldWidth = worldWidth;
-  }, [gameState, difficulty, multipliers, totalLanes, worldWidth]);
+    stateRef.current.moveForward = Boolean(moveForwardActive);
+    stateRef.current.moveBackward = Boolean(moveBackwardActive);
+  }, [gameState, difficulty, multipliers, totalLanes, worldWidth, moveForwardActive, moveBackwardActive]);
 
   // Handle discrete step commands from touch buttons or external props
   const lastStepTimestampRef = useRef<number>(0);
@@ -290,17 +298,18 @@ const RoadCrossingGameComponent: React.FC<RoadCrossingGameProps> = ({
     const s = stateRef.current;
     if (s.gameState !== 'ACTIVE' || s.chicken.isHit || s.chicken.isWon || s.movementLocked) return;
 
-    const targetX = checkpointX(s.targetLane, s.totalLanes);
-    if (Math.abs(s.chicken.x - targetX) > 4) return;
-
     if (stepSignal.direction === 'right') {
-      if (s.targetLane < s.totalLanes + 1) {
-        s.targetLane += 1;
-      }
+      s.moveForward = true;
+      const t = setTimeout(() => {
+        s.moveForward = false;
+      }, 150);
+      return () => clearTimeout(t);
     } else if (stepSignal.direction === 'left') {
-      if (s.targetLane > 0) {
-        s.targetLane -= 1;
-      }
+      s.moveBackward = true;
+      const t = setTimeout(() => {
+        s.moveBackward = false;
+      }, 150);
+      return () => clearTimeout(t);
     }
   }, [stepSignal]);
 
@@ -311,9 +320,13 @@ const RoadCrossingGameComponent: React.FC<RoadCrossingGameProps> = ({
       // Start zone — place chicken in the middle of the start pad
       s.chicken.x = 65;
       s.chicken.vx = 0;
+      s.chicken.facing = 1;
+      s.chicken.stepAnim = 0;
       s.highestLaneCrossed = 0;
       s.verdictLane = 0;
       s.targetLane = 0;
+      s.moveForward = false;
+      s.moveBackward = false;
       s.lastStepSoundAnim = 0;
     } else if (
       gameState === 'ACTIVE' &&
@@ -398,18 +411,18 @@ const RoadCrossingGameComponent: React.FC<RoadCrossingGameProps> = ({
     ];
 
     const speedMultipliers: Record<Difficulty, number> = {
-      MEDIUM: 1.15,
-      HARD:   1.45,
+      MEDIUM: 1.45,
+      HARD:   1.85,
     };
 
     const vehicleCountByDifficulty: Record<Difficulty, number> = {
-      MEDIUM: 2,
+      MEDIUM: 3,
       HARD:   3,
     };
 
-    const speedFactor = speedMultipliers[difficulty] || 1.0;
-    const numVehicles = vehicleCountByDifficulty[difficulty] || 2;
-    const VEHICLE_SAFE_GAP = 40;
+    const speedFactor = speedMultipliers[difficulty] || 1.45;
+    const numVehicles = vehicleCountByDifficulty[difficulty] || 3;
+    const VEHICLE_SAFE_GAP = 48;
 
     for (let lane = 1; lane <= totalLanes; lane++) {
       // Alternating vertical direction: odd lanes move DOWN, even lanes move UP
@@ -417,8 +430,9 @@ const RoadCrossingGameComponent: React.FC<RoadCrossingGameProps> = ({
       const laneX = laneCenterX(lane);
 
       const laneProgress = totalLanes > 1 ? (lane - 1) / (totalLanes - 1) : 0;
-      const baseSpeed = (1.8 + laneProgress * 0.8 + Math.random() * 0.25) * speedFactor;
-      const laneSpacing = (WORLD_HEIGHT + 240) / numVehicles;
+      // High-speed traffic so reaching even the 3rd step is an intense challenge!
+      const baseSpeed = (4.8 + laneProgress * 2.4 + (lane % 3) * 0.4 + Math.random() * 0.35) * speedFactor;
+      const laneSpacing = (WORLD_HEIGHT + 280) / numVehicles;
 
       for (let i = 0; i < numVehicles; i++) {
         const template = vehicleTemplates[(lane + i * 2) % vehicleTemplates.length];
@@ -472,69 +486,75 @@ const RoadCrossingGameComponent: React.FC<RoadCrossingGameProps> = ({
     }
   }, [gameState, generatePotholes]);
 
-  // Keyboard and touch listeners
+  // Keyboard and pointer listeners: press/hold to move forward, release to stop on the spot
   useEffect(() => {
     const isLeftKey = (e: KeyboardEvent) =>
       ['ArrowLeft', 'KeyA'].includes(e.code) || ['ArrowLeft', 'a', 'A'].includes(e.key);
     const isRightKey = (e: KeyboardEvent) =>
       ['ArrowRight', 'KeyD'].includes(e.code) || ['ArrowRight', 'd', 'D'].includes(e.key);
 
-    const triggerStep = (dir: 'left' | 'right') => {
-      const s = stateRef.current;
-      if (s.gameState !== 'ACTIVE' || s.chicken.isHit || s.chicken.isWon || s.movementLocked) return;
-      const targetX = checkpointX(s.targetLane, s.totalLanes);
-      if (Math.abs(s.chicken.x - targetX) > 4) return;
-      if (dir === 'right' && s.targetLane < s.totalLanes + 1) {
-        s.targetLane += 1;
-      } else if (dir === 'left' && s.targetLane > 0) {
-        s.targetLane -= 1;
-      }
-    };
-
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.repeat) return;
-      if (isRightKey(e)) {
+      const s = stateRef.current;
+      if (s.gameState !== 'ACTIVE' || s.chicken.isHit || s.chicken.isWon || s.movementLocked) return;
+      if (isRightKey(e) || e.code === 'Space') {
         e.preventDefault();
-        triggerStep('right');
+        s.moveForward = true;
+        s.moveBackward = false;
       } else if (isLeftKey(e)) {
         e.preventDefault();
-        triggerStep('left');
+        s.moveBackward = true;
+        s.moveForward = false;
       }
     };
 
-    // Canvas touch drag / swipe support horizontally
-    let touchStartX: number | null = null;
-    const handleTouchStart = (e: TouchEvent) => {
-      if (e.touches.length > 0) {
-        touchStartX = e.touches[0].clientX;
+    const handleKeyUp = (e: KeyboardEvent) => {
+      const s = stateRef.current;
+      if (isRightKey(e) || e.code === 'Space') {
+        s.moveForward = false;
+      } else if (isLeftKey(e)) {
+        s.moveBackward = false;
       }
     };
 
-    const handleTouchEnd = (e: TouchEvent) => {
-      if (touchStartX === null || e.changedTouches.length === 0) return;
-      const currentX = e.changedTouches[0].clientX;
-      const diffX = currentX - touchStartX;
-      touchStartX = null;
-      if (diffX > 25) {
-        triggerStep('right');
-      } else if (diffX < -25) {
-        triggerStep('left');
+    // Canvas touch/mouse pointer events: hold to move, release to stop on the spot
+    const handleCanvasPointerDown = (e: PointerEvent) => {
+      const s = stateRef.current;
+      if (s.gameState !== 'ACTIVE' || s.chicken.isHit || s.chicken.isWon || s.movementLocked) return;
+      const rect = containerRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const clickX = e.clientX - rect.left;
+      if (clickX >= rect.width / 2) {
+        s.moveForward = true;
+        s.moveBackward = false;
+      } else {
+        s.moveBackward = true;
+        s.moveForward = false;
       }
+    };
+
+    const handleCanvasPointerUp = () => {
+      stateRef.current.moveForward = false;
+      stateRef.current.moveBackward = false;
     };
 
     window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    window.addEventListener('pointerup', handleCanvasPointerUp);
+    window.addEventListener('pointercancel', handleCanvasPointerUp);
 
     const canvasEl = containerRef.current;
     if (canvasEl) {
-      canvasEl.addEventListener('touchstart', handleTouchStart, { passive: true });
-      canvasEl.addEventListener('touchend', handleTouchEnd, { passive: true });
+      canvasEl.addEventListener('pointerdown', handleCanvasPointerDown);
     }
 
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+      window.removeEventListener('pointerup', handleCanvasPointerUp);
+      window.removeEventListener('pointercancel', handleCanvasPointerUp);
       if (canvasEl) {
-        canvasEl.removeEventListener('touchstart', handleTouchStart);
-        canvasEl.removeEventListener('touchend', handleTouchEnd);
+        canvasEl.removeEventListener('pointerdown', handleCanvasPointerDown);
       }
     };
   }, []);
@@ -675,44 +695,50 @@ const RoadCrossingGameComponent: React.FC<RoadCrossingGameProps> = ({
         }
       });
 
-      // Update chicken if ACTIVE (Horizontal movement only)
+      // Update chicken if ACTIVE (Continuous horizontal movement with instant stop on release)
       if (s.gameState === 'ACTIVE' && !s.chicken.isHit && !s.chicken.isWon) {
         if (s.movementLocked) {
           s.chicken.vx = 0;
-        }
-
-        const targetX = checkpointX(s.targetLane, s.totalLanes);
-        const diffX = targetX - s.chicken.x;
-
-        if (Math.abs(diffX) > 1 && !s.movementLocked) {
-          const dir = Math.sign(diffX);
-          s.chicken.facing = dir;
+        } else if (s.moveForward) {
+          s.chicken.facing = 1;
           s.chicken.stepAnim += 0.28 * dt;
           if (Math.floor(s.chicken.stepAnim) !== Math.floor(s.lastStepSoundAnim)) {
             s.lastStepSoundAnim = s.chicken.stepAnim;
             sounds.playStep();
           }
-
-          const moveSpeed = 5.2;
-          const step = dir * Math.min(Math.abs(diffX), moveSpeed * dt);
-          s.chicken.x += step;
+          const CHICKEN_SPEED_FWD = 4.2;
+          s.chicken.x += CHICKEN_SPEED_FWD * dt;
+          s.chicken.vx = CHICKEN_SPEED_FWD;
+        } else if (s.moveBackward) {
+          s.chicken.facing = -1;
+          s.chicken.stepAnim += 0.28 * dt;
+          if (Math.floor(s.chicken.stepAnim) !== Math.floor(s.lastStepSoundAnim)) {
+            s.lastStepSoundAnim = s.chicken.stepAnim;
+            sounds.playStep();
+          }
+          const CHICKEN_SPEED_BWD = 3.8;
+          s.chicken.x -= CHICKEN_SPEED_BWD * dt;
+          s.chicken.vx = -CHICKEN_SPEED_BWD;
         } else {
-          s.chicken.x = targetX;
+          // Immediately stop on the spot when the button is released
           s.chicken.vx = 0;
+          s.chicken.stepAnim = 0;
         }
 
         // Clamp inside world boundaries
         s.chicken.x = Math.max(35, Math.min(s.worldWidth - 40, s.chicken.x));
         s.chicken.y = fixedY;
 
-        // Lane crossing detection as chicken lands on checkpoint
-        if (s.targetLane > s.highestLaneCrossed && s.targetLane <= s.totalLanes) {
-          if (Math.abs(s.chicken.x - targetX) <= 4) {
-            s.highestLaneCrossed = s.targetLane;
-            s.verdictLane = s.targetLane;
+        // Lane crossing detection as chicken reaches lane center multiplier badge
+        for (let lane = 1; lane <= s.totalLanes; lane++) {
+          const lCenter = laneCenterX(lane);
+          if (s.chicken.x >= lCenter && s.highestLaneCrossed < lane) {
+            s.highestLaneCrossed = lane;
+            s.targetLane = lane;
+            s.verdictLane = lane;
             sounds.playLaneCross();
             spawnStarBurst(s.chicken.x, s.chicken.y);
-            Promise.resolve(callbacksRef.current.onLaneCross(s.targetLane)).catch(() => {});
+            Promise.resolve(callbacksRef.current.onLaneCross(lane)).catch(() => {});
           }
         }
 
@@ -720,7 +746,7 @@ const RoadCrossingGameComponent: React.FC<RoadCrossingGameProps> = ({
         const finishStartX = START_ZONE_WIDTH + s.totalLanes * LANE_WIDTH;
 
         // Check if chicken reached the RIGHT Finish Safe Zone (Green Point)
-        if (s.targetLane > s.totalLanes && s.chicken.x >= finishStartX && !s.chicken.isWon) {
+        if (s.chicken.x >= finishStartX && !s.chicken.isWon) {
           s.chicken.isWon = true;
           sounds.playWin();
           spawnStarBurst(s.chicken.x, s.chicken.y);
@@ -964,15 +990,13 @@ const RoadCrossingGameComponent: React.FC<RoadCrossingGameProps> = ({
         const laneCenterX = laneLeftX + LANE_WIDTH / 2;
         const dividerX = laneLeftX + LANE_WIDTH;
 
-        // Vertical lane divider dashed white markings (#E8E8E8)
+        // Vertical lane divider dashed white markings (#E8E8E8) - continuous unbroken line
         if (lane < s.totalLanes) {
           ctx.strokeStyle = '#E8E8E8';
           ctx.lineWidth = 3;
           ctx.setLineDash([20, 16]);
           ctx.beginPath();
           ctx.moveTo(dividerX, roadTop + 10);
-          ctx.lineTo(dividerX, fixedY - 32);
-          ctx.moveTo(dividerX, fixedY + 32);
           ctx.lineTo(dividerX, roadBottom - 10);
           ctx.stroke();
           ctx.setLineDash([]);
@@ -986,10 +1010,10 @@ const RoadCrossingGameComponent: React.FC<RoadCrossingGameProps> = ({
         ctx.fillText(dir, laneCenterX, roadTop + 25);
         ctx.fillText(dir, laneCenterX, roadBottom - 20);
 
-        // Pothole / Manhole Multiplier Checkpoint embedded in asphalt
+        // Circular Multiplier Checkpoint badge centered squarely in the middle of each road lane
         const mult = s.multipliers[lane - 1] || 1.0 + lane * 0.05;
         const isCrossed = s.highestLaneCrossed >= lane;
-        const markerX = dividerX;
+        const markerX = laneCenterX;
         const markerY = fixedY;
 
         ctx.save();

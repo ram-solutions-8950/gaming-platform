@@ -88,13 +88,57 @@ export function ChickenRoadPage() {
   const [showHowToPlay, setShowHowToPlay] = useState<boolean>(false);
   const [showExitConfirm, setShowExitConfirm] = useState<boolean>(false);
 
-  // Step signal for discrete stepping (1 tap = 1 lane)
-  const [stepSignal, setStepSignal] = useState<{ direction: 'left' | 'right'; timestamp: number } | null>(null);
+  // Continuous movement state: hold to move forward, release to stop on the spot immediately
+  const [moveForwardActive, setMoveForwardActive] = useState<boolean>(false);
+  const [moveBackwardActive, setMoveBackwardActive] = useState<boolean>(false);
 
-  const handleStep = useCallback((direction: 'left' | 'right') => {
+  const startMoveForward = useCallback((e?: React.SyntheticEvent) => {
+    if (e && e.cancelable) e.preventDefault();
     if (gameState !== 'ACTIVE' || isActionLoading) return;
-    setStepSignal({ direction, timestamp: Date.now() });
+    setMoveForwardActive(true);
+    setMoveBackwardActive(false);
   }, [gameState, isActionLoading]);
+
+  const stopMoveForward = useCallback(() => {
+    setMoveForwardActive(false);
+  }, []);
+
+  const startMoveBackward = useCallback((e?: React.SyntheticEvent) => {
+    if (e && e.cancelable) e.preventDefault();
+    if (gameState !== 'ACTIVE' || isActionLoading) return;
+    setMoveBackwardActive(true);
+    setMoveForwardActive(false);
+  }, [gameState, isActionLoading]);
+
+  const stopMoveBackward = useCallback(() => {
+    setMoveBackwardActive(false);
+  }, []);
+
+  // Global window release listener so chicken stops immediately if touch/pointer releases anywhere
+  useEffect(() => {
+    const handleGlobalRelease = () => {
+      setMoveForwardActive(false);
+      setMoveBackwardActive(false);
+    };
+    window.addEventListener('pointerup', handleGlobalRelease);
+    window.addEventListener('pointercancel', handleGlobalRelease);
+    window.addEventListener('touchend', handleGlobalRelease);
+    window.addEventListener('touchcancel', handleGlobalRelease);
+    return () => {
+      window.removeEventListener('pointerup', handleGlobalRelease);
+      window.removeEventListener('pointercancel', handleGlobalRelease);
+      window.removeEventListener('touchend', handleGlobalRelease);
+      window.removeEventListener('touchcancel', handleGlobalRelease);
+    };
+  }, []);
+
+  // Reset movement when game is no longer ACTIVE
+  useEffect(() => {
+    if (gameState !== 'ACTIVE') {
+      setMoveForwardActive(false);
+      setMoveBackwardActive(false);
+    }
+  }, [gameState]);
 
   // Synchronous refs to prevent race conditions and closure staleness
   const activeRoundIdRef = useRef<string | null>(null);
@@ -110,6 +154,8 @@ export function ChickenRoadPage() {
     activeRoundIdRef.current = null;
     currentLaneRef.current = 0;
     crossLanePromiseRef.current = null;
+    setMoveForwardActive(false);
+    setMoveBackwardActive(false);
     setGameState('READY');
     setCurrentLane(0);
     setCurrentMultiplier(1.0);
@@ -648,26 +694,41 @@ export function ChickenRoadPage() {
             onLaneCross={handleLaneCross}
             onFinish={handleFinish}
             onCollision={handleCollision}
-            stepSignal={stepSignal}
+            moveForwardActive={moveForwardActive}
+            moveBackwardActive={moveBackwardActive}
             movementLocked={isActionLoading}
           />
 
-          {/* Floating Touch Controls (Mobile) */}
+          {/* Floating Touch Controls (Hold to move, release to stop on the spot immediately) */}
           <div className="cr-mobile-controls">
             <button
               type="button"
-              className="cr-steer-btn"
-              onClick={() => handleStep('left')}
-              aria-label="Steer Left"
+              className={`cr-steer-btn cr-steer-btn--left ${moveBackwardActive ? 'cr-steer-btn--active' : ''}`}
+              onPointerDown={startMoveBackward}
+              onPointerUp={stopMoveBackward}
+              onPointerLeave={stopMoveBackward}
+              onPointerCancel={stopMoveBackward}
+              onTouchStart={startMoveBackward}
+              onTouchEnd={stopMoveBackward}
+              onTouchCancel={stopMoveBackward}
+              onContextMenu={(e) => e.preventDefault()}
+              aria-label="Steer Left (Hold to move, release to stop)"
             >
               <ChevronLeft size={28} />
             </button>
 
             <button
               type="button"
-              className="cr-steer-btn"
-              onClick={() => handleStep('right')}
-              aria-label="Steer Right"
+              className={`cr-steer-btn cr-steer-btn--right ${moveForwardActive ? 'cr-steer-btn--active' : ''}`}
+              onPointerDown={startMoveForward}
+              onPointerUp={stopMoveForward}
+              onPointerLeave={stopMoveForward}
+              onPointerCancel={stopMoveForward}
+              onTouchStart={startMoveForward}
+              onTouchEnd={stopMoveForward}
+              onTouchCancel={stopMoveForward}
+              onContextMenu={(e) => e.preventDefault()}
+              aria-label="Steer Forward (Hold to move, release to stop)"
             >
               <ChevronRight size={28} />
             </button>

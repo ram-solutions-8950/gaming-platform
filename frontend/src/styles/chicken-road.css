@@ -372,11 +372,19 @@
   -webkit-touch-callout: none;
 }
 
-.cr-steer-btn:active {
+.cr-steer-btn--right {
+  border-color: rgba(251, 191, 36, 0.6);
+  background: rgba(45, 45, 45, 0.90);
+  box-shadow: 0 4px 14px rgba(251, 191, 36, 0.25);
+}
+
+.cr-steer-btn:active,
+.cr-steer-btn--active {
   transform: scale(0.92);
-  background: rgba(255, 255, 255, 0.25);
+  background: rgba(251, 191, 36, 0.35);
   border-color: #FBBF24;
   color: #FBBF24;
+  box-shadow: 0 0 16px rgba(251, 191, 36, 0.6);
 }
 
 .cr-error-banner {
