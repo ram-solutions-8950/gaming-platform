@@ -10,6 +10,7 @@ import { RouletteChatModal, type ChatMessage } from '../../components/roulette/R
 import { GameRulesModal } from '../../components/common/GameRulesModal';
 import { ROULETTE_RULES_DATA } from '../../components/common/gameRulesData';
 import { setNativeLandscape } from '../../utils/nativeOrientation';
+import { showInsufficientBalance } from '../../store/insufficientBalanceStore';
 import '../../styles/roulette.css';
 
 // European Roulette Red Numbers
@@ -305,6 +306,7 @@ export function RoulettePage() {
     }
 
     if (balance < selectedChip) {
+      showInsufficientBalance();
       setToastMessage('Insufficient balance!');
       setTimeout(() => setToastMessage(null), 1500);
       return;
@@ -399,6 +401,7 @@ export function RoulettePage() {
 
     const needed = previousRoundBets.reduce((sum, b) => sum + b.amount, 0);
     if (balance < needed) {
+      showInsufficientBalance();
       setToastMessage('Insufficient balance to repeat bet');
       setTimeout(() => setToastMessage(null), 1500);
       return;

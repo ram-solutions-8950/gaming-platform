@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ArrowLeft } from 'lucide-react';
 import type { LudoTokenStyle } from '../../types/ludo';
+import { showInsufficientBalance } from '../../store/insufficientBalanceStore';
 
 interface Props {
   userBalance: number; // in paise
@@ -175,15 +176,21 @@ export const LudoLobby: React.FC<Props> = ({
       {/* Action Button */}
       <button
         type="button"
-        onClick={() => onStartMatchmaking(playerCount, selectedTier.amount)}
-        disabled={!canAfford || searching}
+        onClick={() => {
+          if (!canAfford) {
+            showInsufficientBalance();
+            return;
+          }
+          onStartMatchmaking(playerCount, selectedTier.amount);
+        }}
+        disabled={searching}
         className={`ludo-find-btn w-full py-4 rounded-2xl font-black text-base uppercase tracking-wider shadow-xl transition-all transform active:scale-98 ${
           canAfford
             ? 'bg-gradient-to-r from-amber-500 via-yellow-500 to-amber-600 hover:brightness-110 text-slate-950 cursor-pointer shadow-amber-500/20'
-            : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+            : 'bg-red-950/40 border border-red-500/50 text-red-300 hover:bg-red-900/50 cursor-pointer'
         }`}
       >
-        {!canAfford ? 'INSUFFICIENT BALANCE' : `FIND MATCH (${selectedTier.label})`}
+        {!canAfford ? 'INSUFFICIENT BALANCE (REFILL)' : `FIND MATCH (${selectedTier.label})`}
       </button>
 
       {/* 30-Second Matchmaking Radar Modal */}

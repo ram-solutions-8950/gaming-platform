@@ -1,3 +1,3 @@
 // App version — auto-updated by build scripts
-export const APP_VERSION = '0.0.46';
-export const BUILD_DATE = '2026-09-27';
+export const APP_VERSION = '0.0.48';
+export const BUILD_DATE = '2026-09-28';

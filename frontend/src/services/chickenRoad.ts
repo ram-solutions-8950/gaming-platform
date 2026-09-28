@@ -64,6 +64,14 @@ export interface FinishResponse {
   wallet_balance: number;
 }
 
+export interface CollisionResponse {
+  round_id: string;
+  status: 'LOST';
+  lane_index: number;
+  bet_amount: number;
+  won_amount: number;
+}
+
 export interface CashoutResponse {
   round_id: string;
   status: 'CASHED_OUT';
@@ -91,6 +99,11 @@ export const chickenRoadService = {
 
   async finishGame(round_id: string, lane_index?: number): Promise<FinishResponse | LostResponse> {
     const res = await api.post('/games/chicken-road/finish', { round_id, lane_index });
+    return res.data.data;
+  },
+
+  async reportCollision(round_id: string, lane_index: number): Promise<CollisionResponse> {
+    const res = await api.post('/games/chicken-road/collision', { round_id, lane_index });
     return res.data.data;
   },
 

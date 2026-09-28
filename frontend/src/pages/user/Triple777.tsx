@@ -15,6 +15,7 @@ import triple777Logo from '../../assets/triple-777-logo.webp';
 import { GameRulesModal } from '../../components/common/GameRulesModal';
 import { TRIPLE_777_RULES_DATA } from '../../components/common/gameRulesData';
 import { setNativePortrait, setNativeLandscape } from '../../utils/nativeOrientation';
+import { showInsufficientBalance } from '../../store/insufficientBalanceStore';
 import '../../styles/triple-777.css';
 import { getApiErrorMessage } from '../../utils/apiError';
 
@@ -293,6 +294,7 @@ export function Triple777Page() {
   const handleSpin = useCallback(async (currentStake: number, isTurbo: boolean) => {
     if (spinLockRef.current) return;
     if (balanceRef.current < currentStake) {
+      showInsufficientBalance();
       setErrorMessage('Insufficient balance to spin.');
       stopAutoSpin();
       return;
@@ -357,6 +359,7 @@ export function Triple777Page() {
               setAutoSummary({ totalWon: completedWon, totalSpins: completedCount });
             }
             if (response.balance < currentStake && remaining > 0) {
+              showInsufficientBalance();
               setErrorMessage('Auto spin stopped: Insufficient balance.');
             }
           } else {
@@ -393,6 +396,7 @@ export function Triple777Page() {
       stopAutoSpin();
     } else {
       if (balanceRef.current < stakeRef.current) {
+        showInsufficientBalance();
         setErrorMessage('Insufficient balance for auto spin.');
         return;
       }

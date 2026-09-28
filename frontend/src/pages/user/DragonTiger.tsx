@@ -8,6 +8,7 @@ import { DragonTigerArena, type ArenaPhase } from '../../components/dragonTiger/
 import useAudio from '../../hooks/useAudio';
 import { ChipLayer } from '../../components/dragonTiger/ChipLayer';
 import { getWebSocketUrl } from '../../utils/ws';
+import { showInsufficientBalance } from '../../store/insufficientBalanceStore';
 
 import bgImg from '../../assets/dragon-tiger-bg.webp';
 import dragonImg from '../../assets/dragon-3d.webp';
@@ -796,6 +797,10 @@ export function DragonTigerPage() {
     const prediction = predictionKey || selected;
     if (!prediction || !round || !game || betting) return;
     if (round.status !== 'BETTING' || isBettingLocked || countdown <= 0) return;
+    if (wallet && wallet.balance < amount * 100) {
+      showInsufficientBalance();
+      return;
+    }
     setBetting(true);
     try {
       const placed = await gameService.placeBet(round.id, prediction, amount, game.id);

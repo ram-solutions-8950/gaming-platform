@@ -59,6 +59,12 @@ export function LoginPage() {
           setError('Admin accounts cannot log in via the mobile application. Please use the Web Admin Portal.');
           return;
         }
+        if (isAdminRoute && me.role !== 'ADMIN' && me.role !== 'SUPER_ADMIN') {
+          await authService.logout();
+          setUser(null);
+          setError('Access denied. Administrator privileges required.');
+          return;
+        }
         setUser(me);
         navigate(me.role === 'USER' ? '/dashboard' : '/admin/dashboard');
       } else {
@@ -73,16 +79,35 @@ export function LoginPage() {
   };
 
   return (
-    <div className="auth-page-wrapper">
-      <GlitterRain />
+    <div className={`auth-page-wrapper ${isAdminRoute ? 'admin-auth-page-wrapper' : ''}`}>
+      {!isAdminRoute && <GlitterRain />}
 
-      <div className="casino-login-card">
+      <div className={`casino-login-card ${isAdminRoute ? 'admin-login-card' : ''}`}>
         {/* Logo & Subtitle */}
         <div className="casino-login-header">
-          <h2 className="casino-login-title">{isAdminRoute ? 'ADMIN PORTAL' : 'WELCOME BACK'}</h2>
-          <p className="casino-login-subtitle">
-            {isAdminRoute ? 'Secure Super Admin Authentication' : 'Enter your credentials to continue'}
-          </p>
+          {isAdminRoute ? (
+            <div className="flex flex-col items-center gap-2 mb-2">
+              <div className="relative w-14 h-14 rounded-2xl bg-cyan-950/60 border border-cyan-500/40 flex items-center justify-center text-cyan-400 shadow-[0_0_20px_rgba(6,182,212,0.25)]">
+                <svg className="w-7 h-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                </svg>
+                <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-emerald-400 border-2 border-slate-900 shadow-[0_0_8px_#34d399]" />
+              </div>
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-cyan-950/40 border border-cyan-500/30 text-[11px] font-bold text-cyan-300 uppercase tracking-widest mt-1">
+                <span>✦</span>
+                <span>CORONA888 ENTERPRISE SECURITY</span>
+              </div>
+              <h2 className="casino-login-title text-2xl font-black text-white mt-1">Admin Portal</h2>
+              <p className="casino-login-subtitle text-slate-400 text-xs font-medium">
+                Access platform governance, analytics & operations
+              </p>
+            </div>
+          ) : (
+            <>
+              <h2 className="casino-login-title">WELCOME BACK</h2>
+              <p className="casino-login-subtitle">Enter your credentials to continue</p>
+            </>
+          )}
         </div>
 
         {/* Login Form */}
@@ -93,20 +118,20 @@ export function LoginPage() {
             </div>
           )}
 
-          {/* Email Input */}
+          {/* Email / Admin ID Input */}
           <div className="casino-input-group">
             <label htmlFor="email" className="casino-input-label">
-              Email
+              {isAdminRoute ? 'Admin ID' : 'Email'}
             </label>
             <div className="casino-input-wrapper">
               <Mail className="casino-input-icon" size={18} />
               <input
                 id="email"
                 type="email"
-                placeholder="you@example.com"
+                placeholder={isAdminRoute ? 'admin@corona888.com' : 'you@example.com'}
                 autoComplete="email"
                 className="casino-input-field with-icon"
-                {...register('email', { required: 'Email is required' })}
+                {...register('email', { required: isAdminRoute ? 'Admin ID is required' : 'Email is required' })}
               />
             </div>
             {errors.email && (
@@ -117,14 +142,14 @@ export function LoginPage() {
           {/* Password Input with Visibility Toggle */}
           <div className="casino-input-group">
             <label htmlFor="password" className="casino-input-label">
-              Password
+              {isAdminRoute ? 'Security Password' : 'Password'}
             </label>
             <div className="casino-input-wrapper password-input-wrapper">
               <Lock className="casino-input-icon" size={18} />
               <input
                 id="password"
                 type={showPassword ? 'text' : 'password'}
-                placeholder="Password"
+                placeholder={isAdminRoute ? 'Security Password' : 'Password'}
                 autoComplete="current-password"
                 className="casino-input-field with-icon with-toggle"
                 {...register('password', { required: 'Password is required' })}
@@ -156,28 +181,38 @@ export function LoginPage() {
                 type="checkbox"
                 checked={rememberMe}
                 onChange={(e) => setRememberMe(e.target.checked)}
-                style={{ accentColor: '#eab308', width: '16px', height: '16px', cursor: 'pointer' }}
+                style={{ accentColor: isAdminRoute ? '#06b6d4' : '#eab308', width: '16px', height: '16px', cursor: 'pointer' }}
               />
               <span>Remember ID & Password</span>
             </label>
           </div>
 
-          {/* Casino Gold Submit Button */}
+          {/* Submit Button */}
           <button
             type="submit"
-            className="casino-login-btn"
+            className={isAdminRoute ? 'admin-login-btn' : 'casino-login-btn'}
             disabled={loading}
           >
-            {loading ? 'Signing In...' : 'Sign in to Play'}
+            {loading
+              ? 'Signing In...'
+              : isAdminRoute
+              ? 'Sign In to Dashboard →'
+              : 'Sign in to Play'}
           </button>
 
-          {/* Footer Link */}
-          <p className="casino-login-footer">
-            Don't have an account?{' '}
-            <Link to="/signup" className="casino-login-link">
-              Sign up
-            </Link>
-          </p>
+          {/* Footer Link / Security Notice */}
+          {isAdminRoute ? (
+            <p className="text-center text-[11px] text-slate-500 font-medium mt-3 tracking-wide">
+              Protected by end-to-end encrypted admin token authorization.
+            </p>
+          ) : (
+            <p className="casino-login-footer">
+              Don't have an account?{' '}
+              <Link to="/signup" className="casino-login-link">
+                Sign up
+              </Link>
+            </p>
+          )}
         </form>
       </div>
     </div>

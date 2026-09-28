@@ -71,12 +71,14 @@ const AdminGamesPage = lazyPage(() => import('./pages/admin/Games'), 'AdminGames
 function ProtectedRoute({ adminOnly = false }: { adminOnly?: boolean }) {
   const { user, isLoading } = useAuthStore();
   if (isLoading) return null;
-  if (!user) return <Navigate to="/login" replace />;
+  if (!user) return <Navigate to={adminOnly ? '/admin/login' : '/login'} replace />;
   if (isNativePlatform() && (user.role === 'ADMIN' || user.role === 'SUPER_ADMIN')) {
     authStorage.clearTokens();
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/admin/login" replace />;
   }
-  if (adminOnly && user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN') return <Navigate to="/dashboard" replace />;
+  if (adminOnly && user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN') {
+    return <Navigate to="/admin/login" replace />;
+  }
   return <Outlet />;
 }
 
@@ -340,6 +342,10 @@ function App() {
             <Route path="/admin/fees" element={<AdminFeesPage />} />
           </Route>
         </Route>
+
+        {/* Admin Portal Redirects */}
+        <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
+        <Route path="/admin/*" element={<Navigate to="/admin/dashboard" replace />} />
 
         <Route path="/" element={<Navigate to={user ? '/dashboard' : '/login'} replace />} />
         <Route path="*" element={<Navigate to={user ? '/dashboard' : '/login'} replace />} />

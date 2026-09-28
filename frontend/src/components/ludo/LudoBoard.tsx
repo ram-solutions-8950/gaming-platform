@@ -234,9 +234,10 @@ const renderPawnGraphic = (
   style: LudoTokenStyle,
   cx: number,
   cy: number,
-  colorKey: string,
+  color: LudoColor,
   isLegal: boolean
 ) => {
+  const colorHex = COLOR_HEX[color];
   if (style === 'KNIGHT_HELM') {
     return (
       <g>
@@ -246,7 +247,7 @@ const renderPawnGraphic = (
           cy={cy + 14}
           rx="28"
           ry="9.5"
-          fill="url(#goldCollar)"
+          fill="#fbbf24"
           stroke="#451a03"
           strokeWidth="1.2"
         />
@@ -255,7 +256,7 @@ const renderPawnGraphic = (
           cy={cy + 10}
           rx="24"
           ry="7"
-          fill={`url(#${colorKey}HeadGrad)`}
+          fill={colorHex}
           stroke={isLegal ? '#fef08a' : 'rgba(255,255,255,0.7)'}
           strokeWidth={isLegal ? 2.5 : 1}
         />
@@ -266,7 +267,7 @@ const renderPawnGraphic = (
         {/* Angular Chiseled Breastplate */}
         <path
           d={`M ${cx - 21},${cy + 10} L ${cx - 23},${cy - 2} L ${cx - 12},${cy - 22} L ${cx - 8},${cy - 28} L ${cx + 8},${cy - 28} L ${cx + 12},${cy - 22} L ${cx + 23},${cy - 2} L ${cx + 21},${cy + 10} Z`}
-          fill={`url(#${colorKey}HeadGrad)`}
+          fill={colorHex}
           stroke={isLegal ? '#fef08a' : 'rgba(255,255,255,0.4)'}
           strokeWidth={isLegal ? 2 : 0.8}
         />
@@ -294,7 +295,7 @@ const renderPawnGraphic = (
         {/* 3D Greathelm Face */}
         <path
           d={`M ${cx - 16},${cy - 28} C ${cx - 19},${cy - 42} ${cx - 16},${cy - 58} ${cx},${cy - 62} C ${cx + 16},${cy - 58} ${cx + 19},${cy - 42} ${cx + 16},${cy - 28} Z`}
-          fill={`url(#${colorKey}HeadGrad)`}
+          fill={colorHex}
           stroke={isLegal ? '#fef08a' : 'rgba(255,255,255,0.7)'}
           strokeWidth={isLegal ? 3 : 1.2}
         />
@@ -303,7 +304,7 @@ const renderPawnGraphic = (
         <path
           d={`M ${cx - 14},${cy - 34} L ${cx},${cy - 30} L ${cx + 14},${cy - 34} L ${cx + 11},${cy - 46} L ${cx},${cy - 44} L ${cx - 11},${cy - 46} Z`}
           fill="#090d16"
-          stroke="url(#goldCollar)"
+          stroke="#fbbf24"
           strokeWidth="1.2"
         />
 
@@ -330,7 +331,7 @@ const renderPawnGraphic = (
         {/* Aerodynamic Golden Plume Battle Crest */}
         <path
           d={`M ${cx - 4},${cy - 60} C ${cx - 2},${cy - 74} ${cx + 15},${cy - 76} ${cx + 18},${cy - 62} C ${cx + 12},${cy - 64} ${cx + 4},${cy - 62} ${cx + 4},${cy - 60} Z`}
-          fill="url(#goldCollar)"
+          fill="#fbbf24"
           stroke="#78350f"
           strokeWidth="1"
         />
@@ -342,20 +343,20 @@ const renderPawnGraphic = (
     return (
       <g>
         {/* Floating Anti-Gravity Gyro Base */}
-        <ellipse cx={cx} cy={cy + 13} rx="26" ry="8" fill="url(#goldCollar)" stroke="#451a03" />
+        <ellipse cx={cx} cy={cy + 13} rx="26" ry="8" fill="#fbbf24" stroke="#451a03" />
         <ellipse cx={cx} cy={cy + 10} rx="20" ry="6" fill="#090d16" />
         <ellipse
           cx={cx}
           cy={cy + 10}
           rx="14"
           ry="4"
-          fill={`url(#${colorKey}HeadGrad)`}
+          fill={colorHex}
         />
 
         {/* Faceted Prism Pillar Body */}
         <polygon
           points={`${cx - 16},${cy + 9} ${cx - 10},${cy - 26} ${cx + 10},${cy - 26} ${cx + 16},${cy + 9}`}
-          fill={`url(#${colorKey}HeadGrad)`}
+          fill={colorHex}
           stroke={isLegal ? '#fef08a' : 'rgba(255,255,255,0.4)'}
           strokeWidth={isLegal ? 2 : 0.8}
         />
@@ -386,15 +387,15 @@ const renderPawnGraphic = (
         {/* Table & Crown */}
         <polygon
           points={`${cx - 12},${cy - 62} ${cx + 12},${cy - 62} ${cx + 18},${cy - 50} ${cx - 18},${cy - 50}`}
-          fill={`url(#${colorKey}HeadGrad)`}
-          stroke="url(#goldCollar)"
+          fill={colorHex}
+          stroke="#fbbf24"
           strokeWidth="1.5"
         />
         {/* Pavilion point */}
         <polygon
           points={`${cx - 18},${cy - 50} ${cx + 18},${cy - 50} ${cx},${cy - 28}`}
-          fill={`url(#${colorKey}HeadGrad)`}
-          stroke="url(#goldCollar)"
+          fill={colorHex}
+          stroke="#fbbf24"
           strokeWidth="1.5"
         />
         {/* Refracting Diamond Facets */}
@@ -442,7 +443,7 @@ const renderPawnGraphic = (
         cy={cy + 10}
         rx="22"
         ry="7"
-        fill={`url(#${colorKey}HeadGrad)`}
+        fill={COLOR_HEX[color]}
         stroke={isLegal ? '#fef08a' : 'rgba(255,255,255,0.7)'}
         strokeWidth={isLegal ? 2.8 : 1.2}
       />
@@ -450,7 +451,7 @@ const renderPawnGraphic = (
       {/* Sculpted Elegant Chalice Pawn Body */}
       <path
         d={`M ${cx - 20},${cy + 10} C ${cx - 18},${cy - 6} ${cx - 10},${cy - 22} ${cx - 7},${cy - 30} L ${cx + 7},${cy - 30} C ${cx + 10},${cy - 22} ${cx + 18},${cy - 6} ${cx + 20},${cy + 10} Z`}
-        fill={`url(#${colorKey}HeadGrad)`}
+        fill={COLOR_HEX[color]}
         stroke={isLegal ? '#fef08a' : 'rgba(255,255,255,0.4)'}
         strokeWidth={isLegal ? 2.5 : 0.8}
       />
@@ -459,7 +460,7 @@ const renderPawnGraphic = (
       <path
         d={`M ${cx - 14},${cy + 8} C ${cx - 13},${cy - 5} ${cx - 7},${cy - 18} ${cx - 4},${cy - 26} L ${cx},${cy - 26} C ${cx - 3},${cy - 18} ${cx - 9},${cy - 5} ${cx - 9},${cy + 8} Z`}
         fill="#ffffff"
-        opacity="0.45"
+        opacity="0.35"
       />
 
       {/* Polished Gold Collar Ring */}
@@ -468,7 +469,7 @@ const renderPawnGraphic = (
         cy={cy - 30}
         rx="12.5"
         ry="4.5"
-        fill="url(#goldCollar)"
+        fill="#fbbf24"
         stroke="#78350f"
         strokeWidth="1"
       />
@@ -477,12 +478,12 @@ const renderPawnGraphic = (
       <circle cx={cx} cy={cy - 30} r="1.8" fill="#fef08a" />
       <circle cx={cx + 6} cy={cy - 30} r="1.4" fill="#ffffff" />
 
-      {/* Spherical 3D High-Gloss Crown Head */}
+      {/* Spherical Crown Head */}
       <circle
         cx={cx}
         cy={cy - 48}
         r="19"
-        fill={`url(#${colorKey}HeadGrad)`}
+        fill={COLOR_HEX[color]}
         stroke={isLegal ? '#fef08a' : 'rgba(255,255,255,0.7)'}
         strokeWidth={isLegal ? 3 : 1.2}
       />
@@ -494,7 +495,7 @@ const renderPawnGraphic = (
         rx="6.5"
         ry="3.5"
         fill="#ffffff"
-        opacity="0.85"
+        opacity="0.6"
         transform={`rotate(-25 ${cx - 6} ${cy - 54})`}
       />
       {/* Pinpoint Sparkle Star */}
@@ -503,21 +504,21 @@ const renderPawnGraphic = (
       {/* Imperial Golden 3-Point Crown */}
       <polygon
         points={`${cx - 14},${cy - 50} ${cx - 12},${cy - 65} ${cx - 5},${cy - 54} ${cx},${cy - 72} ${cx + 5},${cy - 54} ${cx + 12},${cy - 65} ${cx + 14},${cy - 50}`}
-        fill="url(#goldCollar)"
+        fill="#fbbf24"
         stroke="#78350f"
         strokeWidth="1.2"
       />
       {/* Crown Finials */}
-      <circle cx={cx} cy={cy - 73} r="4" fill="url(#goldCollar)" stroke="#78350f" strokeWidth="0.8" />
-      <circle cx={cx - 12} cy={cy - 66} r="3" fill="url(#goldCollar)" stroke="#78350f" strokeWidth="0.6" />
-      <circle cx={cx + 12} cy={cy - 66} r="3" fill="url(#goldCollar)" stroke="#78350f" strokeWidth="0.6" />
+      <circle cx={cx} cy={cy - 73} r="4" fill="#fbbf24" stroke="#78350f" strokeWidth="0.8" />
+      <circle cx={cx - 12} cy={cy - 66} r="3" fill="#fbbf24" stroke="#78350f" strokeWidth="0.6" />
+      <circle cx={cx + 12} cy={cy - 66} r="3" fill="#fbbf24" stroke="#78350f" strokeWidth="0.6" />
 
       {/* Center Crown Ruby/Gem Inlay */}
       <circle
         cx={cx}
         cy={cy - 56}
         r="3"
-        fill={`url(#${colorKey}HeadGrad)`}
+        fill={COLOR_HEX[color]}
         stroke="#fef08a"
         strokeWidth="0.8"
       />
@@ -586,23 +587,23 @@ const renderBoardArt = () => (
       {/* 4 Large Corner Yards with Clean Trays & Pedestals */}
       {(
         [
-          { color: 'RED', grad: 'yardRedGrad', socketFill: '#fee2e2', socketRing: '#fca5a5' },
-          { color: 'GREEN', grad: 'yardGreenGrad', socketFill: '#d1fae5', socketRing: '#86efac' },
-          { color: 'YELLOW', grad: 'yardYellowGrad', socketFill: '#fef3c7', socketRing: '#fde047' },
-          { color: 'BLUE', grad: 'yardBlueGrad', socketFill: '#dbeafe', socketRing: '#93c5fd' },
+          { color: 'RED', socketFill: '#fee2e2', socketRing: '#fca5a5' },
+          { color: 'GREEN', socketFill: '#d1fae5', socketRing: '#86efac' },
+          { color: 'YELLOW', socketFill: '#fef3c7', socketRing: '#fde047' },
+          { color: 'BLUE', socketFill: '#dbeafe', socketRing: '#93c5fd' },
         ] as const
       ).map((yard) => (
         <g key={`yard-${yard.color}`}>
-          <rect x={YARD_ORIGINS[yard.color][0]} y={YARD_ORIGINS[yard.color][1]} width="600" height="600" fill={`url(#${yard.grad})`} />
+          <rect x={YARD_ORIGINS[yard.color][0]} y={YARD_ORIGINS[yard.color][1]} width="600" height="600" fill={COLOR_HEX[yard.color]} />
           <rect
             x={YARD_ORIGINS[yard.color][0] + 85}
             y={YARD_ORIGINS[yard.color][1] + 85}
             width="430"
             height="430"
-            fill="url(#yardTrayGrad)"
+            fill="#ffffff"
             rx="36"
             stroke={COLOR_HEX[yard.color]}
-            strokeWidth="3.5"
+            strokeWidth="4"
           />
           {YARD_COORDINATES[yard.color].map((socket, idx) => {
             const [sx, sy] = cellCenter(socket);
@@ -817,7 +818,7 @@ const LudoBoardView: React.FC<Props> = ({
     const art: Record<string, React.ReactElement> = {};
     COLORS.forEach((color) => {
       [false, true].forEach((legal) => {
-        art[`${color}_${legal}`] = renderPawnGraphic(tokenStyle, 0, 0, color.toLowerCase(), legal);
+        art[`${color}_${legal}`] = renderPawnGraphic(tokenStyle, 0, 0, color, legal);
       });
     });
     return art;
@@ -1204,7 +1205,7 @@ const LudoBoardView: React.FC<Props> = ({
                   pointerEvents={t.isLegal ? 'auto' : 'none'}
                   role={t.isLegal ? 'button' : undefined}
                   aria-label={t.isLegal ? `Move ${t.color.toLowerCase()} token ${t.tokenIndex + 1}` : undefined}
-                  style={t.isLegal ? { cursor: 'pointer', touchAction: 'manipulation' } : undefined}
+                  style={t.isLegal ? { cursor: 'pointer', touchAction: 'manipulation', filter: 'drop-shadow(0 0 10px #f59e0b)' } : undefined}
                   onClick={(e) => {
                     e.stopPropagation();
                     if (!t.isLegal) return;

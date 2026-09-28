@@ -20,6 +20,7 @@ import { getWebSocketUrl } from "../../utils/ws";
 import { setNativeLandscape } from "../../utils/nativeOrientation";
 import { GameRulesModal } from "../../components/common/GameRulesModal";
 import { ANDAR_BAHAR_RULES_DATA } from "../../components/common/gameRulesData";
+import { showInsufficientBalance } from "../../store/insufficientBalanceStore";
 import "../../styles/andar-bahar.css";
 
 type Phase = "betting" | "closed" | "dealing" | "result";
@@ -615,6 +616,7 @@ export function AndarBaharPage() {
     }
 
     if (stake > balance) {
+      showInsufficientBalance();
       setServerError("Insufficient wallet balance for this bet amount.");
       return;
     }

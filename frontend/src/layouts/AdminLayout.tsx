@@ -30,7 +30,7 @@ export function AdminLayout() {
   const handleLogout = async () => {
     await authService.logout();
     setUser(null);
-    navigate('/login');
+    navigate('/admin/login');
   };
 
   return (
