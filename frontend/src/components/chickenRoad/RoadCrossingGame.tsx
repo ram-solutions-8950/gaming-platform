@@ -411,8 +411,8 @@ const RoadCrossingGameComponent: React.FC<RoadCrossingGameProps> = ({
     ];
 
     const speedMultipliers: Record<Difficulty, number> = {
-      MEDIUM: 1.45,
-      HARD:   1.85,
+      MEDIUM: 1.38,
+      HARD:   1.75,
     };
 
     const vehicleCountByDifficulty: Record<Difficulty, number> = {
@@ -420,7 +420,7 @@ const RoadCrossingGameComponent: React.FC<RoadCrossingGameProps> = ({
       HARD:   3,
     };
 
-    const speedFactor = speedMultipliers[difficulty] || 1.45;
+    const speedFactor = speedMultipliers[difficulty] || 1.38;
     const numVehicles = vehicleCountByDifficulty[difficulty] || 3;
     const VEHICLE_SAFE_GAP = 48;
 
