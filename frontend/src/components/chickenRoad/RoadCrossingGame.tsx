@@ -411,8 +411,8 @@ const RoadCrossingGameComponent: React.FC<RoadCrossingGameProps> = ({
     ];
 
     const speedMultipliers: Record<Difficulty, number> = {
-      MEDIUM: 1.38,
-      HARD:   1.75,
+      MEDIUM: 1.25,
+      HARD:   1.55,
     };
 
     const vehicleCountByDifficulty: Record<Difficulty, number> = {
