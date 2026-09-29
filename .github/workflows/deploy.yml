@@ -120,7 +120,13 @@ jobs:
             sudo chown -R www-data:www-data /opt/gaming-platform/frontend/dist
             sudo chmod -R 755 /opt/gaming-platform/frontend/dist
 
+            if [ -f corona888.conf ]; then
+              sudo cp corona888.conf /etc/nginx/sites-available/corona888.conf
+              sudo ln -sf /etc/nginx/sites-available/corona888.conf /etc/nginx/sites-enabled/
+            fi
+
             echo "=== 6. RELOADING NGINX ==="
+            sudo nginx -t
             sudo systemctl reload nginx
 
             echo "=== 7. VERIFYING STATUS ==="
