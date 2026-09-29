@@ -34,6 +34,8 @@ async def lifespan(app: FastAPI):
             from sqlalchemy import text
             try:
                 db.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url TEXT;"))
+                db.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS permissions JSONB;"))
+                db.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS team_role VARCHAR(100);"))
                 db.commit()
             except Exception:
                 db.rollback()

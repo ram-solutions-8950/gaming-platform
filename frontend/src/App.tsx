@@ -67,6 +67,10 @@ const AdminPaymentSettingsPage = lazyPage(() => import('./pages/admin/AdminPayme
 const AdminFeesPage = lazyPage(() => import('./pages/admin/Fees'), 'AdminFeesPage');
 const AdminGameControlPage = lazyPage(() => import('./pages/admin/AdminGameControl'), 'AdminGameControlPage');
 const AdminGamesPage = lazyPage(() => import('./pages/admin/Games'), 'AdminGamesPage');
+const AdminRBACPage = lazyPage(() => import('./pages/admin/AdminRBAC'), 'AdminRBACPage');
+const AdminWagersPage = lazyPage(() => import('./pages/admin/AdminWagers'), 'AdminWagersPage');
+const AdminWinningControlPage = lazyPage(() => import('./pages/admin/AdminWinningControl'), 'AdminWinningControlPage');
+const AdminRewardsPage = lazyPage(() => import('./pages/admin/AdminRewards'), 'AdminRewardsPage');
 
 function ProtectedRoute({ adminOnly = false }: { adminOnly?: boolean }) {
   const { user, isLoading } = useAuthStore();
@@ -334,12 +338,18 @@ function App() {
             <Route path="/admin/dashboard" element={<AdminDashboardPage />} />
             <Route path="/admin/catalog" element={<AdminGamesPage />} />
             <Route path="/admin/games" element={<AdminGameControlPage />} />
+            <Route path="/admin/winning-control" element={<AdminWinningControlPage />} />
+            <Route path="/admin/wagers" element={<AdminWagersPage />} />
             <Route path="/admin/users" element={<AdminUsersPage />} />
             <Route path="/admin/transactions" element={<AdminTransactionsPage />} />
             <Route path="/admin/deposits" element={<AdminDepositsPage />} />
             <Route path="/admin/withdrawals" element={<AdminWithdrawalsPage />} />
+            <Route path="/admin/rewards" element={<AdminRewardsPage />} />
             <Route path="/admin/payment-settings" element={<AdminPaymentSettingsPage />} />
             <Route path="/admin/fees" element={<AdminFeesPage />} />
+            <Route path="/admin/rbac" element={<AdminRBACPage />} />
+            <Route path="/admin/team" element={<AdminRBACPage />} />
+            <Route path="/admin/analytics" element={<AdminDashboardPage />} />
           </Route>
         </Route>
 

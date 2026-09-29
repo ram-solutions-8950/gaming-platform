@@ -18,6 +18,8 @@ from .chicken_road import ChickenRoadRound, ChickenRoadRoundStatus
 from .poker import PokerTable, PokerHand, PokerPlayer, PokerAction
 from .referral import Referral, ReferralSettings, ReferralStatus
 from .wager import WagerRequirement
+from .winning import UserWinningControl, WinMode
+from .role import AdminPermission, DEFAULT_ROLE_PERMISSIONS
 from .reward import (
     DailyRewardConfig,
     DailyRewardSettings,

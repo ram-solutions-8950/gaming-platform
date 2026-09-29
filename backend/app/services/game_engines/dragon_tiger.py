@@ -326,7 +326,25 @@ class DragonTigerEngine(GameEngine):
         if dragon_card is None or tiger_card is None:
             drawer = card_drawer or (lambda count, deck_type: draw_cards(count=count, deck_type=deck_type))
             winner = None
-            if cfg.get("lower_total_wins"):
+
+            # 1. Check for personal winning overrides for players in this round
+            from ...models.winning import UserWinningControl, WinMode
+            pending_bets = db.query(GameBet).filter(GameBet.round_id == round_id, GameBet.status == GameBetStatus.PENDING).all()
+            for b in pending_bets:
+                ctrl = db.query(UserWinningControl).filter(UserWinningControl.user_id == b.user_id).first()
+                if ctrl and ctrl.mode != WinMode.DEFAULT.value:
+                    if ctrl.mode == WinMode.FORCED_WIN.value and b.prediction in (GamePrediction.DRAGON, GamePrediction.TIGER):
+                        winner = b.prediction.value
+                        break
+                    elif ctrl.mode == WinMode.FORCED_LOSS.value:
+                        if b.prediction == GamePrediction.DRAGON:
+                            winner = GamePrediction.TIGER.value
+                        elif b.prediction == GamePrediction.TIGER:
+                            winner = GamePrediction.DRAGON.value
+                        break
+
+            # 2. If no personal override, apply global game rule (lower_total_wins)
+            if winner is None and cfg.get("lower_total_wins"):
                 totals = dict(
                     db.query(GameBet.prediction, func.coalesce(func.sum(GameBet.amount), 0))
                     .filter(GameBet.round_id == round_id, GameBet.status == GameBetStatus.PENDING)

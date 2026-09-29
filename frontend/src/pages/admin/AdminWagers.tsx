@@ -1,0 +1,381 @@
+import { useEffect, useState, useCallback } from 'react';
+import { Card } from '../../components/common/Card';
+import { Loader } from '../../components/common/Loader';
+import { adminService, type WagerRequirementItem } from '../../services/adminService';
+import {
+  Coins,
+  Search,
+  Plus,
+  X,
+  ChevronLeft,
+  ChevronRight,
+  RefreshCw,
+} from 'lucide-react';
+import toast from 'react-hot-toast';
+
+export function AdminWagersPage() {
+  const [wagers, setWagers] = useState<WagerRequirementItem[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [filterFulfilled, setFilterFulfilled] = useState<string>('ALL');
+
+  // Modal state
+  const [modalOpen, setModalOpen] = useState(false);
+  const [targetUserId, setTargetUserId] = useState('');
+  const [requiredAmountInr, setRequiredAmountInr] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  const pageSize = 15;
+
+  const fetchWagers = useCallback(async () => {
+    try {
+      setLoading(true);
+      const isFulfilled = filterFulfilled === 'ALL' ? undefined : filterFulfilled === 'FULFILLED';
+      const data = await adminService.getWagers(page, pageSize, search.trim() || undefined, isFulfilled);
+      setWagers(data.items);
+      setTotal(data.total);
+    } catch (err) {
+      console.error('Failed to load wagers:', err);
+      toast.error('Failed to load wager requirements');
+    } finally {
+      setLoading(false);
+    }
+  }, [page, search, filterFulfilled]);
+
+  useEffect(() => {
+    fetchWagers();
+  }, [fetchWagers]);
+
+  const handleFulfillWager = async (wagerId: string) => {
+    try {
+      await adminService.fulfillWager(wagerId);
+      toast.success('Wager requirement waived / fulfilled');
+      fetchWagers();
+    } catch (err: any) {
+      toast.error('Failed to fulfill wager');
+    }
+  };
+
+  const handleWaiveAll = async (userId: string, username: string) => {
+    if (!window.confirm(`Waive all unfulfilled wagers for @${username}?`)) return;
+    try {
+      await adminService.waiveUserWagers(userId);
+      toast.success(`All wagers waived for @${username}`);
+      fetchWagers();
+    } catch (err: any) {
+      toast.error('Failed to waive user wagers');
+    }
+  };
+
+  const handleCreateWager = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const amt = parseFloat(requiredAmountInr);
+    if (!amt || amt <= 0) {
+      toast.error('Please enter a valid amount');
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await adminService.createWager(targetUserId.trim(), amt);
+      toast.success('Wager requirement created successfully');
+      setModalOpen(false);
+      setTargetUserId('');
+      setRequiredAmountInr('');
+      fetchWagers();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to create wager requirement');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+
+  // Compute stats from current page
+  const totalRequired = wagers.reduce((acc, w) => acc + w.required_amount_inr, 0);
+  const totalCompleted = wagers.reduce((acc, w) => acc + w.completed_amount_inr, 0);
+  const pendingCount = wagers.filter((w) => !w.is_fulfilled).length;
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-black text-white tracking-tight flex items-center gap-2">
+            <Coins className="text-cyan-400" size={26} />
+            <span>Wager Requirement Controls</span>
+          </h1>
+          <p className="text-xs text-gray-400 mt-1">
+            Configure player play-through criteria, monitor bet rollover progress, and clear withdrawal holds.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => fetchWagers()}
+            className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold bg-[#141b2d] hover:bg-[#1a233a] text-gray-300 border border-[#222c44] transition"
+          >
+            <RefreshCw size={14} />
+            <span>Refresh</span>
+          </button>
+          <button
+            onClick={() => setModalOpen(true)}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold bg-cyan-600 hover:bg-cyan-500 text-white shadow-lg shadow-cyan-600/20 transition cursor-pointer"
+          >
+            <Plus size={16} />
+            <span>Add Wager Requirement</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Metric Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+        <div className="bg-[#111726] border border-[#1d273d] rounded-2xl p-4">
+          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Total Requirements</span>
+          <p className="text-2xl font-black text-white mt-1 font-mono">{total}</p>
+        </div>
+        <div className="bg-[#111726] border border-[#1d273d] rounded-2xl p-4">
+          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Page Required Turnover</span>
+          <p className="text-2xl font-black text-amber-400 mt-1 font-mono">
+            ₹{totalRequired.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+          </p>
+        </div>
+        <div className="bg-[#111726] border border-[#1d273d] rounded-2xl p-4">
+          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Completed Turnover</span>
+          <p className="text-2xl font-black text-emerald-400 mt-1 font-mono">
+            ₹{totalCompleted.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+          </p>
+        </div>
+        <div className="bg-[#111726] border border-[#1d273d] rounded-2xl p-4">
+          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Pending Play-throughs</span>
+          <p className="text-2xl font-black text-rose-400 mt-1 font-mono">{pendingCount}</p>
+        </div>
+      </div>
+
+      {/* Search and Filters */}
+      <div className="flex flex-col sm:flex-row items-center gap-3">
+        <div className="relative flex-1 w-full">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-500 w-4 h-4" />
+          <input
+            type="text"
+            placeholder="Search by username, user ID, or email..."
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPage(1);
+            }}
+            className="w-full bg-[#111726] border border-[#1d273d] rounded-xl pl-10 pr-4 py-2.5 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-cyan-500"
+          />
+        </div>
+
+        <select
+          value={filterFulfilled}
+          onChange={(e) => {
+            setFilterFulfilled(e.target.value);
+            setPage(1);
+          }}
+          className="bg-[#111726] border border-[#1d273d] text-white text-xs font-semibold rounded-xl px-4 py-2.5 focus:outline-none"
+        >
+          <option value="ALL">All Statuses</option>
+          <option value="PENDING">Pending Only</option>
+          <option value="FULFILLED">Fulfilled Only</option>
+        </select>
+      </div>
+
+      {/* Table */}
+      <Card title="Player Wager Requirements">
+        {loading ? (
+          <div className="py-16 flex justify-center">
+            <Loader size="lg" />
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs text-left">
+              <thead>
+                <tr className="text-gray-400 border-b border-[#1d273d] uppercase text-[10px]">
+                  <th className="py-3 px-3">Player</th>
+                  <th className="py-3 px-3 text-right">Required (₹)</th>
+                  <th className="py-3 px-3 text-right">Wagered (₹)</th>
+                  <th className="py-3 px-3 text-right">Remaining (₹)</th>
+                  <th className="py-3 px-3">Progress</th>
+                  <th className="py-3 px-3 text-center">Status</th>
+                  <th className="py-3 px-3 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#182136]">
+                {wagers.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="py-8 text-center text-gray-500">
+                      No wager requirements found.
+                    </td>
+                  </tr>
+                ) : (
+                  wagers.map((w) => (
+                    <tr key={w.id} className="hover:bg-[#141b2d] transition-colors">
+                      <td className="py-3 px-3">
+                        <span className="font-bold text-white block">{w.user_name}</span>
+                        <span className="text-[11px] text-gray-400 font-mono">@{w.username}</span>
+                      </td>
+                      <td className="py-3 px-3 text-right font-mono font-bold text-white">
+                        ₹{w.required_amount_inr.toFixed(2)}
+                      </td>
+                      <td className="py-3 px-3 text-right font-mono font-semibold text-emerald-400">
+                        ₹{w.completed_amount_inr.toFixed(2)}
+                      </td>
+                      <td className="py-3 px-3 text-right font-mono font-bold text-rose-400">
+                        ₹{w.remaining_amount_inr.toFixed(2)}
+                      </td>
+                      <td className="py-3 px-3 w-40">
+                        <div className="w-full bg-[#1a233a] rounded-full h-2 overflow-hidden mb-1">
+                          <div
+                            className={`h-full rounded-full transition-all duration-300 ${
+                              w.is_fulfilled ? 'bg-emerald-500' : 'bg-cyan-500'
+                            }`}
+                            style={{ width: `${Math.min(100, Math.max(4, w.progress_percent))}%` }}
+                          ></div>
+                        </div>
+                        <span className="text-[10px] text-gray-400 font-mono">{w.progress_percent}% completed</span>
+                      </td>
+                      <td className="py-3 px-3 text-center">
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                            w.is_fulfilled
+                              ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                              : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                          }`}
+                        >
+                          {w.is_fulfilled ? 'FULFILLED' : 'PENDING'}
+                        </span>
+                      </td>
+                      <td className="py-3 px-3 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          {!w.is_fulfilled && (
+                            <>
+                              <button
+                                onClick={() => handleFulfillWager(w.id)}
+                                className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-emerald-600/30 text-emerald-300 hover:bg-emerald-600 hover:text-white transition cursor-pointer"
+                                title="Fulfill this deposit's requirement"
+                              >
+                                Waive Wager
+                              </button>
+                              <button
+                                onClick={() => handleWaiveAll(w.user_id, w.username)}
+                                className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-cyan-600/30 text-cyan-300 hover:bg-cyan-600 hover:text-white transition cursor-pointer"
+                                title="Waive all pending requirements for this user"
+                              >
+                                Clear All
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* Pagination */}
+        {total > pageSize && (
+          <div className="flex items-center justify-between mt-4 pt-3 border-t border-[#1d273d] text-xs text-gray-400">
+            <span>
+              Showing {(page - 1) * pageSize + 1} - {Math.min(page * pageSize, total)} of {total} requirements
+            </span>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page === 1}
+                className="p-1.5 rounded-lg bg-[#141b2d] border border-[#222c44] text-gray-300 hover:text-white disabled:opacity-40"
+              >
+                <ChevronLeft size={16} />
+              </button>
+              <span>
+                Page {page} of {totalPages}
+              </span>
+              <button
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={page >= totalPages}
+                className="p-1.5 rounded-lg bg-[#141b2d] border border-[#222c44] text-gray-300 hover:text-white disabled:opacity-40"
+              >
+                <ChevronRight size={16} />
+              </button>
+            </div>
+          </div>
+        )}
+      </Card>
+
+      {/* Modal: Add Wager Requirement */}
+      {modalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div className="bg-[#0f1422] border border-[#222c44] rounded-2xl w-full max-w-md p-6 shadow-2xl">
+            <div className="flex items-center justify-between pb-3 border-b border-[#222c44]">
+              <h2 className="text-base font-bold text-white flex items-center gap-2">
+                <Coins className="text-cyan-400" size={18} />
+                <span>Add Wager Requirement</span>
+              </h2>
+              <button
+                onClick={() => setModalOpen(false)}
+                className="p-1.5 rounded-lg text-gray-400 hover:text-white transition"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateWager} className="space-y-4 pt-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-300 mb-1">
+                  User UUID (User ID)
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. 4dc86278-02b4-4640-869c-ce84169f4f40"
+                  value={targetUserId}
+                  onChange={(e) => setTargetUserId(e.target.value)}
+                  className="w-full bg-[#141b2d] border border-[#222c44] rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-cyan-500 font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-300 mb-1">
+                  Required Turnover Amount (₹ INR)
+                </label>
+                <input
+                  type="number"
+                  step="any"
+                  min="1"
+                  required
+                  placeholder="e.g. 500.00"
+                  value={requiredAmountInr}
+                  onChange={(e) => setRequiredAmountInr(e.target.value)}
+                  className="w-full bg-[#141b2d] border border-[#222c44] rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-cyan-500 font-mono"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-[#222c44]">
+                <button
+                  type="button"
+                  onClick={() => setModalOpen(false)}
+                  className="px-4 py-2 rounded-xl text-xs text-gray-400 hover:text-white transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="px-5 py-2 rounded-xl text-xs font-bold bg-cyan-600 hover:bg-cyan-500 text-white transition disabled:opacity-50"
+                >
+                  {submitting ? 'Creating...' : 'Set Wager'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

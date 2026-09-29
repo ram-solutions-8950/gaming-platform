@@ -41,3 +41,28 @@ def require_super_admin(user: User = Depends(_get_user_from_token)) -> User:
     if user.role != UserRole.SUPER_ADMIN:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Super-admin access required")
     return user
+
+
+def has_permission(user: User, permission: str) -> bool:
+    """Check if an admin user has a specific granular permission."""
+    if user.role == UserRole.SUPER_ADMIN:
+        return True
+    if user.role != UserRole.ADMIN:
+        return False
+    # If no custom permissions set, grant default admin permissions
+    if user.permissions is None:
+        from ..models.role import DEFAULT_ROLE_PERMISSIONS
+        return permission in DEFAULT_ROLE_PERMISSIONS.get("ADMIN", [])
+    return permission in user.permissions
+
+
+def require_permission(permission: str):
+    """Dependency that enforces a specific granular permission for admins."""
+    def _dependency(user: User = Depends(require_admin)) -> User:
+        if not has_permission(user, permission):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Permission denied: Requires '{permission}' access",
+            )
+        return user
+    return _dependency

@@ -208,3 +208,119 @@ def get_wager_status(db: Session, user_id: UUID) -> dict:
         "progress_percent": progress,
         "is_fulfilled": remaining == 0,
     }
+
+
+def admin_list_wagers(
+    db: Session,
+    page: int = 1,
+    page_size: int = 20,
+    user_id: Optional[UUID] = None,
+    is_fulfilled: Optional[bool] = None,
+    search: Optional[str] = None,
+) -> dict:
+    from ..models.user import User
+    from sqlalchemy import or_, String, cast
+
+    q = db.query(WagerRequirement).join(User, WagerRequirement.user_id == User.id)
+    if user_id:
+        q = q.filter(WagerRequirement.user_id == user_id)
+    if is_fulfilled is not None:
+        q = q.filter(WagerRequirement.is_fulfilled == is_fulfilled)
+    if search:
+        s = f"%{search.strip()}%"
+        q = q.filter(
+            or_(
+                User.username.ilike(s),
+                User.name.ilike(s),
+                User.email.ilike(s),
+                cast(WagerRequirement.id, String).ilike(s),
+                cast(WagerRequirement.user_id, String).ilike(s),
+            )
+        )
+
+    total = q.count()
+    items = (
+        q.order_by(WagerRequirement.created_at.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+        .all()
+    )
+
+    formatted = []
+    for r in items:
+        u = r.user
+        req_p = int(r.required_amount)
+        comp_p = int(r.completed_amount)
+        rem_p = max(0, req_p - comp_p)
+        prog = 100.0 if req_p == 0 else round(min(100.0, (comp_p / req_p) * 100), 1)
+        formatted.append({
+            "id": str(r.id),
+            "user_id": str(r.user_id),
+            "username": u.username if u else "Unknown",
+            "user_name": u.name if u else "Unknown",
+            "deposit_id": str(r.deposit_id) if r.deposit_id else None,
+            "required_amount_paise": req_p,
+            "required_amount_inr": round(req_p / 100, 2),
+            "completed_amount_paise": comp_p,
+            "completed_amount_inr": round(comp_p / 100, 2),
+            "remaining_amount_inr": round(rem_p / 100, 2),
+            "progress_percent": prog,
+            "is_fulfilled": r.is_fulfilled or rem_p == 0,
+            "created_at": r.created_at.isoformat() if r.created_at else None,
+            "updated_at": r.updated_at.isoformat() if r.updated_at else None,
+        })
+
+    return {
+        "items": formatted,
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+    }
+
+
+def admin_set_user_wager(
+    db: Session,
+    user_id: UUID,
+    required_amount_paise: int,
+    deposit_id: Optional[UUID] = None,
+) -> WagerRequirement:
+    """Explicitly set or add a wager requirement for a user."""
+    req = WagerRequirement(
+        user_id=user_id,
+        deposit_id=deposit_id,
+        required_amount=required_amount_paise,
+        completed_amount=0,
+        is_fulfilled=False,
+    )
+    db.add(req)
+    db.commit()
+    db.refresh(req)
+    logger.info("Admin manually set wager requirement: user=%s req=Rs %.2f", user_id, required_amount_paise / 100)
+    return req
+
+
+def admin_fulfill_wager(db: Session, wager_id: UUID) -> bool:
+    """Manually mark a wager requirement as fulfilled/waived."""
+    req = db.query(WagerRequirement).filter(WagerRequirement.id == wager_id).first()
+    if not req:
+        return False
+    req.completed_amount = req.required_amount
+    req.is_fulfilled = True
+    db.commit()
+    logger.info("Admin fulfilled wager requirement %s", wager_id)
+    return True
+
+
+def admin_waive_all_user_wagers(db: Session, user_id: UUID) -> int:
+    """Waive all unfulfilled wager requirements for a user."""
+    wagers = db.query(WagerRequirement).filter(
+        WagerRequirement.user_id == user_id,
+        WagerRequirement.is_fulfilled.is_(False),
+    ).all()
+    count = len(wagers)
+    for w in wagers:
+        w.completed_amount = w.required_amount
+        w.is_fulfilled = True
+    db.commit()
+    logger.info("Admin waived %d wager requirements for user %s", count, user_id)
+    return count
