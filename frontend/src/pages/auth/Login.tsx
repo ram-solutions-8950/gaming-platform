@@ -16,7 +16,11 @@ interface FormData {
 }
 
 export function LoginPage() {
-  const isAdminRoute = typeof window !== 'undefined' && window.location.pathname.toLowerCase().includes('admin');
+  const isDomainAdmin = typeof window !== 'undefined' && (
+    window.location.hostname.startsWith('admin.') ||
+    window.location.hostname === 'admin.crona888.com'
+  );
+  const isAdminRoute = (typeof window !== 'undefined' && window.location.pathname.toLowerCase().includes('admin')) || isDomainAdmin;
   const savedEmail = typeof window !== 'undefined' ? localStorage.getItem('saved_email') || '' : '';
   const [rememberMe, setRememberMe] = useState<boolean>(true);
   const { register, handleSubmit, formState: { errors } } = useForm<FormData>({

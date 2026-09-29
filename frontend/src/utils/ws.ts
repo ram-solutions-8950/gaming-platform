@@ -10,10 +10,15 @@ export function getWebSocketUrl(path: string, token?: string): string {
   const configuredApiUrl = import.meta.env.VITE_API_URL?.trim();
 
   const isCapacitor = isNativePlatform();
+  const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
 
   let wsBase = '';
   if (configuredWsUrl) {
-    wsBase = configuredWsUrl;
+    if (isHttps && configuredWsUrl.startsWith('ws://') && !isCapacitor) {
+      wsBase = `wss://${window.location.host}/api/v1`;
+    } else {
+      wsBase = configuredWsUrl;
+    }
   } else if (configuredApiUrl) {
     try {
       const url = new URL(configuredApiUrl);

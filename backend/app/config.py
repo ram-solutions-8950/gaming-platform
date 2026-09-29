@@ -8,7 +8,20 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=str(PROJECT_ROOT / ".env"), extra="ignore")
 
     ENVIRONMENT: str = "development"
-    CORS_ORIGINS: List[str] = ["http://localhost:5173", "https://5d61-183-82-187-74.ngrok-free.app", "http://localhost", "https://localhost", "capacitor://localhost"]
+    CORS_ORIGINS: List[str] = [
+        "https://crona888.com",
+        "https://www.crona888.com",
+        "https://admin.crona888.com",
+        "http://crona888.com",
+        "http://www.crona888.com",
+        "http://admin.crona888.com",
+        "http://localhost:5173",
+        "http://localhost:3000",
+        "http://localhost",
+        "https://localhost",
+        "capacitor://localhost",
+        "https://5d61-183-82-187-74.ngrok-free.app",
+    ]
     DATABASE_URL: str = "postgresql://postgres@localhost:5432/gaming_db"
     FRONTEND_URL: str = "http://localhost:5173"
     # Apply pending Alembic migrations automatically on startup.

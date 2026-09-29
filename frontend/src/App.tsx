@@ -74,14 +74,22 @@ const AdminRewardsPage = lazyPage(() => import('./pages/admin/AdminRewards'), 'A
 
 function ProtectedRoute({ adminOnly = false }: { adminOnly?: boolean }) {
   const { user, isLoading } = useAuthStore();
+  const isDomainAdmin = typeof window !== 'undefined' && (
+    window.location.hostname.startsWith('admin.') ||
+    window.location.hostname === 'admin.crona888.com'
+  );
+
   if (isLoading) return null;
-  if (!user) return <Navigate to={adminOnly ? '/admin/login' : '/login'} replace />;
+  if (!user) return <Navigate to={adminOnly || isDomainAdmin ? '/admin/login' : '/login'} replace />;
   if (isNativePlatform() && (user.role === 'ADMIN' || user.role === 'SUPER_ADMIN')) {
     authStorage.clearTokens();
     return <Navigate to="/admin/login" replace />;
   }
-  if (adminOnly && user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN') {
+  if ((adminOnly || isDomainAdmin) && user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN') {
     return <Navigate to="/admin/login" replace />;
+  }
+  if (isDomainAdmin && !adminOnly) {
+    return <Navigate to="/admin/dashboard" replace />;
   }
   return <Outlet />;
 }
@@ -249,8 +257,12 @@ function App() {
     };
   }, [setLoading, setUser]);
 
+  const isDomainAdmin = typeof window !== 'undefined' && (
+    window.location.hostname.startsWith('admin.') ||
+    window.location.hostname === 'admin.crona888.com'
+  );
   const isDownloadPath = typeof window !== 'undefined' && window.location.pathname.toLowerCase().includes('download');
-  const isAdminPath = typeof window !== 'undefined' && window.location.pathname.toLowerCase().startsWith('/admin');
+  const isAdminPath = isDomainAdmin || (typeof window !== 'undefined' && window.location.pathname.toLowerCase().startsWith('/admin'));
   const isAuthPath = typeof window !== 'undefined' && (window.location.pathname.toLowerCase().includes('login') || window.location.pathname.toLowerCase().includes('signup'));
 
   useEffect(() => {
@@ -261,7 +273,7 @@ function App() {
 
     const handleFirstInteraction = () => {
       const path = typeof window !== 'undefined' ? window.location.pathname.toLowerCase() : '';
-      if (path.startsWith('/admin') || path.includes('download') || path.includes('login') || path.includes('signup')) return;
+      if (isDomainAdmin || path.startsWith('/admin') || path.includes('download') || path.includes('login') || path.includes('signup')) return;
 
       soundManager.init();
       document.removeEventListener('click', handleFirstInteraction);
@@ -274,7 +286,7 @@ function App() {
       document.removeEventListener('click', handleFirstInteraction);
       document.removeEventListener('keydown', handleFirstInteraction);
     };
-  }, [isDownloadPath, isAdminPath, isAuthPath]);
+  }, [isDownloadPath, isAdminPath, isAuthPath, isDomainAdmin]);
 
   useEffect(() => {
     if (!user || isDownloadPath || isAdminPath || isAuthPath) {
@@ -284,7 +296,7 @@ function App() {
 
   return (
     <>
-      {!isSplashDone && !isDownloadPath && (
+      {!isSplashDone && !isDownloadPath && !isAdminPath && (
         <LoadingScreen
           isReady={!isLoading}
           minDurationMs={2400}
@@ -301,9 +313,9 @@ function App() {
 
         <Route element={<PublicLayout />}>
           <Route element={<AuthLayout />}>
-            <Route path="/login" element={<LoginPage />} />
+            <Route path="/login" element={isDomainAdmin ? <Navigate to="/admin/login" replace /> : <LoginPage />} />
             <Route path="/admin/login" element={<LoginPage />} />
-            <Route path="/signup" element={<SignupPage />} />
+            <Route path="/signup" element={isDomainAdmin ? <Navigate to="/admin/login" replace /> : <SignupPage />} />
           </Route>
         </Route>
 
@@ -357,8 +369,32 @@ function App() {
         <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
         <Route path="/admin/*" element={<Navigate to="/admin/dashboard" replace />} />
 
-        <Route path="/" element={<Navigate to={user ? '/dashboard' : '/login'} replace />} />
-        <Route path="*" element={<Navigate to={user ? '/dashboard' : '/login'} replace />} />
+        <Route
+          path="/"
+          element={
+            isDomainAdmin ? (
+              <Navigate
+                to={user && (user.role === 'ADMIN' || user.role === 'SUPER_ADMIN') ? '/admin/dashboard' : '/admin/login'}
+                replace
+              />
+            ) : (
+              <Navigate to={user ? '/dashboard' : '/login'} replace />
+            )
+          }
+        />
+        <Route
+          path="*"
+          element={
+            isDomainAdmin ? (
+              <Navigate
+                to={user && (user.role === 'ADMIN' || user.role === 'SUPER_ADMIN') ? '/admin/dashboard' : '/admin/login'}
+                replace
+              />
+            ) : (
+              <Navigate to={user ? '/dashboard' : '/login'} replace />
+            )
+          }
+        />
       </Routes>
     </BrowserRouter>
     </>

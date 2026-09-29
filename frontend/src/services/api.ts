@@ -12,15 +12,21 @@ const isLocalHost =
   (window.location.hostname === 'localhost' ||
     window.location.hostname === '127.0.0.1');
 
-export const API_BASE_URL =
-  configuredApiUrl ||
-  (isCapacitor
-    ? 'http://76.13.177.44:8000/api/v1'
-    : isLocalHost
-    ? 'http://127.0.0.1:8000/api/v1'
-    : import.meta.env.PROD
-    ? 'http://76.13.177.44:8000/api/v1'
-    : `${window.location.protocol}//${window.location.hostname}${window.location.port === '5173' ? ':8000' : ''}/api/v1`);
+const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
+
+export const API_BASE_URL = (() => {
+  if (configuredApiUrl) {
+    if (isHttps && configuredApiUrl.startsWith('http://') && !isCapacitor) {
+      return '/api/v1';
+    }
+    return configuredApiUrl;
+  }
+  if (isCapacitor) return 'http://76.13.177.44:8000/api/v1';
+  if (isLocalHost) return 'http://127.0.0.1:8000/api/v1';
+  if (isHttps) return '/api/v1';
+  if (import.meta.env.PROD) return 'http://76.13.177.44:8000/api/v1';
+  return `${window.location.protocol}//${window.location.hostname}${window.location.port === '5173' ? ':8000' : ''}/api/v1`;
+})();
 
 const api = axios.create({
   baseURL: API_BASE_URL,
