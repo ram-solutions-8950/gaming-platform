@@ -18,6 +18,7 @@ interface FormData {
 export function LoginPage() {
   const isDomainAdmin = typeof window !== 'undefined' && (
     window.location.hostname.startsWith('admin.') ||
+    window.location.hostname === 'admin.corona888.tech' ||
     window.location.hostname === 'admin.crona888.com'
   );
   const isAdminRoute = (typeof window !== 'undefined' && window.location.pathname.toLowerCase().includes('admin')) || isDomainAdmin;

@@ -76,6 +76,7 @@ function ProtectedRoute({ adminOnly = false }: { adminOnly?: boolean }) {
   const { user, isLoading } = useAuthStore();
   const isDomainAdmin = typeof window !== 'undefined' && (
     window.location.hostname.startsWith('admin.') ||
+    window.location.hostname === 'admin.corona888.tech' ||
     window.location.hostname === 'admin.crona888.com'
   );
 
@@ -259,6 +260,7 @@ function App() {
 
   const isDomainAdmin = typeof window !== 'undefined' && (
     window.location.hostname.startsWith('admin.') ||
+    window.location.hostname === 'admin.corona888.tech' ||
     window.location.hostname === 'admin.crona888.com'
   );
   const isDownloadPath = typeof window !== 'undefined' && window.location.pathname.toLowerCase().includes('download');

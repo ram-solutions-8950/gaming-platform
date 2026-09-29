@@ -9,6 +9,12 @@ class Settings(BaseSettings):
 
     ENVIRONMENT: str = "development"
     CORS_ORIGINS: List[str] = [
+        "https://corona888.tech",
+        "https://www.corona888.tech",
+        "https://admin.corona888.tech",
+        "http://corona888.tech",
+        "http://www.corona888.tech",
+        "http://admin.corona888.tech",
         "https://crona888.com",
         "https://www.crona888.com",
         "https://admin.crona888.com",
