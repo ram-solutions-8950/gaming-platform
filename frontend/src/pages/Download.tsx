@@ -11,18 +11,6 @@ export const DownloadPage: React.FC = () => {
     } catch {
       /* ignore */
     }
-
-    // Automatically trigger APK download for direct /download visits
-    const timer = setTimeout(() => {
-      const link = document.createElement('a');
-      link.href = '/Corona888.apk';
-      link.download = 'Corona888.apk';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    }, 500);
-
-    return () => clearTimeout(timer);
   }, []);
 
   return (

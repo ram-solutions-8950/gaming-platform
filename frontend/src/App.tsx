@@ -79,10 +79,14 @@ function ProtectedRoute({ adminOnly = false }: { adminOnly?: boolean }) {
     window.location.hostname === 'admin.corona888.tech' ||
     window.location.hostname === 'admin.crona888.com'
   );
+  const isNative = isNativePlatform();
 
   if (isLoading) return null;
+  if (!isNative && !isDomainAdmin) {
+    return <Navigate to="/download" replace />;
+  }
   if (!user) return <Navigate to={adminOnly || isDomainAdmin ? '/admin/login' : '/login'} replace />;
-  if (isNativePlatform() && (user.role === 'ADMIN' || user.role === 'SUPER_ADMIN')) {
+  if (isNative && (user.role === 'ADMIN' || user.role === 'SUPER_ADMIN')) {
     authStorage.clearTokens();
     return <Navigate to="/admin/login" replace />;
   }
@@ -263,7 +267,9 @@ function App() {
     window.location.hostname === 'admin.corona888.tech' ||
     window.location.hostname === 'admin.crona888.com'
   );
-  const isDownloadPath = typeof window !== 'undefined' && window.location.pathname.toLowerCase().includes('download');
+  const isNative = isNativePlatform();
+  const isWebPlayer = !isNative && !isDomainAdmin;
+  const isDownloadPath = isWebPlayer || (typeof window !== 'undefined' && window.location.pathname.toLowerCase().includes('download'));
   const isAdminPath = isDomainAdmin || (typeof window !== 'undefined' && window.location.pathname.toLowerCase().startsWith('/admin'));
   const isAuthPath = typeof window !== 'undefined' && (window.location.pathname.toLowerCase().includes('login') || window.location.pathname.toLowerCase().includes('signup'));
 
@@ -315,9 +321,31 @@ function App() {
 
         <Route element={<PublicLayout />}>
           <Route element={<AuthLayout />}>
-            <Route path="/login" element={isDomainAdmin ? <Navigate to="/admin/login" replace /> : <LoginPage />} />
+            <Route
+              path="/login"
+              element={
+                isDomainAdmin ? (
+                  <Navigate to="/admin/login" replace />
+                ) : isWebPlayer ? (
+                  <Navigate to="/download" replace />
+                ) : (
+                  <LoginPage />
+                )
+              }
+            />
             <Route path="/admin/login" element={<LoginPage />} />
-            <Route path="/signup" element={isDomainAdmin ? <Navigate to="/admin/login" replace /> : <SignupPage />} />
+            <Route
+              path="/signup"
+              element={
+                isDomainAdmin ? (
+                  <Navigate to="/admin/login" replace />
+                ) : isWebPlayer ? (
+                  <Navigate to="/download" replace />
+                ) : (
+                  <SignupPage />
+                )
+              }
+            />
           </Route>
         </Route>
 
@@ -379,6 +407,8 @@ function App() {
                 to={user && (user.role === 'ADMIN' || user.role === 'SUPER_ADMIN') ? '/admin/dashboard' : '/admin/login'}
                 replace
               />
+            ) : isWebPlayer ? (
+              <Navigate to="/download" replace />
             ) : (
               <Navigate to={user ? '/dashboard' : '/login'} replace />
             )
@@ -392,6 +422,8 @@ function App() {
                 to={user && (user.role === 'ADMIN' || user.role === 'SUPER_ADMIN') ? '/admin/dashboard' : '/admin/login'}
                 replace
               />
+            ) : isWebPlayer ? (
+              <Navigate to="/download" replace />
             ) : (
               <Navigate to={user ? '/dashboard' : '/login'} replace />
             )
