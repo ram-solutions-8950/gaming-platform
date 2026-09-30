@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
+import api from '../../services/api';
 import { Card } from '../../components/common/Card';
 import { Loader } from '../../components/common/Loader';
 import {
@@ -38,6 +39,35 @@ export function AdminWinningControlPage() {
   const [personalWinRate, setPersonalWinRate] = useState(80);
   const [personalNote, setPersonalNote] = useState('');
   const [submittingPersonal, setSubmittingPersonal] = useState(false);
+  const [userSearchTerm, setUserSearchTerm] = useState('');
+  const [userSearchResults, setUserSearchResults] = useState<any[]>([]);
+  const [searchingUsers, setSearchingUsers] = useState(false);
+  const [selectedUserObj, setSelectedUserObj] = useState<any | null>(null);
+
+
+  const handleSearchUsers = async (query: string) => {
+    setUserSearchTerm(query);
+    if (!query.trim()) {
+      setUserSearchResults([]);
+      return;
+    }
+    setSearchingUsers(true);
+    try {
+      const res = await api.get('/admin/users', { params: { search: query.trim(), page_size: 5 } });
+      setUserSearchResults(res.data.data?.items || []);
+    } catch {
+      setUserSearchResults([]);
+    } finally {
+      setSearchingUsers(false);
+    }
+  };
+
+  const handleSelectUser = (u: any) => {
+    setSelectedUserObj(u);
+    setTargetUserId(u.id);
+    setUserSearchResults([]);
+    setUserSearchTerm('');
+  };
 
   const fetchGlobal = useCallback(async () => {
     try {
@@ -382,15 +412,72 @@ export function AdminWinningControlPage() {
             <form onSubmit={handleSavePersonal} className="space-y-4 pt-4">
               <div>
                 <label className="block text-xs font-semibold text-gray-300 mb-1">
-                  Player User UUID
+                  Find & Select Player
+                </label>
+                <div className="relative mb-2">
+                  <input
+                    type="text"
+                    placeholder="Search player by username, name, or phone..."
+                    value={userSearchTerm}
+                    onChange={(e) => handleSearchUsers(e.target.value)}
+                    className="w-full bg-[#141b2d] border border-[#222c44] rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-cyan-500"
+                  />
+                  {searchingUsers && (
+                    <span className="absolute right-3 top-2.5 text-[10px] text-cyan-400">Searching...</span>
+                  )}
+                  {userSearchResults.length > 0 && (
+                    <div className="absolute left-0 right-0 top-full mt-1 bg-[#121929] border border-[#222c44] rounded-xl shadow-2xl z-20 max-h-40 overflow-y-auto divide-y divide-[#1e283d]">
+                      {userSearchResults.map((u) => (
+                        <div
+                          key={u.id}
+                          onClick={() => handleSelectUser(u)}
+                          className="p-2.5 hover:bg-[#1a233a] cursor-pointer flex items-center justify-between text-xs transition"
+                        >
+                          <div>
+                            <span className="font-bold text-white block">@{u.username}</span>
+                            <span className="text-[10px] text-gray-400">{u.name || 'Unnamed'} • ID: {u.id.slice(0, 8)}...</span>
+                          </div>
+                          <span className="text-[11px] font-mono font-bold text-emerald-400">
+                            ₹{((u.wallet_balance || 0) / 100).toFixed(2)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {selectedUserObj && (
+                  <div className="p-2.5 rounded-xl bg-cyan-950/40 border border-cyan-800/40 flex items-center justify-between text-xs mb-2">
+                    <div>
+                      <span className="text-cyan-300 font-bold block">@{selectedUserObj.username}</span>
+                      <span className="text-[10px] text-gray-400 font-mono">UUID: {selectedUserObj.id}</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedUserObj(null);
+                        setTargetUserId('');
+                      }}
+                      className="text-gray-400 hover:text-white text-xs px-2 py-1"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                )}
+
+                <label className="block text-[10px] font-medium text-gray-400 mb-1">
+                  Or Direct User UUID:
                 </label>
                 <input
                   type="text"
                   required
                   placeholder="e.g. 6b6ce039-35c4-4c96-a850-2813c5e33d84"
                   value={targetUserId}
-                  onChange={(e) => setTargetUserId(e.target.value)}
-                  className="w-full bg-[#141b2d] border border-[#222c44] rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-cyan-500 font-mono"
+                  onChange={(e) => {
+                    setTargetUserId(e.target.value);
+                    if (!e.target.value) setSelectedUserObj(null);
+                  }}
+                  className="w-full bg-[#141b2d] border border-[#222c44] rounded-xl px-3.5 py-1.5 text-xs text-white focus:outline-none focus:border-cyan-500 font-mono text-[11px]"
                 />
               </div>
 

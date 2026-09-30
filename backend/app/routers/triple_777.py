@@ -124,17 +124,31 @@ def _should_win(stats: Dict[str, int]) -> bool:
     The wins are distributed dynamically so positions within the 10 games remain
     unpredictable while guaranteeing exactly 2 wins per 10 games.
     """
-    spin_in_cycle = stats["spins"] % GAMES_PER_CYCLE
-    cycle_wins = 0 if spin_in_cycle == 0 else stats.get("cycle_wins", 0)
-    remaining_spins = GAMES_PER_CYCLE - spin_in_cycle
-    needed_wins = WINS_PER_CYCLE - cycle_wins
+    if "cycle_wins" in stats:
+        spin_in_cycle = stats["spins"] % GAMES_PER_CYCLE
+        cycle_wins = 0 if spin_in_cycle == 0 else stats.get("cycle_wins", 0)
+        remaining_spins = GAMES_PER_CYCLE - spin_in_cycle
+        needed_wins = WINS_PER_CYCLE - cycle_wins
 
-    if needed_wins <= 0:
+        if needed_wins <= 0:
+            return False
+        if needed_wins >= remaining_spins:
+            return True
+
+        return random.random() < (needed_wins / remaining_spins)
+
+    # Lifetime deficit pace control (fallback when cycle_wins is not explicitly tracked)
+    spins_after = stats["spins"] + 1
+    deficit = spins_after * TARGET_WIN_RATIO - stats["wins"]
+
+    if deficit <= -1.0:
         return False
-    if needed_wins >= remaining_spins:
-        return True
+    if deficit >= 1.0:
+        win_prob = min(1.0, 0.35 + 0.5 * deficit)
+    else:
+        win_prob = max(0.0, TARGET_WIN_RATIO * (1.0 + deficit))
 
-    return random.random() < (needed_wins / remaining_spins)
+    return random.random() < win_prob
 
 
 def _pick_symbol(pool: List[str]) -> str:
