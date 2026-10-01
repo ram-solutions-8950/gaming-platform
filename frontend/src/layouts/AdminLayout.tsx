@@ -86,10 +86,10 @@ export function AdminLayout() {
       permission: 'users',
       subItems: [
         { to: '/admin/users', label: 'All Users' },
-        { to: '/admin/users?role=MASTER', label: 'Masters' },
-        { to: '/admin/users?role=AGENT', label: 'Agents' },
         { to: '/admin/users?role=USER', label: 'Players' },
-        { to: '/admin/users?tab=kyc', label: 'KYC Verification' },
+        { to: '/admin/users?role=ADMIN', label: 'Staff / Admins' },
+        { to: '/admin/users?role=SUPER_ADMIN', label: 'Super Admins' },
+        { to: '/admin/rbac', label: 'Team Roles & RBAC' },
       ],
     },
     {

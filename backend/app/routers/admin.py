@@ -450,11 +450,16 @@ def get_user(user_id: UUID, admin: User = Depends(require_admin), db: Session = 
     return success_response(data)
 
 
+class AdminUserRoleUpdateIn(BaseModel):
+    role: UserRole
+    reason: Optional[str] = None
+
+
 @router.patch("/users/{user_id}/status")
 def update_user_status(
     user_id: UUID,
     data: AdminUserStatusUpdateIn,
-    admin: User = Depends(require_super_admin),   # Only SUPER_ADMIN can change user status
+    admin: User = Depends(require_permission(AdminPermission.USERS.value)),
     db: Session = Depends(get_db),
 ):
     user = db.query(User).filter(User.id == user_id).first()
@@ -466,6 +471,33 @@ def update_user_status(
         db, action="USER_STATUS_CHANGE", actor_id=admin.id,
         entity_type="user", entity_id=user_id,
         metadata={"old": old_status.value, "new": data.status.value, "reason": data.reason},
+    )
+    db.commit()
+    return success_response(UserOut.model_validate(user).model_dump())
+
+
+@router.patch("/users/{user_id}/role")
+def update_user_role(
+    user_id: UUID,
+    data: AdminUserRoleUpdateIn,
+    admin: User = Depends(require_permission(AdminPermission.USERS.value)),
+    db: Session = Depends(get_db),
+):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        return error_response("NOT_FOUND", "User not found", status_code=404)
+    if user.id == admin.id and data.role != UserRole.SUPER_ADMIN and admin.role == UserRole.SUPER_ADMIN:
+        return error_response("SELF_DEMOTION", "Cannot demote your own Super Admin account", status_code=400)
+    old_role = user.role
+    user.role = data.role
+    audit_service.log_action(
+        db, action="USER_ROLE_CHANGE", actor_id=admin.id,
+        entity_type="user", entity_id=user_id,
+        metadata={
+            "old": old_role.value if hasattr(old_role, "value") else str(old_role),
+            "new": data.role.value if hasattr(data.role, "value") else str(data.role),
+            "reason": data.reason,
+        },
     )
     db.commit()
     return success_response(UserOut.model_validate(user).model_dump())
@@ -742,7 +774,7 @@ def get_payment_settings(request: Request, admin: User = Depends(require_admin),
 def create_payment_settings(
     request: Request,
     data: PaymentConfigCreateIn,
-    admin: User = Depends(require_super_admin),
+    admin: User = Depends(require_permission(AdminPermission.SETTINGS.value)),
     db: Session = Depends(get_db),
 ):
     # Check for duplicate provider
@@ -775,7 +807,7 @@ def create_payment_settings(
 def update_payment_settings(
     config_id: UUID,
     data: PaymentConfigUpdateIn,
-    admin: User = Depends(require_super_admin),
+    admin: User = Depends(require_permission(AdminPermission.SETTINGS.value)),
     db: Session = Depends(get_db),
 ):
     config = db.query(PaymentConfiguration).filter(PaymentConfiguration.id == config_id).first()
@@ -810,7 +842,7 @@ def update_payment_settings(
 @router.delete("/payment-settings/{config_id}")
 def delete_payment_settings(
     config_id: UUID,
-    admin: User = Depends(require_super_admin),
+    admin: User = Depends(require_permission(AdminPermission.SETTINGS.value)),
     db: Session = Depends(get_db),
 ):
     config = db.query(PaymentConfiguration).filter(PaymentConfiguration.id == config_id).first()
@@ -839,7 +871,7 @@ def delete_payment_settings(
 async def upload_qr_code(
     request: Request,
     config_id: UUID,
-    admin: User = Depends(require_super_admin),
+    admin: User = Depends(require_permission(AdminPermission.SETTINGS.value)),
     db: Session = Depends(get_db),
 ):
     import os
@@ -961,7 +993,7 @@ def wallet_adjustment(
     user_id: UUID,
     amount: int,
     reason: str,
-    admin: User = Depends(require_super_admin),
+    admin: User = Depends(require_permission(AdminPermission.WALLET.value)),
     db: Session = Depends(get_db),
 ):
     if not reason or len(reason.strip()) < 5:
@@ -1369,7 +1401,7 @@ def list_team_members(
 @router.post("/team")
 def create_team_member(
     payload: TeamMemberCreateIn,
-    admin: User = Depends(require_super_admin),
+    admin: User = Depends(require_permission(AdminPermission.RBAC.value)),
     db: Session = Depends(get_db),
 ):
     """Create a new staff or admin user with specific granular permissions."""
@@ -1408,7 +1440,7 @@ def create_team_member(
 def update_team_member(
     user_id: UUID,
     payload: TeamMemberUpdateIn,
-    admin: User = Depends(require_super_admin),
+    admin: User = Depends(require_permission(AdminPermission.RBAC.value)),
     db: Session = Depends(get_db),
 ):
     """Update team member's role, permissions, status, or details."""
@@ -1449,7 +1481,7 @@ def update_team_member(
 @router.delete("/team/{user_id}")
 def delete_team_member(
     user_id: UUID,
-    admin: User = Depends(require_super_admin),
+    admin: User = Depends(require_permission(AdminPermission.RBAC.value)),
     db: Session = Depends(get_db),
 ):
     """Delete or disable a team member."""

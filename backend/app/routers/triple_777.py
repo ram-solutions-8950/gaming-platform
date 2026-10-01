@@ -368,6 +368,7 @@ def spin(
         if stats["spins"] % GAMES_PER_CYCLE == 0:
             stats["cycle_wins"] = 0
 
+
         if user.id not in USER_SPIN_HISTORY:
             USER_SPIN_HISTORY[user.id] = []
         USER_SPIN_HISTORY[user.id].insert(0, history_item)

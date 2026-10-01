@@ -102,6 +102,7 @@ DEFAULT_ROLE_PERMISSIONS: Dict[str, List[str]] = {
         AdminPermission.REWARDS.value,
         AdminPermission.ANALYTICS.value,
         AdminPermission.SETTINGS.value,
+        AdminPermission.RBAC.value,
     ],
     "OPERATIONS_MANAGER": [
         AdminPermission.DASHBOARD.value,

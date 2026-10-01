@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Card } from '../../components/common/Card';
 import { Badge } from '../../components/common/Badge';
 import { Loader } from '../../components/common/Loader';
@@ -79,6 +80,133 @@ function Toast({ toast, onDismiss }: { toast: ToastState; onDismiss: () => void 
     </div>
   );
 }
+
+/* ─── Edit User Role & Status Modal ─── */
+interface UserEditModalProps {
+  user: User;
+  onClose: () => void;
+  onSuccess: (msg: string) => void;
+}
+
+function UserEditModal({ user, onClose, onSuccess }: UserEditModalProps) {
+  const [role, setRole] = useState(user.role);
+  const [status, setStatus] = useState(user.status);
+  const [reason, setReason] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (role === user.role && status === user.status) {
+      onClose();
+      return;
+    }
+    setSubmitting(true);
+    setError('');
+
+    try {
+      if (status !== user.status) {
+        await api.patch(`/admin/users/${user.id}/status`, {
+          status,
+          reason: reason.trim() || undefined,
+        });
+      }
+      if (role !== user.role) {
+        await api.patch(`/admin/users/${user.id}/role`, {
+          role,
+          reason: reason.trim() || undefined,
+        });
+      }
+      onSuccess(`User ${user.name} updated successfully.`);
+      onClose();
+    } catch (err: any) {
+      setError(getApiErrorMessage(err, 'Failed to update user profile.'));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs">
+      <div className="bg-[#0f172a] border border-[#24314d] rounded-2xl w-full max-w-md shadow-2xl p-6 text-white">
+        <div className="flex items-center justify-between pb-4 border-b border-[#222c44]">
+          <h3 className="text-base font-bold text-white flex items-center gap-2">
+            <span>✏️ Edit User: {user.name}</span>
+          </h3>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-white p-1 rounded-lg hover:bg-[#1a233a] transition cursor-pointer"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {error && (
+          <div className="mt-4 p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-xs">
+            {error}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="mt-4 space-y-4">
+          <div>
+            <label className="block text-xs font-semibold text-gray-400 mb-1">Account Role</label>
+            <select
+              value={role}
+              onChange={(e) => setRole(e.target.value as any)}
+              className="w-full bg-[#161f33] border border-[#24314d] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500"
+            >
+              <option value="USER">USER (Regular Player)</option>
+              <option value="ADMIN">ADMIN (Staff / Operator)</option>
+              <option value="SUPER_ADMIN">SUPER_ADMIN (Full Control)</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-gray-400 mb-1">Account Status</label>
+            <select
+              value={status}
+              onChange={(e) => setStatus(e.target.value as any)}
+              className="w-full bg-[#161f33] border border-[#24314d] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500"
+            >
+              <option value="ACTIVE">ACTIVE</option>
+              <option value="SUSPENDED">SUSPENDED (Temporary restriction)</option>
+              <option value="DISABLED">DISABLED (Account terminated)</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-gray-400 mb-1">Reason for Update (Optional)</label>
+            <input
+              type="text"
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              placeholder="e.g. Verified by support, role elevation"
+              className="w-full bg-[#161f33] border border-[#24314d] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500"
+            />
+          </div>
+
+          <div className="flex items-center justify-end gap-3 pt-3 border-t border-[#222c44]">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 rounded-xl text-xs font-semibold text-gray-400 hover:text-white hover:bg-[#1a233a] transition cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={submitting || (status === user.status && role === user.role)}
+              className="px-4 py-2 rounded-xl text-xs font-bold bg-cyan-600 hover:bg-cyan-500 text-white transition disabled:opacity-40 cursor-pointer"
+            >
+              {submitting ? 'Saving...' : 'Save Changes'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 
 /* ─── Wallet Adjustment Modal ─── */
 interface AdjustModalProps {
@@ -441,17 +569,30 @@ function WalletAdjustModal({ user, currentBalancePaisa, onClose, onSuccess }: Ad
 export function AdminUsersPage() {
   const { user: adminUser } = useAuthStore();
   const isSuperAdmin = adminUser?.role === 'SUPER_ADMIN';
+  const canManageUsers = isSuperAdmin || Boolean(adminUser?.permissions?.includes('users')) || !adminUser?.permissions;
+  const canAdjustWallet = isSuperAdmin || Boolean(adminUser?.permissions?.includes('wallet')) || !adminUser?.permissions;
+  const canPerformActions = canManageUsers || canAdjustWallet;
 
+  const [searchParams, setSearchParams] = useSearchParams();
   const [users, setUsers] = useState<User[]>([]);
   const [totalUsers, setTotalUsers] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const { refreshing, runRefresh } = useRefreshIndicator();
 
-  // Filters & Search (BUG-026)
+  // Filters & Search (BUG-026 & URL sync)
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebouncedValue(search);
-  const [roleFilter, setRoleFilter] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
+  const [roleFilter, setRoleFilter] = useState(searchParams.get('role') || '');
+  const [statusFilter, setStatusFilter] = useState(searchParams.get('status') || '');
+
+  // Keep state synced with URL search params (e.g. sidebar navigation)
+  useEffect(() => {
+    const r = searchParams.get('role') || '';
+    const s = searchParams.get('status') || '';
+    setRoleFilter(r);
+    setStatusFilter(s);
+    setPage(1);
+  }, [searchParams]);
 
   // Pagination (BUG-018)
   const [page, setPage] = useState(1);
@@ -460,6 +601,7 @@ export function AdminUsersPage() {
   // Modal state
   const [adjustTarget, setAdjustTarget] = useState<User | null>(null);
   const [targetBalance, setTargetBalance] = useState<number | null>(null);
+  const [editingTarget, setEditingTarget] = useState<User | null>(null);
 
   // Toast state
   const [toast, setToast] = useState<ToastState | null>(null);
@@ -498,6 +640,7 @@ export function AdminUsersPage() {
     setSearch('');
     setRoleFilter('');
     setStatusFilter('');
+    setSearchParams({});
     setPage(1);
   };
 
@@ -625,13 +768,13 @@ export function AdminUsersPage() {
                   <th className="py-3 px-3">Status</th>
                   <th className="py-3 px-3 text-right">Balance</th>
                   <th className="py-3 px-3">Joined</th>
-                  {isSuperAdmin && <th className="py-3 px-3 text-right">Actions</th>}
+                  {canPerformActions && <th className="py-3 px-3 text-right">Actions</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-dark-800">
                 {users.length === 0 ? (
                   <tr>
-                    <td colSpan={isSuperAdmin ? 7 : 6} className="py-8 text-center text-gray-500">
+                    <td colSpan={canPerformActions ? 7 : 6} className="py-8 text-center text-gray-500">
                       No users match your criteria.
                     </td>
                   </tr>
@@ -677,17 +820,31 @@ export function AdminUsersPage() {
                       </td>
 
                       {/* Actions */}
-                      {isSuperAdmin && (
+                      {canPerformActions && (
                         <td className="py-3 px-3 text-right whitespace-nowrap">
-                          <button
-                            id={`adjust-wallet-${u.id}`}
-                            type="button"
-                            onClick={() => openAdjustModal(u)}
-                            className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-amber-500/15 text-amber-400 hover:bg-amber-500/30 border border-amber-500/30 transition-colors cursor-pointer"
-                            title={`Adjust wallet for ${u.name}`}
-                          >
-                            💰 Adjust Wallet
-                          </button>
+                          <div className="flex items-center justify-end gap-1.5">
+                            {canManageUsers && (
+                              <button
+                                type="button"
+                                onClick={() => setEditingTarget(u)}
+                                className="px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-cyan-500/15 text-cyan-400 hover:bg-cyan-500/30 border border-cyan-500/30 transition-colors cursor-pointer"
+                                title={`Edit role or status for ${u.name}`}
+                              >
+                                ✏️ Edit
+                              </button>
+                            )}
+                            {canAdjustWallet && (
+                              <button
+                                id={`adjust-wallet-${u.id}`}
+                                type="button"
+                                onClick={() => openAdjustModal(u)}
+                                className="px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-amber-500/15 text-amber-400 hover:bg-amber-500/30 border border-amber-500/30 transition-colors cursor-pointer"
+                                title={`Adjust wallet for ${u.name}`}
+                              >
+                                💰 Wallet
+                              </button>
+                            )}
+                          </div>
                         </td>
                       )}
                     </tr>
@@ -747,6 +904,18 @@ export function AdminUsersPage() {
           </div>
         )}
       </Card>
+
+      {/* Edit Role / Status Modal */}
+      {editingTarget && (
+        <UserEditModal
+          user={editingTarget}
+          onClose={() => setEditingTarget(null)}
+          onSuccess={(msg) => {
+            showToast(msg, 'success');
+            fetchUsers();
+          }}
+        />
+      )}
 
       {/* Wallet Adjustment Modal */}
       {adjustTarget && (

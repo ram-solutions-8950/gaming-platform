@@ -16,6 +16,8 @@ export interface User {
   last_login_at: string | null;
   avatar_url?: string | null;
   wallet_balance?: number;
+  team_role?: string | null;
+  permissions?: string[] | null;
 }
 
 export interface Wallet {
