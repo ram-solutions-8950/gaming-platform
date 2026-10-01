@@ -244,6 +244,8 @@ def spin(
     win_ref_id = f"triple777_{round_id}_win"
 
     with SPIN_LOCK:
+        stats = _get_user_stats(db, user.id)
+
         # 1. Debit wallet atomically
         try:
             wallet_service.debit_wallet(
@@ -269,8 +271,7 @@ def spin(
         jackpot_contribution = max(1, int(bet_paisa * 0.02))
         CURRENT_JACKPOT_PAISE += jackpot_contribution
 
-        # 2. Server-authoritative reel spin, capped at the house win ratio
-        stats = _get_user_stats(db, user.id)
+        # 2. Server-authoritative reel spin, capped at the house win ratio or admin override
         allow_win = _should_win(stats)
         reels = _build_reels(allow_win)
 
@@ -360,12 +361,12 @@ def spin(
         }
 
         # Keep the win-ratio counters in step with what actually settled.
-        if stats["spins"] % GAMES_PER_CYCLE == 0:
-            stats["cycle_wins"] = 0
         stats["spins"] += 1
         if won:
             stats["wins"] += 1
             stats["cycle_wins"] = stats.get("cycle_wins", 0) + 1
+        if stats["spins"] % GAMES_PER_CYCLE == 0:
+            stats["cycle_wins"] = 0
 
         if user.id not in USER_SPIN_HISTORY:
             USER_SPIN_HISTORY[user.id] = []
