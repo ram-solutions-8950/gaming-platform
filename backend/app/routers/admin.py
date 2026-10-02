@@ -25,7 +25,11 @@ from ..models.role import AdminPermission, PERMISSION_DETAILS, DEFAULT_ROLE_PERM
 from ..models.winning import UserWinningControl, WinMode
 from ..models.wager import WagerRequirement
 from ..models.audit_log import AuditLog
-from ..services import wallet_service, audit_service, withdrawal_service, reward_service, wager_service, winning_service
+from ..models.support import SupportTicket, SupportTicketStatus
+from ..models.payment_gateway import PaymentGatewayConfig
+from ..models.system_settings import SystemSetting
+from ..models.refresh_token import RefreshToken
+from ..services import wallet_service, audit_service, withdrawal_service, reward_service, wager_service, winning_service, support_service
 from ..security.password import hash_password
 from ..schemas.reward import (
     LuckySpinSegmentUpdateIn,
@@ -65,6 +69,52 @@ class TeamMemberUpdateIn(BaseModel):
 class WagerCreateIn(BaseModel):
     user_id: UUID
     required_amount_inr: float = Field(gt=0)
+
+
+class WagerGlobalUpdateIn(BaseModel):
+    multiplier: float = Field(ge=0.0, le=100.0)
+    default_user_wager_inr: Optional[float] = 0.0
+
+
+class WagerApplyAllIn(BaseModel):
+    required_amount_inr: float = Field(gt=0)
+
+
+class WagerUpdateIn(BaseModel):
+    required_amount_inr: Optional[float] = Field(default=None, ge=0)
+    completed_amount_inr: Optional[float] = Field(default=None, ge=0)
+    is_fulfilled: Optional[bool] = None
+
+
+class SupportTicketUpdateIn(BaseModel):
+    status: str
+    admin_reply: Optional[str] = None
+
+
+class PaymentGatewayUpdateIn(BaseModel):
+    display_name: Optional[str] = None
+    api_key: Optional[str] = None
+    api_secret: Optional[str] = None
+    webhook_secret: Optional[str] = None
+    is_sandbox: Optional[bool] = None
+    is_active: Optional[bool] = None
+
+
+class SupportConfigUpdateIn(BaseModel):
+    whatsapp_vip: Optional[str] = None
+    whatsapp_url: Optional[str] = None
+    support_email: Optional[str] = None
+    helpline_number: Optional[str] = None
+    working_hours: Optional[str] = None
+    faqs: Optional[List[Dict[str, Any]]] = None
+
+
+class AppVersionUpdateIn(BaseModel):
+    latest_version: str
+    min_version: Optional[str] = None
+    download_url: Optional[str] = None
+    release_notes: Optional[str] = None
+    force_update: Optional[bool] = False
 
 
 class WinningGlobalUpdateIn(BaseModel):
@@ -504,6 +554,47 @@ def update_user_role(
     return success_response(UserOut.model_validate(user).model_dump())
 
 
+class AdminUserPasswordUpdateIn(BaseModel):
+    new_password: str = Field(min_length=6, max_length=128)
+
+
+@router.put("/users/{user_id}/password")
+def update_user_password(
+    user_id: UUID,
+    data: AdminUserPasswordUpdateIn,
+    admin: User = Depends(require_permission(AdminPermission.USERS.value)),
+    db: Session = Depends(get_db),
+):
+    """Admin manually sets or resets a player user's password."""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        return error_response("NOT_FOUND", "User not found", status_code=404)
+
+    user.password_hash = hash_password(data.new_password)
+    user.updated_at = datetime.now(timezone.utc)
+
+    # Invalidate existing active refresh tokens so any stolen sessions are revoked
+    db.query(RefreshToken).filter(RefreshToken.user_id == user.id).update({"is_revoked": True})
+
+    audit_service.log_action(
+        db,
+        action="USER_PASSWORD_RESET",
+        actor_id=admin.id,
+        entity_type="user",
+        entity_id=str(user_id),
+        metadata={
+            "target_user": user.username,
+            "target_name": user.name,
+            "reset_by_admin": admin.username,
+        },
+    )
+    db.commit()
+    return success_response({
+        "message": f"Password for @{user.username} has been updated successfully",
+        "user_id": str(user.id),
+    })
+
+
 # -- Transactions ---------------------------------------------------------------
 @router.get("/transactions")
 def list_all_transactions(
@@ -601,6 +692,104 @@ def list_all_deposits(
     return success_response({
         "total": total, "page": page, "page_size": page_size,
         "items": out_items,
+    })
+
+
+@router.post("/deposits/{deposit_id}/approve")
+def approve_deposit_endpoint(
+    deposit_id: UUID,
+    admin: User = Depends(require_permission(AdminPermission.DEPOSITS.value)),
+    db: Session = Depends(get_db),
+):
+    """Admin manually verifies and approves a player deposit, crediting the balance."""
+    dep = db.query(Deposit).filter(Deposit.id == deposit_id).first()
+    if not dep:
+        return error_response("NOT_FOUND", "Deposit not found", status_code=404)
+    if dep.status == DepositStatus.SUCCESS:
+        return error_response("ALREADY_PROCESSED", "Deposit is already approved", status_code=400)
+
+    dep.status = DepositStatus.SUCCESS
+    dep.updated_at = datetime.now(timezone.utc)
+
+    # 1. Credit player wallet
+    wallet_service.credit_wallet(
+        db,
+        user_id=dep.user_id,
+        amount=dep.amount,
+        tx_type=WalletTransactionType.DEPOSIT,
+        reference_type="deposit",
+        reference_id=str(dep.id),
+        metadata={"description": f"Deposit approved by {admin.name or admin.username}"},
+    )
+
+    # 2. Apply global wager multiplier
+    w_setting = db.query(SystemSetting).filter(SystemSetting.key == "global_wager_settings").first()
+    multiplier = 1.0
+    if w_setting and w_setting.value:
+        multiplier = float(w_setting.value.get("multiplier", 1.0))
+    required_wager = int(dep.amount * multiplier)
+    wager_service.create_wager_requirement(db, dep.user_id, required_wager, deposit_id=dep.id)
+
+    # 3. Audit log
+    audit_service.log_action(
+        db,
+        action="DEPOSIT_APPROVE",
+        actor_id=admin.id,
+        entity_type="deposit",
+        entity_id=str(dep.id),
+        metadata={
+            "amount_paise": dep.amount,
+            "amount_inr": dep.amount / 100,
+            "user_id": str(dep.user_id),
+            "wager_multiplier": multiplier,
+            "required_wager_inr": required_wager / 100,
+            "approved_by": admin.username,
+        },
+    )
+    db.commit()
+    return success_response({
+        "message": f"Deposit of ₹{dep.amount / 100:.2f} approved and credited successfully",
+        "deposit_id": str(dep.id),
+        "status": "SUCCESS",
+    })
+
+
+@router.post("/deposits/{deposit_id}/reject")
+def reject_deposit_endpoint(
+    deposit_id: UUID,
+    body: Optional[WithdrawalActionIn] = None,
+    admin: User = Depends(require_permission(AdminPermission.DEPOSITS.value)),
+    db: Session = Depends(get_db),
+):
+    """Admin marks a deposit as rejected / failed."""
+    dep = db.query(Deposit).filter(Deposit.id == deposit_id).first()
+    if not dep:
+        return error_response("NOT_FOUND", "Deposit not found", status_code=404)
+    if dep.status == DepositStatus.SUCCESS:
+        return error_response("ALREADY_PROCESSED", "Cannot reject an already approved deposit", status_code=400)
+
+    reason = (body.reason if body else None) or "Rejected by administrator"
+    dep.status = DepositStatus.FAILED
+    dep.updated_at = datetime.now(timezone.utc)
+
+    audit_service.log_action(
+        db,
+        action="DEPOSIT_REJECT",
+        actor_id=admin.id,
+        entity_type="deposit",
+        entity_id=str(dep.id),
+        metadata={
+            "amount_paise": dep.amount,
+            "user_id": str(dep.user_id),
+            "reason": reason,
+            "rejected_by": admin.username,
+        },
+    )
+    db.commit()
+    return success_response({
+        "message": "Deposit marked as rejected",
+        "deposit_id": str(dep.id),
+        "status": "FAILED",
     })
 
 
@@ -1572,6 +1761,145 @@ def waive_user_wagers(
     return success_response({"message": f"Waived {count} pending wager requirements"})
 
 
+@router.get("/wagers/global")
+def get_global_wager_config(
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """Retrieve global turnover multiplier and baseline playthrough policy."""
+    row = db.query(SystemSetting).filter(SystemSetting.key == "global_wager_settings").first()
+    data = {"multiplier": 1.0, "default_user_wager_inr": 0.0}
+    if row and row.value:
+        data.update(row.value)
+    return success_response(data)
+
+
+@router.put("/wagers/global")
+def update_global_wager_config(
+    payload: WagerGlobalUpdateIn,
+    admin: User = Depends(require_permission(AdminPermission.WAGER_CONTROL.value)),
+    db: Session = Depends(get_db),
+):
+    """Update global turnover multiplier applied to all player deposits."""
+    row = db.query(SystemSetting).filter(SystemSetting.key == "global_wager_settings").first()
+    new_data = {
+        "multiplier": round(payload.multiplier, 2),
+        "default_user_wager_inr": round(payload.default_user_wager_inr or 0.0, 2),
+    }
+    if not row:
+        row = SystemSetting(
+            key="global_wager_settings",
+            value=new_data,
+            description="Global deposit playthrough multiplier",
+        )
+        db.add(row)
+    else:
+        row.value = new_data
+        row.updated_at = datetime.now(timezone.utc)
+
+    audit_service.log_action(
+        db,
+        action="GLOBAL_WAGER_UPDATE",
+        actor_id=admin.id,
+        entity_type="system_setting",
+        entity_id="global_wager_settings",
+        metadata=new_data,
+    )
+    db.commit()
+    return success_response(new_data)
+
+
+@router.post("/wagers/apply-all")
+def apply_wager_to_all_users(
+    payload: WagerApplyAllIn,
+    admin: User = Depends(require_permission(AdminPermission.WAGER_CONTROL.value)),
+    db: Session = Depends(get_db),
+):
+    """Apply a baseline playthrough requirement to ALL registered player accounts."""
+    amount_paise = int(payload.required_amount_inr * 100)
+    users = db.query(User).filter(User.role == UserRole.USER, User.status == UserStatus.ACTIVE).all()
+    count = 0
+    for u in users:
+        wager_service.admin_set_user_wager(db, u.id, amount_paise)
+        count += 1
+
+    audit_service.log_action(
+        db,
+        action="GLOBAL_WAGER_APPLY_ALL",
+        actor_id=admin.id,
+        entity_type="wager_bulk",
+        entity_id="all_users",
+        metadata={"amount_inr": payload.required_amount_inr, "user_count": count},
+    )
+    db.commit()
+    return success_response({
+        "message": f"Applied ₹{payload.required_amount_inr:.2f} wager requirement to {count} player accounts",
+        "applied_count": count,
+    })
+
+
+@router.put("/wagers/{wager_id}")
+def update_individual_wager(
+    wager_id: UUID,
+    payload: WagerUpdateIn,
+    admin: User = Depends(require_permission(AdminPermission.WAGER_CONTROL.value)),
+    db: Session = Depends(get_db),
+):
+    """Edit, increase, or decrease a specific player's wager requirement."""
+    req = db.query(WagerRequirement).filter(WagerRequirement.id == wager_id).first()
+    if not req:
+        return error_response(404, "Wager requirement not found")
+
+    old_req = req.required_amount
+    old_comp = req.completed_amount
+
+    if payload.required_amount_inr is not None:
+        req.required_amount = int(payload.required_amount_inr * 100)
+    if payload.completed_amount_inr is not None:
+        req.completed_amount = int(payload.completed_amount_inr * 100)
+    if payload.is_fulfilled is not None:
+        req.is_fulfilled = payload.is_fulfilled
+
+    # Auto-fulfill if completed exceeds or meets required
+    if req.completed_amount >= req.required_amount and req.required_amount > 0:
+        req.is_fulfilled = True
+    elif req.completed_amount < req.required_amount and payload.is_fulfilled is None:
+        req.is_fulfilled = False
+
+    req.updated_at = datetime.now(timezone.utc)
+
+    audit_service.log_action(
+        db,
+        action="WAGER_UPDATE",
+        actor_id=admin.id,
+        entity_type="wager_requirement",
+        entity_id=str(req.id),
+        metadata={
+            "user_id": str(req.user_id),
+            "old_required": old_req / 100,
+            "new_required": req.required_amount / 100,
+            "old_completed": old_comp / 100,
+            "new_completed": req.completed_amount / 100,
+            "is_fulfilled": req.is_fulfilled,
+        },
+    )
+    db.commit()
+    db.refresh(req)
+
+    rem_p = max(0, int(req.required_amount) - int(req.completed_amount))
+    prog = 100.0 if req.required_amount == 0 else round(min(100.0, (req.completed_amount / req.required_amount) * 100), 1)
+
+    return success_response({
+        "id": str(req.id),
+        "user_id": str(req.user_id),
+        "required_amount_inr": round(req.required_amount / 100, 2),
+        "completed_amount_inr": round(req.completed_amount / 100, 2),
+        "remaining_amount_inr": round(rem_p / 100, 2),
+        "progress_percent": prog,
+        "is_fulfilled": req.is_fulfilled,
+    })
+
+
 # -- Winning & RTP Controls ----------------------------------------------------
 @router.get("/winning-controls/global")
 def get_global_winning_controls(
@@ -1648,16 +1976,34 @@ def delete_personal_winning_control(
 # -- Audit Logs Endpoint -------------------------------------------------------
 @router.get("/audit-logs")
 def list_audit_logs(
-    admin: User = Depends(require_permission(AdminPermission.RBAC.value)),
+    admin: User = Depends(require_permission(AdminPermission.AUDIT_LOGS.value)),
     db: Session = Depends(get_db),
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
     action: Optional[str] = Query(default=None),
     entity_type: Optional[str] = Query(default=None),
     search: Optional[str] = Query(default=None),
+    admin_only: bool = Query(default=True),
 ):
-    """Retrieve paginated platform audit logs with actor and entity details."""
+    """Retrieve paginated platform audit logs with actor and entity details. Defaults to admin operations."""
     query = db.query(AuditLog, User).outerjoin(User, AuditLog.actor_id == User.id)
+
+    if admin_only:
+        # Prioritize administrative operations: audits performed by staff or system config/approval events
+        query = query.filter(
+            or_(
+                User.role.in_([UserRole.ADMIN, UserRole.SUPER_ADMIN]),
+                AuditLog.action.ilike("%APPROVE%"),
+                AuditLog.action.ilike("%REJECT%"),
+                AuditLog.action.ilike("%CONFIG%"),
+                AuditLog.action.ilike("%WAGER%"),
+                AuditLog.action.ilike("%SETTING%"),
+                AuditLog.action.ilike("%PASSWORD%"),
+                AuditLog.action.ilike("%WALLET%"),
+                AuditLog.action.ilike("%ROLE%"),
+                AuditLog.action.ilike("%STATUS%"),
+            )
+        )
 
     if action and action.strip():
         query = query.filter(AuditLog.action.ilike(f"%{action.strip()}%"))
@@ -1790,65 +2136,275 @@ def get_admin_notifications(
 
 
 # -- Support Channels & Contact Config -----------------------------------------
-SUPPORT_CONFIG = {
-    "whatsapp_vip": "+91 98765 43210",
-    "whatsapp_url": "https://wa.me/919876543210",
-    "telegram_handle": "@Corona888Support",
-    "telegram_channel": "https://t.me/Corona888Support",
-    "support_email": "support@corona888.tech",
-    "helpline_number": "1800-888-2026",
-    "working_hours": "24/7 Live Support",
-    "faqs": [
-        {
-            "id": "faq-1",
-            "question": "How long does a withdrawal take to credit?",
-            "answer": "Withdrawals are reviewed by financial operators within 15-30 minutes and transferred instantly via IMPS/UPI.",
-        },
-        {
-            "id": "faq-2",
-            "question": "My deposit is not reflecting in my balance. What to do?",
-            "answer": "If a bank transfer or UPI payment takes longer than 5 minutes, send your 12-digit UTR number directly to VIP Support for immediate manual verification.",
-        },
-        {
-            "id": "faq-3",
-            "question": "What are the wagering requirements before withdrawal?",
-            "answer": "Deposits require 1x wagering. Promotional bonuses require custom wagering as displayed in the Wager settings.",
-        },
-    ],
-}
-
-
-class SupportConfigUpdateIn(BaseModel):
-    whatsapp_vip: Optional[str] = None
-    whatsapp_url: Optional[str] = None
-    telegram_handle: Optional[str] = None
-    telegram_channel: Optional[str] = None
-    support_email: Optional[str] = None
-    helpline_number: Optional[str] = None
-    working_hours: Optional[str] = None
-    faqs: Optional[List[Dict[str, Any]]] = None
-
-
 @router.get("/support/config")
-def get_support_config(admin: User = Depends(require_admin)):
+def get_support_config_endpoint(
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
     """Return platform support channels, helpline details, and FAQ items."""
-    return success_response(SUPPORT_CONFIG)
+    return success_response(support_service.get_support_config(db))
 
 
 @router.put("/support/config")
-def update_support_config(
+def update_support_config_endpoint(
     data: SupportConfigUpdateIn,
+    admin: User = Depends(require_permission(AdminPermission.SUPPORT.value)),
+    db: Session = Depends(get_db),
+):
+    """Update customer support channels, WhatsApp number, email, and FAQs."""
+    update_data = data.model_dump(exclude_none=True)
+    cfg = support_service.update_support_config(db, update_data, admin.id)
+    return success_response(cfg)
+
+
+# -- Support Helpdesk Tickets --------------------------------------------------
+@router.get("/support/tickets")
+def list_support_tickets(
+    admin: User = Depends(require_permission(AdminPermission.SUPPORT.value)),
+    db: Session = Depends(get_db),
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, ge=1, le=100),
+    status: Optional[str] = Query(default=None),
+    category: Optional[str] = Query(default=None),
+    search: Optional[str] = Query(default=None),
+):
+    """Retrieve paginated player support tickets with filters and search."""
+    data = support_service.admin_list_tickets(
+        db, page=page, page_size=page_size, status=status, category=category, search=search
+    )
+    return success_response(data)
+
+
+@router.patch("/support/tickets/{ticket_id}")
+def update_support_ticket(
+    ticket_id: UUID,
+    payload: SupportTicketUpdateIn,
+    admin: User = Depends(require_permission(AdminPermission.SUPPORT.value)),
+    db: Session = Depends(get_db),
+):
+    """Update ticket status (OPEN, IN_PROGRESS, RESOLVED, CLOSED) and write admin response."""
+    try:
+        t = support_service.admin_update_ticket(
+            db,
+            ticket_id=ticket_id,
+            status=payload.status,
+            admin_reply=payload.admin_reply,
+            admin=admin,
+        )
+        return success_response({
+            "id": str(t.id),
+            "ticket_number": t.ticket_number,
+            "status": t.status.value,
+            "admin_reply": t.admin_reply,
+            "updated_at": t.updated_at.isoformat() if t.updated_at else None,
+        })
+    except ValueError as e:
+        return error_response(404, str(e))
+
+
+# -- Payment Gateways Switchable Control (Cashfree & Razorpay) -----------------
+@router.get("/payment-gateways")
+def list_payment_gateways(
+    admin: User = Depends(require_permission(AdminPermission.PAYMENT_GATEWAYS.value)),
+    db: Session = Depends(get_db),
+):
+    """List online payment gateways (Cashfree & Razorpay) with active status and settings."""
+    gateways = db.query(PaymentGatewayConfig).all()
+    if not gateways:
+        cf = PaymentGatewayConfig(
+            gateway_name="cashfree",
+            display_name="Cashfree Payments",
+            is_active=False,
+            api_key="",
+            api_secret="",
+            webhook_secret="",
+            is_sandbox=True,
+        )
+        rz = PaymentGatewayConfig(
+            gateway_name="razorpay",
+            display_name="Razorpay Standard PG",
+            is_active=True,
+            api_key="",
+            api_secret="",
+            webhook_secret="",
+            is_sandbox=True,
+        )
+        db.add_all([cf, rz])
+        db.commit()
+        gateways = [cf, rz]
+
+    result = []
+    for g in gateways:
+        sec = g.api_secret or ""
+        masked_sec = (sec[:4] + "*" * (len(sec) - 8) + sec[-4:]) if len(sec) > 8 else ("****" if sec else "")
+        wh = g.webhook_secret or ""
+        masked_wh = (wh[:4] + "*" * (len(wh) - 8) + wh[-4:]) if len(wh) > 8 else ("****" if wh else "")
+
+        result.append({
+            "id": str(g.id),
+            "gateway_name": g.gateway_name,
+            "display_name": g.display_name,
+            "is_active": g.is_active,
+            "api_key": g.api_key or "",
+            "api_secret": masked_sec,
+            "has_secret": bool(g.api_secret),
+            "webhook_secret": masked_wh,
+            "is_sandbox": g.is_sandbox,
+            "updated_at": g.updated_at.isoformat() if g.updated_at else None,
+        })
+    return success_response(result)
+
+
+@router.put("/payment-gateways/{gateway_name}")
+def update_payment_gateway(
+    gateway_name: str,
+    payload: PaymentGatewayUpdateIn,
+    admin: User = Depends(require_permission(AdminPermission.PAYMENT_GATEWAYS.value)),
+    db: Session = Depends(get_db),
+):
+    """Configure API key, secret, sandbox mode, and active state for Cashfree / Razorpay."""
+    gname = gateway_name.lower().strip()
+    g = db.query(PaymentGatewayConfig).filter(PaymentGatewayConfig.gateway_name == gname).first()
+    if not g:
+        g = PaymentGatewayConfig(
+            gateway_name=gname,
+            display_name="Cashfree Payments" if gname == "cashfree" else "Razorpay Standard PG",
+            is_active=False,
+        )
+        db.add(g)
+
+    if payload.display_name is not None:
+        g.display_name = payload.display_name
+    if payload.api_key is not None:
+        g.api_key = payload.api_key.strip()
+    if payload.api_secret is not None and not payload.api_secret.startswith("*"):
+        g.api_secret = payload.api_secret.strip()
+    if payload.webhook_secret is not None and not payload.webhook_secret.startswith("*"):
+        g.webhook_secret = payload.webhook_secret.strip()
+    if payload.is_sandbox is not None:
+        g.is_sandbox = payload.is_sandbox
+    if payload.is_active is not None and payload.is_active:
+        # Guarantee only one gateway is active
+        db.query(PaymentGatewayConfig).filter(PaymentGatewayConfig.id != g.id).update({"is_active": False})
+        g.is_active = True
+
+    g.updated_at = datetime.now(timezone.utc)
+    audit_service.log_action(
+        db,
+        action="PAYMENT_GATEWAY_CONFIG_UPDATE",
+        actor_id=admin.id,
+        entity_type="payment_gateway",
+        entity_id=g.gateway_name,
+        metadata={
+            "gateway": g.gateway_name,
+            "is_active": g.is_active,
+            "is_sandbox": g.is_sandbox,
+            "has_key": bool(g.api_key),
+            "has_secret": bool(g.api_secret),
+        },
+    )
+    db.commit()
+    db.refresh(g)
+    return success_response({
+        "gateway_name": g.gateway_name,
+        "display_name": g.display_name,
+        "is_active": g.is_active,
+        "is_sandbox": g.is_sandbox,
+        "message": f"{g.display_name} settings saved successfully",
+    })
+
+
+@router.post("/payment-gateways/{gateway_name}/activate")
+def activate_payment_gateway(
+    gateway_name: str,
+    admin: User = Depends(require_permission(AdminPermission.PAYMENT_GATEWAYS.value)),
+    db: Session = Depends(get_db),
+):
+    """Switch the platform's active payment gateway to Cashfree or Razorpay."""
+    gname = gateway_name.lower().strip()
+    target = db.query(PaymentGatewayConfig).filter(PaymentGatewayConfig.gateway_name == gname).first()
+    if not target:
+        target = PaymentGatewayConfig(
+            gateway_name=gname,
+            display_name="Cashfree Payments" if gname == "cashfree" else "Razorpay Standard PG",
+            is_active=True,
+        )
+        db.add(target)
+
+    # Deactivate all and activate target
+    db.query(PaymentGatewayConfig).update({"is_active": False})
+    target.is_active = True
+    target.updated_at = datetime.now(timezone.utc)
+
+    audit_service.log_action(
+        db,
+        action="PAYMENT_GATEWAY_SWITCH",
+        actor_id=admin.id,
+        entity_type="payment_gateway",
+        entity_id=target.gateway_name,
+        metadata={"activated_gateway": target.gateway_name},
+    )
+    db.commit()
+    return success_response({
+        "message": f"Active payment gateway switched to {target.display_name}",
+        "active_gateway": target.gateway_name,
+    })
+
+
+# -- System App Version Management ---------------------------------------------
+@router.get("/system/app-version")
+def get_admin_app_version(
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """Retrieve app version settings."""
+    row = db.query(SystemSetting).filter(SystemSetting.key == "app_version_config").first()
+    data = {
+        "latest_version": "0.0.81",
+        "min_version": "0.0.70",
+        "download_url": "/Corona888.apk",
+        "release_notes": "Added instant payment gateways, live Dragon & Tiger controls, and in-app support helpdesk.",
+        "force_update": False,
+    }
+    if row and row.value:
+        data.update(row.value)
+    return success_response(data)
+
+
+@router.put("/system/app-version")
+def update_admin_app_version(
+    payload: AppVersionUpdateIn,
     admin: User = Depends(require_permission(AdminPermission.SETTINGS.value)),
     db: Session = Depends(get_db),
 ):
-    """Update customer support channels and FAQs."""
-    update_data = data.model_dump(exclude_none=True)
-    SUPPORT_CONFIG.update(update_data)
+    """Update latest released APK version for in-app update prompts."""
+    row = db.query(SystemSetting).filter(SystemSetting.key == "app_version_config").first()
+    data = {
+        "latest_version": payload.latest_version.strip(),
+        "min_version": (payload.min_version or "0.0.70").strip(),
+        "download_url": (payload.download_url or "/Corona888.apk").strip(),
+        "release_notes": payload.release_notes or "Latest security updates and bug fixes.",
+        "force_update": bool(payload.force_update),
+    }
+    if not row:
+        row = SystemSetting(
+            key="app_version_config",
+            value=data,
+            description="Latest mobile APK version and release notes",
+        )
+        db.add(row)
+    else:
+        row.value = data
+        row.updated_at = datetime.now(timezone.utc)
+
     audit_service.log_action(
-        db, action="SUPPORT_CONFIG_UPDATE", actor_id=admin.id,
-        entity_type="support_configuration", entity_id="default",
-        metadata=update_data,
+        db,
+        action="APP_VERSION_UPDATE",
+        actor_id=admin.id,
+        entity_type="system_setting",
+        entity_id="app_version_config",
+        metadata=data,
     )
     db.commit()
-    return success_response(SUPPORT_CONFIG)
+    return success_response(data)
 

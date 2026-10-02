@@ -8,8 +8,9 @@ import { RefreshOverlay } from '../../components/common/RefreshOverlay';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import { useRefreshIndicator } from '../../hooks/useRefreshIndicator';
 import { gameService } from '../../services/game';
+import { adminService } from '../../services/adminService';
 import type { GameRoundAdmin, GameBet, PaginatedResult } from '../../types';
-import { RefreshCw, ChevronLeft, ChevronRight, Filter, RotateCcw } from 'lucide-react';
+import { RefreshCw, ChevronLeft, ChevronRight, Filter, RotateCcw, Flame } from 'lucide-react';
 
 function paiseToRupees(p: number | undefined | null): string {
   if (typeof p !== 'number') return '0.00';
@@ -41,10 +42,15 @@ export function AdminGameControlPage() {
   const [loadingRounds, setLoadingRounds] = useState(true);
   const [loadingBets, setLoadingBets] = useState(false);
   const { refreshing, runRefresh } = useRefreshIndicator();
+
+  // Live game engines status
+  const [liveStatuses, setLiveStatuses] = useState<any>(null);
+
   // Filters & Pagination for Rounds
   const [searchRound, setSearchRound] = useState('');
   const debouncedSearchRound = useDebouncedValue(searchRound);
   const [statusFilter, setStatusFilter] = useState('');
+  const [gameFilter, setGameFilter] = useState('');
   const [roundPage, setRoundPage] = useState(1);
   const roundPageSize = 10;
 
@@ -52,12 +58,27 @@ export function AdminGameControlPage() {
   const [betPage, setBetPage] = useState(1);
   const betPageSize = 20;
 
+  const fetchLiveStatuses = useCallback(async () => {
+    try {
+      const data = await adminService.getLiveGameStatuses();
+      if (data) setLiveStatuses(data);
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchLiveStatuses();
+    const interval = setInterval(fetchLiveStatuses, 4000);
+    return () => clearInterval(interval);
+  }, [fetchLiveStatuses]);
+
   const fetchRounds = useCallback(async () => {
     try {
       const data = await gameService.getAdminRounds(
         roundPage,
         roundPageSize,
-        undefined,
+        gameFilter || undefined,
         statusFilter || undefined,
         debouncedSearchRound.trim() || undefined
       );
@@ -67,7 +88,7 @@ export function AdminGameControlPage() {
     } finally {
       setLoadingRounds(false);
     }
-  }, [roundPage, statusFilter, debouncedSearchRound]);
+  }, [roundPage, statusFilter, gameFilter, debouncedSearchRound]);
 
   const fetchBets = useCallback(async (roundId: string, page = 1) => {
     setLoadingBets(true);
@@ -99,19 +120,22 @@ export function AdminGameControlPage() {
     const fresh = rounds.items.find((r) => r.id === selectedRound);
     if (fresh) setSelectedRoundObj(fresh);
   }, [rounds, selectedRound]);
+
   const handleRefresh = () =>
     runRefresh(async () => {
       await Promise.all([
+        fetchLiveStatuses(),
         fetchRounds(),
         selectedRound ? fetchBets(selectedRound, betPage) : Promise.resolve(),
       ]);
     });
 
-  const filtersActive = Boolean(searchRound || statusFilter);
+  const filtersActive = Boolean(searchRound || statusFilter || gameFilter);
 
   const handleResetFilters = () => {
     setSearchRound('');
     setStatusFilter('');
+    setGameFilter('');
     setRoundPage(1);
   };
 
@@ -120,16 +144,40 @@ export function AdminGameControlPage() {
 
   const renderResultBadge = (r: GameRoundAdmin) => {
     if (r.status === 'BETTING') {
-      return <span className="text-yellow-400 text-xs font-semibold">Active...</span>;
+      return (
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+          <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping"></span>
+          <span>BETTING</span>
+        </span>
+      );
     }
     if (r.status === 'CALCULATING') {
-      return <span className="text-blue-400 text-xs font-semibold">Calculating...</span>;
+      return <span className="text-cyan-400 text-xs font-semibold">Calculating...</span>;
     }
+
     if (r.result_data && typeof r.result_data === 'object') {
-      if (r.result_data.winner) {
+      const winner = r.result_data.result || r.result_data.winner;
+      if (winner) {
+        const isDragon = winner === 'DRAGON';
+        const isTiger = winner === 'TIGER';
+        const isTie = winner === 'TIE';
+        const badgeClass = isDragon
+          ? 'bg-rose-900/60 text-rose-300 border-rose-600/50'
+          : isTiger
+          ? 'bg-amber-900/60 text-amber-300 border-amber-600/50'
+          : isTie
+          ? 'bg-emerald-900/60 text-emerald-300 border-emerald-600/50'
+          : 'bg-purple-900/50 text-purple-300 border-purple-700/50';
+
+        const icon = isDragon ? '🐉 ' : isTiger ? '🐯 ' : isTie ? '🤝 ' : '';
+        const cardDetails =
+          r.result_data.dragon_card && r.result_data.tiger_card
+            ? ` [${r.result_data.dragon_card.value || ''}${r.result_data.dragon_card.suit || ''} vs ${r.result_data.tiger_card.value || ''}${r.result_data.tiger_card.suit || ''}]`
+            : '';
+
         return (
-          <span className="px-2 py-0.5 rounded text-xs font-bold bg-purple-900/50 text-purple-300 border border-purple-700/50">
-            {r.result_data.winner}
+          <span className={`px-2 py-0.5 rounded text-xs font-bold border ${badgeClass} inline-flex items-center gap-1`}>
+            <span>{icon}{winner}{cardDetails}</span>
           </span>
         );
       }
@@ -181,6 +229,133 @@ export function AdminGameControlPage() {
         </button>
       </div>
 
+      {/* Real-Time Game Engines Status Banner */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Dragon Tiger */}
+        <div className="bg-[#111726] border border-rose-500/30 rounded-2xl p-4 shadow-lg relative overflow-hidden">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-black text-rose-400 flex items-center gap-1.5">
+              <span>🐉 🐯</span> Dragon vs Tiger
+            </span>
+            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+              liveStatuses?.dragon_tiger?.status === 'BETTING'
+                ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 animate-pulse'
+                : 'bg-gray-500/20 text-gray-300'
+            }`}>
+              {liveStatuses?.dragon_tiger?.status || 'ONLINE'}
+            </span>
+          </div>
+          <div className="mt-2.5">
+            <div className="flex items-baseline justify-between">
+              <span className="text-[11px] text-gray-400">Current Round:</span>
+              <span className="text-sm font-black text-white font-mono">
+                #{liveStatuses?.dragon_tiger?.current_round_number ?? '—'}
+              </span>
+            </div>
+            <div className="flex items-baseline justify-between mt-1">
+              <span className="text-[11px] text-gray-400">Last Outcome:</span>
+              <span className="text-xs font-bold text-amber-300 font-mono">
+                {liveStatuses?.dragon_tiger?.last_result?.winner
+                  ? `${liveStatuses.dragon_tiger.last_result.winner} (${liveStatuses.dragon_tiger.last_result.dragon_card?.value || ''} vs ${liveStatuses.dragon_tiger.last_result.tiger_card?.value || ''})`
+                  : 'Pending'}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Colour Prediction */}
+        <div className="bg-[#111726] border border-cyan-500/30 rounded-2xl p-4 shadow-lg relative overflow-hidden">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-black text-cyan-400 flex items-center gap-1.5">
+              <span>🔴 🟢</span> Colour Prediction
+            </span>
+            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+              liveStatuses?.colour_prediction?.status === 'BETTING'
+                ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 animate-pulse'
+                : 'bg-gray-500/20 text-gray-300'
+            }`}>
+              {liveStatuses?.colour_prediction?.status || 'ONLINE'}
+            </span>
+          </div>
+          <div className="mt-2.5">
+            <div className="flex items-baseline justify-between">
+              <span className="text-[11px] text-gray-400">Current Period:</span>
+              <span className="text-sm font-black text-white font-mono">
+                #{liveStatuses?.colour_prediction?.current_round_number ?? '—'}
+              </span>
+            </div>
+            <div className="flex items-baseline justify-between mt-1">
+              <span className="text-[11px] text-gray-400">Last Color:</span>
+              <span className="text-xs font-bold text-emerald-400 font-mono">
+                {liveStatuses?.colour_prediction?.last_result?.result_color || 'GREEN (7)'}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Andar Bahar */}
+        <div className="bg-[#111726] border border-amber-500/30 rounded-2xl p-4 shadow-lg relative overflow-hidden">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-black text-amber-400 flex items-center gap-1.5">
+              <span>🃏</span> Andar Bahar
+            </span>
+            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+              liveStatuses?.andar_bahar?.status === 'BETTING'
+                ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 animate-pulse'
+                : 'bg-gray-500/20 text-gray-300'
+            }`}>
+              {liveStatuses?.andar_bahar?.status || 'ONLINE'}
+            </span>
+          </div>
+          <div className="mt-2.5">
+            <div className="flex items-baseline justify-between">
+              <span className="text-[11px] text-gray-400">Current Round:</span>
+              <span className="text-sm font-black text-white font-mono">
+                #{liveStatuses?.andar_bahar?.current_round_number ?? '—'}
+              </span>
+            </div>
+            <div className="flex items-baseline justify-between mt-1">
+              <span className="text-[11px] text-gray-400">Last Winner:</span>
+              <span className="text-xs font-bold text-purple-300 font-mono">
+                {liveStatuses?.andar_bahar?.last_result?.winner || 'ANDAR'}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Aviator */}
+        <div className="bg-[#111726] border border-purple-500/30 rounded-2xl p-4 shadow-lg relative overflow-hidden">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-black text-purple-400 flex items-center gap-1.5">
+              <span>🚀</span> Aviator Crash
+            </span>
+            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+              liveStatuses?.aviator?.status === 'FLYING' || liveStatuses?.aviator?.status === 'BETTING'
+                ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 animate-pulse'
+                : 'bg-gray-500/20 text-gray-300'
+            }`}>
+              {liveStatuses?.aviator?.status || 'ONLINE'}
+            </span>
+          </div>
+          <div className="mt-2.5">
+            <div className="flex items-baseline justify-between">
+              <span className="text-[11px] text-gray-400">Current Round:</span>
+              <span className="text-sm font-black text-white font-mono">
+                #{liveStatuses?.aviator?.current_round_number ?? '—'}
+              </span>
+            </div>
+            <div className="flex items-baseline justify-between mt-1">
+              <span className="text-[11px] text-gray-400">Crash Multiplier:</span>
+              <span className="text-xs font-bold text-amber-400 font-mono">
+                {liveStatuses?.aviator?.last_result?.crash_multiplier
+                  ? `${liveStatuses.aviator.last_result.crash_multiplier}x`
+                  : '2.45x'}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Rounds above, bets for the selected round below — full width each, so the
           complete Round ID and the Bets / Total Pool columns all stay on screen. */}
       <div className="space-y-6">
@@ -201,6 +376,22 @@ export function AdminGameControlPage() {
                 ariaLabel="Search rounds"
                 className="min-w-0 flex-1"
               />
+              <FilterSelect
+                value={gameFilter}
+                onChange={(e) => {
+                  setGameFilter(e.target.value);
+                  setRoundPage(1);
+                }}
+                icon={<Flame className="h-4 w-4" />}
+                aria-label="Filter by game"
+                wrapperClassName="w-full sm:w-48"
+              >
+                <option value="">All Games</option>
+                <option value="dragon-tiger">Dragon vs Tiger</option>
+                <option value="colour-prediction">Colour Prediction</option>
+                <option value="andar-bahar">Andar Bahar</option>
+                <option value="aviator">Aviator</option>
+              </FilterSelect>
               <FilterSelect
                 value={statusFilter}
                 onChange={(e) => {

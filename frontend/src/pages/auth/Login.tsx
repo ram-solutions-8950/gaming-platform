@@ -123,20 +123,20 @@ export function LoginPage() {
             </div>
           )}
 
-          {/* Email / Admin ID Input */}
+          {/* Email or User ID Input */}
           <div className="casino-input-group">
             <label htmlFor="email" className="casino-input-label">
-              {isAdminRoute ? 'Admin ID' : 'Email'}
+              {isAdminRoute ? 'Admin ID' : 'Email or User ID'}
             </label>
             <div className="casino-input-wrapper">
               <Mail className="casino-input-icon" size={18} />
               <input
                 id="email"
-                type="email"
-                placeholder={isAdminRoute ? 'admin@corona888.com' : 'you@example.com'}
-                autoComplete="email"
+                type="text"
+                placeholder={isAdminRoute ? 'admin@corona888.com' : 'Enter email, username or User ID'}
+                autoComplete="username"
                 className="casino-input-field with-icon"
-                {...register('email', { required: isAdminRoute ? 'Admin ID is required' : 'Email is required' })}
+                {...register('email', { required: isAdminRoute ? 'Admin ID is required' : 'Email or User ID is required' })}
               />
             </div>
             {errors.email && (

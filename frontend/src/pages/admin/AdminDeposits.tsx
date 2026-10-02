@@ -2,6 +2,8 @@ import { useEffect, useState, useCallback } from 'react';
 import { Card } from '../../components/common/Card';
 import { Loader } from '../../components/common/Loader';
 import api from '../../services/api';
+import { adminService } from '../../services/adminService';
+import toast from 'react-hot-toast';
 import {
   RefreshCw,
   Filter,
@@ -13,6 +15,8 @@ import {
   ArrowDownCircle,
   RotateCcw,
   X,
+  CheckCircle2,
+  XCircle,
 } from 'lucide-react';
 import { CopyableId } from '../../components/common/CopyableId';
 import { FilterSelect } from '../../components/common/FilterSelect';
@@ -52,11 +56,14 @@ function formatDateTime(dateStr?: string | null): string {
 function DepositDetailsModal({
   deposit,
   onClose,
+  onActionSuccess,
 }: {
   deposit: AdminDepositItem | null;
   onClose: () => void;
+  onActionSuccess: () => void;
 }) {
   const [copied, setCopied] = useState<string | null>(null);
+  const [processing, setProcessing] = useState(false);
 
   if (!deposit) return null;
 
@@ -64,6 +71,37 @@ function DepositDetailsModal({
     if (!(await copyToClipboard(text))) return;
     setCopied(label);
     setTimeout(() => setCopied(null), 2000);
+  };
+
+  const handleApprove = async () => {
+    if (!window.confirm(`Approve deposit of ₹${(deposit.amount / 100).toFixed(2)} for ${deposit.user_name || 'player'}?\n\nThis will immediately credit their wallet and calculate the global wager requirement.`)) return;
+    setProcessing(true);
+    try {
+      await adminService.approveDeposit(deposit.id);
+      toast.success('Deposit approved and player wallet credited!');
+      onClose();
+      onActionSuccess();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to approve deposit');
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const handleReject = async () => {
+    const reason = window.prompt('Enter reason for rejecting this deposit (optional):', 'Deposit verification failed');
+    if (reason === null) return;
+    setProcessing(true);
+    try {
+      await adminService.rejectDeposit(deposit.id, reason);
+      toast.success('Deposit marked as rejected');
+      onClose();
+      onActionSuccess();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to reject deposit');
+    } finally {
+      setProcessing(false);
+    }
   };
 
   return (
@@ -151,10 +189,31 @@ function DepositDetailsModal({
           </div>
         </div>
 
-        <div className="pt-2">
+        {deposit.status === 'PENDING' && (
+          <div className="flex items-center gap-3 pt-2">
+            <button
+              onClick={handleApprove}
+              disabled={processing}
+              className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl transition cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              <CheckCircle2 className="w-4 h-4" />
+              <span>{processing ? 'Processing...' : 'Approve Deposit'}</span>
+            </button>
+            <button
+              onClick={handleReject}
+              disabled={processing}
+              className="flex-1 py-2.5 bg-rose-600/80 hover:bg-rose-600 text-white font-bold rounded-xl transition cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              <XCircle className="w-4 h-4" />
+              <span>Reject</span>
+            </button>
+          </div>
+        )}
+
+        <div className="pt-1">
           <button
             onClick={onClose}
-            className="w-full py-2.5 bg-dark-800 hover:bg-dark-700 text-white font-semibold rounded-xl border border-dark-600 transition"
+            className="w-full py-2.5 bg-dark-800 hover:bg-dark-700 text-white font-semibold rounded-xl border border-dark-600 transition cursor-pointer"
           >
             Close
           </button>
@@ -213,6 +272,29 @@ export function AdminDepositsPage() {
     setSearch('');
     setStatusFilter('');
     setPage(1);
+  };
+
+  const handleQuickApprove = async (d: AdminDepositItem) => {
+    if (!window.confirm(`Approve deposit of ₹${(d.amount / 100).toFixed(2)} for ${d.user_name || 'player'}?\n\nWallet will be credited immediately.`)) return;
+    try {
+      await adminService.approveDeposit(d.id);
+      toast.success('Deposit approved and wallet credited!');
+      fetchDeposits();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to approve deposit');
+    }
+  };
+
+  const handleQuickReject = async (d: AdminDepositItem) => {
+    const reason = window.prompt('Enter reason for rejecting this deposit (optional):', 'Deposit verification failed');
+    if (reason === null) return;
+    try {
+      await adminService.rejectDeposit(d.id, reason);
+      toast.success('Deposit rejected');
+      fetchDeposits();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to reject deposit');
+    }
   };
 
   const totalPages = Math.max(1, Math.ceil(totalDeposits / pageSize));
@@ -367,17 +449,41 @@ export function AdminDepositsPage() {
                         </span>
                       </td>
 
-                      {/* 7. Action (View) */}
+                      {/* 7. Action (View / Approve / Reject) */}
                       <td className="py-3 px-3 text-right whitespace-nowrap">
-                        <button
-                          type="button"
-                          onClick={() => setSelectedDeposit(d)}
-                          className="inline-flex items-center gap-1.5 px-3 py-1 bg-dark-800 hover:bg-dark-700 text-primary-400 hover:text-primary-300 rounded-lg border border-dark-600 text-xs font-semibold transition cursor-pointer shadow-sm"
-                          title="View Deposit Details"
-                        >
-                          <Eye className="w-3.5 h-3.5" />
-                          <span>View</span>
-                        </button>
+                        <div className="flex items-center justify-end gap-1.5">
+                          {d.status === 'PENDING' && (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => handleQuickApprove(d)}
+                                className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-600/30 hover:bg-emerald-600 text-emerald-300 hover:text-white rounded-lg border border-emerald-500/40 text-xs font-semibold transition cursor-pointer shadow-sm"
+                                title="Approve & Credit Wallet"
+                              >
+                                <CheckCircle2 className="w-3.5 h-3.5" />
+                                <span>Approve</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleQuickReject(d)}
+                                className="inline-flex items-center gap-1 px-2.5 py-1 bg-rose-600/30 hover:bg-rose-600 text-rose-300 hover:text-white rounded-lg border border-rose-500/40 text-xs font-semibold transition cursor-pointer shadow-sm"
+                                title="Reject Deposit"
+                              >
+                                <XCircle className="w-3.5 h-3.5" />
+                                <span>Reject</span>
+                              </button>
+                            </>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => setSelectedDeposit(d)}
+                            className="inline-flex items-center gap-1.5 px-3 py-1 bg-dark-800 hover:bg-dark-700 text-primary-400 hover:text-primary-300 rounded-lg border border-dark-600 text-xs font-semibold transition cursor-pointer shadow-sm"
+                            title="View Deposit Details"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                            <span>View</span>
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -443,6 +549,7 @@ export function AdminDepositsPage() {
         <DepositDetailsModal
           deposit={selectedDeposit}
           onClose={() => setSelectedDeposit(null)}
+          onActionSuccess={fetchDeposits}
         />
       )}
     </div>

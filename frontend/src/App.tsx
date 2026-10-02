@@ -12,6 +12,7 @@ import { DownloadPage } from './pages/Download';
 import { DashboardPage } from './pages/user/Dashboard';
 import { LoadingScreen } from './components/common/LoadingScreen';
 import { InsufficientBalanceModal } from './components/common/InsufficientBalanceModal';
+import { AppUpdateModal } from './components/modals/AppUpdateModal';
 import { useInsufficientBalanceStore } from './store/insufficientBalanceStore';
 import { useAuthStore } from './store/authStore';
 import { authService } from './services/auth';
@@ -317,6 +318,7 @@ function App() {
       <BrowserRouter>
         <GlobalAndroidBackHandler />
         <InsufficientBalanceModal />
+        <AppUpdateModal />
         <Routes>
         {/* Dedicated standalone APK download routes - completely separate from game/dashboard layouts */}
         <Route path="/download-apk" element={<DownloadPage />} />

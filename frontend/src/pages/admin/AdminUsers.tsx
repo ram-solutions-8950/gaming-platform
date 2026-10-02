@@ -10,6 +10,7 @@ import { RefreshOverlay } from '../../components/common/RefreshOverlay';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import { useRefreshIndicator } from '../../hooks/useRefreshIndicator';
 import api from '../../services/api';
+import { adminService } from '../../services/adminService';
 import { walletService } from '../../services/wallet';
 import { useAuthStore } from '../../store/authStore';
 import type { User, WalletTransaction } from '../../types';
@@ -565,6 +566,121 @@ function WalletAdjustModal({ user, currentBalancePaisa, onClose, onSuccess }: Ad
   );
 }
 
+/* ─── Reset Password Modal ─── */
+interface ResetPasswordModalProps {
+  user: User;
+  onClose: () => void;
+  onSuccess: (msg: string) => void;
+}
+
+function ResetPasswordModal({ user, onClose, onSuccess }: ResetPasswordModalProps) {
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newPassword || newPassword.length < 6) {
+      setError('Password must be at least 6 characters long.');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setError('Passwords do not match.');
+      return;
+    }
+    setSubmitting(true);
+    setError('');
+
+    try {
+      await adminService.resetUserPassword(user.id, newPassword);
+      onSuccess(`Password for ${user.name} (@${user.username}) has been updated successfully.`);
+      onClose();
+    } catch (err: any) {
+      setError(getApiErrorMessage(err, 'Failed to update user password.'));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs">
+      <div className="bg-[#0f172a] border border-[#24314d] rounded-2xl w-full max-w-md shadow-2xl p-6 text-white">
+        <div className="flex items-center justify-between pb-4 border-b border-[#222c44]">
+          <h3 className="text-base font-bold text-white flex items-center gap-2">
+            <span>🔑 Reset Password: {user.name}</span>
+          </h3>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-white p-1 rounded-lg hover:bg-[#1a233a] transition cursor-pointer"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {error && (
+          <div className="mt-4 p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-xs">
+            {error}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="mt-4 space-y-4">
+          <div className="p-3 bg-[#141b2d] rounded-xl border border-[#222c44] text-xs">
+            <span className="text-gray-400 block text-[11px]">Target Account</span>
+            <span className="font-bold text-white text-sm">{user.name}</span>
+            <span className="text-gray-400 block font-mono text-[11px]">
+              {user.email || 'No email'} &bull; @{user.username}
+            </span>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-gray-400 mb-1">New Password</label>
+            <input
+              type="password"
+              required
+              minLength={6}
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              placeholder="Minimum 6 characters"
+              className="w-full bg-[#161f33] border border-[#24314d] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500 font-mono"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-gray-400 mb-1">Confirm New Password</label>
+            <input
+              type="password"
+              required
+              minLength={6}
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              placeholder="Re-enter new password"
+              className="w-full bg-[#161f33] border border-[#24314d] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500 font-mono"
+            />
+          </div>
+
+          <div className="pt-2 flex justify-end gap-3 border-t border-[#222c44]">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 text-sm text-gray-400 hover:text-white cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={submitting}
+              className="px-5 py-2 text-sm font-bold bg-amber-500 hover:bg-amber-400 text-black rounded-xl transition cursor-pointer disabled:opacity-50"
+            >
+              {submitting ? 'Resetting...' : 'Change Password'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 /* ─── Main Page ─── */
 export function AdminUsersPage() {
   const { user: adminUser } = useAuthStore();
@@ -602,6 +718,7 @@ export function AdminUsersPage() {
   const [adjustTarget, setAdjustTarget] = useState<User | null>(null);
   const [targetBalance, setTargetBalance] = useState<number | null>(null);
   const [editingTarget, setEditingTarget] = useState<User | null>(null);
+  const [resetPasswordTarget, setResetPasswordTarget] = useState<User | null>(null);
 
   // Toast state
   const [toast, setToast] = useState<ToastState | null>(null);
@@ -824,14 +941,24 @@ export function AdminUsersPage() {
                         <td className="py-3 px-3 text-right whitespace-nowrap">
                           <div className="flex items-center justify-end gap-1.5">
                             {canManageUsers && (
-                              <button
-                                type="button"
-                                onClick={() => setEditingTarget(u)}
-                                className="px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-cyan-500/15 text-cyan-400 hover:bg-cyan-500/30 border border-cyan-500/30 transition-colors cursor-pointer"
-                                title={`Edit role or status for ${u.name}`}
-                              >
-                                ✏️ Edit
-                              </button>
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => setEditingTarget(u)}
+                                  className="px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-cyan-500/15 text-cyan-400 hover:bg-cyan-500/30 border border-cyan-500/30 transition-colors cursor-pointer"
+                                  title={`Edit role or status for ${u.name}`}
+                                >
+                                  ✏️ Edit
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setResetPasswordTarget(u)}
+                                  className="px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-yellow-500/15 text-yellow-300 hover:bg-yellow-500/30 border border-yellow-500/30 transition-colors cursor-pointer"
+                                  title={`Change password for ${u.name}`}
+                                >
+                                  🔑 Password
+                                </button>
+                              </>
                             )}
                             {canAdjustWallet && (
                               <button
@@ -913,6 +1040,17 @@ export function AdminUsersPage() {
           onSuccess={(msg) => {
             showToast(msg, 'success');
             fetchUsers();
+          }}
+        />
+      )}
+
+      {/* Reset Password Modal */}
+      {resetPasswordTarget && (
+        <ResetPasswordModal
+          user={resetPasswordTarget}
+          onClose={() => setResetPasswordTarget(null)}
+          onSuccess={(msg) => {
+            showToast(msg, 'success');
           }}
         />
       )}

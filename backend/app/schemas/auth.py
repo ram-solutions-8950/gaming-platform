@@ -11,7 +11,7 @@ class RegisterIn(BaseModel):
 
 
 class LoginIn(BaseModel):
-    email: EmailStr
+    email: str
     password: str
     client_platform: Optional[str] = None
 

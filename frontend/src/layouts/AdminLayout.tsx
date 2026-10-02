@@ -12,9 +12,7 @@ import {
   Gamepad2,
   Receipt,
   Gift,
-  BarChart3,
   Settings,
-  Bell,
   FileText,
   ShieldCheck,
   LifeBuoy,
@@ -46,20 +44,11 @@ export function AdminLayout() {
     'Games Management': true,
   });
   const [adminProfile, setAdminProfile] = useState<TeamMember | null>(null);
-  const [unreadNotifs, setUnreadNotifs] = useState<number>(0);
 
   useEffect(() => {
     soundManager.stopAll();
     adminService.getCurrentAdminMe()
       .then(setAdminProfile)
-      .catch(() => {});
-
-    adminService.getNotifications(10)
-      .then((data) => {
-        if (data?.unread_count !== undefined) {
-          setUnreadNotifs(data.unread_count);
-        }
-      })
       .catch(() => {});
   }, []);
 
@@ -142,12 +131,6 @@ export function AdminLayout() {
       permission: 'rewards',
     },
     {
-      to: '/admin/analytics',
-      label: 'Reports & Analytics',
-      icon: BarChart3,
-      permission: 'analytics',
-    },
-    {
       to: '/admin/payment-settings',
       label: 'System Settings',
       icon: Settings,
@@ -158,16 +141,10 @@ export function AdminLayout() {
       ],
     },
     {
-      to: '/admin/notifications',
-      label: 'Notifications',
-      icon: Bell,
-      badge: unreadNotifs > 0 ? unreadNotifs : undefined,
-    },
-    {
       to: '/admin/audit-logs',
       label: 'Audit Logs',
       icon: FileText,
-      permission: 'rbac',
+      permission: 'audit_logs',
     },
     {
       to: '/admin/rbac',
@@ -179,8 +156,9 @@ export function AdminLayout() {
       to: '/admin/support',
       label: 'Support & Helpdesk',
       icon: LifeBuoy,
+      permission: 'support',
     },
-  ], [adminProfile, user, unreadNotifs]);
+  ], [adminProfile, user]);
 
   const filteredNav = navigationConfig.filter((item) => hasAccess(item.permission));
 
@@ -233,17 +211,6 @@ export function AdminLayout() {
             <ChevronDown className="w-3 h-3 text-gray-500 ml-1" />
           </div>
 
-          {/* Notification Bell */}
-          <button
-            onClick={() => navigate('/admin/dashboard')}
-            className="relative p-2 rounded-xl bg-[#141b2d] border border-[#222c44] text-gray-300 hover:text-white hover:bg-[#1a233a] transition"
-            title="Notifications"
-          >
-            <Bell size={17} />
-            <span className="absolute -top-1 -right-1 w-4 h-4 bg-rose-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center ring-2 ring-[#0e1320]">
-              5
-            </span>
-          </button>
 
           {/* User Profile Chip */}
           <div className="flex items-center gap-3 pl-2 border-l border-[#222c44]">

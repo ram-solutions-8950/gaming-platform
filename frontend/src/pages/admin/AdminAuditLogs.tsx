@@ -45,6 +45,7 @@ export function AdminAuditLogsPage() {
   const [search, setSearch] = useState('');
   const [selectedAction, setSelectedAction] = useState('ALL');
   const [selectedEntity, setSelectedEntity] = useState('ALL');
+  const [adminOnly, setAdminOnly] = useState(true);
 
   // JSON Details Modal
   const [selectedLog, setSelectedLog] = useState<AuditLogItem | null>(null);
@@ -65,7 +66,8 @@ export function AdminAuditLogsPage() {
           pageSize,
           actionParam,
           entityParam,
-          searchParam
+          searchParam,
+          adminOnly
         );
 
         if (data) {
@@ -79,7 +81,7 @@ export function AdminAuditLogsPage() {
         setRefreshing(false);
       }
     },
-    [page, pageSize, selectedAction, selectedEntity, search]
+    [page, pageSize, selectedAction, selectedEntity, search, adminOnly]
   );
 
   useEffect(() => {
@@ -175,38 +177,65 @@ export function AdminAuditLogsPage() {
               className="w-full bg-dark-950 border border-dark-700 rounded-lg pl-9 pr-4 py-2 text-sm text-gray-200 focus:outline-none focus:border-brand-500 cursor-pointer appearance-none"
             >
               <option value="ALL">All Actions</option>
+              <option value="DEPOSIT_APPROVED">Deposit Approved</option>
+              <option value="DEPOSIT_REJECTED">Deposit Rejected</option>
+              <option value="WITHDRAWAL_APPROVED">Withdrawal Approved</option>
+              <option value="WITHDRAWAL_REJECTED">Withdrawal Rejected</option>
+              <option value="WAGER_CREATED">Wager Created</option>
+              <option value="WAGER_UPDATED">Wager Updated</option>
+              <option value="WAGER_WAIVED">Wager Waived</option>
+              <option value="USER_PASSWORD_RESET">Password Reset</option>
+              <option value="PAYMENT_GATEWAY_CONFIG">Payment Gateway Config</option>
+              <option value="PAYMENT_GATEWAY_ACTIVATED">Gateway Activated</option>
+              <option value="SUPPORT_CONFIG_UPDATE">Support Channel Update</option>
+              <option value="SUPPORT_TICKET_REPLY">Support Ticket Reply</option>
+              <option value="APP_VERSION_UPDATE">App Version Update</option>
+              <option value="GAME_RTP_UPDATE">Game RTP Update</option>
               <option value="USER_STATUS_CHANGE">User Status Change</option>
               <option value="WALLET_ADJUSTMENT">Wallet Balance Adjust</option>
-              <option value="WITHDRAWAL_STATUS_CHANGE">Withdrawal Status</option>
-              <option value="GAME_RTP_UPDATE">Game RTP Update</option>
-              <option value="PAYMENT_GATEWAY_CONFIG">Payment Gateway Config</option>
-              <option value="SUPPORT_CONFIG_UPDATE">Support Channel Update</option>
               <option value="RBAC_ROLE_CHANGE">RBAC Role Change</option>
-              <option value="USER_LOGIN">User Login</option>
             </select>
           </div>
 
-          {/* Entity Type Filter */}
-          <div className="relative">
-            <Activity className="w-4 h-4 absolute left-3 top-3 text-gray-500" />
-            <select
-              value={selectedEntity}
-              onChange={(e) => {
-                setSelectedEntity(e.target.value);
-                setPage(1);
-              }}
-              className="w-full bg-dark-950 border border-dark-700 rounded-lg pl-9 pr-4 py-2 text-sm text-gray-200 focus:outline-none focus:border-brand-500 cursor-pointer appearance-none"
-            >
-              <option value="ALL">All Entities</option>
-              <option value="user">User</option>
-              <option value="wallet">Wallet</option>
-              <option value="withdrawal">Withdrawal</option>
-              <option value="deposit">Deposit</option>
-              <option value="game">Game Engine</option>
-              <option value="payment_setting">Payment Config</option>
-              <option value="support_configuration">Support Settings</option>
-              <option value="rbac_member">Staff / RBAC</option>
-            </select>
+          {/* Entity Type Filter & Admin Only Checkbox */}
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1">
+              <Activity className="w-4 h-4 absolute left-3 top-3 text-gray-500" />
+              <select
+                value={selectedEntity}
+                onChange={(e) => {
+                  setSelectedEntity(e.target.value);
+                  setPage(1);
+                }}
+                className="w-full bg-dark-950 border border-dark-700 rounded-lg pl-9 pr-4 py-2 text-sm text-gray-200 focus:outline-none focus:border-brand-500 cursor-pointer appearance-none"
+              >
+                <option value="ALL">All Entities</option>
+                <option value="user">User</option>
+                <option value="deposit">Deposit</option>
+                <option value="withdrawal">Withdrawal</option>
+                <option value="wager">Wager Requirement</option>
+                <option value="wallet">Wallet</option>
+                <option value="payment_gateway">Payment Gateway</option>
+                <option value="support_ticket">Support Ticket</option>
+                <option value="support_config">Support Config</option>
+                <option value="app_version">App Version</option>
+                <option value="game">Game Engine</option>
+                <option value="rbac_member">Staff / RBAC</option>
+              </select>
+            </div>
+
+            <label className="flex items-center gap-2 px-3 py-2 bg-dark-950 border border-dark-700 rounded-lg text-xs font-semibold text-gray-300 cursor-pointer hover:bg-dark-800 transition select-none shrink-0" title="Filter out routine player events to inspect only admin back-office actions">
+              <input
+                type="checkbox"
+                checked={adminOnly}
+                onChange={(e) => {
+                  setAdminOnly(e.target.checked);
+                  setPage(1);
+                }}
+                className="rounded border-dark-700 text-brand-500 focus:ring-0 w-4 h-4 cursor-pointer accent-brand-500"
+              />
+              <span className="hidden sm:inline">Admin Only</span>
+            </label>
           </div>
         </div>
       </Card>

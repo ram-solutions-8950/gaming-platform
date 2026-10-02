@@ -250,9 +250,19 @@ export const adminService = {
     return res.data.data;
   },
 
+  // Notifications
+  getNotifications: async (limit = 20) => {
+    try {
+      const res = await api.get(`/admin/notifications?limit=${limit}`);
+      return res.data.data;
+    } catch {
+      return { unread_count: 0, items: [] };
+    }
+  },
+
   // Audit Logs
-  getAuditLogs: async (page = 1, pageSize = 20, action?: string, entityType?: string, search?: string) => {
-    let url = `/admin/audit-logs?page=${page}&page_size=${pageSize}`;
+  getAuditLogs: async (page = 1, pageSize = 20, action?: string, entityType?: string, search?: string, adminOnly = true) => {
+    let url = `/admin/audit-logs?page=${page}&page_size=${pageSize}&admin_only=${adminOnly}`;
     if (action) url += `&action=${encodeURIComponent(action)}`;
     if (entityType) url += `&entity_type=${encodeURIComponent(entityType)}`;
     if (search) url += `&search=${encodeURIComponent(search)}`;
@@ -260,9 +270,56 @@ export const adminService = {
     return res.data.data;
   },
 
-  // Notifications
-  getNotifications: async (limit = 30) => {
-    const res = await api.get(`/admin/notifications?limit=${limit}`);
+  // Deposit Actions
+  approveDeposit: async (depositId: string) => {
+    const res = await api.post(`/admin/deposits/${depositId}/approve`);
+    return res.data.data;
+  },
+
+  rejectDeposit: async (depositId: string, reason = 'Administrative review') => {
+    const res = await api.post(`/admin/deposits/${depositId}/reject`, { reason });
+    return res.data.data;
+  },
+
+  // User Password Management
+  resetUserPassword: async (userId: string, newPassword: string) => {
+    const res = await api.put(`/admin/users/${userId}/password`, { new_password: newPassword });
+    return res.data.data;
+  },
+
+  // Global & Individual Wagers
+  getGlobalWagerConfig: async () => {
+    const res = await api.get('/admin/wagers/global');
+    return res.data.data;
+  },
+
+  updateGlobalWagerConfig: async (payload: { multiplier: number; default_user_wager_inr?: number }) => {
+    const res = await api.put('/admin/wagers/global', payload);
+    return res.data.data;
+  },
+
+  applyWagerToAllUsers: async (requiredAmountInr: number) => {
+    const res = await api.post('/admin/wagers/apply-all', { required_amount_inr: requiredAmountInr });
+    return res.data.data;
+  },
+
+  updateWager: async (wagerId: string, payload: { required_amount_inr?: number; completed_amount_inr?: number; is_fulfilled?: boolean }) => {
+    const res = await api.put(`/admin/wagers/${wagerId}`, payload);
+    return res.data.data;
+  },
+
+  // Support Tickets Helpdesk
+  getSupportTickets: async (page = 1, pageSize = 20, status?: string, category?: string, search?: string) => {
+    let url = `/admin/support/tickets?page=${page}&page_size=${pageSize}`;
+    if (status && status !== 'ALL') url += `&status=${encodeURIComponent(status)}`;
+    if (category && category !== 'ALL') url += `&category=${encodeURIComponent(category)}`;
+    if (search) url += `&search=${encodeURIComponent(search)}`;
+    const res = await api.get(url);
+    return res.data.data;
+  },
+
+  updateSupportTicket: async (ticketId: string, payload: { status: string; admin_reply?: string }) => {
+    const res = await api.patch(`/admin/support/tickets/${ticketId}`, payload);
     return res.data.data;
   },
 
@@ -274,6 +331,39 @@ export const adminService = {
 
   updateSupportConfig: async (payload: any) => {
     const res = await api.put('/admin/support/config', payload);
+    return res.data.data;
+  },
+
+  // Payment Gateways (Cashfree / Razorpay)
+  getPaymentGateways: async () => {
+    const res = await api.get('/admin/payment-gateways');
+    return res.data.data;
+  },
+
+  updatePaymentGateway: async (gatewayName: string, payload: any) => {
+    const res = await api.put(`/admin/payment-gateways/${gatewayName}`, payload);
+    return res.data.data;
+  },
+
+  activatePaymentGateway: async (gatewayName: string) => {
+    const res = await api.post(`/admin/payment-gateways/${gatewayName}/activate`);
+    return res.data.data;
+  },
+
+  // Live Games Status
+  getLiveGameStatuses: async () => {
+    const res = await api.get('/admin/games/live-status');
+    return res.data.data;
+  },
+
+  // App Version Config
+  getAdminAppVersion: async () => {
+    const res = await api.get('/admin/system/app-version');
+    return res.data.data;
+  },
+
+  updateAdminAppVersion: async (payload: any) => {
+    const res = await api.put('/admin/system/app-version', payload);
     return res.data.data;
   },
 };

@@ -17,6 +17,9 @@ class AdminPermission(str, enum.Enum):
     ANALYTICS = "analytics"
     SETTINGS = "settings"
     RBAC = "rbac"
+    AUDIT_LOGS = "audit_logs"
+    SUPPORT = "support"
+    PAYMENT_GATEWAYS = "payment_gateways"
 
 
 PERMISSION_DETAILS: Dict[str, Dict[str, str]] = {
@@ -85,25 +88,26 @@ PERMISSION_DETAILS: Dict[str, Dict[str, str]] = {
         "description": "Create admin accounts, assign roles, and configure granular permissions",
         "category": "Security",
     },
+    AdminPermission.AUDIT_LOGS.value: {
+        "label": "Audit Logs Monitoring",
+        "description": "Audit staff actions, approvals, financial modifications, and system events",
+        "category": "Security",
+    },
+    AdminPermission.SUPPORT.value: {
+        "label": "Support & Helpdesk",
+        "description": "Manage customer support tickets, replies, and player support contact channels",
+        "category": "Support",
+    },
+    AdminPermission.PAYMENT_GATEWAYS.value: {
+        "label": "Payment Gateways Control",
+        "description": "Configure and switch active gateways (Cashfree / Razorpay) and API keys",
+        "category": "System",
+    },
 }
 
 DEFAULT_ROLE_PERMISSIONS: Dict[str, List[str]] = {
     "SUPER_ADMIN": [p.value for p in AdminPermission],
-    "ADMIN": [
-        AdminPermission.DASHBOARD.value,
-        AdminPermission.USERS.value,
-        AdminPermission.WALLET.value,
-        AdminPermission.DEPOSITS.value,
-        AdminPermission.WITHDRAWALS.value,
-        AdminPermission.GAMES.value,
-        AdminPermission.WINNING_CONTROL.value,
-        AdminPermission.WAGER_CONTROL.value,
-        AdminPermission.TRANSACTIONS.value,
-        AdminPermission.REWARDS.value,
-        AdminPermission.ANALYTICS.value,
-        AdminPermission.SETTINGS.value,
-        AdminPermission.RBAC.value,
-    ],
+    "ADMIN": [p.value for p in AdminPermission],
     "OPERATIONS_MANAGER": [
         AdminPermission.DASHBOARD.value,
         AdminPermission.USERS.value,
@@ -111,6 +115,7 @@ DEFAULT_ROLE_PERMISSIONS: Dict[str, List[str]] = {
         AdminPermission.WINNING_CONTROL.value,
         AdminPermission.WAGER_CONTROL.value,
         AdminPermission.ANALYTICS.value,
+        AdminPermission.SUPPORT.value,
     ],
     "FINANCE_OFFICER": [
         AdminPermission.DASHBOARD.value,
@@ -119,12 +124,14 @@ DEFAULT_ROLE_PERMISSIONS: Dict[str, List[str]] = {
         AdminPermission.WITHDRAWALS.value,
         AdminPermission.WAGER_CONTROL.value,
         AdminPermission.TRANSACTIONS.value,
+        AdminPermission.PAYMENT_GATEWAYS.value,
     ],
     "SUPPORT_AGENT": [
         AdminPermission.DASHBOARD.value,
         AdminPermission.USERS.value,
         AdminPermission.TRANSACTIONS.value,
         AdminPermission.WAGER_CONTROL.value,
+        AdminPermission.SUPPORT.value,
     ],
     "GAME_MASTER": [
         AdminPermission.DASHBOARD.value,

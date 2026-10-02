@@ -10,6 +10,9 @@ import {
   ChevronLeft,
   ChevronRight,
   RefreshCw,
+  Edit3,
+  Sliders,
+  Users,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -21,13 +24,43 @@ export function AdminWagersPage() {
   const [search, setSearch] = useState('');
   const [filterFulfilled, setFilterFulfilled] = useState<string>('ALL');
 
-  // Modal state
+  // Global wager config state
+  const [globalConfig, setGlobalConfig] = useState<{ multiplier: number; default_user_wager_inr?: number } | null>(null);
+  const [editingGlobal, setEditingGlobal] = useState(false);
+  const [inputMultiplier, setInputMultiplier] = useState('1.0');
+  const [savingGlobal, setSavingGlobal] = useState(false);
+
+  // Apply to all modal state
+  const [applyAllModalOpen, setApplyAllModalOpen] = useState(false);
+  const [applyAllAmount, setApplyAllAmount] = useState('100');
+  const [applyingAll, setApplyingAll] = useState(false);
+
+  // Add individual wager modal
   const [modalOpen, setModalOpen] = useState(false);
   const [targetUserId, setTargetUserId] = useState('');
   const [requiredAmountInr, setRequiredAmountInr] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
+  // Edit individual wager modal
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [editingWager, setEditingWager] = useState<WagerRequirementItem | null>(null);
+  const [editRequiredAmt, setEditRequiredAmt] = useState('');
+  const [editCompletedAmt, setEditCompletedAmt] = useState('');
+  const [savingEdit, setSavingEdit] = useState(false);
+
   const pageSize = 15;
+
+  const fetchGlobalConfig = async () => {
+    try {
+      const cfg = await adminService.getGlobalWagerConfig();
+      if (cfg) {
+        setGlobalConfig(cfg);
+        setInputMultiplier(String(cfg.multiplier ?? 1.0));
+      }
+    } catch (err) {
+      console.error('Failed to load global wager config', err);
+    }
+  };
 
   const fetchWagers = useCallback(async () => {
     try {
@@ -45,15 +78,92 @@ export function AdminWagersPage() {
   }, [page, search, filterFulfilled]);
 
   useEffect(() => {
+    fetchGlobalConfig();
     fetchWagers();
   }, [fetchWagers]);
+
+  const handleSaveGlobalWager = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const mult = parseFloat(inputMultiplier);
+    if (isNaN(mult) || mult < 0) {
+      toast.error('Multiplier must be a non-negative number');
+      return;
+    }
+    setSavingGlobal(true);
+    try {
+      await adminService.updateGlobalWagerConfig({ multiplier: mult });
+      toast.success(`Global wager multiplier updated to ${mult}x`);
+      setEditingGlobal(false);
+      fetchGlobalConfig();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to update global wager');
+    } finally {
+      setSavingGlobal(false);
+    }
+  };
+
+  const handleApplyToAll = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const amt = parseFloat(applyAllAmount);
+    if (isNaN(amt) || amt <= 0) {
+      toast.error('Please enter a valid amount');
+      return;
+    }
+    if (!window.confirm(`Apply ₹${amt} baseline wager requirement to ALL active player accounts?`)) return;
+
+    setApplyingAll(true);
+    try {
+      const res = await adminService.applyWagerToAllUsers(amt);
+      toast.success(res?.message || `Successfully applied baseline wager to all users!`);
+      setApplyAllModalOpen(false);
+      fetchWagers();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to apply wager to all users');
+    } finally {
+      setApplyingAll(false);
+    }
+  };
+
+  const openEditModal = (w: WagerRequirementItem) => {
+    setEditingWager(w);
+    setEditRequiredAmt(String(w.required_amount_inr));
+    setEditCompletedAmt(String(w.completed_amount_inr));
+    setEditModalOpen(true);
+  };
+
+  const handleSaveWagerEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingWager) return;
+    const reqAmt = parseFloat(editRequiredAmt);
+    const compAmt = parseFloat(editCompletedAmt);
+    if (isNaN(reqAmt) || reqAmt < 0 || isNaN(compAmt) || compAmt < 0) {
+      toast.error('Amounts must be non-negative numbers');
+      return;
+    }
+    setSavingEdit(true);
+    try {
+      await adminService.updateWager(editingWager.id, {
+        required_amount_inr: reqAmt,
+        completed_amount_inr: compAmt,
+        is_fulfilled: compAmt >= reqAmt,
+      });
+      toast.success('Wager requirement updated successfully');
+      setEditModalOpen(false);
+      setEditingWager(null);
+      fetchWagers();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to update wager');
+    } finally {
+      setSavingEdit(false);
+    }
+  };
 
   const handleFulfillWager = async (wagerId: string) => {
     try {
       await adminService.fulfillWager(wagerId);
       toast.success('Wager requirement waived / fulfilled');
       fetchWagers();
-    } catch (err: any) {
+    } catch {
       toast.error('Failed to fulfill wager');
     }
   };
@@ -64,7 +174,7 @@ export function AdminWagersPage() {
       await adminService.waiveUserWagers(userId);
       toast.success(`All wagers waived for @${username}`);
       fetchWagers();
-    } catch (err: any) {
+    } catch {
       toast.error('Failed to waive user wagers');
     }
   };
@@ -127,6 +237,76 @@ export function AdminWagersPage() {
             <Plus size={16} />
             <span>Add Wager Requirement</span>
           </button>
+        </div>
+      </div>
+
+      {/* Global Wager Settings & Batch Actions Card */}
+      <div className="bg-gradient-to-r from-[#111726] to-[#151c30] border border-cyan-500/20 rounded-2xl p-5 shadow-lg">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-start gap-3.5">
+            <div className="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 shrink-0">
+              <Sliders size={20} />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-bold text-white">Global Auto-Wager Rollover Setting</h3>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-cyan-500/20 text-cyan-300 border border-cyan-500/40">
+                  {globalConfig ? `${globalConfig.multiplier}x Multiplier` : '1.0x Multiplier'}
+                </span>
+              </div>
+              <p className="text-xs text-gray-400 mt-1 max-w-2xl">
+                Automatically calculates wager rollover requirement when any player deposits (e.g. ₹1,000 deposit at 1.0x = ₹1,000 bet playthrough before withdrawal unlock).
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            {editingGlobal ? (
+              <form onSubmit={handleSaveGlobalWager} className="flex items-center gap-2">
+                <input
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  max="50"
+                  value={inputMultiplier}
+                  onChange={(e) => setInputMultiplier(e.target.value)}
+                  className="w-20 bg-[#0d121f] border border-cyan-500/50 rounded-xl px-2.5 py-1.5 text-xs text-white font-mono text-center focus:outline-none"
+                  placeholder="1.0"
+                />
+                <span className="text-xs text-cyan-400 font-bold">x</span>
+                <button
+                  type="submit"
+                  disabled={savingGlobal}
+                  className="px-3 py-1.5 rounded-xl text-xs font-bold bg-cyan-600 hover:bg-cyan-500 text-white transition disabled:opacity-50 cursor-pointer"
+                >
+                  {savingGlobal ? 'Saving...' : 'Save'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditingGlobal(false)}
+                  className="px-2.5 py-1.5 rounded-xl text-xs text-gray-400 hover:text-white"
+                >
+                  Cancel
+                </button>
+              </form>
+            ) : (
+              <button
+                onClick={() => setEditingGlobal(true)}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-[#1a233a] hover:bg-[#232f4e] text-cyan-300 border border-cyan-500/30 transition cursor-pointer"
+              >
+                <Edit3 size={13} />
+                <span>Adjust Multiplier</span>
+              </button>
+            )}
+
+            <button
+              onClick={() => setApplyAllModalOpen(true)}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-purple-600/30 hover:bg-purple-600/40 text-purple-200 border border-purple-500/40 transition cursor-pointer"
+            >
+              <Users size={14} />
+              <span>Apply Baseline Wager to All</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -250,7 +430,14 @@ export function AdminWagersPage() {
                         </span>
                       </td>
                       <td className="py-3 px-3 text-right">
-                        <div className="flex items-center justify-end gap-2">
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            onClick={() => openEditModal(w)}
+                            className="p-1.5 rounded-lg text-gray-400 hover:text-cyan-400 hover:bg-[#1a233a] transition cursor-pointer"
+                            title="Edit Required or Completed Turnover"
+                          >
+                            <Edit3 size={14} />
+                          </button>
                           {!w.is_fulfilled && (
                             <>
                               <button
@@ -370,6 +557,146 @@ export function AdminWagersPage() {
                   className="px-5 py-2 rounded-xl text-xs font-bold bg-cyan-600 hover:bg-cyan-500 text-white transition disabled:opacity-50"
                 >
                   {submitting ? 'Creating...' : 'Set Wager'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Edit Wager Requirement */}
+      {editModalOpen && editingWager && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
+          <div className="bg-[#0f1422] border border-[#222c44] rounded-2xl w-full max-w-md p-6 shadow-2xl">
+            <div className="flex items-center justify-between pb-3 border-b border-[#222c44]">
+              <h2 className="text-base font-bold text-white flex items-center gap-2">
+                <Edit3 className="text-cyan-400" size={18} />
+                <span>Adjust Wager Requirement</span>
+              </h2>
+              <button
+                onClick={() => {
+                  setEditModalOpen(false);
+                  setEditingWager(null);
+                }}
+                className="p-1.5 rounded-lg text-gray-400 hover:text-white transition"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveWagerEdit} className="space-y-4 pt-4">
+              <div className="p-3 rounded-xl bg-[#141b2d] border border-[#222c44] text-xs">
+                <span className="text-gray-400 block text-[11px]">Target Player</span>
+                <span className="font-bold text-white text-sm">{editingWager.user_name}</span>
+                <span className="text-gray-400 block font-mono text-[11px]">@{editingWager.username} • {editingWager.user_id.slice(0, 8)}...</span>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-300 mb-1">
+                  Required Turnover Amount (₹ INR)
+                </label>
+                <input
+                  type="number"
+                  step="any"
+                  min="0"
+                  required
+                  value={editRequiredAmt}
+                  onChange={(e) => setEditRequiredAmt(e.target.value)}
+                  className="w-full bg-[#141b2d] border border-[#222c44] rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-cyan-500 font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-300 mb-1">
+                  Completed / Wagered Amount (₹ INR)
+                </label>
+                <input
+                  type="number"
+                  step="any"
+                  min="0"
+                  required
+                  value={editCompletedAmt}
+                  onChange={(e) => setEditCompletedAmt(e.target.value)}
+                  className="w-full bg-[#141b2d] border border-[#222c44] rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-cyan-500 font-mono"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-[#222c44]">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditModalOpen(false);
+                    setEditingWager(null);
+                  }}
+                  className="px-4 py-2 rounded-xl text-xs text-gray-400 hover:text-white transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingEdit}
+                  className="px-5 py-2 rounded-xl text-xs font-bold bg-cyan-600 hover:bg-cyan-500 text-white transition disabled:opacity-50"
+                >
+                  {savingEdit ? 'Updating...' : 'Save Adjustments'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Apply Baseline Wager to All Users */}
+      {applyAllModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
+          <div className="bg-[#0f1422] border border-[#222c44] rounded-2xl w-full max-w-md p-6 shadow-2xl">
+            <div className="flex items-center justify-between pb-3 border-b border-[#222c44]">
+              <h2 className="text-base font-bold text-white flex items-center gap-2">
+                <Users className="text-purple-400" size={18} />
+                <span>Apply Baseline Wager to All Players</span>
+              </h2>
+              <button
+                onClick={() => setApplyAllModalOpen(false)}
+                className="p-1.5 rounded-lg text-gray-400 hover:text-white transition"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleApplyToAll} className="space-y-4 pt-4">
+              <div className="p-3 bg-purple-900/20 border border-purple-500/30 rounded-xl text-xs text-purple-200">
+                ⚠️ This will set or add a baseline playthrough wager requirement for <strong>all registered player accounts</strong> in the system. Players will need to reach this betting turnover before requesting withdrawals.
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-300 mb-1">
+                  Baseline Required Turnover (₹ INR)
+                </label>
+                <input
+                  type="number"
+                  step="any"
+                  min="1"
+                  required
+                  placeholder="e.g. 100"
+                  value={applyAllAmount}
+                  onChange={(e) => setApplyAllAmount(e.target.value)}
+                  className="w-full bg-[#141b2d] border border-[#222c44] rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-purple-500 font-mono"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-[#222c44]">
+                <button
+                  type="button"
+                  onClick={() => setApplyAllModalOpen(false)}
+                  className="px-4 py-2 rounded-xl text-xs text-gray-400 hover:text-white transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={applyingAll}
+                  className="px-5 py-2 rounded-xl text-xs font-bold bg-purple-600 hover:bg-purple-500 text-white transition disabled:opacity-50"
+                >
+                  {applyingAll ? 'Applying to All Accounts...' : 'Confirm & Apply to All'}
                 </button>
               </div>
             </form>

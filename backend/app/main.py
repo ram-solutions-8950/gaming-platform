@@ -143,6 +143,9 @@ app.include_router(fees.router, prefix=PREFIX)
 app.include_router(games.router, prefix=PREFIX)
 app.include_router(referral.router, prefix=PREFIX)
 app.include_router(rewards.router, prefix=PREFIX)
+from .routers import support, system
+app.include_router(support.router, prefix=PREFIX)
+app.include_router(system.router, prefix=PREFIX)
 from .routers import ludo, rummy, teen_patti, aviator, poker, chicken_road, triple_777, roulette
 from .websocket import teen_patti_ws, aviator_ws, poker_ws
 app.include_router(ludo.router, prefix=PREFIX)

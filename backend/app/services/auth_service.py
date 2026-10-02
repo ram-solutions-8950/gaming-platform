@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from typing import Optional
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from ..models.user import User, UserRole, UserStatus
 from ..models.wallet import Wallet
 from ..models.refresh_token import RefreshToken
@@ -90,11 +90,33 @@ def login_user(
     ip_address: Optional[str] = None,
     client_platform: Optional[str] = None,
 ) -> dict:
-    email_lower = email.lower()
-    user = db.query(User).filter(func.lower(User.email) == email_lower).first()
+    ident = (email or "").strip()
+    ident_lower = ident.lower()
+
+    # Match by email or username
+    user = db.query(User).filter(
+        or_(
+            func.lower(User.email) == ident_lower,
+            func.lower(User.username) == ident_lower,
+        )
+    ).first()
+
+    # Match by User ID (UUID)
+    if not user:
+        try:
+            import uuid
+            val_uuid = uuid.UUID(ident)
+            user = db.query(User).filter(User.id == val_uuid).first()
+        except (ValueError, TypeError):
+            pass
+
+    # Partial prefix match on User ID if user copied part of their ID
+    if not user and len(ident) >= 8:
+        from sqlalchemy import cast, String
+        user = db.query(User).filter(cast(User.id, String).ilike(f"{ident}%")).first()
 
     if not user or not verify_password(password, user.password_hash):
-        raise ValueError("Invalid email or password")
+        raise ValueError("Invalid email/user ID or password")
     if user.status != UserStatus.ACTIVE:
         raise ValueError(f"Account is {user.status.value.lower()}")
 

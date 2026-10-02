@@ -219,6 +219,86 @@ def admin_create_game(
         return error_response("GAME_CREATION_FAILED", str(e))
 
 
+@router.get("/admin/games/live-status")
+def admin_get_live_game_statuses(
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """Retrieve real-time live rounds, statuses, and recent outcomes for live games."""
+    from ..services.game_engines.dragon_tiger import DragonTigerEngine
+    from ..services.game_engines.andar_bahar import AndarBaharEngine
+    from ..services.game_engines.colour_prediction import ColourPredictionEngine
+    from ..models.aviator import AviatorRound, AviatorRoundStatus
+
+    dt_engine = DragonTigerEngine()
+    ab_engine = AndarBaharEngine()
+    cp_engine = ColourPredictionEngine()
+
+    # 1. Dragon Tiger
+    dt_curr = dt_engine.get_current_round(db)
+    dt_history = dt_engine.get_round_history(db, limit=1)
+    dt_last = dt_history[0] if dt_history else None
+
+    # 2. Colour Prediction
+    cp_curr = cp_engine.get_current_round(db)
+    cp_history = cp_engine.get_round_history(db, limit=1)
+    cp_last = cp_history[0] if cp_history else None
+
+    # 3. Andar Bahar
+    ab_curr = ab_engine.get_current_round(db)
+    ab_history = ab_engine.get_round_history(db, limit=1)
+    ab_last = ab_history[0] if ab_history else None
+
+    # 4. Aviator
+    av_curr = (
+        db.query(AviatorRound)
+        .filter(AviatorRound.status.in_([AviatorRoundStatus.BETTING, AviatorRoundStatus.FLYING]))
+        .order_by(AviatorRound.betting_started_at.desc())
+        .first()
+    )
+    av_last = (
+        db.query(AviatorRound)
+        .filter(AviatorRound.status == AviatorRoundStatus.SETTLED)
+        .order_by(AviatorRound.settled_at.desc())
+        .first()
+    )
+
+    return success_response({
+        "dragon_tiger": {
+            "name": "Dragon & Tiger",
+            "slug": "dragon-tiger",
+            "active_round_id": str(dt_curr.id) if dt_curr else None,
+            "status": dt_curr.status.value if dt_curr else "COMPLETED",
+            "betting_closes_at": dt_curr.betting_closes_at.isoformat() if dt_curr and dt_curr.betting_closes_at else None,
+            "last_winner": (dt_last.result_data.get("result") or dt_last.result_data.get("winner")) if dt_last and dt_last.result_data else None,
+            "last_cards": f"{dt_last.result_data.get('dragon_card', '')} vs {dt_last.result_data.get('tiger_card', '')}" if dt_last and dt_last.result_data else None,
+        },
+        "colour_prediction": {
+            "name": "Colour Prediction",
+            "slug": "colour-prediction",
+            "active_round_id": str(cp_curr.id) if cp_curr else None,
+            "status": cp_curr.status.value if cp_curr else "COMPLETED",
+            "betting_closes_at": cp_curr.betting_closes_at.isoformat() if cp_curr and cp_curr.betting_closes_at else None,
+            "last_result": f"{cp_last.result_color} ({cp_last.result_number})" if cp_last and cp_last.result_color else None,
+        },
+        "andar_bahar": {
+            "name": "Andar Bahar",
+            "slug": "andar-bahar",
+            "active_round_id": str(ab_curr.id) if ab_curr else None,
+            "status": ab_curr.status.value if ab_curr else "COMPLETED",
+            "betting_closes_at": ab_curr.betting_closes_at.isoformat() if ab_curr and ab_curr.betting_closes_at else None,
+            "last_winner": (ab_last.result_data.get("winner") or ab_last.result_data.get("result")) if ab_last and ab_last.result_data else None,
+        },
+        "aviator": {
+            "name": "Aviator",
+            "slug": "aviator",
+            "active_round_id": str(av_curr.id) if av_curr else None,
+            "status": av_curr.status.value if av_curr else "SETTLED",
+            "last_multiplier": f"{av_last.crash_multiplier}x" if av_last and av_last.crash_multiplier else None,
+        },
+    })
+
+
 @router.get("/admin/games/rounds")
 def admin_list_rounds(
     admin: User = Depends(require_admin),

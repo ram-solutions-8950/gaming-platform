@@ -20,6 +20,9 @@ from .referral import Referral, ReferralSettings, ReferralStatus
 from .wager import WagerRequirement
 from .winning import UserWinningControl, WinMode
 from .role import AdminPermission, DEFAULT_ROLE_PERMISSIONS
+from .support import SupportTicket, SupportTicketStatus
+from .payment_gateway import PaymentGatewayConfig
+from .system_settings import SystemSetting
 from .reward import (
     DailyRewardConfig,
     DailyRewardSettings,
@@ -40,6 +43,7 @@ __all__ = [
     "Deposit", "DepositStatus",
     "Withdrawal", "WithdrawalStatus",
     "PaymentConfiguration", "PaymentEvent",
+    "PaymentGatewayConfig",
     "AuditLog",
     "RefreshToken",
     "IdempotencyKey",
@@ -54,6 +58,8 @@ __all__ = [
     "PokerTable", "PokerHand", "PokerPlayer", "PokerAction",
     "Referral", "ReferralSettings", "ReferralStatus",
     "WagerRequirement",
+    "SupportTicket", "SupportTicketStatus",
+    "SystemSetting",
     "DailyRewardConfig", "DailyRewardSettings", "UserRewardProfile", "UserDailyRewardClaim",
     "LuckySpinSegmentConfig", "UserLuckySpinLog", "BonusConfig", "UserBonusClaim",
     "JackpotConfig", "VipBonusConfig",

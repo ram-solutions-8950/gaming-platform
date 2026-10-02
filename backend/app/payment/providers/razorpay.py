@@ -11,15 +11,15 @@ from ...config import settings
 
 class RazorpayProvider(PaymentProvider):
 
-    def __init__(self) -> None:
-        if not settings.PAYMENT_API_KEY:
-            raise ValueError("PAYMENT_API_KEY is not configured")
+    def __init__(self, key_id: Optional[str] = None, key_secret: Optional[str] = None) -> None:
+        self.key_id = key_id or settings.PAYMENT_API_KEY
+        self.key_secret = key_secret or settings.PAYMENT_SECRET
 
-        if not settings.PAYMENT_SECRET:
-            raise ValueError("PAYMENT_SECRET is not configured")
+        if not self.key_id:
+            raise ValueError("Razorpay Key ID is not configured")
 
-        self.key_id = settings.PAYMENT_API_KEY
-        self.key_secret = settings.PAYMENT_SECRET
+        if not self.key_secret:
+            raise ValueError("Razorpay Key Secret is not configured")
 
         self.client = razorpay.Client(
             auth=(self.key_id, self.key_secret)
