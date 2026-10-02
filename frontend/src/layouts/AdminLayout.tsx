@@ -46,11 +46,20 @@ export function AdminLayout() {
     'Games Management': true,
   });
   const [adminProfile, setAdminProfile] = useState<TeamMember | null>(null);
+  const [unreadNotifs, setUnreadNotifs] = useState<number>(0);
 
   useEffect(() => {
     soundManager.stopAll();
     adminService.getCurrentAdminMe()
       .then(setAdminProfile)
+      .catch(() => {});
+
+    adminService.getNotifications(10)
+      .then((data) => {
+        if (data?.unread_count !== undefined) {
+          setUnreadNotifs(data.unread_count);
+        }
+      })
       .catch(() => {});
   }, []);
 
@@ -152,7 +161,7 @@ export function AdminLayout() {
       to: '/admin/notifications',
       label: 'Notifications',
       icon: Bell,
-      badge: '5',
+      badge: unreadNotifs > 0 ? unreadNotifs : undefined,
     },
     {
       to: '/admin/audit-logs',
@@ -168,10 +177,10 @@ export function AdminLayout() {
     },
     {
       to: '/admin/support',
-      label: 'Support / Tickets',
+      label: 'Support & Helpdesk',
       icon: LifeBuoy,
     },
-  ], [adminProfile, user]);
+  ], [adminProfile, user, unreadNotifs]);
 
   const filteredNav = navigationConfig.filter((item) => hasAccess(item.permission));
 

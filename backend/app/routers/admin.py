@@ -24,6 +24,7 @@ from ..models.game_catalog import Game, GameStatus
 from ..models.role import AdminPermission, PERMISSION_DETAILS, DEFAULT_ROLE_PERMISSIONS
 from ..models.winning import UserWinningControl, WinMode
 from ..models.wager import WagerRequirement
+from ..models.audit_log import AuditLog
 from ..services import wallet_service, audit_service, withdrawal_service, reward_service, wager_service, winning_service
 from ..security.password import hash_password
 from ..schemas.reward import (
@@ -1643,4 +1644,211 @@ def delete_personal_winning_control(
     if not ok:
         return error_response(404, "Personal winning control not found for this user")
     return success_response({"message": "Personal winning control reset to default"})
+
+# -- Audit Logs Endpoint -------------------------------------------------------
+@router.get("/audit-logs")
+def list_audit_logs(
+    admin: User = Depends(require_permission(AdminPermission.RBAC.value)),
+    db: Session = Depends(get_db),
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, ge=1, le=100),
+    action: Optional[str] = Query(default=None),
+    entity_type: Optional[str] = Query(default=None),
+    search: Optional[str] = Query(default=None),
+):
+    """Retrieve paginated platform audit logs with actor and entity details."""
+    query = db.query(AuditLog, User).outerjoin(User, AuditLog.actor_id == User.id)
+
+    if action and action.strip():
+        query = query.filter(AuditLog.action.ilike(f"%{action.strip()}%"))
+    if entity_type and entity_type.strip():
+        query = query.filter(AuditLog.entity_type == entity_type.strip())
+    if search and search.strip():
+        s = search.strip()
+        query = query.filter(
+            or_(
+                AuditLog.action.ilike(f"%{s}%"),
+                AuditLog.entity_type.ilike(f"%{s}%"),
+                AuditLog.entity_id.ilike(f"%{s}%"),
+                User.username.ilike(f"%{s}%"),
+                User.name.ilike(f"%{s}%"),
+                User.email.ilike(f"%{s}%"),
+            )
+        )
+
+    total = query.count()
+    items = query.order_by(AuditLog.created_at.desc()).offset((page - 1) * page_size).limit(page_size).all()
+
+    result = []
+    for log, actor in items:
+        result.append({
+            "id": str(log.id),
+            "actor_id": str(log.actor_id) if log.actor_id else None,
+            "actor_name": actor.name if actor else "System",
+            "actor_username": actor.username if actor else "system",
+            "actor_email": actor.email if actor else None,
+            "action": log.action,
+            "entity_type": log.entity_type,
+            "entity_id": log.entity_id,
+            "metadata": log.metadata_,
+            "ip_address": log.ip_address,
+            "created_at": log.created_at.isoformat() if log.created_at else None,
+        })
+
+    return success_response({
+        "items": result,
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+    })
+
+
+# -- Admin Notifications Hub ----------------------------------------------------
+@router.get("/notifications")
+def get_admin_notifications(
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+    limit: int = Query(default=30, ge=1, le=100),
+):
+    """Aggregate actionable platform alerts: pending withdrawals, large deposits, system events."""
+    notifications = []
+
+    # 1. Pending withdrawals (High Priority Action)
+    pending_wds = (
+        db.query(Withdrawal, User)
+        .join(User, Withdrawal.user_id == User.id)
+        .filter(Withdrawal.status == WithdrawalStatus.PENDING)
+        .order_by(Withdrawal.created_at.desc())
+        .limit(10)
+        .all()
+    )
+    for wd, u in pending_wds:
+        notifications.append({
+            "id": f"notif-wd-{wd.id}",
+            "type": "WITHDRAWAL",
+            "priority": "HIGH",
+            "title": f"Withdrawal Request: ₹{wd.amount / 100:.2f}",
+            "message": f"Player @{u.username} ({u.name}) requested ₹{wd.amount / 100:.2f} payout via {wd.method or 'UPI'}.",
+            "created_at": wd.created_at.isoformat() if wd.created_at else datetime.now(timezone.utc).isoformat(),
+            "link": "/admin/withdrawals",
+            "action_id": str(wd.id),
+            "is_read": False,
+        })
+
+    # 2. Recent Large Deposits
+    recent_deps = (
+        db.query(Deposit, User)
+        .join(User, Deposit.user_id == User.id)
+        .order_by(Deposit.created_at.desc())
+        .limit(10)
+        .all()
+    )
+    for dep, u in recent_deps:
+        is_success = dep.status == DepositStatus.SUCCESS
+        status_str = dep.status.value if hasattr(dep.status, "value") else str(dep.status)
+        notifications.append({
+            "id": f"notif-dep-{dep.id}",
+            "type": "DEPOSIT",
+            "priority": "MEDIUM" if dep.amount >= 50000 else "LOW",
+            "title": f"Deposit: ₹{dep.amount / 100:.2f} ({status_str})",
+            "message": f"Player @{u.username} initiated ₹{dep.amount / 100:.2f} deposit via {dep.provider or 'UPI'}.",
+            "created_at": dep.created_at.isoformat() if dep.created_at else datetime.now(timezone.utc).isoformat(),
+            "link": "/admin/deposits",
+            "action_id": str(dep.id),
+            "is_read": is_success,
+        })
+
+    # 3. System Admin Audit events
+    recent_audits = (
+        db.query(AuditLog, User)
+        .outerjoin(User, AuditLog.actor_id == User.id)
+        .order_by(AuditLog.created_at.desc())
+        .limit(10)
+        .all()
+    )
+    for log, actor in recent_audits:
+        actor_name = actor.username if actor else "System"
+        notifications.append({
+            "id": f"notif-audit-{log.id}",
+            "type": "SYSTEM",
+            "priority": "LOW",
+            "title": f"System Event: {log.action}",
+            "message": f"{actor_name} performed {log.action} on {log.entity_type or 'resource'}.",
+            "created_at": log.created_at.isoformat() if log.created_at else datetime.now(timezone.utc).isoformat(),
+            "link": "/admin/audit-logs",
+            "action_id": str(log.id),
+            "is_read": True,
+        })
+
+    notifications.sort(key=lambda x: x["created_at"], reverse=True)
+    unread_count = sum(1 for n in notifications if not n["is_read"])
+
+    return success_response({
+        "items": notifications[:limit],
+        "unread_count": unread_count,
+    })
+
+
+# -- Support Channels & Contact Config -----------------------------------------
+SUPPORT_CONFIG = {
+    "whatsapp_vip": "+91 98765 43210",
+    "whatsapp_url": "https://wa.me/919876543210",
+    "telegram_handle": "@Corona888Support",
+    "telegram_channel": "https://t.me/Corona888Support",
+    "support_email": "support@corona888.tech",
+    "helpline_number": "1800-888-2026",
+    "working_hours": "24/7 Live Support",
+    "faqs": [
+        {
+            "id": "faq-1",
+            "question": "How long does a withdrawal take to credit?",
+            "answer": "Withdrawals are reviewed by financial operators within 15-30 minutes and transferred instantly via IMPS/UPI.",
+        },
+        {
+            "id": "faq-2",
+            "question": "My deposit is not reflecting in my balance. What to do?",
+            "answer": "If a bank transfer or UPI payment takes longer than 5 minutes, send your 12-digit UTR number directly to VIP Support for immediate manual verification.",
+        },
+        {
+            "id": "faq-3",
+            "question": "What are the wagering requirements before withdrawal?",
+            "answer": "Deposits require 1x wagering. Promotional bonuses require custom wagering as displayed in the Wager settings.",
+        },
+    ],
+}
+
+
+class SupportConfigUpdateIn(BaseModel):
+    whatsapp_vip: Optional[str] = None
+    whatsapp_url: Optional[str] = None
+    telegram_handle: Optional[str] = None
+    telegram_channel: Optional[str] = None
+    support_email: Optional[str] = None
+    helpline_number: Optional[str] = None
+    working_hours: Optional[str] = None
+    faqs: Optional[List[Dict[str, Any]]] = None
+
+
+@router.get("/support/config")
+def get_support_config(admin: User = Depends(require_admin)):
+    """Return platform support channels, helpline details, and FAQ items."""
+    return success_response(SUPPORT_CONFIG)
+
+
+@router.put("/support/config")
+def update_support_config(
+    data: SupportConfigUpdateIn,
+    admin: User = Depends(require_permission(AdminPermission.SETTINGS.value)),
+    db: Session = Depends(get_db),
+):
+    """Update customer support channels and FAQs."""
+    update_data = data.model_dump(exclude_none=True)
+    SUPPORT_CONFIG.update(update_data)
+    audit_service.log_action(
+        db, action="SUPPORT_CONFIG_UPDATE", actor_id=admin.id,
+        entity_type="support_configuration", entity_id="default",
+        metadata=update_data,
+    )
+    db.commit()
+    return success_response(SUPPORT_CONFIG)
 

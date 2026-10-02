@@ -4,7 +4,8 @@ from ..dependencies.database import get_db
 from ..schemas.fee import FeeConfigurationOut, FeeConfigurationUpdateIn
 from ..models.fee_configuration import FeeConfiguration
 from ..models.user import User
-from ..security.permissions import require_admin, require_super_admin, require_user
+from ..security.permissions import require_admin, require_super_admin, require_user, require_permission
+from ..models.role import AdminPermission
 from ..services import audit_service
 from ..utils.responses import success_response
 

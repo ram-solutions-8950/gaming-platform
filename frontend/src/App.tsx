@@ -71,6 +71,9 @@ const AdminRBACPage = lazyPage(() => import('./pages/admin/AdminRBAC'), 'AdminRB
 const AdminWagersPage = lazyPage(() => import('./pages/admin/AdminWagers'), 'AdminWagersPage');
 const AdminWinningControlPage = lazyPage(() => import('./pages/admin/AdminWinningControl'), 'AdminWinningControlPage');
 const AdminRewardsPage = lazyPage(() => import('./pages/admin/AdminRewards'), 'AdminRewardsPage');
+const AdminAuditLogsPage = lazyPage(() => import('./pages/admin/AdminAuditLogs'), 'AdminAuditLogsPage');
+const AdminNotificationsPage = lazyPage(() => import('./pages/admin/AdminNotifications'), 'AdminNotificationsPage');
+const AdminSupportPage = lazyPage(() => import('./pages/admin/AdminSupport'), 'AdminSupportPage');
 
 function ProtectedRoute({ adminOnly = false }: { adminOnly?: boolean }) {
   const { user, isLoading } = useAuthStore();
@@ -392,6 +395,9 @@ function App() {
             <Route path="/admin/rbac" element={<AdminRBACPage />} />
             <Route path="/admin/team" element={<AdminRBACPage />} />
             <Route path="/admin/analytics" element={<AdminDashboardPage />} />
+            <Route path="/admin/audit-logs" element={<AdminAuditLogsPage />} />
+            <Route path="/admin/notifications" element={<AdminNotificationsPage />} />
+            <Route path="/admin/support" element={<AdminSupportPage />} />
           </Route>
         </Route>
 

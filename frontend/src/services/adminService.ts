@@ -249,4 +249,31 @@ export const adminService = {
     const res = await api.post(`/admin/withdrawals/${withdrawalId}/reject`, { reason });
     return res.data.data;
   },
+
+  // Audit Logs
+  getAuditLogs: async (page = 1, pageSize = 20, action?: string, entityType?: string, search?: string) => {
+    let url = `/admin/audit-logs?page=${page}&page_size=${pageSize}`;
+    if (action) url += `&action=${encodeURIComponent(action)}`;
+    if (entityType) url += `&entity_type=${encodeURIComponent(entityType)}`;
+    if (search) url += `&search=${encodeURIComponent(search)}`;
+    const res = await api.get(url);
+    return res.data.data;
+  },
+
+  // Notifications
+  getNotifications: async (limit = 30) => {
+    const res = await api.get(`/admin/notifications?limit=${limit}`);
+    return res.data.data;
+  },
+
+  // Support Config
+  getSupportConfig: async () => {
+    const res = await api.get('/admin/support/config');
+    return res.data.data;
+  },
+
+  updateSupportConfig: async (payload: any) => {
+    const res = await api.put('/admin/support/config', payload);
+    return res.data.data;
+  },
 };
