@@ -32,8 +32,10 @@ def _alembic_config():
     cfg = Config(str(BACKEND_ROOT / "alembic.ini"))
     # script_location is relative in alembic.ini, so anchor it to the backend
     # directory rather than whatever cwd the process was launched from.
-    cfg.set_main_option("script_location", str(BACKEND_ROOT / "alembic"))
-    cfg.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
+    db_url = settings.DATABASE_URL
+    if db_url.startswith("postgresql://"):
+        db_url = db_url.replace("postgresql://", "postgresql+psycopg2://", 1)
+    cfg.set_main_option("sqlalchemy.url", db_url)
     return cfg
 
 

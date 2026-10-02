@@ -131,7 +131,22 @@ jobs:
 
             echo "=== 7. VERIFYING STATUS ==="
             docker compose ps
-            curl -sf http://127.0.0.1:8000/api/v1/health || true
+            echo "Waiting for backend health check..."
+            HEALTHY=0
+            for i in $(seq 1 15); do
+              if curl -sf http://127.0.0.1:8000/api/v1/health; then
+                echo "✅ Backend is healthy and responding!"
+                HEALTHY=1
+                break
+              fi
+              echo "Waiting for backend ($i/15)..."
+              sleep 2
+            done
+            if [ "$HEALTHY" -ne 1 ]; then
+              echo "❌ Backend failed to respond to health check. Dumping logs:"
+              docker compose logs --tail=100 backend
+              exit 1
+            fi
             curl -I http://127.0.0.1 || true
 
             echo "=== DEPLOYMENT COMPLETED SUCCESSFULLY ==="

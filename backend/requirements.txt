@@ -1,7 +1,8 @@
 fastapi
 uvicorn[standard]
-sqlalchemy
+sqlalchemy>=2.0.0,<2.1.0
 psycopg2-binary
+psycopg[binary]
 alembic
 pydantic[email]
 pydantic-settings
