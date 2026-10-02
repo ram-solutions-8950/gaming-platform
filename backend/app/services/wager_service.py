@@ -221,57 +221,73 @@ def admin_list_wagers(
     from ..models.user import User
     from sqlalchemy import or_, String, cast
 
-    q = db.query(WagerRequirement).join(User, WagerRequirement.user_id == User.id)
+    user_q = db.query(User)
     if user_id:
-        q = q.filter(WagerRequirement.user_id == user_id)
-    if is_fulfilled is not None:
-        q = q.filter(WagerRequirement.is_fulfilled == is_fulfilled)
+        user_q = user_q.filter(User.id == user_id)
     if search:
         s = f"%{search.strip()}%"
-        q = q.filter(
+        user_q = user_q.filter(
             or_(
                 User.username.ilike(s),
                 User.name.ilike(s),
                 User.email.ilike(s),
-                cast(WagerRequirement.id, String).ilike(s),
-                cast(WagerRequirement.user_id, String).ilike(s),
+                User.phone.ilike(s),
+                cast(User.id, String).ilike(s),
             )
         )
 
-    total = q.count()
-    items = (
-        q.order_by(WagerRequirement.created_at.desc())
-        .offset((page - 1) * page_size)
-        .limit(page_size)
-        .all()
-    )
+    all_users = user_q.order_by(User.created_at.desc()).all()
 
     formatted = []
-    for r in items:
-        u = r.user
-        req_p = int(r.required_amount)
-        comp_p = int(r.completed_amount)
+    for u in all_users:
+        wager_rows = (
+            db.query(WagerRequirement)
+            .filter(WagerRequirement.user_id == u.id)
+            .order_by(WagerRequirement.created_at.desc())
+            .all()
+        )
+
+        req_p = sum(int(r.required_amount) for r in wager_rows)
+        comp_p = sum(int(r.completed_amount) for r in wager_rows)
         rem_p = max(0, req_p - comp_p)
         prog = 100.0 if req_p == 0 else round(min(100.0, (comp_p / req_p) * 100), 1)
+        is_ful = (rem_p == 0) and (req_p > 0 or (wager_rows and all(r.is_fulfilled for r in wager_rows)))
+
+        if is_fulfilled is not None:
+            if is_fulfilled and not is_ful:
+                continue
+            if not is_fulfilled and is_ful:
+                continue
+
+        latest_id = str(wager_rows[0].id) if wager_rows else str(u.id)
+        deposit_id = str(wager_rows[0].deposit_id) if (wager_rows and wager_rows[0].deposit_id) else None
+        created_at = wager_rows[0].created_at.isoformat() if (wager_rows and wager_rows[0].created_at) else (u.created_at.isoformat() if u.created_at else None)
+        updated_at = wager_rows[0].updated_at.isoformat() if (wager_rows and wager_rows[0].updated_at) else None
+
         formatted.append({
-            "id": str(r.id),
-            "user_id": str(r.user_id),
-            "username": u.username if u else "Unknown",
-            "user_name": u.name if u else "Unknown",
-            "deposit_id": str(r.deposit_id) if r.deposit_id else None,
+            "id": latest_id,
+            "user_id": str(u.id),
+            "username": u.username or u.phone or "Unknown",
+            "user_name": u.name or u.username or "Player",
+            "deposit_id": deposit_id,
             "required_amount_paise": req_p,
             "required_amount_inr": round(req_p / 100, 2),
             "completed_amount_paise": comp_p,
             "completed_amount_inr": round(comp_p / 100, 2),
             "remaining_amount_inr": round(rem_p / 100, 2),
             "progress_percent": prog,
-            "is_fulfilled": r.is_fulfilled or rem_p == 0,
-            "created_at": r.created_at.isoformat() if r.created_at else None,
-            "updated_at": r.updated_at.isoformat() if r.updated_at else None,
+            "is_fulfilled": is_ful,
+            "created_at": created_at,
+            "updated_at": updated_at,
         })
 
+    total = len(formatted)
+    start_idx = (page - 1) * page_size
+    end_idx = start_idx + page_size
+    paginated_items = formatted[start_idx:end_idx]
+
     return {
-        "items": formatted,
+        "items": paginated_items,
         "total": total,
         "page": page,
         "page_size": page_size,
@@ -301,8 +317,14 @@ def admin_set_user_wager(
 
 def admin_fulfill_wager(db: Session, wager_id: UUID) -> bool:
     """Manually mark a wager requirement as fulfilled/waived."""
+    from ..models.user import User
     req = db.query(WagerRequirement).filter(WagerRequirement.id == wager_id).first()
     if not req:
+        # Check if wager_id corresponds to a User ID
+        user = db.query(User).filter(User.id == wager_id).first()
+        if user:
+            admin_waive_all_user_wagers(db, user.id)
+            return True
         return False
     req.completed_amount = req.required_amount
     req.is_fulfilled = True

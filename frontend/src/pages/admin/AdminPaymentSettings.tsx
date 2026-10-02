@@ -33,6 +33,7 @@ interface PaymentGatewayConfigItem {
   has_key: boolean;
   has_secret: boolean;
   has_webhook_secret: boolean;
+  api_key?: string;
   api_key_masked: string | null;
   is_sandbox: boolean;
   updated_at: string | null;
@@ -103,7 +104,7 @@ export function AdminPaymentSettingsPage() {
 
   const handleOpenGatewayEdit = (gw: PaymentGatewayConfigItem) => {
     setEditingGateway(gw.gateway_name);
-    setGwApiKey('');
+    setGwApiKey(gw.api_key || '');
     setGwApiSecret('');
     setGwWebhookSecret('');
     setGwIsSandbox(gw.is_sandbox);
@@ -355,7 +356,7 @@ export function AdminPaymentSettingsPage() {
                         <div className="flex items-center justify-between p-2.5 rounded-xl bg-[#141b2d] border border-[#1d273d]">
                           <span className="text-gray-400">API Key / App ID:</span>
                           <span className="font-mono text-gray-200">
-                            {gw.api_key_masked || (gw.has_key ? '••••••••••••••••' : 'Not configured')}
+                            {gw.api_key_masked || ((gw.has_key || gw.api_key) ? '••••••••••••••••' : 'Not configured')}
                           </span>
                         </div>
 

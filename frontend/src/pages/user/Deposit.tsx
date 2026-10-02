@@ -45,8 +45,37 @@ interface DepositResponse {
   provider: string;
   provider_order_id: string;
   currency: string;
-  key_id: string;
+  key_id?: string;
+  payment_session_id?: string;
+  environment?: string;
+  app_id?: string;
   created_at: string;
+}
+
+function loadCashfreeScript(): Promise<boolean> {
+  return new Promise((resolve) => {
+    if ((window as any).Cashfree) {
+      resolve(true);
+      return;
+    }
+
+    const existingScript = document.querySelector(
+      'script[src="https://sdk.cashfree.com/js/v3/cashfree.js"]',
+    );
+
+    if (existingScript) {
+      existingScript.addEventListener('load', () => resolve(true));
+      existingScript.addEventListener('error', () => resolve(false));
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.src = 'https://sdk.cashfree.com/js/v3/cashfree.js';
+    script.async = true;
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.body.appendChild(script);
+  });
 }
 
 function loadRazorpayScript(): Promise<boolean> {
@@ -134,22 +163,12 @@ export function DepositPage() {
     setProcessing(true);
 
     try {
-      // 1. Load Razorpay Checkout.
-      const scriptLoaded =
-        await loadRazorpayScript();
-
-      if (!scriptLoaded) {
-        throw new Error(
-          'Unable to load Razorpay Checkout.',
-        );
-      }
-
-      // 2. Create server-side deposit/order.
+      // 1. Create server-side deposit/order. Active gateway (Cashfree or Razorpay) is resolved on server.
       const response = await api.post(
         '/deposits',
         {
           amount: amountInPaise,
-          provider: 'razorpay',
+          provider: 'auto',
         },
       );
 
@@ -157,95 +176,166 @@ export function DepositPage() {
         response.data.data as DepositResponse;
 
       setDeposit(depositData);
-      setPaymentStatus(
-        'Opening secure Razorpay Checkout...',
-      );
 
-      // 3. Open Razorpay Checkout.
-      const options: RazorpayOptions = {
-        key: depositData.key_id,
-        amount: depositData.amount,
-        currency: depositData.currency,
-        name: 'Corona 888',
-        description: 'Wallet Deposit',
-        order_id:
-          depositData.provider_order_id,
+      if (depositData.provider === 'cashfree') {
+        // --- CASHFREE CHECKOUT FLOW ---
+        setPaymentStatus('Loading Cashfree Checkout...');
+        const cfLoaded = await loadCashfreeScript();
+        if (!cfLoaded || !(window as any).Cashfree) {
+          throw new Error('Unable to load Cashfree payment gateway.');
+        }
 
-        handler: async (
-          paymentResponse: RazorpayResponse,
-        ) => {
+        const cashfree = (window as any).Cashfree({
+          mode: depositData.environment === 'production' ? 'production' : 'sandbox',
+        });
+
+        setPaymentStatus('Opening secure Cashfree Checkout...');
+        cashfree.checkout({
+          paymentSessionId: depositData.payment_session_id,
+          redirectTarget: '_modal',
+        }).then(async (result: any) => {
+          if (result.error) {
+            setErrorMsg(result.error.message || 'Payment was cancelled or failed.');
+            setProcessing(false);
+            return;
+          }
+
           setProcessing(true);
-          setPaymentStatus(
-            'Payment received. Verifying with server...',
-          );
+          setPaymentStatus('Payment submitted. Verifying with server...');
           setErrorMsg('');
 
           try {
-            // 4. Server-side verification.
-            const verifyResponse =
-              await api.post(
-                `/deposits/${depositData.id}/verify`,
-                {
-                  provider_order_id:
-                    paymentResponse.razorpay_order_id,
-                  provider_payment_id:
-                    paymentResponse.razorpay_payment_id,
-                  signature:
-                    paymentResponse.razorpay_signature,
-                },
-              );
+            const verifyResponse = await api.post(
+              `/deposits/${depositData.id}/verify`,
+              {
+                provider_order_id: depositData.provider_order_id,
+                provider_payment_id: result.paymentDetails?.paymentMessage || depositData.provider_order_id,
+                signature: 'cashfree_checkout',
+              },
+            );
 
-            const verifiedDeposit =
-              verifyResponse.data.data;
-
+            const verifiedDeposit = verifyResponse.data.data;
             setDeposit(verifiedDeposit);
 
-            if (
-              verifiedDeposit.status ===
-              'SUCCESS'
-            ) {
+            if (verifiedDeposit.status === 'SUCCESS') {
               setPaymentStatus(
-                'Payment successful. Your wallet has been credited.',
+                'Payment successful! Your wallet has been credited.',
               );
             } else {
               setPaymentStatus(
                 `Payment status: ${verifiedDeposit.status}`,
               );
             }
-          } catch (error: any) {
+          } catch (verifyErr: any) {
             setErrorMsg(
-              error.response?.data?.error?.message ||
-                'Payment verification failed. Please contact support.',
+              verifyErr.response?.data?.message ||
+              verifyErr.response?.data?.error?.message ||
+              'Payment verification pending. Please check wallet in a moment.',
             );
-
-            setPaymentStatus('');
           } finally {
             setProcessing(false);
           }
-        },
+        });
+      } else {
+        // --- RAZORPAY CHECKOUT FLOW ---
+        setPaymentStatus('Loading Razorpay Checkout...');
+        const scriptLoaded =
+          await loadRazorpayScript();
 
-        modal: {
-          ondismiss: () => {
-            if (
-              deposit?.status !== 'SUCCESS'
-            ) {
-              setProcessing(false);
-              setPaymentStatus(
-                'Payment window closed. If you completed the payment, verification may still be processed by the server.',
+        if (!scriptLoaded) {
+          throw new Error(
+            'Unable to load Razorpay Checkout.',
+          );
+        }
+
+        setPaymentStatus(
+          'Opening secure Razorpay Checkout...',
+        );
+
+        const options: RazorpayOptions = {
+          key: depositData.key_id || '',
+          amount: depositData.amount,
+          currency: depositData.currency || 'INR',
+          name: 'Corona 888',
+          description: 'Wallet Deposit',
+          order_id:
+            depositData.provider_order_id,
+
+          handler: async (
+            paymentResponse: RazorpayResponse,
+          ) => {
+            setProcessing(true);
+            setPaymentStatus(
+              'Payment received. Verifying with server...',
+            );
+            setErrorMsg('');
+
+            try {
+              const verifyResponse =
+                await api.post(
+                  `/deposits/${depositData.id}/verify`,
+                  {
+                    provider_order_id:
+                      paymentResponse.razorpay_order_id,
+                    provider_payment_id:
+                      paymentResponse.razorpay_payment_id,
+                    signature:
+                      paymentResponse.razorpay_signature,
+                  },
+                );
+
+              const verifiedDeposit =
+                verifyResponse.data.data;
+
+              setDeposit(verifiedDeposit);
+
+              if (
+                verifiedDeposit.status ===
+                'SUCCESS'
+              ) {
+                setPaymentStatus(
+                  'Payment successful. Your wallet has been credited.',
+                );
+              } else {
+                setPaymentStatus(
+                  `Payment status: ${verifiedDeposit.status}`,
+                );
+              }
+            } catch (error: any) {
+              setErrorMsg(
+                error.response?.data?.error?.message ||
+                  error.response?.data?.message ||
+                  'Payment verification failed. Please contact support.',
               );
+              setPaymentStatus('');
+            } finally {
+              setProcessing(false);
             }
           },
-        },
 
-        theme: {
-          color: '#4f46e5',
-        },
-      };
+          modal: {
+            ondismiss: () => {
+              if (
+                deposit?.status !== 'SUCCESS'
+              ) {
+                setProcessing(false);
+                setPaymentStatus(
+                  'Payment window closed. If you completed the payment, verification may still be processed by the server.',
+                );
+              }
+            },
+          },
 
-      const razorpay =
-        new window.Razorpay(options);
+          theme: {
+            color: '#4f46e5',
+          },
+        };
 
-      razorpay.open();
+        const razorpay =
+          new window.Razorpay(options);
+
+        razorpay.open();
+      }
     } catch (error: any) {
       setErrorMsg(
         error.response?.data?.error?.message ||

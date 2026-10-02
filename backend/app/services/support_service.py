@@ -53,21 +53,29 @@ def get_support_config(db: Session) -> dict:
 
 def update_support_config(db: Session, update_data: dict, admin_id: UUID) -> dict:
     """Update support channels and persist in database."""
+    from sqlalchemy.orm.attributes import flag_modified
     row = db.query(SystemSetting).filter(SystemSetting.key == "support_config").first()
     current = DEFAULT_SUPPORT_CONFIG.copy()
     if row and row.value:
         current.update(row.value)
     current.update(update_data)
 
+    # Automatically synchronize whatsapp_url if whatsapp_vip was updated and whatsapp_url wasn't customized
+    if "whatsapp_vip" in update_data and update_data["whatsapp_vip"]:
+        clean_num = "".join(ch for ch in str(update_data["whatsapp_vip"]) if ch.isdigit())
+        if clean_num and ("whatsapp_url" not in update_data or not update_data["whatsapp_url"]):
+            current["whatsapp_url"] = f"https://wa.me/{clean_num}"
+
     if not row:
         row = SystemSetting(
             key="support_config",
-            value=current,
+            value=dict(current),
             description="Player support channels and contact details",
         )
         db.add(row)
     else:
-        row.value = current
+        row.value = dict(current)
+        flag_modified(row, "value")
         row.updated_at = datetime.now(timezone.utc)
 
     log_action(

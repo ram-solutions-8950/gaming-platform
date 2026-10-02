@@ -1848,7 +1848,21 @@ def update_individual_wager(
     """Edit, increase, or decrease a specific player's wager requirement."""
     req = db.query(WagerRequirement).filter(WagerRequirement.id == wager_id).first()
     if not req:
-        return error_response(404, "Wager requirement not found")
+        # Check if wager_id is actually a User ID
+        user = db.query(User).filter(User.id == wager_id).first()
+        if user:
+            req = db.query(WagerRequirement).filter(WagerRequirement.user_id == user.id).order_by(WagerRequirement.created_at.desc()).first()
+            if not req:
+                req = WagerRequirement(
+                    user_id=user.id,
+                    required_amount=0,
+                    completed_amount=0,
+                    is_fulfilled=False,
+                )
+                db.add(req)
+                db.flush()
+        else:
+            return error_response(404, "Wager requirement not found")
 
     old_req = req.required_amount
     old_comp = req.completed_amount
@@ -2235,6 +2249,8 @@ def list_payment_gateways(
 
     result = []
     for g in gateways:
+        key = g.api_key or ""
+        masked_key = (key[:6] + "*" * (len(key) - 10) + key[-4:]) if len(key) > 10 else ("****" if key else "")
         sec = g.api_secret or ""
         masked_sec = (sec[:4] + "*" * (len(sec) - 8) + sec[-4:]) if len(sec) > 8 else ("****" if sec else "")
         wh = g.webhook_secret or ""
@@ -2245,10 +2261,13 @@ def list_payment_gateways(
             "gateway_name": g.gateway_name,
             "display_name": g.display_name,
             "is_active": g.is_active,
-            "api_key": g.api_key or "",
+            "api_key": key,
+            "api_key_masked": masked_key,
+            "has_key": bool(key),
             "api_secret": masked_sec,
             "has_secret": bool(g.api_secret),
             "webhook_secret": masked_wh,
+            "has_webhook_secret": bool(g.webhook_secret),
             "is_sandbox": g.is_sandbox,
             "updated_at": g.updated_at.isoformat() if g.updated_at else None,
         })

@@ -21,27 +21,8 @@ def get_target_step(current_step: int, roll: int) -> Optional[int]:
     return target
 
 def find_blockades(all_tokens: List[LudoToken], color_map: Dict[str, LudoColor]) -> Dict[int, LudoColor]:
-    """
-    Returns a dict mapping absolute_position -> LudoColor for any cell
-    occupied by 2 or more tokens of the SAME color (excluding Yard and Home).
-    """
-    cell_occupants: Dict[int, List[LudoColor]] = {}
-    for t in all_tokens:
-        if t.position < 0 or t.position >= HOME_STEP:
-            continue
-        c = color_map.get(str(t.player_id))
-        if not c:
-            continue
-        abs_pos = get_absolute_position(t.position, c)
-        if abs_pos < 100:  # Only common track can be blockaded
-            cell_occupants.setdefault(abs_pos, []).append(c)
-
-    blockades: Dict[int, LudoColor] = {}
-    for abs_pos, colors in cell_occupants.items():
-        for color in set(colors):
-            if colors.count(color) >= 2:
-                blockades[abs_pos] = color
-    return blockades
+    """Preserved for compatibility. In standard casual rules, blockades do not block movement."""
+    return {}
 
 def can_move_token(
     token: LudoToken,
@@ -58,25 +39,7 @@ def can_move_token(
     if target_step is None:
         return False
 
-    blockades = find_blockades(all_tokens, color_map)
-
-    if token.position == -1:
-        # Exiting yard onto start position
-        start_abs = get_absolute_position(0, color)
-        # Blocked if an opponent has a blockade on our start position
-        if start_abs in blockades and blockades[start_abs] != color:
-            return False
-        return True
-
-    # Moving along track / home path
-    # Check intermediate steps for opponent blockades
-    for step in range(token.position + 1, target_step + 1):
-        if step <= MAX_TRACK_STEP:
-            abs_p = get_absolute_position(step, color)
-            if abs_p in blockades and blockades[abs_p] != color:
-                # Cannot jump or land on an opponent blockade
-                return False
-
+    # Standard casual Ludo rules: Tokens can freely jump over and pass any occupied squares.
     return True
 
 def get_legal_token_indices(

@@ -44,14 +44,24 @@ export const ServiceModal: React.FC<Props> = ({ onClose }) => {
   }, [onClose]);
 
   // Fetch live contact info
-  useEffect(() => {
-    supportService
-      .getContactConfig()
-      .then((cfg) => {
-        if (cfg) setContactInfo(cfg);
-      })
-      .catch(() => {});
+  const fetchContactConfig = useCallback(async () => {
+    try {
+      const cfg = await supportService.getContactConfig();
+      if (cfg) setContactInfo(cfg);
+    } catch (err) {
+      console.error('Failed to load contact config', err);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchContactConfig();
+  }, [fetchContactConfig]);
+
+  useEffect(() => {
+    if (activeTab === 'channels') {
+      fetchContactConfig();
+    }
+  }, [activeTab, fetchContactConfig]);
 
   const fetchMyTickets = useCallback(async () => {
     setLoadingTickets(true);

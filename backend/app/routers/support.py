@@ -1,7 +1,7 @@
 """Player Support & Helpdesk Router."""
 from typing import Optional
 from pydantic import BaseModel, Field
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy.orm import Session
 
 from ..dependencies.database import get_db
@@ -20,8 +20,11 @@ class TicketCreateIn(BaseModel):
 
 
 @router.get("/contact")
-def get_contact_info(db: Session = Depends(get_db)):
+def get_contact_info(response: Response, db: Session = Depends(get_db)):
     """Return platform direct contact channels (WhatsApp VIP & official email) and FAQs."""
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
     cfg = support_service.get_support_config(db)
     # Ensure Telegram is completely omitted from the public support response
     return success_response({

@@ -23,7 +23,7 @@ export interface UserSupportTicket {
 
 export const supportService = {
   getContactConfig: async (): Promise<SupportContactInfo> => {
-    const res = await api.get('/support/contact');
+    const res = await api.get('/support/contact', { params: { _t: Date.now() } });
     return res.data.data;
   },
 

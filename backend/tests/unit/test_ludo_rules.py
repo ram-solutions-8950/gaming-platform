@@ -56,7 +56,7 @@ def test_token_exact_roll_to_home():
     # Step 54 + 3 = 57 > 56 -> Illegal (overshoot)
     assert get_target_step(54, 3) is None
 
-def test_blockade_prevents_opponent_passing_or_landing():
+def test_tokens_can_freely_pass_opponent_tokens():
     p1_id = uuid.uuid4()
     p2_id = uuid.uuid4()
 
@@ -64,23 +64,15 @@ def test_blockade_prevents_opponent_passing_or_landing():
     t1 = LudoToken(id=uuid.uuid4(), player_id=p1_id, token_index=0, position=5, is_home=False)
     t2 = LudoToken(id=uuid.uuid4(), player_id=p1_id, token_index=1, position=5, is_home=False)
 
-    # Player 2 (Yellow) has token on step 10 (abs pos (26+10)%52 = 36). Let's place Yellow token at abs pos 3
-    # Step for Yellow to reach abs pos 3: (26 + step) % 52 = 3 => step = 29
-    t_yellow = LudoToken(id=uuid.uuid4(), player_id=p2_id, token_index=0, position=27, is_home=False) # abs pos 1
+    # Player 2 (Yellow) has token on step 27 (abs pos 1)
+    t_yellow = LudoToken(id=uuid.uuid4(), player_id=p2_id, token_index=0, position=27, is_home=False)
 
     all_tokens = [t1, t2, t_yellow]
     color_map = {str(p1_id): LudoColor.RED, str(p2_id): LudoColor.YELLOW}
 
-    # Blockade detected at abs pos 5
-    blockades = find_blockades(all_tokens, color_map)
-    assert 5 in blockades
-    assert blockades[5] == LudoColor.RED
-
-    # Yellow token at abs pos 1 rolling 4 wants to land on abs pos 5 (Red blockade) -> Illegal!
-    assert not can_move_token(t_yellow, 4, LudoColor.YELLOW, all_tokens, color_map)
-
-    # Yellow token at abs pos 1 rolling 5 wants to jump past abs pos 5 to abs pos 6 -> Blocked!
-    assert not can_move_token(t_yellow, 5, LudoColor.YELLOW, all_tokens, color_map)
+    # In authentic casual Ludo rules, Yellow token rolling 4 lands freely, and rolling 5 jumps past freely
+    assert can_move_token(t_yellow, 4, LudoColor.YELLOW, all_tokens, color_map)
+    assert can_move_token(t_yellow, 5, LudoColor.YELLOW, all_tokens, color_map)
 
 def test_capture_on_non_safe_cell():
     p1_id = uuid.uuid4()

@@ -17,6 +17,29 @@ from ..models.user import User
 router = APIRouter(prefix="/deposits", tags=["Deposits"])
 
 
+from ..services.payment_service import get_active_gateway_config
+
+@router.get("/config")
+def get_deposit_config(db: Session = Depends(get_db)):
+    """Return active payment gateway details for client checkout."""
+    active_gw = get_active_gateway_config(db)
+    if active_gw and active_gw.is_active:
+        return success_response({
+            "active_gateway": active_gw.gateway_name,
+            "display_name": active_gw.display_name,
+            "is_sandbox": active_gw.is_sandbox,
+            "key_id": active_gw.api_key if active_gw.gateway_name == "razorpay" else None,
+            "app_id": active_gw.api_key if active_gw.gateway_name == "cashfree" else None,
+        })
+    return success_response({
+        "active_gateway": settings.PAYMENT_PROVIDER or "razorpay",
+        "display_name": "Online Payment",
+        "is_sandbox": True,
+        "key_id": settings.PAYMENT_API_KEY,
+        "app_id": None,
+    })
+
+
 @router.post("")
 def create_deposit(
     data: DepositCreateIn,
@@ -24,26 +47,46 @@ def create_deposit(
     db: Session = Depends(get_db),
 ):
     try:
-        provider = (
-            data.provider
-            or settings.PAYMENT_PROVIDER
-            or ""
-        ).strip().lower()
+        active_gw = get_active_gateway_config(db)
+        if active_gw and active_gw.is_active:
+            provider = active_gw.gateway_name.strip().lower()
+        else:
+            provider = (
+                data.provider
+                or settings.PAYMENT_PROVIDER
+                or "razorpay"
+            ).strip().lower()
+
+        customer_email = current_user.email or f"user_{str(current_user.id)[:8]}@corona888.tech"
+        customer_phone = current_user.phone or "9999999999"
 
         deposit = deposit_service.create_deposit(
-            db,
-            current_user.id,
-            data.amount,
-            provider,
+            db=db,
+            user_id=current_user.id,
+            amount=data.amount,
+            provider_name=provider,
+            metadata={
+                "email": customer_email,
+                "phone": customer_phone,
+                "name": current_user.name or current_user.username or "Player",
+            },
         )
 
         response = DepositOut.model_validate(
             deposit
         ).model_dump()
 
+        response["provider"] = provider
+        response["currency"] = "INR"
+
         if provider == "razorpay":
-            response["currency"] = "INR"
-            response["key_id"] = settings.PAYMENT_API_KEY
+            key_id = (active_gw.api_key if active_gw and active_gw.gateway_name == "razorpay" and active_gw.api_key else settings.PAYMENT_API_KEY)
+            response["key_id"] = key_id
+        elif provider == "cashfree":
+            meta = deposit.metadata_ or {}
+            response["payment_session_id"] = meta.get("payment_session_id")
+            response["environment"] = meta.get("environment", "sandbox" if (active_gw and active_gw.is_sandbox) else "production")
+            response["app_id"] = active_gw.api_key if active_gw else ""
 
         return success_response(
             response,

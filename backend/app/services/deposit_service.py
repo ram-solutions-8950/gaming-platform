@@ -75,7 +75,7 @@ def create_deposit(
     db.add(deposit)
     db.flush()
 
-    payment_provider = get_provider(provider_name)
+    payment_provider = get_provider(provider_name, db=db)
 
     provider_result = payment_provider.create_payment(
         amount=amount,
@@ -97,6 +97,9 @@ def create_deposit(
             "currency",
             "INR",
         ),
+        "payment_session_id": provider_result.get("payment_session_id"),
+        "environment": provider_result.get("environment"),
+        "provider": provider_result.get("provider", provider_name),
     }
 
     db.commit()
@@ -134,22 +137,22 @@ def verify_deposit_payment(
     if not deposit:
         raise ValueError("Deposit not found")
 
-    if deposit.provider != "razorpay":
+    if deposit.provider not in ("razorpay", "cashfree"):
         raise ValueError(
-            "This deposit does not use Razorpay"
+            f"Unsupported provider for online verification: {deposit.provider}"
         )
 
     if not deposit.provider_order_id:
         raise ValueError(
-            "Deposit has no Razorpay order ID"
+            f"Deposit has no {deposit.provider} order ID"
         )
 
     # Never trust an order ID supplied by the browser.
-    if str(provider_order_id) != str(
+    if provider_order_id and str(provider_order_id) != str(
         deposit.provider_order_id
     ):
         raise ValueError(
-            "Razorpay order ID does not match deposit"
+            f"{deposit.provider.capitalize()} order ID does not match deposit"
         )
 
     # Already completed.
@@ -167,24 +170,25 @@ def verify_deposit_payment(
             f"{deposit.status.value} state"
         )
 
-    provider = get_provider("razorpay")
+    provider = get_provider(deposit.provider, db=db)
 
-    # Verify Razorpay checkout signature.
-    if not provider.verify_payment(
-        provider_order_id=str(
-            deposit.provider_order_id
-        ),
-        provider_payment_id=str(
-            provider_payment_id
-        ),
-        signature=str(signature),
-    ):
-        db.rollback()
-        raise ValueError(
-            "Invalid Razorpay payment signature"
-        )
+    if deposit.provider == "razorpay":
+        # Verify Razorpay checkout signature.
+        if not provider.verify_payment(
+            provider_order_id=str(
+                deposit.provider_order_id
+            ),
+            provider_payment_id=str(
+                provider_payment_id
+            ),
+            signature=str(signature),
+        ):
+            db.rollback()
+            raise ValueError(
+                "Invalid Razorpay payment signature"
+            )
 
-    # Query Razorpay's server-side API.
+    # Query provider's server-side API (both Razorpay and Cashfree implement get_payment_status)
     provider_status = provider.get_payment_status(
         str(deposit.provider_order_id)
     )
@@ -192,18 +196,18 @@ def verify_deposit_payment(
     if provider_status.get("status") != "SUCCESS":
         db.rollback()
         raise ValueError(
-            "Razorpay payment has not been captured"
+            f"{deposit.provider.capitalize()} payment has not been captured (status: {provider_status.get('status')})"
         )
 
     provider_amount = int(
         provider_status.get("amount", 0)
     )
 
-    # Amount must match the original Deposit.
-    if provider_amount != int(deposit.amount):
+    # Amount must match the original Deposit if returned.
+    if provider_amount > 0 and provider_amount != int(deposit.amount):
         db.rollback()
         raise ValueError(
-            "Razorpay payment amount does not match deposit"
+            f"{deposit.provider.capitalize()} payment amount does not match deposit"
         )
 
     actual_payment_id = (
@@ -211,6 +215,7 @@ def verify_deposit_payment(
             "provider_payment_id"
         )
         or provider_payment_id
+        or str(deposit.provider_order_id)
     )
 
     deposit.status = DepositStatus.SUCCESS
@@ -226,7 +231,7 @@ def verify_deposit_payment(
 
     reference_type = "payment_verification"
     reference_id = (
-        f"razorpay:{deposit.id}"
+        f"{deposit.provider}:{deposit.id}"
     )
 
     try:
@@ -238,7 +243,7 @@ def verify_deposit_payment(
             reference_type=reference_type,
             reference_id=reference_id,
             metadata={
-                "provider": "razorpay",
+                "provider": deposit.provider,
                 "deposit_id": str(deposit.id),
                 "provider_order_id": str(
                     deposit.provider_order_id
