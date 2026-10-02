@@ -42,6 +42,10 @@ class CashfreeProvider(PaymentProvider):
         metadata: Optional[dict] = None,
     ) -> dict:
         """Create a Cashfree payment order. amount is in paise."""
+        if not self.app_id or not self.secret_key:
+            logger.warning("Cashfree App ID or Secret Key is not configured.")
+            raise ValueError("Cashfree payment credentials are not configured. Please enter your Cashfree App ID and Secret Key in Admin Panel > Payment Gateways.")
+
         if amount <= 0:
             raise ValueError("Payment amount must be positive")
 
@@ -76,7 +80,13 @@ class CashfreeProvider(PaymentProvider):
                 )
                 if resp.status_code not in (200, 201):
                     logger.error("Cashfree create order error: %s %s", resp.status_code, resp.text)
-                    raise ValueError(f"Cashfree order creation failed: {resp.text}")
+                    err_msg = resp.text
+                    try:
+                        err_data = resp.json()
+                        err_msg = err_data.get("message") or err_data.get("error") or resp.text
+                    except Exception:
+                        pass
+                    raise ValueError(f"Cashfree order creation failed: {err_msg}")
 
                 data = resp.json()
                 return {

@@ -30,13 +30,15 @@ def get_deposit_config(db: Session = Depends(get_db)):
             "is_sandbox": active_gw.is_sandbox,
             "key_id": active_gw.api_key if active_gw.gateway_name == "razorpay" else None,
             "app_id": active_gw.api_key if active_gw.gateway_name == "cashfree" else None,
+            "has_credentials": bool(active_gw.api_key and active_gw.api_secret),
         })
     return success_response({
         "active_gateway": settings.PAYMENT_PROVIDER or "razorpay",
-        "display_name": "Online Payment",
+        "display_name": "Razorpay Standard PG",
         "is_sandbox": True,
         "key_id": settings.PAYMENT_API_KEY,
         "app_id": None,
+        "has_credentials": bool(settings.PAYMENT_API_KEY and settings.PAYMENT_SECRET),
     })
 
 
@@ -64,6 +66,7 @@ def create_deposit(
             db=db,
             user_id=current_user.id,
             amount=data.amount,
+            provider=provider,
             provider_name=provider,
             metadata={
                 "email": customer_email,
@@ -97,6 +100,11 @@ def create_deposit(
         return error_response(
             "DEPOSIT_ERROR",
             str(e),
+        )
+    except Exception as e:
+        return error_response(
+            "DEPOSIT_ERROR",
+            str(e) or "An unexpected error occurred while initiating payment.",
         )
 
 

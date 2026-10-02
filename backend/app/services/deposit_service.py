@@ -3,11 +3,12 @@ from typing import Optional
 
 from sqlalchemy.orm import Session
 
+from ..config import settings
 from ..models.deposit import Deposit, DepositStatus
 from ..models.wallet import Wallet
 from ..models.payment import PaymentConfiguration
 from ..models.transaction import WalletTransactionType
-from ..services.payment_service import get_provider
+from ..services.payment_service import get_provider, get_active_gateway_config
 from ..services.wallet_service import credit_wallet
 
 
@@ -16,6 +17,7 @@ def create_deposit(
     user_id: UUID,
     amount: int,
     provider: Optional[str] = None,
+    provider_name: Optional[str] = None,
     external_reference: Optional[str] = None,
     metadata: Optional[dict] = None,
 ) -> Deposit:
@@ -33,34 +35,35 @@ def create_deposit(
             "Deposit amount must be strictly positive"
         )
 
+    # 1. Resolve requested or active gateway provider
+    active_gw = get_active_gateway_config(db)
+    resolved_provider = (provider or provider_name or "").strip().lower()
+    if not resolved_provider or resolved_provider in ("auto", "gateway", "active"):
+        if active_gw and active_gw.is_active:
+            resolved_provider = active_gw.gateway_name.strip().lower()
+        else:
+            resolved_provider = (settings.PAYMENT_PROVIDER or "razorpay").strip().lower()
+
+    # 2. Deposit limits: Check manual config if enabled, otherwise use platform defaults (₹100 - ₹10,000)
     active_config = (
         db.query(PaymentConfiguration)
         .filter(PaymentConfiguration.enabled.is_(True))
         .first()
     )
+    min_dep = active_config.minimum_deposit if active_config else 10000  # ₹100 in paise
+    max_dep = active_config.maximum_deposit if active_config else 1000000  # ₹10,000 in paise
 
-    if not active_config:
+    if amount < min_dep:
         raise ValueError(
-            "No active payment provider available"
+            f"Amount is below the minimum deposit of ₹{min_dep / 100:.2f}"
         )
 
-    if amount < active_config.minimum_deposit:
+    if amount > max_dep:
         raise ValueError(
-            f"Amount is below the minimum deposit of "
-            f"₹{active_config.minimum_deposit / 100:.2f}"
+            f"Amount exceeds the maximum deposit of ₹{max_dep / 100:.2f}"
         )
 
-    if amount > active_config.maximum_deposit:
-        raise ValueError(
-            f"Amount exceeds the maximum deposit of "
-            f"₹{active_config.maximum_deposit / 100:.2f}"
-        )
-
-    provider_name = (
-        provider
-        or active_config.provider
-        or "razorpay"
-    ).strip().lower()
+    provider_name_final = resolved_provider or "razorpay"
 
     deposit = Deposit(
         user_id=user_id,

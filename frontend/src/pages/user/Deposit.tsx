@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { Card } from '../../components/common/Card';
@@ -35,6 +35,15 @@ interface RazorpayResponse {
 interface RazorpayInstance {
   open: () => void;
   close: () => void;
+}
+
+interface ActiveGatewayConfig {
+  active_gateway: string;
+  display_name: string;
+  is_sandbox: boolean;
+  key_id?: string | null;
+  app_id?: string | null;
+  has_credentials?: boolean;
 }
 
 interface DepositResponse {
@@ -115,9 +124,28 @@ export function DepositPage() {
   const [processing, setProcessing] = useState(false);
   const [paymentStatus, setPaymentStatus] = useState('');
   const [deposit, setDeposit] = useState<DepositResponse | null>(null);
+  const [gatewayConfig, setGatewayConfig] = useState<ActiveGatewayConfig | null>(null);
 
   const minimumDeposit = 100;
   const maximumDeposit = 10000;
+
+  useEffect(() => {
+    let isMounted = true;
+    api
+      .get('/deposits/config')
+      .then((res) => {
+        if (isMounted && res.data?.data) {
+          setGatewayConfig(res.data.data);
+        }
+      })
+      .catch((err) => {
+        console.warn('Failed to load active payment gateway config:', err);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const handleAmountChange = (
     e: React.ChangeEvent<HTMLInputElement>,
@@ -347,6 +375,18 @@ export function DepositPage() {
     }
   };
 
+  const isCashfree = gatewayConfig?.active_gateway === 'cashfree';
+  const cardTitle = gatewayConfig
+    ? `${gatewayConfig.display_name} Deposit`
+    : 'Secure Online Deposit';
+  const buttonLabel = processing
+    ? 'Processing...'
+    : isCashfree
+    ? 'Pay Securely via Cashfree ⚡'
+    : gatewayConfig?.active_gateway === 'razorpay'
+    ? 'Pay Securely via Razorpay ⚡'
+    : `Pay Securely via ${gatewayConfig?.display_name || 'Gateway'} ⚡`;
+
   return (
     <div className="deposit-page w-full max-w-xl mx-auto space-y-4">
       <div className="deposit-page-header flex flex-wrap items-center justify-between gap-3">
@@ -365,12 +405,19 @@ export function DepositPage() {
             Deposit Funds
           </h1>
         </div>
-        <span className="deposit-page-badge text-xs text-brand-400 bg-brand-500/10 border border-brand-500/20 px-2.5 py-1 rounded-full font-semibold shrink-0">
-          Instant Credit ⚡
-        </span>
+        <div className="flex items-center gap-2">
+          {gatewayConfig?.is_sandbox && (
+            <span className="text-[10px] text-amber-300 bg-amber-500/15 border border-amber-500/30 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider shrink-0">
+              Sandbox Mode
+            </span>
+          )}
+          <span className="deposit-page-badge text-xs text-brand-400 bg-brand-500/10 border border-brand-500/20 px-2.5 py-1 rounded-full font-semibold shrink-0">
+            Instant Credit ⚡
+          </span>
+        </div>
       </div>
 
-      <Card title="Razorpay Secure Deposit" className="deposit-card">
+      <Card title={cardTitle} className="deposit-card">
         <div className="deposit-card-body space-y-4">
           <div>
             <label className="deposit-amount-label block text-xs font-medium text-gray-400 mb-1.5">
@@ -446,6 +493,10 @@ export function DepositPage() {
                 <span className="text-white font-mono">{deposit.id.slice(0, 12)}...</span>
               </div>
               <div className="flex justify-between">
+                <span className="text-gray-400">Gateway:</span>
+                <span className="text-cyan-400 font-bold uppercase">{deposit.provider}</span>
+              </div>
+              <div className="flex justify-between">
                 <span className="text-gray-400">Amount:</span>
                 <span className="text-gold-400 font-bold">₹{(deposit.amount / 100).toFixed(2)}</span>
               </div>
@@ -457,7 +508,7 @@ export function DepositPage() {
             disabled={processing || !amount}
             className="deposit-submit-btn w-full bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-500 hover:to-green-500 disabled:from-dark-800 disabled:to-dark-800 disabled:text-gray-600 text-white font-extrabold py-3 px-4 rounded-xl shadow-lg shadow-green-600/20 transition-all cursor-pointer text-sm active:scale-95"
           >
-            {processing ? 'Processing...' : 'Pay Securely via Razorpay ⚡'}
+            {buttonLabel}
           </button>
         </div>
       </Card>

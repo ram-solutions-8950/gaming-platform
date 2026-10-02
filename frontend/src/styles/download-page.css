@@ -1,8 +1,18 @@
 /* ───────────────────────────────────────────────────────────
    Corona 888 - OFFICIAL APK DOWNLOAD POSTER PAGE
-   Matches reference design: Red/Blue split neon, tactical frame,
-   authentic logo, golden 888, neon gradient button, glass cards.
+   Centralized, compact, responsive tactical card design.
    ─────────────────────────────────────────────────────────── */
+
+/* Allow smooth scrolling on download page so mobile viewports never clip */
+html:has(.c888-download-root),
+body:has(.c888-download-root),
+#root:has(.c888-download-root) {
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  height: auto !important;
+  min-height: 100% !important;
+  max-height: none !important;
+}
 
 .c888-download-root {
   min-height: 100vh;
@@ -16,15 +26,15 @@
   box-sizing: border-box;
   background-color: #04060d;
   background-image:
-    radial-gradient(ellipse 45% 45% at 5% 30%, rgba(239, 68, 68, 0.18) 0%, transparent 70%),
-    radial-gradient(ellipse 45% 45% at 95% 30%, rgba(0, 176, 255, 0.20) 0%, transparent 70%),
-    radial-gradient(circle 35% at 50% 60%, rgba(147, 51, 234, 0.12) 0%, transparent 70%),
-    radial-gradient(circle at 50% 15%, rgba(255, 255, 255, 0.03) 0%, transparent 50%),
+    radial-gradient(ellipse 50% 50% at 5% 30%, rgba(239, 68, 68, 0.16) 0%, transparent 70%),
+    radial-gradient(ellipse 50% 50% at 95% 30%, rgba(0, 176, 255, 0.18) 0%, transparent 70%),
+    radial-gradient(circle 40% at 50% 60%, rgba(147, 51, 234, 0.10) 0%, transparent 70%),
     linear-gradient(180deg, #050811 0%, #030409 100%);
   color: #f1f5f9;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   margin: 0;
   overflow-x: hidden;
+  overflow-y: auto;
   position: relative;
 }
 
@@ -34,32 +44,32 @@
   position: fixed;
   inset: 0;
   background:
-    radial-gradient(circle at 20% 40%, rgba(255, 23, 68, 0.05) 0%, transparent 40%),
-    radial-gradient(circle at 80% 40%, rgba(0, 176, 255, 0.05) 0%, transparent 40%);
+    radial-gradient(circle at 20% 40%, rgba(255, 23, 68, 0.04) 0%, transparent 40%),
+    radial-gradient(circle at 80% 40%, rgba(0, 176, 255, 0.04) 0%, transparent 40%);
   pointer-events: none;
   z-index: 1;
 }
 
-/* Outer Tactical Cyberpunk Poster Card Frame */
+/* Outer Tactical Cyberpunk Poster Card Frame - Centralized and Compact */
 .c888-poster-frame {
   width: 100%;
-  max-width: 480px;
-  margin: 0 auto;
+  max-width: 410px;
+  margin: auto;
   position: relative;
   z-index: 2;
   box-sizing: border-box;
-  padding: 24px 22px 26px;
-  background: rgba(7, 11, 22, 0.88);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border-radius: 28px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 20px 18px 22px;
+  background: rgba(7, 11, 22, 0.92);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border-radius: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
   box-shadow:
-    -6px 0 35px -4px rgba(239, 68, 68, 0.3),
-    6px 0 35px -4px rgba(0, 176, 255, 0.32),
-    0 24px 60px rgba(0, 0, 0, 0.9),
-    inset 0 1px 0 rgba(255, 255, 255, 0.15),
-    inset 0 0 30px rgba(0, 0, 0, 0.6);
+    -6px 0 30px -4px rgba(239, 68, 68, 0.25),
+    6px 0 30px -4px rgba(0, 176, 255, 0.28),
+    0 20px 50px rgba(0, 0, 0, 0.85),
+    inset 0 1px 0 rgba(255, 255, 255, 0.14),
+    inset 0 0 24px rgba(0, 0, 0, 0.5);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -69,8 +79,8 @@
 /* Tactical Chamfered Corner Accents (Red on left, Blue on right) */
 .c888-frame-corner {
   position: absolute;
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
   pointer-events: none;
   z-index: 5;
 }
@@ -111,46 +121,46 @@
   filter: drop-shadow(0 0 6px rgba(0, 176, 255, 0.8));
 }
 
-/* 1. Large Corona 888 Tactical Emblem Logo Container */
+/* 1. Logo Container - Sleek and Proportional */
 .c888-logo-container {
   width: 100%;
-  max-width: 420px;
+  max-width: 320px;
   display: flex;
   justify-content: center;
   align-items: center;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
   position: relative;
 }
 
 .c888-logo-img {
-  width: 100%;
-  height: auto;
-  max-height: 250px;
+  width: auto;
+  max-width: 100%;
+  max-height: 125px;
   object-fit: contain;
   filter:
-    drop-shadow(0 10px 25px rgba(0, 0, 0, 0.85))
-    drop-shadow(-8px 0 20px rgba(239, 68, 68, 0.35))
-    drop-shadow(8px 0 20px rgba(0, 176, 255, 0.35));
+    drop-shadow(0 8px 20px rgba(0, 0, 0, 0.8))
+    drop-shadow(-6px 0 16px rgba(239, 68, 68, 0.3))
+    drop-shadow(6px 0 16px rgba(0, 176, 255, 0.3));
   user-select: none;
   pointer-events: none;
 }
 
 /* 2. Main Title: "Corona 888" */
 .c888-title {
-  margin: 0 0 4px;
-  font-size: clamp(2.1rem, 6.5vw, 2.75rem);
+  margin: 0 0 2px;
+  font-size: clamp(24px, 6.2vw, 30px);
   font-weight: 900;
   letter-spacing: 0.02em;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
-  line-height: 1.1;
+  gap: 8px;
+  line-height: 1.15;
 }
 
 .c888-title .title-corona {
   color: #ffffff;
-  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.8);
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.8);
 }
 
 .c888-title .title-888 {
@@ -158,41 +168,40 @@
   background: linear-gradient(180deg, #fff2be 0%, #ffc83b 50%, #f59e0b 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
-  filter: drop-shadow(0 0 16px rgba(255, 200, 59, 0.6));
+  filter: drop-shadow(0 0 14px rgba(255, 200, 59, 0.6));
 }
 
 /* 3. Sub-title: "OFFICIAL ANDROID APPLICATION" */
 .c888-subtitle {
-  font-size: clamp(0.85rem, 2.8vw, 1.02rem);
+  font-size: 11px;
   font-weight: 800;
-  letter-spacing: 0.15em;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
   color: #a78bfa;
   background: linear-gradient(90deg, #c084fc 0%, #a78bfa 50%, #818cf8 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
-  filter: drop-shadow(0 0 12px rgba(167, 139, 250, 0.5));
-  margin-bottom: 12px;
+  filter: drop-shadow(0 0 10px rgba(167, 139, 250, 0.45));
+  margin-bottom: 6px;
 }
 
 /* 4. Description */
 .c888-desc {
-  font-size: clamp(0.92rem, 2.7vw, 1.05rem);
-  color: #f1f5f9;
-  line-height: 1.48;
-  margin: 0 0 22px;
+  font-size: 12.5px;
+  color: #cbd5e1;
+  line-height: 1.4;
+  margin: 0 0 14px;
   max-width: 320px;
   font-weight: 400;
-  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
 }
 
 /* 5. Trust / Information Badges Row */
 .c888-badges-row {
   display: flex;
-  gap: 12px;
+  gap: 8px;
   width: 100%;
-  max-width: 410px;
-  margin-bottom: 24px;
+  margin-bottom: 16px;
 }
 
 .c888-badge {
@@ -200,14 +209,14 @@
   min-width: 0;
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 10px 12px;
+  gap: 8px;
+  padding: 8px 10px;
   background: rgba(10, 18, 34, 0.85);
-  border: 1px solid rgba(56, 189, 248, 0.28);
-  border-radius: 14px;
+  border: 1px solid rgba(56, 189, 248, 0.25);
+  border-radius: 12px;
   box-shadow:
-    0 6px 18px rgba(0, 0, 0, 0.5),
-    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    0 4px 14px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
   box-sizing: border-box;
   text-align: left;
 }
@@ -220,8 +229,8 @@
 }
 
 .c888-badge-icon {
-  width: 22px;
-  height: 22px;
+  width: 20px;
+  height: 20px;
   display: block;
 }
 
@@ -233,16 +242,16 @@
 }
 
 .c888-badge-title {
-  font-size: 12.5px;
+  font-size: 11.5px;
   font-weight: 800;
   color: #ffffff;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.02em;
   white-space: nowrap;
-  line-height: 1.25;
+  line-height: 1.2;
 }
 
 .c888-badge-sub {
-  font-size: 11px;
+  font-size: 10px;
   color: #94a3b8;
   font-weight: 500;
   white-space: nowrap;
@@ -252,78 +261,63 @@
 /* 6. Primary DOWNLOAD APK Button */
 .c888-download-btn {
   width: 100%;
-  max-width: 410px;
-  min-height: 60px;
+  min-height: 52px;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 12px;
+  gap: 10px;
   background: linear-gradient(90deg, #ff1744 0%, #e11d48 20%, #9333ea 50%, #2563eb 80%, #00b0ff 100%);
   color: #ffffff;
-  font-size: clamp(17px, 4.5vw, 20px);
+  font-size: clamp(16px, 4vw, 18px);
   font-weight: 900;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   text-decoration: none;
-  padding: 16px 24px;
-  border-radius: 18px;
+  padding: 13px 20px;
+  border-radius: 16px;
   border: 1.5px solid rgba(255, 255, 255, 0.45);
   box-shadow:
-    0 0 28px rgba(255, 23, 68, 0.5),
-    0 0 35px rgba(0, 176, 255, 0.5),
-    0 10px 24px rgba(0, 0, 0, 0.6),
-    inset 0 1px 2px rgba(255, 255, 255, 0.65);
+    0 0 24px rgba(255, 23, 68, 0.45),
+    0 0 30px rgba(0, 176, 255, 0.45),
+    0 8px 20px rgba(0, 0, 0, 0.6),
+    inset 0 1px 2px rgba(255, 255, 255, 0.6);
   cursor: pointer;
   box-sizing: border-box;
   transition: transform 0.16s ease, filter 0.16s ease, box-shadow 0.16s ease;
   user-select: none;
   -webkit-tap-highlight-color: transparent;
-  margin-bottom: 22px;
+  margin-bottom: 14px;
 }
 
 .c888-download-btn:hover {
   transform: translateY(-2px) scale(1.01);
-  filter: brightness(1.12);
+  filter: brightness(1.1);
   box-shadow:
-    0 0 36px rgba(255, 23, 68, 0.65),
-    0 0 45px rgba(0, 176, 255, 0.65),
-    0 14px 30px rgba(0, 0, 0, 0.7),
-    inset 0 1px 2px rgba(255, 255, 255, 0.8);
+    0 0 32px rgba(255, 23, 68, 0.6),
+    0 0 40px rgba(0, 176, 255, 0.6),
+    0 12px 24px rgba(0, 0, 0, 0.7);
 }
 
 .c888-download-btn:active {
   transform: translateY(1px) scale(0.99);
-  box-shadow:
-    0 0 18px rgba(255, 23, 68, 0.4),
-    0 0 22px rgba(0, 176, 255, 0.4),
-    0 6px 16px rgba(0, 0, 0, 0.5);
 }
 
 .c888-btn-icon {
-  width: 24px;
-  height: 24px;
+  width: 22px;
+  height: 22px;
   flex-shrink: 0;
-  transition: transform 0.2s ease;
 }
 
-.c888-download-btn:hover .c888-btn-icon {
-  transform: translateY(2px);
-}
-
-/* 7. Installation Note Card */
+/* 7. Installation Tip Note Card */
 .c888-install-note {
   width: 100%;
-  max-width: 410px;
   display: flex;
   align-items: flex-start;
-  gap: 12px;
-  padding: 14px 16px;
-  background: rgba(8, 14, 26, 0.88);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 16px;
-  box-shadow:
-    0 8px 24px rgba(0, 0, 0, 0.5),
-    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  gap: 10px;
+  padding: 10px 12px;
+  background: rgba(8, 14, 26, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
   box-sizing: border-box;
   text-align: left;
 }
@@ -334,21 +328,247 @@
 }
 
 .c888-note-icon {
-  width: 22px;
-  height: 22px;
+  width: 18px;
+  height: 18px;
   display: block;
 }
 
 .c888-note-content {
-  font-size: 12.5px;
-  line-height: 1.5;
-  color: #e2e8f0;
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: #cbd5e1;
   margin: 0;
 }
 
 .c888-note-lead {
   color: #fbbf24;
   font-weight: 800;
+}
+
+/* ───────────────────────────────────────────────────────────
+   DOWNLOAD STARTED SUCCESS SCREEN (Requested in Audio Note)
+   ─────────────────────────────────────────────────────────── */
+
+.c888-success-container {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  animation: c888FadeScale 0.24s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes c888FadeScale {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.c888-success-icon-wrap {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 8px;
+}
+
+.c888-pulse-ring {
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  border: 2px solid rgba(34, 197, 94, 0.5);
+  animation: c888Pulse 1.8s infinite ease-out;
+}
+
+@keyframes c888Pulse {
+  0% {
+    transform: scale(0.85);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1.35);
+    opacity: 0;
+  }
+}
+
+.c888-pulse-circle {
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  background: rgba(34, 197, 94, 0.18);
+  border: 2px solid rgba(34, 197, 94, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 20px rgba(34, 197, 94, 0.45);
+}
+
+.c888-success-check-icon {
+  width: 30px;
+  height: 30px;
+}
+
+.c888-success-badge {
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  color: #4ade80;
+  background: rgba(34, 197, 94, 0.12);
+  border: 1px solid rgba(34, 197, 94, 0.35);
+  padding: 4px 10px;
+  border-radius: 20px;
+  margin-bottom: 4px;
+}
+
+.c888-success-title {
+  font-size: 20px;
+  font-weight: 900;
+  color: #ffffff;
+  margin: 2px 0 10px;
+}
+
+/* Highlight Golden Voice Alert Box matching user instructions */
+.c888-voice-alert-box {
+  width: 100%;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  background: linear-gradient(135deg, rgba(234, 179, 8, 0.16) 0%, rgba(245, 158, 11, 0.08) 100%);
+  border: 1.5px solid rgba(234, 179, 8, 0.6);
+  border-radius: 14px;
+  box-shadow:
+    0 0 24px rgba(234, 179, 8, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  box-sizing: border-box;
+  text-align: left;
+  margin-bottom: 14px;
+}
+
+.c888-voice-alert-icon {
+  font-size: 20px;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.c888-voice-alert-text {
+  flex: 1;
+}
+
+.c888-voice-alert-lead {
+  font-size: 13.5px;
+  font-weight: 800;
+  color: #fef08a;
+  line-height: 1.35;
+  margin-bottom: 3px;
+}
+
+.c888-voice-alert-sub {
+  font-size: 11px;
+  color: #fef9c3;
+  line-height: 1.4;
+  opacity: 0.9;
+}
+
+/* Step-by-Step Installation Cards */
+.c888-steps-card {
+  width: 100%;
+  background: rgba(14, 21, 37, 0.92);
+  border: 1px solid rgba(56, 189, 248, 0.25);
+  border-radius: 14px;
+  padding: 12px 14px;
+  box-sizing: border-box;
+  text-align: left;
+  margin-bottom: 14px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+
+.c888-step-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.c888-step-number {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #0284c7 0%, #2563eb 100%);
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 1px;
+  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.4);
+}
+
+.c888-step-body {
+  flex: 1;
+}
+
+.c888-step-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: #ffffff;
+  display: block;
+  line-height: 1.25;
+}
+
+.c888-step-desc {
+  font-size: 11px;
+  color: #94a3b8;
+  display: block;
+  line-height: 1.35;
+  margin-top: 2px;
+}
+
+.c888-step-desc strong {
+  color: #e2e8f0;
+}
+
+.c888-step-divider {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.08);
+  margin: 8px 0;
+}
+
+/* Re-download Button */
+.c888-redownload-btn {
+  width: 100%;
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: rgba(26, 35, 58, 0.8);
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  color: #38bdf8;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 10px 16px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.c888-redownload-btn:hover {
+  background: rgba(35, 47, 78, 0.95);
+  border-color: rgba(56, 189, 248, 0.6);
+  color: #ffffff;
+}
+
+.c888-redownload-btn:active {
+  transform: scale(0.98);
 }
 
 /* ───────────────────────────────────────────────────────────
@@ -360,77 +580,79 @@
   }
 
   .c888-poster-frame {
-    padding: 18px 14px 20px;
-    border-radius: 22px;
+    padding: 16px 14px 18px;
+    border-radius: 20px;
   }
 
   .c888-logo-img {
-    max-height: 200px;
+    max-height: 115px;
   }
 
   .c888-title {
-    font-size: 28px;
-    margin-bottom: 2px;
+    font-size: 24px;
   }
 
   .c888-subtitle {
-    font-size: 12px;
-    margin-bottom: 10px;
+    font-size: 10.5px;
+    margin-bottom: 5px;
   }
 
   .c888-desc {
-    font-size: 13.5px;
-    margin-bottom: 18px;
+    font-size: 12px;
+    margin-bottom: 12px;
   }
 
   .c888-badges-row {
-    gap: 8px;
-    margin-bottom: 20px;
+    gap: 6px;
+    margin-bottom: 14px;
   }
 
   .c888-badge {
-    padding: 8px 10px;
-    border-radius: 12px;
-    gap: 8px;
+    padding: 7px 8px;
+    border-radius: 10px;
+    gap: 6px;
   }
 
   .c888-badge-title {
-    font-size: 11.5px;
+    font-size: 11px;
   }
 
   .c888-badge-sub {
-    font-size: 10px;
+    font-size: 9.5px;
   }
 
   .c888-badge-icon {
-    width: 19px;
-    height: 19px;
+    width: 18px;
+    height: 18px;
   }
 
   .c888-download-btn {
-    min-height: 54px;
-    font-size: 16.5px;
-    padding: 14px 18px;
-    margin-bottom: 18px;
-    border-radius: 16px;
-  }
-
-  .c888-btn-icon {
-    width: 21px;
-    height: 21px;
-  }
-
-  .c888-install-note {
-    padding: 12px 14px;
+    min-height: 48px;
+    font-size: 15.5px;
+    padding: 11px 16px;
+    margin-bottom: 12px;
     border-radius: 14px;
   }
 
-  .c888-note-icon {
+  .c888-btn-icon {
     width: 20px;
     height: 20px;
   }
 
+  .c888-install-note {
+    padding: 9px 11px;
+    border-radius: 11px;
+  }
+
   .c888-note-content {
-    font-size: 12px;
+    font-size: 11px;
+  }
+
+  .c888-voice-alert-lead {
+    font-size: 12.5px;
+  }
+
+  .c888-voice-alert-sub {
+    font-size: 10.5px;
   }
 }
