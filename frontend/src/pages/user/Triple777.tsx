@@ -294,7 +294,7 @@ export function Triple777Page() {
   const handleSpin = useCallback(async (currentStake: number, isTurbo: boolean) => {
     if (spinLockRef.current) return;
     if (balanceRef.current < currentStake) {
-      showInsufficientBalance({ requiredAmount: currentStake * 100, currentBalance: balanceRef.current * 100 });
+      showInsufficientBalance({ requiredAmount: currentStake, currentBalance: balanceRef.current });
       setErrorMessage('Insufficient balance to spin.');
       stopAutoSpin();
       return;
@@ -365,7 +365,7 @@ export function Triple777Page() {
               setAutoSummary({ totalWon: completedWon, totalSpins: completedCount });
             }
             if (response.balance < currentStake && remaining > 0) {
-              showInsufficientBalance({ requiredAmount: currentStake * 100, currentBalance: response.balance * 100 });
+              showInsufficientBalance({ requiredAmount: currentStake, currentBalance: response.balance });
               setErrorMessage('Auto spin stopped: Insufficient balance.');
             }
           } else {
@@ -406,7 +406,7 @@ export function Triple777Page() {
       stopAutoSpin();
     } else {
       if (balanceRef.current < stakeRef.current) {
-        showInsufficientBalance({ requiredAmount: stakeRef.current * 100, currentBalance: balanceRef.current * 100 });
+        showInsufficientBalance({ requiredAmount: stakeRef.current, currentBalance: balanceRef.current });
         setErrorMessage('Insufficient balance for auto spin.');
         return;
       }

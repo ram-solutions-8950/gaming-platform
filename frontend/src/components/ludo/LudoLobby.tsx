@@ -178,7 +178,7 @@ export const LudoLobby: React.FC<Props> = ({
         type="button"
         onClick={() => {
           if (!canAfford) {
-            showInsufficientBalance({ requiredAmount: selectedTier.amount, currentBalance: userBalance });
+            showInsufficientBalance({ requiredAmount: selectedTier.amount / 100, currentBalance: userBalance / 100 });
             return;
           }
           onStartMatchmaking(playerCount, selectedTier.amount);

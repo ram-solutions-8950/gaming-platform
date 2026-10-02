@@ -78,13 +78,10 @@ export const TeenPattiTable: React.FC<TeenPattiTableProps> = ({
     const isBlind = !gameState?.seats.find((s) => s.id === currentUserId)?.seen;
     const mult = isBlind ? 1 : 2;
     const cost = amount || ((gameState?.current_stake || 1000) * mult);
-    const curBal = walletBalance ?? 0;
-    if (curBal < cost) {
-      showInsufficientBalance({ requiredAmount: cost, currentBalance: curBal });
+    if (walletBalance !== null && walletBalance < cost) {
+      showInsufficientBalance({ requiredAmount: cost / 100, currentBalance: walletBalance / 100 });
       return;
     }
-    setWalletBalance((prev) => (prev !== null ? Math.max(0, prev - cost) : 0));
-    window.dispatchEvent(new Event('wallet-update'));
     chaal(amount);
   }, [gameState, currentUserId, walletBalance, chaal]);
 
@@ -92,13 +89,10 @@ export const TeenPattiTable: React.FC<TeenPattiTableProps> = ({
     const isBlind = !gameState?.seats.find((s) => s.id === currentUserId)?.seen;
     const mult = isBlind ? 1 : 2;
     const cost = (gameState?.current_stake ? gameState.current_stake * 2 : 2000) * mult;
-    const curBal = walletBalance ?? 0;
-    if (curBal < cost) {
-      showInsufficientBalance({ requiredAmount: cost, currentBalance: curBal });
+    if (walletBalance !== null && walletBalance < cost) {
+      showInsufficientBalance({ requiredAmount: cost / 100, currentBalance: walletBalance / 100 });
       return;
     }
-    setWalletBalance((prev) => (prev !== null ? Math.max(0, prev - cost) : 0));
-    window.dispatchEvent(new Event('wallet-update'));
     raiseBet();
   }, [gameState, currentUserId, walletBalance, raiseBet]);
 
@@ -106,37 +100,28 @@ export const TeenPattiTable: React.FC<TeenPattiTableProps> = ({
     const isBlind = !gameState?.seats.find((s) => s.id === currentUserId)?.seen;
     const mult = isBlind ? 1 : 2;
     const cost = (gameState?.current_stake || 1000) * mult;
-    const curBal = walletBalance ?? 0;
-    if (curBal < cost) {
-      showInsufficientBalance({ requiredAmount: cost, currentBalance: curBal });
+    if (walletBalance !== null && walletBalance < cost) {
+      showInsufficientBalance({ requiredAmount: cost / 100, currentBalance: walletBalance / 100 });
       return;
     }
-    setWalletBalance((prev) => (prev !== null ? Math.max(0, prev - cost) : 0));
-    window.dispatchEvent(new Event('wallet-update'));
     show();
   }, [gameState, currentUserId, walletBalance, show]);
 
   const handleSideShowAction = useCallback(() => {
     const cost = (gameState?.current_stake || 1000) * 2;
-    const curBal = walletBalance ?? 0;
-    if (curBal < cost) {
-      showInsufficientBalance({ requiredAmount: cost, currentBalance: curBal });
+    if (walletBalance !== null && walletBalance < cost) {
+      showInsufficientBalance({ requiredAmount: cost / 100, currentBalance: walletBalance / 100 });
       return;
     }
-    setWalletBalance((prev) => (prev !== null ? Math.max(0, prev - cost) : 0));
-    window.dispatchEvent(new Event('wallet-update'));
     sideShow();
   }, [gameState, walletBalance, sideShow]);
 
   const handleStartHandAction = useCallback(() => {
     const bootCost = gameState?.boot_amount || gameState?.current_stake || 1000;
-    const curBal = walletBalance ?? 0;
-    if (curBal < bootCost) {
-      showInsufficientBalance({ requiredAmount: bootCost, currentBalance: curBal });
+    if (walletBalance !== null && walletBalance < bootCost) {
+      showInsufficientBalance({ requiredAmount: bootCost / 100, currentBalance: walletBalance / 100 });
       return;
     }
-    setWalletBalance((prev) => (prev !== null ? Math.max(0, prev - bootCost) : 0));
-    window.dispatchEvent(new Event('wallet-update'));
     startHand();
   }, [gameState?.boot_amount, gameState?.current_stake, walletBalance, startHand]);
 

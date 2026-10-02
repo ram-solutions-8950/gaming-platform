@@ -306,7 +306,7 @@ export function RoulettePage() {
     }
 
     if (balance < selectedChip) {
-      showInsufficientBalance({ requiredAmount: selectedChip * 100, currentBalance: balance * 100 });
+      showInsufficientBalance({ requiredAmount: selectedChip, currentBalance: balance });
       setToastMessage('Insufficient balance!');
       setTimeout(() => setToastMessage(null), 1500);
       return;
@@ -404,7 +404,7 @@ export function RoulettePage() {
 
     const needed = previousRoundBets.reduce((sum, b) => sum + b.amount, 0);
     if (balance < needed) {
-      showInsufficientBalance({ requiredAmount: needed * 100, currentBalance: balance * 100 });
+      showInsufficientBalance({ requiredAmount: needed, currentBalance: balance });
       setToastMessage('Insufficient balance to repeat bet');
       setTimeout(() => setToastMessage(null), 1500);
       return;

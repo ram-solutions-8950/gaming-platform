@@ -347,7 +347,7 @@ export function ChickenRoadPage() {
       return;
     }
     if (betAmount > balance) {
-      showInsufficientBalance({ requiredAmount: betAmount * 100, currentBalance: balance * 100 });
+      showInsufficientBalance({ requiredAmount: betAmount, currentBalance: balance });
       setErrorMessage('Insufficient balance.');
       return;
     }

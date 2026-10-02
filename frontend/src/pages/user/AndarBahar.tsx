@@ -616,7 +616,7 @@ export function AndarBaharPage() {
     }
 
     if (stake > balance) {
-      showInsufficientBalance({ requiredAmount: stake * 100, currentBalance: balance * 100 });
+      showInsufficientBalance({ requiredAmount: stake, currentBalance: balance });
       setServerError("Insufficient wallet balance for this bet amount.");
       return;
     }

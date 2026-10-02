@@ -797,15 +797,15 @@ export function DragonTigerPage() {
     const prediction = predictionKey || selected;
     if (!prediction || !round || !game || betting) return;
     if (round.status !== 'BETTING' || isBettingLocked || countdown <= 0) return;
-    if (wallet && wallet.balance < amount * 100) {
-      showInsufficientBalance({ requiredAmount: amount * 100, currentBalance: wallet.balance });
+    if (wallet && wallet.balance < amount) {
+      showInsufficientBalance({ requiredAmount: amount / 100, currentBalance: wallet.balance / 100 });
       return;
     }
     setBetting(true);
 
     // Optimistically deduct in real-time immediately
     if (wallet) {
-      const newBal = Math.max(0, wallet.balance - amount * 100);
+      const newBal = Math.max(0, wallet.balance - amount);
       setWallet((prev) => (prev ? { ...prev, balance: newBal, balance_inr: (newBal / 100).toFixed(2) } : prev));
       window.dispatchEvent(new Event('wallet-update'));
     }

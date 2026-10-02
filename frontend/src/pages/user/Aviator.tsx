@@ -133,7 +133,7 @@ export function AviatorPage() {
   const handlePlaceBet = useCallback(
     (slot: 1 | 2, amountPaise: number, autoCashout?: number | null) => {
       if (walletBalancePaise < amountPaise) {
-        showInsufficientBalance({ requiredAmount: amountPaise, currentBalance: walletBalancePaise });
+        showInsufficientBalance({ requiredAmount: amountPaise / 100, currentBalance: walletBalancePaise / 100 });
         return;
       }
       setWalletBalancePaise((prev) => Math.max(0, prev - amountPaise));

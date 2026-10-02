@@ -56,7 +56,7 @@ export const TeenPattiLobby: React.FC<TeenPattiLobbyProps> = ({ onJoinTable }) =
 
   const handleCreateTierTable = async (tier: typeof BOOT_TIERS[0]) => {
     if (walletBalance !== null && walletBalance < tier.boot) {
-      showInsufficientBalance({ requiredAmount: tier.boot, currentBalance: walletBalance });
+      showInsufficientBalance({ requiredAmount: tier.boot / 100, currentBalance: walletBalance / 100 });
       return;
     }
     try {

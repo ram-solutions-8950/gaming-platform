@@ -10,10 +10,10 @@ from ..utils.responses import success_response
 router = APIRouter(prefix="/system", tags=["System"])
 
 DEFAULT_APP_VERSION_CONFIG = {
-    "latest_version": "0.0.85",
+    "latest_version": "0.0.86",
     "min_version": "0.0.70",
     "download_url": "/Corona888.apk",
-    "release_notes": "New update available: Enhanced payment gateways, real-time live game controls, and direct VIP support desk.",
+    "release_notes": "Fix balance validation and display in Dragon & Tiger, Roulette, Teen Patti, and slots.",
     "force_update": False,
 }
 

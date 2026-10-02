@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { Wallet, PlusCircle, X } from 'lucide-react';
@@ -21,12 +22,22 @@ export function InsufficientBalanceModal() {
 
   const formattedRequired =
     requiredAmount !== undefined
-      ? `₹${(requiredAmount >= 100 ? requiredAmount / 100 : requiredAmount).toFixed(2)}`
+      ? `₹${Number(requiredAmount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
       : null;
   const formattedBalance =
     currentBalance !== undefined
-      ? `₹${(currentBalance >= 100 ? currentBalance / 100 : currentBalance).toFixed(2)}`
+      ? `₹${Number(currentBalance).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
       : null;
+
+  useEffect(() => {
+    if (isOpen) {
+      window.dispatchEvent(new Event('wallet-update'));
+    }
+  }, [isOpen]);
+
+  const showBalanceBox =
+    (formattedRequired || formattedBalance) &&
+    (currentBalance === undefined || requiredAmount === undefined || currentBalance < requiredAmount);
 
   return createPortal(
     <div
@@ -68,7 +79,7 @@ export function InsufficientBalanceModal() {
           Your balance is too low to place this bet. Please recharge your account to continue playing.
         </p>
 
-        {(formattedRequired || formattedBalance) && (
+        {showBalanceBox && (
           <div className="w-full bg-slate-900/90 border border-white/10 rounded-xl p-3 my-1 flex items-center justify-around text-xs">
             {formattedBalance && (
               <div>
