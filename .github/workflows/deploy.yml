@@ -1,3 +1,4 @@
+
 name: Deploy Gaming Platform
 
 on:
@@ -6,53 +7,27 @@ on:
       - client-version
 
 jobs:
-
-  # ============================================================
-  # CHECKS
-  # ============================================================
+  # ============================================
+  # 1. CODE QUALITY CHECKS
+  # ============================================
 
   checks:
     runs-on: ubuntu-latest
 
     steps:
-
-      # --------------------------------------------------------
-      # Checkout
-      # --------------------------------------------------------
-
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
-
-
-      # --------------------------------------------------------
-      # Setup Python
-      # --------------------------------------------------------
 
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
 
-
-      # --------------------------------------------------------
-      # Install Ruff
-      # --------------------------------------------------------
-
       - name: Install Ruff
         run: pip install ruff
 
-
-      # --------------------------------------------------------
-      # Backend undefined-name check
-      # --------------------------------------------------------
-
-      - name: Backend - undefined names
+      - name: Check backend
         run: ruff check --select F821,F822 backend/app backend/tests
-
-
-      # --------------------------------------------------------
-      # Setup Node.js
-      # --------------------------------------------------------
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -61,49 +36,31 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
-
-      # --------------------------------------------------------
-      # Install frontend dependencies
-      # --------------------------------------------------------
-
       - name: Install frontend dependencies
         working-directory: frontend
         run: npm ci
 
-
-      # --------------------------------------------------------
-      # Frontend type check
-      # --------------------------------------------------------
-
-      - name: Frontend - type check
+      - name: TypeScript check
         working-directory: frontend
         run: npx tsc -b
 
-
-  # ============================================================
-  # BACKEND TESTS
-  # ============================================================
+  # ============================================
+  # 2. BACKEND TESTS
+  # ============================================
 
   backend-tests:
     runs-on: ubuntu-latest
-
-    # Tests are currently non-blocking.
-    # Remove this when you are ready to make tests mandatory.
     continue-on-error: true
 
     services:
-
       postgres:
         image: postgres:16
-
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: gaming_test_db
-
         ports:
           - 5432:5432
-
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
@@ -115,163 +72,112 @@ jobs:
       AUTO_MIGRATE: 'false'
 
     steps:
+      - uses: actions/checkout@v4
 
-      # --------------------------------------------------------
-      # Checkout
-      # --------------------------------------------------------
-
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-
-      # --------------------------------------------------------
-      # Setup Python
-      # --------------------------------------------------------
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
 
-
-      # --------------------------------------------------------
-      # Install backend dependencies
-      # --------------------------------------------------------
-
-      - name: Install backend dependencies
+      - name: Install dependencies
         working-directory: backend
         run: pip install -r requirements.txt
 
-
-      # --------------------------------------------------------
-      # Run backend tests
-      # --------------------------------------------------------
-
-      - name: Run backend tests
+      - name: Run tests
         working-directory: backend
         run: python -m pytest tests/integration tests/unit -q
 
-
-  # ============================================================
-  # DEPLOYMENT
-  # ============================================================
+  # ============================================
+  # 3. PRODUCTION DEPLOYMENT
+  # ============================================
 
   deploy:
+    name: Deploy Polandexim
     needs: checks
-
     runs-on: ubuntu-latest
 
     steps:
-
-      # ========================================================
-      # DEPLOY TO VPS
-      # ========================================================
-
       - name: Deploy to VPS
         uses: appleboy/ssh-action@v1.2.2
 
         with:
-
-          # ----------------------------------------------------
-          # VPS CONNECTION
-          # ----------------------------------------------------
-
           host: ${{ secrets.VPS_HOST }}
-
           username: ${{ secrets.VPS_USER }}
-
           key: ${{ secrets.VPS_SSH_KEY }}
-
           port: ${{ secrets.VPS_PORT || '22' }}
-
           timeout: 60s
-
           command_timeout: 30m
 
-
-          # ==================================================
-          # VPS SCRIPT
-          # ==================================================
-
           script: |
+            set -eu
 
-            set -e
-
-
-            # ==================================================
-            # 1. NAVIGATE TO PROJECT
-            # ==================================================
-
-            echo "=================================================="
+            echo "===================================="
             echo "1. NAVIGATING TO PROJECT"
-            echo "=================================================="
+            echo "===================================="
 
-            cd /root/gaming-platform || cd ~/gaming-platform
+            if [ -d /root/gaming-platform ]; then
+              cd /root/gaming-platform
+            elif [ -d "$HOME/gaming-platform" ]; then
+              cd "$HOME/gaming-platform"
+            else
+              echo "ERROR: Project directory missing"
+              exit 1
+            fi
 
-            echo "Current directory:"
-            pwd
-
-
-            # ==================================================
-            # 2. PULL LATEST CODE
-            # ==================================================
-
-            echo "=================================================="
+            echo "===================================="
             echo "2. PULLING LATEST CODE"
-            echo "=================================================="
+            echo "===================================="
 
             git fetch origin client-version
-
             git reset --hard origin/client-version
-
-
-            echo "Current commit:"
             git log -1 --oneline
 
+            echo "===================================="
+            echo "3. VALIDATING REQUIRED FILES"
+            echo "===================================="
 
-            # ==================================================
-            # 3. START BACKEND + DATABASE + REDIS
-            # ==================================================
+            test -f polandexim.conf || {
+              echo "ERROR: polandexim.conf missing"
+              exit 1
+            }
 
-            echo "=================================================="
-            echo "3. STARTING BACKEND + DATABASE + REDIS"
-            echo "=================================================="
+            test -f docker-compose.yml || \
+            test -f docker-compose.yaml || \
+            test -f compose.yml || \
+            test -f compose.yaml || {
+              echo "ERROR: Docker Compose file missing"
+              exit 1
+            }
+
+            echo "===================================="
+            echo "4. STARTING DOCKER SERVICES"
+            echo "===================================="
 
             docker compose up -d --build backend db redis
 
-
-            # ==================================================
-            # 4. BUILD FRONTEND
-            # ==================================================
-
-            echo "=================================================="
-            echo "4. BUILDING FRONTEND"
-            echo "=================================================="
+            echo "===================================="
+            echo "5. BUILDING FRONTEND"
+            echo "===================================="
 
             docker compose run --rm frontend npm run build
 
+            test -f frontend/dist/index.html || {
+              echo "ERROR: Frontend build missing"
+              exit 1
+            }
 
-            # ==================================================
-            # 5. DEPLOY FRONTEND
-            # ==================================================
+            echo "===================================="
+            echo "6. DEPLOYING FRONTEND"
+            echo "===================================="
 
-            echo "=================================================="
-            echo "5. DEPLOYING FRONTEND"
-            echo "=================================================="
+            sudo mkdir -p \
+              /opt/gaming-platform/frontend/dist
 
-            sudo mkdir -p /opt/gaming-platform/frontend/dist
-
-            sudo cp -r frontend/dist/* \
+            sudo cp -a frontend/dist/. \
               /opt/gaming-platform/frontend/dist/
 
-
-            # ==================================================
-            # 6. DEPLOY APK
-            # ==================================================
-
-            echo "=================================================="
-            echo "6. DEPLOYING APK"
-            echo "=================================================="
+            echo "===================================="
+            echo "7. DEPLOYING APK"
+            echo "===================================="
 
             if [ -f frontend/public/Corona888.apk ]; then
 
@@ -281,231 +187,202 @@ jobs:
               sudo chmod 644 \
                 /opt/gaming-platform/frontend/dist/Corona888.apk
 
-              echo "APK deployed successfully."
+              echo "APK deployed"
+
+            elif [ -f frontend/dist/Corona888.apk ]; then
+
+              echo "APK already included in frontend build"
 
             else
 
-              echo "WARNING: Corona888.apk not found."
-
-              echo "Expected location:"
-              echo "frontend/public/Corona888.apk"
-
-              echo "Skipping APK deployment."
+              echo "ERROR: Corona888.apk missing"
+              exit 1
 
             fi
 
-
-            # ==================================================
-            # 7. SET FRONTEND PERMISSIONS
-            # ==================================================
-
-            echo "=================================================="
-            echo "7. SETTING FRONTEND PERMISSIONS"
-            echo "=================================================="
+            echo "===================================="
+            echo "8. SETTING PERMISSIONS"
+            echo "===================================="
 
             sudo chown -R www-data:www-data \
               /opt/gaming-platform/frontend/dist
 
-            sudo chmod -R 755 \
-              /opt/gaming-platform/frontend/dist
+            sudo find \
+              /opt/gaming-platform/frontend/dist \
+              -type d -exec chmod 755 {} +
 
+            sudo find \
+              /opt/gaming-platform/frontend/dist \
+              -type f -exec chmod 644 {} +
 
-            # ==================================================
-            # 8. INSTALL POLANDEXIM NGINX CONFIG
-            # ==================================================
+            echo "===================================="
+            echo "9. BACKING UP NGINX CONFIG"
+            echo "===================================="
 
-            echo "=================================================="
-            echo "8. INSTALLING POLANDEXIM NGINX CONFIG"
-            echo "=================================================="
+            sudo mkdir -p \
+              /etc/nginx/deployment-backups
 
-            if [ -f polandexim.conf ]; then
+            if [ -f \
+              /etc/nginx/sites-available/polandexim.conf ]; then
 
-              sudo cp polandexim.conf \
-                /etc/nginx/sites-available/polandexim.conf
-
-              sudo ln -sf \
+              sudo cp \
                 /etc/nginx/sites-available/polandexim.conf \
-                /etc/nginx/sites-enabled/polandexim.conf
-
-              echo "polandexim.conf installed successfully."
-
-            else
-
-              echo "ERROR: polandexim.conf NOT FOUND."
-
-              echo "Expected location:"
-              echo "$(pwd)/polandexim.conf"
-
-              exit 1
+                /etc/nginx/deployment-backups/polandexim.conf.bak
 
             fi
 
+            echo "===================================="
+            echo "10. INSTALLING NEW NGINX CONFIG"
+            echo "===================================="
 
-            # ==================================================
-            # 9. REMOVE OLD CORONA888 NGINX CONFIG
-            # ==================================================
+            sudo cp polandexim.conf \
+              /etc/nginx/sites-available/polandexim.conf
 
-            echo "=================================================="
-            echo "9. REMOVING OLD CORONA888 NGINX CONFIG"
-            echo "=================================================="
+            sudo ln -sfn \
+              /etc/nginx/sites-available/polandexim.conf \
+              /etc/nginx/sites-enabled/polandexim.conf
 
-            sudo rm -f \
-              /etc/nginx/sites-enabled/corona888.conf
+            echo "===================================="
+            echo "11. DISABLING OLD CORONA CONFIG"
+            echo "===================================="
 
-            sudo rm -f \
-              /etc/nginx/sites-available/corona888.conf
+            if [ -e \
+              /etc/nginx/sites-enabled/corona888.conf ] || \
+              [ -L \
+              /etc/nginx/sites-enabled/corona888.conf ]; then
 
-            echo "Old Corona888 Nginx configuration removed."
+              sudo rm -f \
+                /etc/nginx/sites-enabled/corona888.conf
 
+              echo "Old Corona888 site disabled"
 
-            # ==================================================
-            # 10. TEST NGINX
-            # ==================================================
+            fi
 
-            echo "=================================================="
-            echo "10. TESTING NGINX CONFIGURATION"
-            echo "=================================================="
+            echo "===================================="
+            echo "12. CHECKING OTHER NGINX RULES"
+            echo "===================================="
 
-            sudo nginx -t
+            echo "Active site configurations:"
 
+            sudo ls -la /etc/nginx/sites-enabled/
 
-            # ==================================================
-            # 11. RELOAD NGINX
-            # ==================================================
+            echo "Searching for old domain references:"
 
-            echo "=================================================="
-            echo "11. RELOADING NGINX"
-            echo "=================================================="
+            sudo grep -RnE \
+              'corona888.tech|return 30[1278].*download' \
+              /etc/nginx/sites-enabled/ \
+              /etc/nginx/conf.d/ || true
+
+            echo "===================================="
+            echo "13. TESTING NGINX"
+            echo "===================================="
+
+            if ! sudo nginx -t; then
+              echo "ERROR: Nginx validation failed"
+
+              if [ -f \
+                /etc/nginx/deployment-backups/polandexim.conf.bak ]; then
+
+                sudo cp \
+                  /etc/nginx/deployment-backups/polandexim.conf.bak \
+                  /etc/nginx/sites-available/polandexim.conf
+
+              fi
+
+              exit 1
+            fi
+
+            echo "===================================="
+            echo "14. RELOADING NGINX"
+            echo "===================================="
 
             sudo systemctl reload nginx
 
-            echo "Nginx reloaded successfully."
-
-
-            # ==================================================
-            # 12. DOCKER STATUS
-            # ==================================================
-
-            echo "=================================================="
-            echo "12. DOCKER CONTAINER STATUS"
-            echo "=================================================="
-
-            docker compose ps
-
-
-            # ==================================================
-            # 13. VERIFY APK
-            # ==================================================
-
-            echo "=================================================="
-            echo "13. VERIFYING APK"
-            echo "=================================================="
-
-            if [ -f /opt/gaming-platform/frontend/dist/Corona888.apk ]; then
-
-              echo "APK exists:"
-              ls -lh \
-                /opt/gaming-platform/frontend/dist/Corona888.apk
-
-            else
-
-              echo "WARNING: APK does not exist on server."
-
-            fi
-
-
-            # ==================================================
-            # 14. BACKEND HEALTH CHECK
-            # ==================================================
-
-            echo "=================================================="
-            echo "14. CHECKING BACKEND HEALTH"
-            echo "=================================================="
-
-            echo "Waiting for backend health check..."
-
+            echo "===================================="
+            echo "15. BACKEND HEALTH CHECK"
+            echo "===================================="
 
             HEALTHY=0
 
-
             for i in $(seq 1 15); do
 
-              if curl -sf \
+              if curl -fsS \
                 http://127.0.0.1:8000/api/v1/health; then
 
-                echo ""
-                echo "Backend is healthy and responding!"
-
                 HEALTHY=1
-
                 break
 
               fi
 
-
-              echo "Waiting for backend ($i/15)..."
-
               sleep 2
-
             done
-
-
-            # ==================================================
-            # BACKEND FAILED
-            # ==================================================
 
             if [ "$HEALTHY" -ne 1 ]; then
 
-              echo ""
-              echo "=================================================="
-              echo "BACKEND HEALTH CHECK FAILED"
-              echo "=================================================="
-
-              echo ""
-              echo "Backend logs:"
-
               docker compose logs --tail=100 backend
-
               exit 1
 
             fi
 
+            echo "===================================="
+            echo "16. TESTING MAIN WEBSITE"
+            echo "===================================="
 
-            # ==================================================
-            # 15. LOCAL NGINX CHECK
-            # ==================================================
+            ROOT_STATUS=$(curl -s \
+              -o /dev/null \
+              -w '%{http_code}' \
+              -H 'Host: polandexim.com' \
+              http://127.0.0.1/)
 
-            echo "=================================================="
-            echo "15. LOCAL NGINX CHECK"
-            echo "=================================================="
+            echo "Root status: $ROOT_STATUS"
 
-            curl -I http://127.0.0.1 || true
+            if [ "$ROOT_STATUS" != "200" ]; then
+              echo "ERROR: Main website did not return 200"
+              exit 1
+            fi
 
+            echo "===================================="
+            echo "17. TESTING APK DOWNLOAD"
+            echo "===================================="
 
-            # ==================================================
-            # 16. DEPLOYMENT SUCCESS
-            # ==================================================
+            DOWNLOAD_STATUS=$(curl -s \
+              -o /dev/null \
+              -w '%{http_code}' \
+              -H 'Host: polandexim.com' \
+              http://127.0.0.1/download)
 
-            echo ""
-            echo "=================================================="
-            echo "DEPLOYMENT COMPLETED SUCCESSFULLY"
-            echo "=================================================="
+            echo "Download status: $DOWNLOAD_STATUS"
 
-            echo ""
-            echo "Main Website:"
-            echo "https://polandexim.com/"
+            if [ "$DOWNLOAD_STATUS" != "200" ]; then
+              echo "ERROR: APK download failed"
+              exit 1
+            fi
 
-            echo ""
-            echo "APK Download:"
-            echo "https://polandexim.com/download"
+            echo "===================================="
+            echo "18. TESTING ADMIN"
+            echo "===================================="
 
-            echo ""
-            echo "Admin Panel:"
-            echo "https://admin.polandexim.com/"
+            ADMIN_STATUS=$(curl -s \
+              -o /dev/null \
+              -w '%{http_code}' \
+              -H 'Host: admin.polandexim.com' \
+              http://127.0.0.1/)
 
-            echo ""
-            echo "Backend:"
-            echo "http://127.0.0.1:8000"
+            echo "Admin status: $ADMIN_STATUS"
 
-            echo ""
-            echo "Deployment finished successfully."
+            if [ "$ADMIN_STATUS" != "200" ]; then
+              echo "ERROR: Admin portal failed"
+              exit 1
+            fi
+
+            echo "===================================="
+            echo "19. DEPLOYMENT SUMMARY"
+            echo "===================================="
+
+            docker compose ps
+
+            echo "Main: https://polandexim.com/"
+            echo "APK: https://polandexim.com/download"
+            echo "Admin: https://admin.polandexim.com/"
+
+            echo "Deployment checks completed"
