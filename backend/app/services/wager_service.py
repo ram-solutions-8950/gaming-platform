@@ -231,7 +231,6 @@ def admin_list_wagers(
                 User.username.ilike(s),
                 User.name.ilike(s),
                 User.email.ilike(s),
-                User.phone.ilike(s),
                 cast(User.id, String).ilike(s),
             )
         )
@@ -267,7 +266,7 @@ def admin_list_wagers(
         formatted.append({
             "id": latest_id,
             "user_id": str(u.id),
-            "username": u.username or u.phone or "Unknown",
+            "username": u.username or u.name or "Unknown",
             "user_name": u.name or u.username or "Player",
             "deposit_id": deposit_id,
             "required_amount_paise": req_p,

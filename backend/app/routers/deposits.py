@@ -59,8 +59,10 @@ def create_deposit(
                 or "razorpay"
             ).strip().lower()
 
-        customer_email = current_user.email or f"user_{str(current_user.id)[:8]}@corona888.tech"
-        customer_phone = current_user.phone or "9999999999"
+        customer_email = getattr(current_user, "email", None) or f"user_{str(current_user.id)[:8]}@corona888.tech"
+        raw_phone = getattr(current_user, "phone", None) or ""
+        digits_phone = "".join(filter(str.isdigit, str(raw_phone)))
+        customer_phone = digits_phone if len(digits_phone) == 10 else "9999999999"
 
         deposit = deposit_service.create_deposit(
             db=db,
