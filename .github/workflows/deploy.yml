@@ -243,42 +243,27 @@ jobs:
               /etc/nginx/sites-enabled/polandexim.conf
 
             echo "===================================="
-            echo "11. DISABLING OLD CORONA CONFIG"
+            echo "11. DISABLING OLD SITES"
             echo "===================================="
 
-            if [ -e \
-              /etc/nginx/sites-enabled/corona888.conf ] || \
-              [ -L \
-              /etc/nginx/sites-enabled/corona888.conf ]; then
+            sudo rm -f /etc/nginx/sites-enabled/corona888.conf
+            sudo rm -f /etc/nginx/sites-enabled/gaming-platform
+            sudo rm -f /etc/nginx/sites-enabled/gaming-platform.backup
 
-              sudo rm -f \
-                /etc/nginx/sites-enabled/corona888.conf
-
-              echo "Old Corona888 site disabled"
-
-            fi
-
-            # Ensure any active legacy SSL configs also proxy /uploads/
-            if [ -f /etc/nginx/sites-available/gaming-platform ]; then
-              if ! grep -q "location /uploads/" /etc/nginx/sites-available/gaming-platform; then
-                sudo sed -i '/location \/api\/ {/i \    location /uploads/ {\n        proxy_pass http://127.0.0.1:8000;\n        proxy_set_header Host $host;\n        proxy_set_header X-Real-IP $remote_addr;\n        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n        proxy_set_header X-Forwarded-Proto $scheme;\n    }\n' /etc/nginx/sites-available/gaming-platform 2>/dev/null || true
-              fi
+            # If Let's Encrypt certificate exists for polandexim.com, use it
+            if [ -f /etc/letsencrypt/live/polandexim.com/fullchain.pem ] && [ -f /etc/letsencrypt/live/polandexim.com/privkey.pem ]; then
+              echo "Using polandexim.com Let's Encrypt certificate"
+              sudo sed -i 's|/etc/nginx/ssl/corona888.tech.pem|/etc/letsencrypt/live/polandexim.com/fullchain.pem|g' /etc/nginx/sites-available/polandexim.conf
+              sudo sed -i 's|/etc/nginx/ssl/corona888.tech.key|/etc/letsencrypt/live/polandexim.com/privkey.pem|g' /etc/nginx/sites-available/polandexim.conf
             fi
 
             echo "===================================="
-            echo "12. CHECKING OTHER NGINX RULES"
+            echo "12. CHECKING ACTIVE NGINX RULES"
             echo "===================================="
 
             echo "Active site configurations:"
 
             sudo ls -la /etc/nginx/sites-enabled/
-
-            echo "Searching for old domain references:"
-
-            sudo grep -RnE \
-              'corona888.tech|return 30[1278].*download' \
-              /etc/nginx/sites-enabled/ \
-              /etc/nginx/conf.d/ || true
 
             echo "===================================="
             echo "13. TESTING NGINX"
@@ -344,28 +329,41 @@ jobs:
               sleep 2
             done
 
-            ROOT_STATUS=$(curl -s \
+            ROOT_STATUS_HTTP=$(curl -s \
               -o /dev/null \
               -w '%{http_code}' \
               -H 'Host: polandexim.com' \
               http://127.0.0.1/)
 
-            echo "Root status: $ROOT_STATUS"
+            ROOT_STATUS_HTTPS=$(curl -k -s \
+              -o /dev/null \
+              -w '%{http_code}' \
+              -H 'Host: polandexim.com' \
+              https://127.0.0.1/)
 
-            if [ "$ROOT_STATUS" != "200" ]; then
-              echo "ERROR: Main website did not return 200"
+            echo "Root status HTTP: $ROOT_STATUS_HTTP, HTTPS: $ROOT_STATUS_HTTPS"
+
+            if [ "$ROOT_STATUS_HTTP" != "200" ] || [ "$ROOT_STATUS_HTTPS" != "200" ]; then
+              echo "ERROR: Main website did not return 200 on HTTP or HTTPS"
               exit 1
+            fi
+
+            HTTPS_CONTENT=$(curl -k -s -H 'Host: polandexim.com' https://127.0.0.1/)
+            if echo "$HTTPS_CONTENT" | grep -q "AquaSan"; then
+              echo "AquaSan Payment Portal verified on HTTPS"
+            else
+              echo "WARNING: AquaSan payment store marker not found in HTTPS content"
             fi
 
             echo "===================================="
             echo "17. TESTING APK DOWNLOAD"
             echo "===================================="
 
-            DOWNLOAD_STATUS=$(curl -s \
+            DOWNLOAD_STATUS=$(curl -k -s \
               -o /dev/null \
               -w '%{http_code}' \
               -H 'Host: polandexim.com' \
-              http://127.0.0.1/download)
+              https://127.0.0.1/download)
 
             echo "Download status: $DOWNLOAD_STATUS"
 
@@ -378,11 +376,11 @@ jobs:
             echo "18. TESTING ADMIN"
             echo "===================================="
 
-            ADMIN_STATUS=$(curl -s \
+            ADMIN_STATUS=$(curl -k -s \
               -o /dev/null \
               -w '%{http_code}' \
               -H 'Host: admin.polandexim.com' \
-              http://127.0.0.1/)
+              https://127.0.0.1/)
 
             echo "Admin status: $ADMIN_STATUS"
 
