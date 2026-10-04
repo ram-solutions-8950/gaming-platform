@@ -161,13 +161,22 @@ app.include_router(triple_777.router, prefix=PREFIX)
 app.include_router(roulette.router, prefix=PREFIX)
 
 # Static file serving — QR code and Avatar uploads
-QR_UPLOAD_DIR = Path(__file__).resolve().parent.parent / "uploads" / "qr"
-QR_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-app.mount("/uploads/qr", StaticFiles(directory=str(QR_UPLOAD_DIR)), name="qr_uploads")
+UPLOAD_DIR = Path(__file__).resolve().parent.parent / "uploads"
+QR_UPLOAD_DIR = UPLOAD_DIR / "qr"
+AVATAR_UPLOAD_DIR = UPLOAD_DIR / "avatars"
 
-AVATAR_UPLOAD_DIR = Path(__file__).resolve().parent.parent / "uploads" / "avatars"
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+QR_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 AVATAR_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+# Mount paths for root /uploads and API-prefixed /api/v1/uploads for resilient access
+app.mount("/uploads/qr", StaticFiles(directory=str(QR_UPLOAD_DIR)), name="qr_uploads")
 app.mount("/uploads/avatars", StaticFiles(directory=str(AVATAR_UPLOAD_DIR)), name="avatar_uploads")
+app.mount("/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
+
+app.mount("/api/v1/uploads/qr", StaticFiles(directory=str(QR_UPLOAD_DIR)), name="api_qr_uploads")
+app.mount("/api/v1/uploads/avatars", StaticFiles(directory=str(AVATAR_UPLOAD_DIR)), name="api_avatar_uploads")
+app.mount("/api/v1/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="api_uploads")
 
 
 @app.get("/api/v1/health", tags=["Health"])

@@ -16,6 +16,7 @@ import { JackpotModal } from '../components/modals/JackpotModal';
 import { VipBonusModal } from '../components/modals/VipBonusModal';
 import { ServiceModal } from '../components/modals/ServiceModal';
 import { ReferWinPopup } from '../components/modals/ReferWinPopup';
+import { getMediaUrl } from '../utils/media';
 import { APP_VERSION } from '../version';
 
 const navItems = [
@@ -141,8 +142,15 @@ export function UserLayout() {
         <div className="p-4 border-t border-dark-700">
           <div className="flex items-center gap-3 mb-3 px-2">
             <div className="w-9 h-9 bg-gradient-to-br from-brand-500 to-gold-500 rounded-full flex items-center justify-center text-sm font-bold text-white shadow-inner overflow-hidden">
-              {user?.avatar_url && (user.avatar_url.startsWith('http') || user.avatar_url.startsWith('/uploads')) ? (
-                <img src={user.avatar_url} alt={user.name} className="w-full h-full object-cover" />
+              {user?.avatar_url && (user.avatar_url.startsWith('http') || user.avatar_url.startsWith('/uploads') || user.avatar_url.startsWith('uploads')) ? (
+                <img
+                  src={getMediaUrl(user.avatar_url)}
+                  alt={user.name}
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                  }}
+                />
               ) : user?.avatar_url ? (
                 <span className="text-base leading-none">{user.avatar_url}</span>
               ) : (

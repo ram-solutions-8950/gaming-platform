@@ -2,8 +2,9 @@ import { useEffect, useState, useRef, useCallback } from 'react';
 import { Card } from '../../components/common/Card';
 import { Badge } from '../../components/common/Badge';
 import { Loader } from '../../components/common/Loader';
-import api, { API_BASE_URL } from '../../services/api';
+import api from '../../services/api';
 import { adminService } from '../../services/adminService';
+import { getMediaUrl } from '../../utils/media';
 import toast from 'react-hot-toast';
 import {
   CreditCard,
@@ -603,6 +604,36 @@ export function AdminPaymentSettingsPage() {
                       className="block w-full text-white file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-gray-700 file:text-gray-200 hover:file:bg-gray-600"
                       onChange={(e) => setQrFile(e.target.files ? e.target.files[0] : null)}
                     />
+                    {qrFile ? (
+                      <div className="mt-3 p-3 bg-gray-800/90 rounded-xl border border-dashed border-brand-500/50 flex items-center gap-3">
+                        <img
+                          src={URL.createObjectURL(qrFile)}
+                          alt="Selected QR Preview"
+                          className="w-16 h-16 object-contain bg-white rounded-lg p-1 border border-gray-600 shadow shrink-0"
+                        />
+                        <div className="min-w-0">
+                          <span className="inline-block px-2 py-0.5 text-[10px] font-bold bg-brand-500/20 text-brand-300 rounded border border-brand-500/30 mb-1">
+                            New Image Selected (Save to apply)
+                          </span>
+                          <p className="text-xs text-white truncate font-medium">{qrFile.name}</p>
+                          <p className="text-[10px] text-gray-400">{(qrFile.size / 1024).toFixed(1)} KB</p>
+                        </div>
+                      </div>
+                    ) : editingId && configs.find((c) => c.id === editingId)?.qr_code_reference ? (
+                      <div className="mt-3 p-3 bg-gray-800/50 rounded-xl border border-gray-700 flex items-center gap-3">
+                        <img
+                          src={getMediaUrl(configs.find((c) => c.id === editingId)!.qr_code_reference)}
+                          alt="Current QR"
+                          className="w-14 h-14 object-contain bg-white rounded-lg p-1 border border-gray-600 shadow shrink-0"
+                        />
+                        <div>
+                          <span className="inline-block px-2 py-0.5 text-[10px] font-semibold text-gray-400 mb-0.5">
+                            Current Active QR
+                          </span>
+                          <p className="text-[11px] text-gray-400">Upload a new file above to replace it.</p>
+                        </div>
+                      </div>
+                    ) : null}
                   </div>
                 </div>
                 <div className="flex space-x-3 pt-4 border-t border-gray-700">
@@ -650,14 +681,34 @@ export function AdminPaymentSettingsPage() {
                     <p className="text-gray-300 mt-1 whitespace-pre-wrap">{c.deposit_instructions || 'None'}</p>
                   </div>
                 </div>
-                <div className="flex flex-col items-center justify-center border border-gray-700 rounded-xl p-4 bg-gray-800">
-                  <p className="text-gray-400 text-xs mb-2">QR Code Preview</p>
+                <div className="flex flex-col items-center justify-center border border-gray-700 rounded-xl p-4 bg-gray-800/80">
+                  <p className="text-gray-400 text-xs mb-2 font-medium">QR Code Preview</p>
                   {c.qr_code_reference ? (
-                    <img
-                      src={`${API_BASE_URL.replace(/\/api\/v1\/?$/, '')}${c.qr_code_reference}`}
-                      alt="QR Code"
-                      className="max-h-32 object-contain"
-                    />
+                    <div className="flex flex-col items-center gap-2">
+                      <div className="p-2 bg-white rounded-xl shadow-md border border-gray-600 flex items-center justify-center">
+                        <img
+                          src={getMediaUrl(c.qr_code_reference)}
+                          alt="QR Code"
+                          className="max-h-36 max-w-[150px] object-contain rounded"
+                          onError={(e) => {
+                            const target = e.currentTarget;
+                            const src = target.src;
+                            // Fallback to /api/v1/uploads if root /uploads failed
+                            if (c.qr_code_reference && !src.includes('/api/v1/uploads')) {
+                              target.src = getMediaUrl(`/api/v1${c.qr_code_reference.startsWith('/') ? '' : '/'}${c.qr_code_reference}`);
+                            }
+                          }}
+                        />
+                      </div>
+                      <a
+                        href={getMediaUrl(c.qr_code_reference)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[11px] text-cyan-400 hover:text-cyan-300 underline font-medium"
+                      >
+                        View Full Image ↗
+                      </a>
+                    </div>
                   ) : (
                     <p className="text-gray-500 italic text-xs">No QR code uploaded</p>
                   )}

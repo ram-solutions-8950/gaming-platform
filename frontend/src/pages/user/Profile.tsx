@@ -14,6 +14,7 @@ import {
 import { APP_VERSION, BUILD_DATE } from '../../version';
 import api from '../../services/api';
 import { copyToClipboard } from '../../utils/clipboard';
+import { getMediaUrl } from '../../utils/media';
 
 const AVATAR_PRESETS = ['👑', '🐉', '🐅', '🦁', '💎', '🃏', '🎲', '🎯'];
 
@@ -144,8 +145,15 @@ export function ProfilePage() {
             {/* Avatar with Camera Overlay */}
             <div className="relative group mb-3">
               <div className="profile-avatar w-24 h-24 bg-gradient-to-br from-brand-500 via-purple-600 to-gold-500 rounded-full flex items-center justify-center text-4xl font-extrabold text-white shadow-xl shadow-brand-500/20 border-2 border-white/30 overflow-hidden">
-                {user?.avatar_url && (user.avatar_url.startsWith('http') || user.avatar_url.startsWith('/uploads')) ? (
-                  <img src={user.avatar_url} alt={user.name} className="w-full h-full object-cover" />
+                {user?.avatar_url && (user.avatar_url.startsWith('http') || user.avatar_url.startsWith('/uploads') || user.avatar_url.startsWith('uploads')) ? (
+                  <img
+                    src={getMediaUrl(user.avatar_url)}
+                    alt={user.name}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      e.currentTarget.style.display = 'none';
+                    }}
+                  />
                 ) : user?.avatar_url ? (
                   <span className="text-4xl leading-none">{user.avatar_url}</span>
                 ) : (

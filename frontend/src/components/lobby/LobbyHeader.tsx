@@ -6,6 +6,7 @@ import { authService } from '../../services/auth';
 import { useAuthStore } from '../../store/authStore';
 
 import { useRewardStore } from '../../store/rewardStore';
+import { getMediaUrl } from '../../utils/media';
 import { APP_VERSION } from '../../version';
 
 interface Props {
@@ -52,8 +53,15 @@ export const LobbyHeader: React.FC<Props> = ({ user, wallet }) => {
           </button>
         )}
         <div className="w-7 h-7 rounded-full bg-gradient-to-br from-amber-400 via-purple-500 to-amber-500 flex items-center justify-center text-xs font-black text-white shrink-0 ring-1.5 ring-amber-400/90 shadow-md overflow-hidden">
-          {user?.avatar_url && (user.avatar_url.startsWith('http') || user.avatar_url.startsWith('/uploads')) ? (
-            <img src={user.avatar_url} alt={user.name} className="w-full h-full object-cover" />
+          {user?.avatar_url && (user.avatar_url.startsWith('http') || user.avatar_url.startsWith('/uploads') || user.avatar_url.startsWith('uploads')) ? (
+            <img
+              src={getMediaUrl(user.avatar_url)}
+              alt={user.name}
+              className="w-full h-full object-cover"
+              onError={(e) => {
+                e.currentTarget.style.display = 'none';
+              }}
+            />
           ) : user?.avatar_url ? (
             <span className="text-sm leading-none">{user.avatar_url}</span>
           ) : (
