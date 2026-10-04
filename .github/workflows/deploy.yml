@@ -289,6 +289,7 @@ jobs:
             echo "===================================="
 
             sudo systemctl reload nginx
+            sleep 2
 
             echo "===================================="
             echo "15. BACKEND HEALTH CHECK"
@@ -329,17 +330,17 @@ jobs:
               sleep 2
             done
 
-            ROOT_STATUS_HTTP=$(curl -s \
-              -o /dev/null \
-              -w '%{http_code}' \
-              -H 'Host: polandexim.com' \
-              http://127.0.0.1/)
+            ROOT_STATUS_HTTP=0
+            ROOT_STATUS_HTTPS=0
 
-            ROOT_STATUS_HTTPS=$(curl -k -s \
-              -o /dev/null \
-              -w '%{http_code}' \
-              -H 'Host: polandexim.com' \
-              https://127.0.0.1/)
+            for i in $(seq 1 5); do
+              ROOT_STATUS_HTTP=$(curl -s -o /dev/null -w '%{http_code}' -H 'Host: polandexim.com' http://127.0.0.1/ || true)
+              ROOT_STATUS_HTTPS=$(curl -k -s -o /dev/null -w '%{http_code}' -H 'Host: polandexim.com' https://127.0.0.1/ || true)
+              if [ "$ROOT_STATUS_HTTP" = "200" ] && [ "$ROOT_STATUS_HTTPS" = "200" ]; then
+                break
+              fi
+              sleep 1
+            done
 
             echo "Root status HTTP: $ROOT_STATUS_HTTP, HTTPS: $ROOT_STATUS_HTTPS"
 
@@ -348,7 +349,7 @@ jobs:
               exit 1
             fi
 
-            HTTPS_CONTENT=$(curl -k -s -H 'Host: polandexim.com' https://127.0.0.1/)
+            HTTPS_CONTENT=$(curl -k -s -H 'Host: polandexim.com' https://127.0.0.1/ || true)
             if echo "$HTTPS_CONTENT" | grep -q "AquaSan"; then
               echo "AquaSan Payment Portal verified on HTTPS"
             else
@@ -359,11 +360,14 @@ jobs:
             echo "17. TESTING APK DOWNLOAD"
             echo "===================================="
 
-            DOWNLOAD_STATUS=$(curl -k -s \
-              -o /dev/null \
-              -w '%{http_code}' \
-              -H 'Host: polandexim.com' \
-              https://127.0.0.1/download)
+            DOWNLOAD_STATUS=0
+            for i in $(seq 1 5); do
+              DOWNLOAD_STATUS=$(curl -k -s -o /dev/null -w '%{http_code}' -H 'Host: polandexim.com' https://127.0.0.1/download || true)
+              if [ "$DOWNLOAD_STATUS" = "200" ]; then
+                break
+              fi
+              sleep 1
+            done
 
             echo "Download status: $DOWNLOAD_STATUS"
 
@@ -376,11 +380,14 @@ jobs:
             echo "18. TESTING ADMIN"
             echo "===================================="
 
-            ADMIN_STATUS=$(curl -k -s \
-              -o /dev/null \
-              -w '%{http_code}' \
-              -H 'Host: admin.polandexim.com' \
-              https://127.0.0.1/)
+            ADMIN_STATUS=0
+            for i in $(seq 1 5); do
+              ADMIN_STATUS=$(curl -k -s -o /dev/null -w '%{http_code}' -H 'Host: admin.polandexim.com' https://127.0.0.1/ || true)
+              if [ "$ADMIN_STATUS" = "200" ]; then
+                break
+              fi
+              sleep 1
+            done
 
             echo "Admin status: $ADMIN_STATUS"
 
