@@ -26,9 +26,11 @@ export function AdminWagersPage() {
 
   // Global wager config state
   const [globalConfig, setGlobalConfig] = useState<{ multiplier: number; default_user_wager_inr?: number } | null>(null);
-  const [editingGlobal, setEditingGlobal] = useState(false);
+  const [adjustModalOpen, setAdjustModalOpen] = useState(false);
   const [inputMultiplier, setInputMultiplier] = useState('1.0');
+  const [applyToExisting, setApplyToExisting] = useState(true);
   const [savingGlobal, setSavingGlobal] = useState(false);
+  const [syncingMultiplier, setSyncingMultiplier] = useState(false);
 
   // Apply to all modal state
   const [applyAllModalOpen, setApplyAllModalOpen] = useState(false);
@@ -65,8 +67,9 @@ export function AdminWagersPage() {
   const fetchWagers = useCallback(async () => {
     try {
       setLoading(true);
-      const isFulfilled = filterFulfilled === 'ALL' ? undefined : filterFulfilled === 'FULFILLED';
-      const data = await adminService.getWagers(page, pageSize, search.trim() || undefined, isFulfilled);
+      const isFulfilled = filterFulfilled === 'ALL' ? undefined : (filterFulfilled === 'FULFILLED' ? true : (filterFulfilled === 'PENDING' ? false : undefined));
+      const statusFilter = filterFulfilled === 'NO_REQUIREMENT' ? 'NO_REQUIREMENT' : undefined;
+      const data = await adminService.getWagers(page, pageSize, search.trim() || undefined, isFulfilled, statusFilter);
       setWagers(data.items);
       setTotal(data.total);
     } catch (err) {
@@ -91,14 +94,36 @@ export function AdminWagersPage() {
     }
     setSavingGlobal(true);
     try {
-      await adminService.updateGlobalWagerConfig({ multiplier: mult });
-      toast.success(`Global wager multiplier updated to ${mult}x`);
-      setEditingGlobal(false);
+      const res = await adminService.updateGlobalWagerConfig({
+        multiplier: mult,
+        apply_to_existing_deposits: applyToExisting,
+      });
+      if (res?.synced_info) {
+        toast.success(`Updated to ${mult}x & synced ${res.synced_info.total_requirements_updated} deposit requirements!`);
+      } else {
+        toast.success(`Global wager multiplier updated to ${mult}x`);
+      }
+      setAdjustModalOpen(false);
       fetchGlobalConfig();
+      fetchWagers();
     } catch (err: any) {
       toast.error(err.response?.data?.message || 'Failed to update global wager');
     } finally {
       setSavingGlobal(false);
+    }
+  };
+
+  const handleSyncMultiplier = async () => {
+    if (!window.confirm(`Recalculate and apply the active ${globalConfig?.multiplier ?? 1.0}x multiplier to all player deposits?`)) return;
+    setSyncingMultiplier(true);
+    try {
+      const res = await adminService.syncMultiplierToDeposits();
+      toast.success(res?.message || 'Successfully synced multiplier with all player deposits!');
+      fetchWagers();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to sync multiplier');
+    } finally {
+      setSyncingMultiplier(false);
     }
   };
 
@@ -206,7 +231,7 @@ export function AdminWagersPage() {
   // Compute stats from current page
   const totalRequired = wagers.reduce((acc, w) => acc + w.required_amount_inr, 0);
   const totalCompleted = wagers.reduce((acc, w) => acc + w.completed_amount_inr, 0);
-  const pendingCount = wagers.filter((w) => !w.is_fulfilled).length;
+  const pendingCount = wagers.filter((w) => w.required_amount_inr > 0 && !w.is_fulfilled).length;
 
   return (
     <div className="space-y-6">
@@ -250,54 +275,37 @@ export function AdminWagersPage() {
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="text-sm font-bold text-white">Global Auto-Wager Rollover Setting</h3>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-cyan-500/20 text-cyan-300 border border-cyan-500/40">
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-cyan-500/20 text-cyan-300 border border-cyan-500/40">
                   {globalConfig ? `${globalConfig.multiplier}x Multiplier` : '1.0x Multiplier'}
                 </span>
               </div>
               <p className="text-xs text-gray-400 mt-1 max-w-2xl">
-                Automatically calculates wager rollover requirement when any player deposits (e.g. ₹1,000 deposit at 1.0x = ₹1,000 bet playthrough before withdrawal unlock).
+                Automatically calculates wager rollover requirement when any player deposits (e.g. ₹1,000 deposit at {globalConfig?.multiplier ?? 1.0}x = ₹{((globalConfig?.multiplier ?? 1.0) * 1000).toLocaleString('en-IN')} bet playthrough before withdrawal unlock).
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            {editingGlobal ? (
-              <form onSubmit={handleSaveGlobalWager} className="flex items-center gap-2">
-                <input
-                  type="number"
-                  step="0.1"
-                  min="0"
-                  max="50"
-                  value={inputMultiplier}
-                  onChange={(e) => setInputMultiplier(e.target.value)}
-                  className="w-20 bg-[#0d121f] border border-cyan-500/50 rounded-xl px-2.5 py-1.5 text-xs text-white font-mono text-center focus:outline-none"
-                  placeholder="1.0"
-                />
-                <span className="text-xs text-cyan-400 font-bold">x</span>
-                <button
-                  type="submit"
-                  disabled={savingGlobal}
-                  className="px-3 py-1.5 rounded-xl text-xs font-bold bg-cyan-600 hover:bg-cyan-500 text-white transition disabled:opacity-50 cursor-pointer"
-                >
-                  {savingGlobal ? 'Saving...' : 'Save'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setEditingGlobal(false)}
-                  className="px-2.5 py-1.5 rounded-xl text-xs text-gray-400 hover:text-white"
-                >
-                  Cancel
-                </button>
-              </form>
-            ) : (
-              <button
-                onClick={() => setEditingGlobal(true)}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-[#1a233a] hover:bg-[#232f4e] text-cyan-300 border border-cyan-500/30 transition cursor-pointer"
-              >
-                <Edit3 size={13} />
-                <span>Adjust Multiplier</span>
-              </button>
-            )}
+          <div className="flex flex-wrap items-center gap-2.5">
+            <button
+              onClick={() => {
+                setInputMultiplier(String(globalConfig?.multiplier ?? 1.0));
+                setAdjustModalOpen(true);
+              }}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-cyan-600/20 hover:bg-cyan-600/30 text-cyan-300 border border-cyan-500/40 transition cursor-pointer"
+            >
+              <Edit3 size={13} />
+              <span>Adjust Multiplier</span>
+            </button>
+
+            <button
+              onClick={handleSyncMultiplier}
+              disabled={syncingMultiplier}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-[#1a233a] hover:bg-[#232f4e] text-cyan-200 border border-[#2d3a5e] transition cursor-pointer disabled:opacity-50"
+              title="Recalculate turnover for all player deposits using current multiplier"
+            >
+              <RefreshCw size={13} className={syncingMultiplier ? 'animate-spin' : ''} />
+              <span>{syncingMultiplier ? 'Syncing...' : 'Sync to Deposits'}</span>
+            </button>
 
             <button
               onClick={() => setApplyAllModalOpen(true)}
@@ -359,8 +367,9 @@ export function AdminWagersPage() {
           className="bg-[#111726] border border-[#1d273d] text-white text-xs font-semibold rounded-xl px-4 py-2.5 focus:outline-none"
         >
           <option value="ALL">All Statuses</option>
-          <option value="PENDING">Pending Only</option>
+          <option value="PENDING">Pending Turnover Only</option>
           <option value="FULFILLED">Fulfilled Only</option>
+          <option value="NO_REQUIREMENT">No Requirement</option>
         </select>
       </div>
 
@@ -408,26 +417,38 @@ export function AdminWagersPage() {
                         ₹{w.remaining_amount_inr.toFixed(2)}
                       </td>
                       <td className="py-3 px-3 w-40">
-                        <div className="w-full bg-[#1a233a] rounded-full h-2 overflow-hidden mb-1">
-                          <div
-                            className={`h-full rounded-full transition-all duration-300 ${
-                              w.is_fulfilled ? 'bg-emerald-500' : 'bg-cyan-500'
-                            }`}
-                            style={{ width: `${Math.min(100, Math.max(4, w.progress_percent))}%` }}
-                          ></div>
-                        </div>
-                        <span className="text-[10px] text-gray-400 font-mono">{w.progress_percent}% completed</span>
+                        {w.required_amount_inr === 0 ? (
+                          <span className="text-[11px] text-gray-500 font-mono italic">No requirement</span>
+                        ) : (
+                          <>
+                            <div className="w-full bg-[#1a233a] rounded-full h-2 overflow-hidden mb-1">
+                              <div
+                                className={`h-full rounded-full transition-all duration-300 ${
+                                  w.is_fulfilled ? 'bg-emerald-500' : 'bg-cyan-500'
+                                }`}
+                                style={{ width: `${Math.min(100, Math.max(4, w.progress_percent))}%` }}
+                              ></div>
+                            </div>
+                            <span className="text-[10px] text-gray-400 font-mono">{w.progress_percent}% completed</span>
+                          </>
+                        )}
                       </td>
                       <td className="py-3 px-3 text-center">
-                        <span
-                          className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                            w.is_fulfilled
-                              ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                              : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
-                          }`}
-                        >
-                          {w.is_fulfilled ? 'FULFILLED' : 'PENDING'}
-                        </span>
+                        {w.required_amount_inr === 0 ? (
+                          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#141b2d] text-gray-400 border border-gray-700/60">
+                            NO REQUIREMENT
+                          </span>
+                        ) : (
+                          <span
+                            className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                              w.is_fulfilled
+                                ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                                : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                            }`}
+                          >
+                            {w.is_fulfilled ? 'FULFILLED' : 'PENDING'}
+                          </span>
+                        )}
                       </td>
                       <td className="py-3 px-3 text-right">
                         <div className="flex items-center justify-end gap-1.5">
@@ -638,6 +659,110 @@ export function AdminWagersPage() {
                   className="px-5 py-2 rounded-xl text-xs font-bold bg-cyan-600 hover:bg-cyan-500 text-white transition disabled:opacity-50"
                 >
                   {savingEdit ? 'Updating...' : 'Save Adjustments'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Adjust Multiplier */}
+      {adjustModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
+          <div className="bg-[#0f1422] border border-[#222c44] rounded-2xl w-full max-w-md p-6 shadow-2xl">
+            <div className="flex items-center justify-between pb-3 border-b border-[#222c44]">
+              <h2 className="text-base font-bold text-white flex items-center gap-2">
+                <Sliders className="text-cyan-400" size={18} />
+                <span>Adjust Global Turnover Multiplier</span>
+              </h2>
+              <button
+                onClick={() => setAdjustModalOpen(false)}
+                className="p-1.5 rounded-lg text-gray-400 hover:text-white transition"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveGlobalWager} className="space-y-4 pt-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-300 mb-1">
+                  Rollover Play-Through Multiplier
+                </label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    max="100"
+                    required
+                    value={inputMultiplier}
+                    onChange={(e) => setInputMultiplier(e.target.value)}
+                    className="w-full bg-[#141b2d] border border-[#222c44] rounded-xl px-3.5 py-2.5 text-sm text-white font-mono font-bold focus:outline-none focus:border-cyan-500"
+                    placeholder="e.g. 50"
+                  />
+                  <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-cyan-400 font-black text-sm">x</span>
+                </div>
+                {/* Presets */}
+                <div className="flex items-center gap-1.5 mt-2">
+                  {[1, 2, 5, 10, 25, 50].map((preset) => (
+                    <button
+                      key={preset}
+                      type="button"
+                      onClick={() => setInputMultiplier(String(preset))}
+                      className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition ${
+                        parseFloat(inputMultiplier) === preset
+                          ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/50'
+                          : 'bg-[#141b2d] text-gray-400 border-[#222c44] hover:text-white'
+                      }`}
+                    >
+                      {preset}x
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Dynamic example calculation */}
+              <div className="p-3 bg-cyan-950/30 border border-cyan-500/30 rounded-xl text-xs text-cyan-200 space-y-1">
+                <span className="font-bold block text-white">Example Calculation:</span>
+                <p className="text-gray-300 text-[11px]">
+                  When a player deposits <strong className="text-gold-400 font-mono">₹1,000</strong> at{' '}
+                  <strong className="text-cyan-400 font-mono">{parseFloat(inputMultiplier) || 0}x</strong> multiplier, they must place{' '}
+                  <strong className="text-emerald-400 font-mono">₹{(1000 * (parseFloat(inputMultiplier) || 0)).toLocaleString('en-IN')}</strong> in bets before withdrawal unlock.
+                </p>
+              </div>
+
+              {/* Apply to existing deposits checkbox */}
+              <label className="flex items-start gap-2.5 p-3 bg-[#141b2d] border border-[#222c44] rounded-xl cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={applyToExisting}
+                  onChange={(e) => setApplyToExisting(e.target.checked)}
+                  className="rounded border-gray-700 text-cyan-500 focus:ring-0 mt-0.5"
+                />
+                <div className="text-xs">
+                  <span className="font-bold text-white block">
+                    Recalculate & apply to all active player deposits now
+                  </span>
+                  <span className="text-[11px] text-gray-400">
+                    Immediately recalculates turnover requirements for all existing deposits in the table below using {parseFloat(inputMultiplier) || 0}x multiplier.
+                  </span>
+                </div>
+              </label>
+
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-[#222c44]">
+                <button
+                  type="button"
+                  onClick={() => setAdjustModalOpen(false)}
+                  className="px-4 py-2 rounded-xl text-xs text-gray-400 hover:text-white transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingGlobal}
+                  className="px-5 py-2 rounded-xl text-xs font-bold bg-cyan-600 hover:bg-cyan-500 text-white transition disabled:opacity-50 cursor-pointer shadow-lg shadow-cyan-600/20"
+                >
+                  {savingGlobal ? 'Applying Multiplier...' : 'Save & Update Wagers'}
                 </button>
               </div>
             </form>

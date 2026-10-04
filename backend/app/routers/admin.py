@@ -74,6 +74,7 @@ class WagerCreateIn(BaseModel):
 class WagerGlobalUpdateIn(BaseModel):
     multiplier: float = Field(ge=0.0, le=100.0)
     default_user_wager_inr: Optional[float] = 0.0
+    apply_to_existing_deposits: Optional[bool] = False
 
 
 class WagerApplyAllIn(BaseModel):
@@ -728,7 +729,7 @@ def approve_deposit_endpoint(
     if w_setting and w_setting.value:
         multiplier = float(w_setting.value.get("multiplier", 1.0))
     required_wager = int(dep.amount * multiplier)
-    wager_service.create_wager_requirement(db, dep.user_id, required_wager, deposit_id=dep.id)
+    wager_service.create_wager_requirement(db, dep.user_id, dep.amount, deposit_id=dep.id, multiplier=multiplier)
 
     # 3. Audit log
     audit_service.log_action(
@@ -1708,12 +1709,13 @@ def list_wagers(
     user_id: Optional[UUID] = Query(default=None),
     is_fulfilled: Optional[bool] = Query(default=None),
     search: Optional[str] = Query(default=None),
+    status_filter: Optional[str] = Query(default=None),
     admin: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
     """List wager requirements with search, filters, and user details."""
     data = wager_service.admin_list_wagers(
-        db, page=page, page_size=page_size, user_id=user_id, is_fulfilled=is_fulfilled, search=search
+        db, page=page, page_size=page_size, user_id=user_id, is_fulfilled=is_fulfilled, search=search, status_filter=status_filter
     )
     return success_response(data)
 
@@ -1797,16 +1799,33 @@ def update_global_wager_config(
         row.value = new_data
         row.updated_at = datetime.now(timezone.utc)
 
+    synced_info = None
+    if payload.apply_to_existing_deposits:
+        synced_info = wager_service.sync_all_user_wagers_with_multiplier(db, payload.multiplier)
+
     audit_service.log_action(
         db,
         action="GLOBAL_WAGER_UPDATE",
         actor_id=admin.id,
         entity_type="system_setting",
         entity_id="global_wager_settings",
-        metadata=new_data,
+        metadata={**new_data, "synced_info": synced_info},
     )
     db.commit()
-    return success_response(new_data)
+    return success_response({**new_data, "synced_info": synced_info})
+
+
+@router.post("/wagers/sync-multiplier")
+def sync_multiplier_wagers(
+    admin: User = Depends(require_permission(AdminPermission.WAGER_CONTROL.value)),
+    db: Session = Depends(get_db),
+):
+    """Sync and recalculate all player deposit turnover requirements with the active global multiplier."""
+    result = wager_service.sync_all_user_wagers_with_multiplier(db)
+    return success_response({
+        "message": f"Successfully recalculated turnover for {result['updated_users']} players ({result['total_requirements_updated']} deposit requirements) at {result['multiplier']}x multiplier.",
+        **result,
+    })
 
 
 @router.post("/wagers/apply-all")

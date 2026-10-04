@@ -25,6 +25,7 @@ def create_wager_requirement(
     user_id: UUID,
     deposit_amount: int,
     deposit_id: Optional[UUID] = None,
+    multiplier: Optional[float] = None,
 ) -> Optional[WagerRequirement]:
     """Create a play-through requirement when a deposit is credited.
 
@@ -36,29 +37,41 @@ def create_wager_requirement(
         user_id: Owner of the requirement.
         deposit_amount: Deposit amount in paise.
         deposit_id: Deposit this requirement belongs to.
+        multiplier: Optional turnover multiplier override. If omitted, uses global_wager_settings.
     """
     if deposit_amount <= 0:
         return None
+
+    if multiplier is None:
+        from ..models.system import SystemSetting
+        w_setting = db.query(SystemSetting).filter(SystemSetting.key == "global_wager_settings").first()
+        multiplier = float(w_setting.value.get("multiplier", 1.0)) if (w_setting and w_setting.value) else 1.0
+
+    required_amount = int(round(deposit_amount * multiplier))
 
     if deposit_id is not None:
         existing = db.query(WagerRequirement).filter(
             WagerRequirement.deposit_id == deposit_id
         ).first()
         if existing:
+            if not existing.is_fulfilled and existing.required_amount != required_amount:
+                existing.required_amount = required_amount
+                existing.is_fulfilled = existing.completed_amount >= existing.required_amount
+                db.flush()
             return existing
 
     req = WagerRequirement(
         user_id=user_id,
         deposit_id=deposit_id,
-        required_amount=deposit_amount,
+        required_amount=required_amount,
         completed_amount=0,
         is_fulfilled=False,
     )
     db.add(req)
     db.flush()
     logger.info(
-        "Wager requirement created: user=%s amount=%s (Rs %.2f) deposit=%s",
-        user_id, deposit_amount, deposit_amount / 100, deposit_id,
+        "Wager requirement created: user=%s deposit_amount=%s multiplier=%sx required=%s (Rs %.2f) deposit=%s",
+        user_id, deposit_amount, multiplier, required_amount, required_amount / 100, deposit_id,
     )
     return req
 
@@ -210,6 +223,69 @@ def get_wager_status(db: Session, user_id: UUID) -> dict:
     }
 
 
+def sync_all_user_wagers_with_multiplier(
+    db: Session,
+    multiplier: Optional[float] = None,
+) -> dict:
+    """Recalculate or create wager requirements for all users based on their completed deposits and multiplier."""
+    from ..models.deposit import Deposit, DepositStatus
+    from ..models.user import User, UserRole
+    from ..models.system import SystemSetting
+
+    if multiplier is None:
+        w_setting = db.query(SystemSetting).filter(SystemSetting.key == "global_wager_settings").first()
+        multiplier = float(w_setting.value.get("multiplier", 1.0)) if (w_setting and w_setting.value) else 1.0
+
+    users = db.query(User).filter(User.role == UserRole.USER).all()
+    updated_users = 0
+    total_requirements_updated = 0
+
+    for u in users:
+        successful_deposits = (
+            db.query(Deposit)
+            .filter(Deposit.user_id == u.id, Deposit.status == DepositStatus.SUCCESS)
+            .order_by(Deposit.created_at.asc())
+            .all()
+        )
+
+        user_touched = False
+        if successful_deposits:
+            for dep in successful_deposits:
+                req = db.query(WagerRequirement).filter(WagerRequirement.deposit_id == dep.id).first()
+                new_required = int(round(dep.amount * multiplier))
+                if req:
+                    if req.required_amount != new_required:
+                        req.required_amount = new_required
+                        req.is_fulfilled = req.completed_amount >= req.required_amount
+                        total_requirements_updated += 1
+                        user_touched = True
+                else:
+                    new_req = WagerRequirement(
+                        user_id=u.id,
+                        deposit_id=dep.id,
+                        required_amount=new_required,
+                        completed_amount=0,
+                        is_fulfilled=False,
+                    )
+                    db.add(new_req)
+                    total_requirements_updated += 1
+                    user_touched = True
+
+        if user_touched:
+            updated_users += 1
+
+    db.commit()
+    logger.info(
+        "Synced wagers with %sx multiplier: updated %d requirements across %d users",
+        multiplier, total_requirements_updated, updated_users,
+    )
+    return {
+        "multiplier": multiplier,
+        "updated_users": updated_users,
+        "total_requirements_updated": total_requirements_updated,
+    }
+
+
 def admin_list_wagers(
     db: Session,
     page: int = 1,
@@ -217,6 +293,7 @@ def admin_list_wagers(
     user_id: Optional[UUID] = None,
     is_fulfilled: Optional[bool] = None,
     search: Optional[str] = None,
+    status_filter: Optional[str] = None,
 ) -> dict:
     from ..models.user import User
     from sqlalchemy import or_, String, cast
@@ -249,13 +326,27 @@ def admin_list_wagers(
         req_p = sum(int(r.required_amount) for r in wager_rows)
         comp_p = sum(int(r.completed_amount) for r in wager_rows)
         rem_p = max(0, req_p - comp_p)
-        prog = 100.0 if req_p == 0 else round(min(100.0, (comp_p / req_p) * 100), 1)
-        is_ful = (rem_p == 0) and (req_p > 0 or (wager_rows and all(r.is_fulfilled for r in wager_rows)))
 
-        if is_fulfilled is not None:
-            if is_fulfilled and not is_ful:
+        if req_p == 0:
+            status = "NO_REQUIREMENT"
+            is_ful = False
+            prog = 0.0
+        elif rem_p == 0 or comp_p >= req_p:
+            status = "FULFILLED"
+            is_ful = True
+            prog = 100.0
+        else:
+            status = "PENDING"
+            is_ful = False
+            prog = round(min(100.0, (comp_p / req_p) * 100), 1)
+
+        if status_filter and status_filter != "ALL":
+            if status_filter != status:
                 continue
-            if not is_fulfilled and is_ful:
+        elif is_fulfilled is not None:
+            if is_fulfilled and status != "FULFILLED":
+                continue
+            if not is_fulfilled and status != "PENDING":
                 continue
 
         latest_id = str(wager_rows[0].id) if wager_rows else str(u.id)
@@ -276,6 +367,7 @@ def admin_list_wagers(
             "remaining_amount_inr": round(rem_p / 100, 2),
             "progress_percent": prog,
             "is_fulfilled": is_ful,
+            "status": status,
             "created_at": created_at,
             "updated_at": updated_at,
         })

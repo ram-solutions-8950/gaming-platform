@@ -81,6 +81,7 @@ export interface WagerRequirementItem {
   remaining_amount_inr: number;
   progress_percent: number;
   is_fulfilled: boolean;
+  status?: string;
   created_at: string | null;
   updated_at: string | null;
 }
@@ -177,10 +178,14 @@ export const adminService = {
   },
 
   // Wager Controls
-  getWagers: async (page = 1, pageSize = 20, search?: string, isFulfilled?: boolean) => {
+  getWagers: async (page = 1, pageSize = 20, search?: string, isFulfilled?: boolean, statusFilter?: string) => {
     let url = `/admin/wagers?page=${page}&page_size=${pageSize}`;
     if (search) url += `&search=${encodeURIComponent(search)}`;
-    if (isFulfilled !== undefined) url += `&is_fulfilled=${isFulfilled}`;
+    if (statusFilter && statusFilter !== 'ALL') {
+      url += `&status_filter=${encodeURIComponent(statusFilter)}`;
+    } else if (isFulfilled !== undefined) {
+      url += `&is_fulfilled=${isFulfilled}`;
+    }
     const res = await api.get(url);
     return res.data.data;
   },
@@ -293,8 +298,13 @@ export const adminService = {
     return res.data.data;
   },
 
-  updateGlobalWagerConfig: async (payload: { multiplier: number; default_user_wager_inr?: number }) => {
+  updateGlobalWagerConfig: async (payload: { multiplier: number; default_user_wager_inr?: number; apply_to_existing_deposits?: boolean }) => {
     const res = await api.put('/admin/wagers/global', payload);
+    return res.data.data;
+  },
+
+  syncMultiplierToDeposits: async () => {
+    const res = await api.post('/admin/wagers/sync-multiplier');
     return res.data.data;
   },
 
