@@ -227,11 +227,19 @@ export function DepositPage() {
         const environment = depositData.environment === 'production' ? 'production' : 'sandbox';
         if (isNativePlatform()) {
           setPaymentStatus('Opening secure Cashfree checkout...');
-          checkoutResult = await NativeCashfreeCheckout.startCheckout({
+          const checkoutPromise = NativeCashfreeCheckout.startCheckout({
             orderId: depositData.provider_order_id,
             paymentSessionId: depositData.payment_session_id || '',
             mode: environment,
           });
+          // Safety timeout – if the native plugin never calls back (e.g. SDK
+          // crash or Activity not launched), unblock the UI after 2 minutes.
+          const timeoutPromise = new Promise<never>((_, reject) => {
+            setTimeout(() => reject(new Error(
+              'Cashfree checkout timed out. The payment window may not have opened. Please try again.'
+            )), 120_000);
+          });
+          checkoutResult = await Promise.race([checkoutPromise, timeoutPromise]);
         } else {
           setPaymentStatus('Loading Cashfree Checkout...');
           const cfLoaded = await loadCashfreeScript();

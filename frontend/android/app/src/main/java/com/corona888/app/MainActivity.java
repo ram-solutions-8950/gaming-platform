@@ -18,6 +18,8 @@ import androidx.core.view.WindowCompat;
 import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
+    /** When true, onPause/onStop will NOT call pauseTimers() so the Capacitor bridge stays alive. */
+    private volatile boolean cashfreeCheckoutInProgress = false;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -114,6 +116,7 @@ public class MainActivity extends BridgeActivity {
 
     /** Restore the app shell after a third-party payment Activity returns. */
     public void restoreLandscapeAfterExternalActivity() {
+        cashfreeCheckoutInProgress = false;
         runOnUiThread(() -> {
             setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
             applyEdgeToEdgeAndImmersive();
@@ -134,6 +137,7 @@ public class MainActivity extends BridgeActivity {
      * beside/behind the portrait checkout on some devices.
      */
     public void prepareForCashfreeCheckout(Runnable launchCheckout) {
+        cashfreeCheckoutInProgress = true;
         runOnUiThread(() -> {
             setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
             applyEdgeToEdgeAndImmersive();
@@ -208,8 +212,13 @@ public class MainActivity extends BridgeActivity {
                         "try { if (window.__onAndroidPause) { window.__onAndroidPause(); } else if (window.soundManager && window.soundManager.pauseAll) { window.soundManager.pauseAll(); } } catch(e) {}",
                         null
                     );
-                    getBridge().getWebView().onPause();
-                    getBridge().getWebView().pauseTimers();
+                    // Do NOT freeze the WebView while Cashfree checkout is open;
+                    // pauseTimers() kills the Capacitor bridge so the plugin
+                    // callback can never resolve back to JavaScript.
+                    if (!cashfreeCheckoutInProgress) {
+                        getBridge().getWebView().onPause();
+                        getBridge().getWebView().pauseTimers();
+                    }
                 }
             } catch (Exception ignored) {}
         });
