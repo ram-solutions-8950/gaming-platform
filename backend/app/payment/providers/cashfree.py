@@ -6,6 +6,7 @@ from typing import Optional
 import httpx
 
 from ..base import PaymentProvider
+from ...config import settings
 from ...utils.logging import get_logger
 
 logger = get_logger("cashfree")
@@ -65,8 +66,8 @@ class CashfreeProvider(PaymentProvider):
                 "customer_phone": customer_phone,
             },
             "order_meta": {
-                "return_url": meta.get("return_url", "https://corona888.tech/wallet?status={order_status}&order_id={order_id}"),
-                "notify_url": meta.get("notify_url", "https://api.corona888.tech/api/v1/payments/webhook/cashfree"),
+                "return_url": meta.get("return_url") or settings.CASHFREE_RETURN_URL,
+                "notify_url": meta.get("notify_url") or settings.CASHFREE_NOTIFY_URL,
             },
             "order_note": f"Wallet Deposit User {user_id}",
         }

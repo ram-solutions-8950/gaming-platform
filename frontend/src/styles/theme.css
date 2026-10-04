@@ -502,7 +502,7 @@ body {
     padding: 8px 14px 10px 14px !important;
     border-radius: 12px !important;
     margin: 0 auto !important;
-    max-height: calc(100dvh - 125px) !important;
+    max-height: min(500px, calc(100dvh - 220px)) !important;
     overflow-y: auto !important;
     scrollbar-width: none !important;
   }

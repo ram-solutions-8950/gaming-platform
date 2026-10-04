@@ -45,6 +45,8 @@ class Settings(BaseSettings):
     PAYMENT_API_KEY: str = ""
     PAYMENT_SECRET: str = ""
     PAYMENT_WEBHOOK_SECRET: str = ""
+    CASHFREE_RETURN_URL: str = "https://polandexim.com/wallet?status={order_status}&order_id={order_id}"
+    CASHFREE_NOTIFY_URL: str = "https://polandexim.com/api/v1/payments/webhook?provider=cashfree"
 
 settings = Settings()
 

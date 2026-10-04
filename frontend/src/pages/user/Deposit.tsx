@@ -217,56 +217,75 @@ export function DepositPage() {
           mode: depositData.environment === 'production' ? 'production' : 'sandbox',
         });
 
-        cashfree.checkout({
+        const checkoutResult = await cashfree.checkout({
           paymentSessionId: depositData.payment_session_id,
           redirectTarget: '_modal',
-        }).then(async (result: any) => {
-          if (result.error) {
-            setErrorMsg(result.error.message || 'Payment was cancelled.');
-            setPaymentStatus('');
-            setProcessing(false);
-            return;
-          }
+        });
 
-          setProcessing(true);
-          setPaymentStatus('Payment submitted. Verifying with server...');
-          setErrorMsg('');
+        if (checkoutResult?.error) {
+          throw new Error(checkoutResult.error.message || 'Payment was cancelled.');
+        }
 
+        setPaymentStatus('Payment submitted. Verifying with server...');
+        setErrorMsg('');
+
+        let verified = false;
+        let lastVerifyError: any;
+        for (let attempt = 0; attempt < 5; attempt += 1) {
           try {
             const verifyResponse = await api.post(
               `/deposits/${depositData.id}/verify`,
               {
                 provider_order_id: depositData.provider_order_id,
-                provider_payment_id: result.paymentDetails?.paymentMessage || depositData.provider_order_id,
+                provider_payment_id: checkoutResult?.paymentDetails?.paymentMessage || depositData.provider_order_id,
                 signature: 'cashfree_checkout',
               },
             );
 
             const verifiedDeposit = verifyResponse.data.data;
             setDeposit(verifiedDeposit);
-
             if (verifiedDeposit.status === 'SUCCESS') {
-              setPaymentStatus(
-                'Payment successful! Your wallet has been credited.',
-              );
-              setErrorMsg('');
-            } else {
-              setErrorMsg(
-                `Payment status: ${verifiedDeposit.status}. Please check wallet or try again.`,
-              );
-              setPaymentStatus('');
+              setPaymentStatus('Payment successful! Your wallet has been credited.');
+              verified = true;
+              break;
+            }
+
+            lastVerifyError = new Error(`Payment status: ${verifiedDeposit.status}`);
+            if (verifiedDeposit.status !== 'PENDING') {
+              break;
             }
           } catch (verifyErr: any) {
-            setErrorMsg(
+            lastVerifyError = verifyErr;
+            const message =
               verifyErr.response?.data?.message ||
               verifyErr.response?.data?.error?.message ||
-              'Payment verification pending. Please check wallet in a moment.',
-            );
-            setPaymentStatus('');
-          } finally {
-            setProcessing(false);
+              verifyErr.message || '';
+            const stillPending = /status:\s*PENDING/i.test(message);
+
+            if (!stillPending || attempt === 4) {
+              break;
+            }
           }
-        });
+
+          if (attempt < 4) {
+            await new Promise((resolve) => window.setTimeout(resolve, 2000));
+          }
+        }
+
+        if (!verified) {
+          const message =
+            lastVerifyError?.response?.data?.message ||
+            lastVerifyError?.response?.data?.error?.message ||
+            lastVerifyError?.message || '';
+          if (/status:\s*PENDING/i.test(message)) {
+            setErrorMsg('');
+            setPaymentStatus('Payment is still being confirmed. Please do not pay again; check your wallet shortly.');
+          } else {
+            setErrorMsg(message || 'Payment verification is pending. Please check your wallet shortly.');
+            setPaymentStatus('');
+          }
+        }
+        setProcessing(false);
       } else {
         // --- RAZORPAY CHECKOUT FLOW ---
         setPaymentStatus('Loading Razorpay Checkout...');
@@ -505,7 +524,7 @@ export function DepositPage() {
           <button
             onClick={handleDepositSubmit}
             disabled={processing || !amount}
-            className="deposit-submit-btn w-full bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-500 hover:to-green-500 disabled:from-dark-800 disabled:to-dark-800 disabled:text-gray-600 text-white font-extrabold py-3 px-4 rounded-xl shadow-lg shadow-green-600/20 transition-all cursor-pointer text-sm active:scale-95"
+            className="deposit-submit-btn w-full bg-linear-to-r from-emerald-600 to-green-600 hover:from-emerald-500 hover:to-green-500 disabled:from-dark-800 disabled:to-dark-800 disabled:text-gray-600 text-white font-extrabold py-3 px-4 rounded-xl shadow-lg shadow-green-600/20 transition-all cursor-pointer text-sm active:scale-95"
           >
             {buttonLabel}
           </button>
