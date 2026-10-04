@@ -99,13 +99,23 @@ def test_admin_upload_qr_too_large(client, superadmin_token, test_qr_bytes, db):
 
 def test_admin_upload_qr_path_traversal(client, superadmin_token, test_qr_bytes, db):
     config = db.query(PaymentConfiguration).first()
+    if config is None:
+        config = PaymentConfiguration(
+            provider="qr_path_test",
+            display_name="QR Path Test",
+            minimum_deposit=10000,
+            maximum_deposit=50000,
+        )
+        db.add(config)
+        db.commit()
+        db.refresh(config)
     res = client.post(f"/api/v1/admin/payment-settings/{config.id}/qr-upload",
                       files={"file": ("../../../test.png", test_qr_bytes, "image/png")},
                       headers={"Authorization": f"Bearer {superadmin_token}"})
     assert res.status_code == 200
     qr_ref = res.json()["data"]["qr_code_reference"]
     assert ".." not in qr_ref
-    assert qr_ref.startswith("/uploads/qr/")
+    assert qr_ref.startswith("/api/v1/uploads/qr/")
 
 def test_user_active_config(client, user_token, db):
     config = db.query(PaymentConfiguration).first()

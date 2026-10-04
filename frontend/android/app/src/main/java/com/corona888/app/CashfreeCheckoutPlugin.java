@@ -82,6 +82,9 @@ public class CashfreeCheckoutPlugin extends Plugin implements CFCheckoutResponse
         JSObject result = new JSObject();
         result.put("orderId", orderId);
         result.put("status", "COMPLETED");
+        if (getActivity() instanceof MainActivity) {
+            ((MainActivity) getActivity()).restoreLandscapeAfterExternalActivity();
+        }
         call.resolve(result);
     }
 
@@ -95,6 +98,9 @@ public class CashfreeCheckoutPlugin extends Plugin implements CFCheckoutResponse
         String message = error != null && error.getMessage() != null
             ? error.getMessage()
             : "Cashfree payment was cancelled or failed.";
+        if (getActivity() instanceof MainActivity) {
+            ((MainActivity) getActivity()).restoreLandscapeAfterExternalActivity();
+        }
         call.reject(message);
     }
 }

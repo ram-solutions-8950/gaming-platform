@@ -69,7 +69,7 @@ def test_boot_and_bets_leave_the_wallet_when_they_are_placed(db, real_table):
     assert _balance(db, user) == 48000
 
 
-def test_emptying_the_wallet_mid_hand_cannot_dodge_a_loss(db, real_table):
+def test_emptying_the_wallet_mid_hand_cannot_dodge_a_loss(db, real_table, zero_winning_fee):
     table_id, hand, users = real_table
     first = _turn_user(hand)
     hand.bet(first)

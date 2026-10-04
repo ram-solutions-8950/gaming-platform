@@ -52,7 +52,7 @@ def test_deal_start_holds_the_maximum_loss(db, real_deal):
     assert all(_balance(db, u) == 5000 - ENTRY_FEE for u in users)
 
 
-def test_loser_pays_only_their_points_even_after_emptying_the_wallet(db, real_deal):
+def test_loser_pays_only_their_points_even_after_emptying_the_wallet(db, real_deal, zero_winning_fee):
     table_id, game, users = real_deal
     rws._hold_deal_stakes(table_id, game)
     game.start_deal()

@@ -667,7 +667,7 @@ def test_shutdown_pays_every_stack_back_and_voids_the_live_hand(client, db, monk
     assert engine.players == []
 
 
-def test_player_who_stays_disconnected_is_cashed_out(client, db, monkeypatch):
+def test_player_who_stays_disconnected_is_cashed_out(client, db, monkeypatch, zero_winning_fee):
     monkeypatch.setattr(poker_ws, "SessionLocal", sessionmaker(autocommit=False, autoflush=False, bind=db.get_bind()))
     _silence_table_io(monkeypatch)
     monkeypatch.setattr(poker_ws, "_DISCONNECT_CASHOUT_SECONDS", 0)

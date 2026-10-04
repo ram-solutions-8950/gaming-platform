@@ -67,7 +67,7 @@ def test_aviator_flight_cut_off_by_a_restart_refunds_live_bets(db, player):
     assert db.get(AviatorRound, rnd.id).status == AviatorRoundStatus.SETTLED
 
 
-def test_aviator_auto_cashout_just_below_the_crash_is_paid(db, player, monkeypatch):
+def test_aviator_auto_cashout_just_below_the_crash_is_paid(db, player, monkeypatch, zero_winning_fee):
     monkeypatch.setattr(aviator_module, "compute_crash_point", lambda seed, nonce: 2.0)
     eng = aviator_module.AviatorEngine()
     eng._recent_crash_points = [1.5]

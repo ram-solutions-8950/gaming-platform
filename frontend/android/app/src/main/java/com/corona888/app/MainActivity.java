@@ -108,7 +108,39 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onResume() {
         super.onResume();
+        restoreLandscapeAfterExternalActivity();
         notifyWebAudioResume();
+    }
+
+    /** Restore the app shell after a third-party payment Activity returns. */
+    public void restoreLandscapeAfterExternalActivity() {
+        runOnUiThread(() -> {
+            setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
+            applyEdgeToEdgeAndImmersive();
+
+            WebView webView = getBridge() != null ? getBridge().getWebView() : null;
+            if (webView == null) return;
+
+            // Cashfree can finish before Android has completed its orientation/inset
+            // transition. Re-measure after that transition so CSS and game canvases
+            // do not remain laid out using the checkout Activity's viewport.
+            webView.postDelayed(() -> {
+                webView.requestLayout();
+                webView.invalidate();
+                webView.evaluateJavascript(
+                    "try { " +
+                    "  const root = document.documentElement; " +
+                    "  const vh = window.innerHeight * 0.01; " +
+                    "  root.style.setProperty('--vh', vh + 'px'); " +
+                    "  root.style.setProperty('--app-height', window.innerHeight + 'px'); " +
+                    "  window.dispatchEvent(new Event('orientationchange')); " +
+                    "  window.dispatchEvent(new Event('resize')); " +
+                    "  if (window.visualViewport) window.visualViewport.dispatchEvent(new Event('resize')); " +
+                    "} catch(e) {}",
+                    null
+                );
+            }, 350);
+        });
     }
 
     @Override
