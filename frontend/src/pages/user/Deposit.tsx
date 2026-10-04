@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
+import { createPortal } from 'react-dom';
 import { Card } from '../../components/common/Card';
 import api from '../../services/api';
 
@@ -125,6 +126,8 @@ export function DepositPage() {
   const [paymentStatus, setPaymentStatus] = useState('');
   const [deposit, setDeposit] = useState<DepositResponse | null>(null);
   const [gatewayConfig, setGatewayConfig] = useState<ActiveGatewayConfig | null>(null);
+  const [cashfreeCheckoutOpen, setCashfreeCheckoutOpen] = useState(false);
+  const cashfreeCheckoutRef = useRef<HTMLDivElement>(null);
 
   const minimumDeposit = 100;
   const maximumDeposit = 10000;
@@ -217,10 +220,25 @@ export function DepositPage() {
           mode: depositData.environment === 'production' ? 'production' : 'sandbox',
         });
 
+        setCashfreeCheckoutOpen(true);
+        await new Promise<void>((resolve) => {
+          window.requestAnimationFrame(() => window.requestAnimationFrame(() => resolve()));
+        });
+
+        const checkoutTarget = cashfreeCheckoutRef.current;
+        if (!checkoutTarget) {
+          throw new Error('Unable to open the embedded Cashfree checkout.');
+        }
+
         const checkoutResult = await cashfree.checkout({
           paymentSessionId: depositData.payment_session_id,
-          redirectTarget: '_modal',
+          redirectTarget: checkoutTarget,
+          appearance: {
+            width: '100%',
+            height: '100%',
+          },
         });
+        setCashfreeCheckoutOpen(false);
 
         if (checkoutResult?.error) {
           throw new Error(checkoutResult.error.message || 'Payment was cancelled.');
@@ -387,6 +405,7 @@ export function DepositPage() {
         razorpay.open();
       }
     } catch (error: any) {
+      setCashfreeCheckoutOpen(false);
       setErrorMsg(
         error.response?.data?.error?.message ||
           error.message ||
@@ -530,6 +549,31 @@ export function DepositPage() {
           </button>
         </div>
       </Card>
+      {cashfreeCheckoutOpen && createPortal(
+        <div className="fixed inset-0 z-100 flex items-center justify-center bg-slate-950/90 p-3 backdrop-blur-sm sm:p-5">
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-label="Secure Cashfree checkout"
+            className="flex h-[calc(100dvh-24px)] w-full max-w-300 flex-col overflow-hidden rounded-2xl border border-white/15 bg-white shadow-2xl sm:h-[calc(100dvh-40px)]"
+          >
+            <div className="flex min-h-12 shrink-0 items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 sm:px-6">
+              <div className="min-w-0">
+                <p className="truncate text-sm font-bold text-slate-900">Secure payment</p>
+                <p className="text-[11px] text-slate-500">Complete your deposit using Cashfree</p>
+              </div>
+              <span className="shrink-0 rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-emerald-700">
+                Encrypted checkout
+              </span>
+            </div>
+            <div
+              ref={cashfreeCheckoutRef}
+              className="min-h-0 flex-1 overflow-auto bg-slate-100 [&>iframe]:block [&>iframe]:h-full [&>iframe]:w-full [&>iframe]:border-0"
+            />
+          </section>
+        </div>,
+        document.body,
+      )}
     </div>
   );
 }

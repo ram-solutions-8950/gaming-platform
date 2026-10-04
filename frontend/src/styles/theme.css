@@ -470,8 +470,8 @@ body {
 
   /* ── Deposit Page Mobile Landscape ── */
   .deposit-page {
-    width: min(540px, calc(100vw - 32px)) !important;
-    max-width: 540px !important;
+    width: min(640px, calc(100vw - 32px)) !important;
+    max-width: 640px !important;
     margin: 0 auto !important;
     padding: 0 0 6px 0 !important;
     gap: 3px !important;
@@ -502,7 +502,7 @@ body {
     padding: 8px 14px 10px 14px !important;
     border-radius: 12px !important;
     margin: 0 auto !important;
-    max-height: min(500px, calc(100dvh - 220px)) !important;
+    max-height: min(560px, calc(100dvh - 150px)) !important;
     overflow-y: auto !important;
     scrollbar-width: none !important;
   }
@@ -560,6 +560,9 @@ body {
   }
 
   .deposit-submit-btn {
+    position: sticky !important;
+    bottom: 0 !important;
+    z-index: 2 !important;
     height: 36px !important;
     min-height: 36px !important;
     padding: 3px 10px !important;
