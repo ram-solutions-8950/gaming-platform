@@ -34,7 +34,13 @@ export function getMediaUrl(path: string | null | undefined): string {
   }
 
   // 3. Relative paths (e.g. "/uploads/qr/...", "uploads/qr/...", "/api/v1/uploads/...")
-  const normalizedPath = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
+  let normalizedPath = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
+
+  // Automatically ensure uploaded media routes through /api/v1/uploads so it is guaranteed
+  // to be proxied by all web servers, SSL endpoints, and CDNs
+  if (normalizedPath.startsWith('/uploads/')) {
+    normalizedPath = `/api/v1${normalizedPath}`;
+  }
 
   // If running inside Native Capacitor APK (Android/iOS)
   if (isNativePlatform()) {
@@ -55,7 +61,7 @@ export function getMediaUrl(path: string | null | undefined): string {
       }
     }
     // On production HTTPS web (admin.polandexim.com or polandexim.com),
-    // Nginx proxies /uploads/ to backend port 8000, so root-relative /uploads/... works directly
+    // root-relative /api/v1/uploads/... routes directly through the API proxy
     return normalizedPath;
   }
 

@@ -57,6 +57,6 @@ async def upload_my_avatar(
     with open(dest, "wb") as f:
         f.write(contents)
 
-    avatar_url = f"/uploads/avatars/{filename}"
+    avatar_url = f"/api/v1/uploads/avatars/{filename}"
     updated = user_service.update_user_profile(db, current_user, avatar_url=avatar_url)
     return success_response(UserOut.model_validate(updated).model_dump())

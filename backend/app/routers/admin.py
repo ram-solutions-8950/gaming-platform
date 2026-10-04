@@ -1166,7 +1166,7 @@ async def upload_qr_code(
                 pass
 
     # Store only the relative URL path, not filesystem path
-    qr_url = f"/uploads/qr/{safe_name}"
+    qr_url = f"/api/v1/uploads/qr/{safe_name}"
     config.qr_code_reference = qr_url
     audit_service.log_action(
         db, action="PAYMENT_QR_UPLOAD", actor_id=admin.id,

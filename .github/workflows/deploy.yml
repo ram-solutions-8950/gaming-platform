@@ -258,6 +258,13 @@ jobs:
 
             fi
 
+            # Ensure any active legacy SSL configs also proxy /uploads/
+            if [ -f /etc/nginx/sites-available/gaming-platform ]; then
+              if ! grep -q "location /uploads/" /etc/nginx/sites-available/gaming-platform; then
+                sudo sed -i '/location \/api\/ {/i \    location /uploads/ {\n        proxy_pass http://127.0.0.1:8000;\n        proxy_set_header Host $host;\n        proxy_set_header X-Real-IP $remote_addr;\n        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n        proxy_set_header X-Forwarded-Proto $scheme;\n    }\n' /etc/nginx/sites-available/gaming-platform 2>/dev/null || true
+              fi
+            fi
+
             echo "===================================="
             echo "12. CHECKING OTHER NGINX RULES"
             echo "===================================="
