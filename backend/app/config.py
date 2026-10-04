@@ -30,6 +30,7 @@ class Settings(BaseSettings):
     ]
     DATABASE_URL: str = "postgresql://postgres@localhost:5432/gaming_db"
     FRONTEND_URL: str = "http://localhost:5173"
+    PUBLIC_DOWNLOAD_URL: str = "https://polandexim.com/download"
     # Apply pending Alembic migrations automatically on startup.
     # Disable to gate schema changes behind a manual deploy step.
     AUTO_MIGRATE: bool = True

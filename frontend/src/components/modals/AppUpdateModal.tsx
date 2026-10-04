@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { systemService, type AppVersionInfo } from '../../services/systemService';
 import { APP_VERSION } from '../../version';
+import { isNativePlatform } from '../../utils/platform';
 import { Download, Sparkles, X, ArrowRight, ShieldCheck } from 'lucide-react';
 
 function isNewerVersion(latest: string, current: string): boolean {
@@ -66,7 +67,10 @@ export function AppUpdateModal() {
   const handleDownload = () => {
     setDownloading(true);
     const link = document.createElement('a');
-    link.href = updateInfo.download_url || '/Corona888.apk';
+    const downloadUrl = updateInfo.download_url || '/Corona888.apk';
+    link.href = isNativePlatform() && downloadUrl.startsWith('/')
+      ? `https://polandexim.com${downloadUrl}`
+      : downloadUrl;
     link.setAttribute('download', 'Corona888.apk');
     document.body.appendChild(link);
     link.click();
@@ -75,8 +79,8 @@ export function AppUpdateModal() {
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fade-in select-none">
-      <div className="relative w-full max-w-md bg-gradient-to-b from-[#180a2e] via-[#0f051e] to-[#080212] rounded-3xl border-2 border-purple-500/50 shadow-[0_0_60px_rgba(168,85,247,0.35)] overflow-hidden text-white p-6">
+    <div className="fixed inset-0 z-100 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fade-in select-none">
+      <div className="relative w-full max-w-md bg-linear-to-b from-[#180a2e] via-[#0f051e] to-[#080212] rounded-3xl border-2 border-purple-500/50 shadow-[0_0_60px_rgba(168,85,247,0.35)] overflow-hidden text-white p-6">
         {/* Glow circle background */}
         <div className="absolute -top-16 -left-16 w-40 h-40 bg-purple-600/30 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute -bottom-16 -right-16 w-40 h-40 bg-cyan-600/25 rounded-full blur-3xl pointer-events-none" />
@@ -94,7 +98,7 @@ export function AppUpdateModal() {
 
         {/* Update Graphic */}
         <div className="flex flex-col items-center text-center pt-2">
-          <div className="relative w-16 h-16 rounded-2xl bg-gradient-to-tr from-purple-600 to-cyan-500 p-0.5 shadow-xl shadow-purple-600/30 mb-4 animate-bounce">
+          <div className="relative w-16 h-16 rounded-2xl bg-linear-to-tr from-purple-600 to-cyan-500 p-0.5 shadow-xl shadow-purple-600/30 mb-4 animate-bounce">
             <div className="w-full h-full bg-[#120624] rounded-2xl flex items-center justify-center text-3xl">
               🚀
             </div>
@@ -134,7 +138,7 @@ export function AppUpdateModal() {
             <button
               onClick={handleDownload}
               disabled={downloading}
-              className="w-full py-3.5 px-4 rounded-2xl font-black text-sm uppercase tracking-wider bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 text-gray-950 shadow-lg shadow-teal-500/25 active:scale-98 transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+              className="w-full py-3.5 px-4 rounded-2xl font-black text-sm uppercase tracking-wider bg-linear-to-r from-emerald-500 via-teal-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 text-gray-950 shadow-lg shadow-teal-500/25 active:scale-98 transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
             >
               <Download size={18} />
               <span>{downloading ? 'Downloading Update...' : 'Download & Update Now'}</span>

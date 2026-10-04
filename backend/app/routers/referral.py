@@ -55,7 +55,7 @@ def get_user_referral_stats(
 
     return success_response({
         "referral_code": current_user.referral_code,
-        "referral_link": f"{settings_config.FRONTEND_URL.rstrip('/')}/signup?ref={current_user.referral_code}",
+        "referral_link": f"{settings_config.PUBLIC_DOWNLOAD_URL.rstrip('/')}?ref={current_user.referral_code}",
         "reward_type": cfg["reward_type"],
         "reward_amount": cfg["reward_amount"],
         "reward_percentage": cfg["reward_percentage"],

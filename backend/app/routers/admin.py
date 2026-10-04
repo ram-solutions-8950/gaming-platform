@@ -28,6 +28,7 @@ from ..models.audit_log import AuditLog
 from ..models.support import SupportTicket, SupportTicketStatus
 from ..models.payment_gateway import PaymentGatewayConfig
 from ..models.system_settings import SystemSetting
+from ..app_version import LATEST_APP_VERSION
 from ..models.refresh_token import RefreshToken
 from ..services import wallet_service, audit_service, withdrawal_service, reward_service, wager_service, winning_service, support_service
 from ..security.password import hash_password
@@ -2429,14 +2430,18 @@ def get_admin_app_version(
     """Retrieve app version settings."""
     row = db.query(SystemSetting).filter(SystemSetting.key == "app_version_config").first()
     data = {
-        "latest_version": "0.0.81",
+        "latest_version": LATEST_APP_VERSION,
         "min_version": "0.0.70",
-        "download_url": "/Corona888.apk",
+        "download_url": "https://polandexim.com/Corona888.apk",
         "release_notes": "Added instant payment gateways, live Dragon & Tiger controls, and in-app support helpdesk.",
         "force_update": False,
     }
     if row and row.value:
         data.update(row.value)
+    configured = tuple(int(part) if part.isdigit() else 0 for part in str(data.get("latest_version", "")).removeprefix("v").split("."))
+    built = tuple(int(part) for part in LATEST_APP_VERSION.split("."))
+    if configured < built:
+        data["latest_version"] = LATEST_APP_VERSION
     return success_response(data)
 
 
@@ -2451,7 +2456,7 @@ def update_admin_app_version(
     data = {
         "latest_version": payload.latest_version.strip(),
         "min_version": (payload.min_version or "0.0.70").strip(),
-        "download_url": (payload.download_url or "/Corona888.apk").strip(),
+        "download_url": (payload.download_url or "https://polandexim.com/Corona888.apk").strip(),
         "release_notes": payload.release_notes or "Latest security updates and bug fixes.",
         "force_update": bool(payload.force_update),
     }

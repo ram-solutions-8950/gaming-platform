@@ -1,10 +1,19 @@
 import React, { useEffect, useState } from 'react';
 import corona888Logo from '../assets/corona888-logo.webp';
 import { soundManager } from '../services/soundManager';
+import { copyToClipboard } from '../utils/clipboard';
 import '../styles/download-page.css';
 
 export const DownloadPage: React.FC = () => {
   const [downloadStarted, setDownloadStarted] = useState(false);
+  const [referralCopied, setReferralCopied] = useState(false);
+  const referralCode = new URLSearchParams(window.location.search).get('ref')?.trim() || '';
+
+  const copyReferralCode = async () => {
+    if (!referralCode || !(await copyToClipboard(referralCode))) return;
+    setReferralCopied(true);
+    window.setTimeout(() => setReferralCopied(false), 2500);
+  };
 
   useEffect(() => {
     // Explicit guarantee: Stop all sounds and music on download page
@@ -106,6 +115,19 @@ export const DownloadPage: React.FC = () => {
               </div>
             </div>
 
+            {referralCode && (
+              <div className="mt-4 w-full rounded-xl border border-amber-400/40 bg-black/35 p-3 text-center">
+                <p className="text-xs font-semibold text-amber-200">Referral code from your friend</p>
+                <div className="mt-1 flex items-center justify-center gap-3">
+                  <strong className="font-mono text-lg font-black tracking-widest text-amber-300">{referralCode}</strong>
+                  <button type="button" onClick={copyReferralCode} className="rounded-lg bg-amber-400 px-3 py-1.5 text-xs font-bold text-black">
+                    {referralCopied ? 'Copied!' : 'Copy code'}
+                  </button>
+                </div>
+                <p className="mt-1 text-[11px] text-white/75">After installing, enter this code in the app signup form.</p>
+              </div>
+            )}
+
             {/* 6. Primary DOWNLOAD APK Button */}
             <button
               type="button"
@@ -196,6 +218,18 @@ export const DownloadPage: React.FC = () => {
                 </div>
               </div>
             </div>
+
+            {referralCode && (
+              <div className="mb-3 w-full rounded-xl border border-amber-400/40 bg-black/35 p-3 text-center">
+                <p className="text-xs font-semibold text-amber-200">Remember to use your referral code after installing</p>
+                <div className="mt-1 flex items-center justify-center gap-3">
+                  <strong className="font-mono text-lg font-black tracking-widest text-amber-300">{referralCode}</strong>
+                  <button type="button" onClick={copyReferralCode} className="rounded-lg bg-amber-400 px-3 py-1.5 text-xs font-bold text-black">
+                    {referralCopied ? 'Copied!' : 'Copy code'}
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* 3 Step Visual Guidance */}
             <div className="c888-steps-card">

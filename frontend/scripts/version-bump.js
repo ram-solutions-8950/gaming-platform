@@ -12,6 +12,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const pkgPath = resolve(__dirname, '..', 'package.json');
 const versionPath = resolve(__dirname, '..', 'src', 'version.ts');
 const gradlePath = resolve(__dirname, '..', 'android', 'app', 'build.gradle');
+const backendVersionPath = resolve(__dirname, '..', '..', 'backend', 'app', 'app_version.py');
 
 // Read and increment version
 const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8'));
@@ -29,6 +30,13 @@ export const APP_VERSION = '${pkg.version}';
 export const BUILD_DATE = '${today}';
 `;
 writeFileSync(versionPath, versionTs);
+
+// Keep the API's built-in update target aligned with the APK release. This is
+// committed with the APK so stale admin DB settings cannot hide update prompts.
+writeFileSync(
+  backendVersionPath,
+  `# Auto-updated by frontend/scripts/version-bump.js with the APK release.\nLATEST_APP_VERSION = "${pkg.version}"\n`,
+);
 
 // Update Android build.gradle if it exists
 if (existsSync(gradlePath)) {

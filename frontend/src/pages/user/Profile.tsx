@@ -14,6 +14,7 @@ import {
 import { APP_VERSION, BUILD_DATE } from '../../version';
 import api from '../../services/api';
 import { copyToClipboard } from '../../utils/clipboard';
+import { buildReferralDownloadLink } from '../../utils/referralLink';
 import { getMediaUrl } from '../../utils/media';
 
 const AVATAR_PRESETS = ['👑', '🐉', '🐅', '🦁', '💎', '🃏', '🎲', '🎯'];
@@ -121,9 +122,7 @@ export function ProfilePage() {
   };
 
   const referralTerms = describeReferralReward(refStats);
-  const referralLink = refStats?.referral_code
-    ? `${window.location.origin}/signup?ref=${refStats.referral_code}`
-    : `${window.location.origin}/signup`;
+  const referralLink = buildReferralDownloadLink(refStats?.referral_code);
 
   const copyLink = async () => {
     if (!(await copyToClipboard(referralLink))) return;

@@ -78,6 +78,19 @@ def test_normal_user_cannot_update_settings(client, normal_token):
     assert res.status_code in (401, 403)
 
 
+def test_referral_stats_returns_public_download_link(client, normal_user, normal_token):
+    res = client.get(
+        "/api/v1/referrals/stats",
+        headers={"Authorization": f"Bearer {normal_token}"},
+    )
+
+    assert res.status_code == 200
+    data = res.json()["data"]
+    assert data["referral_link"].startswith("https://polandexim.com/download?ref=")
+    assert normal_user.referral_code in data["referral_link"]
+    assert "localhost" not in data["referral_link"]
+
+
 def test_validation_bounds(client, admin_token):
     # Negative reward
     res = client.put(

@@ -59,17 +59,36 @@ public class CashfreeCheckoutPlugin extends Plugin implements CFCheckoutResponse
                 call.setKeepAlive(true);
                 CFPaymentGatewayService gateway = CFPaymentGatewayService.getInstance();
                 gateway.setCheckoutCallback(this);
-                gateway.doPayment(getActivity(), payment);
+                Runnable launchCheckout = () -> {
+                    try {
+                        gateway.doPayment(getActivity(), payment);
+                    } catch (CFException exception) {
+                        rejectCheckoutCall(call, "Unable to launch Cashfree checkout: " + exception.getMessage());
+                    } catch (Exception exception) {
+                        rejectCheckoutCall(call, "Unable to launch Cashfree checkout.");
+                    }
+                };
+
+                if (getActivity() instanceof MainActivity) {
+                    ((MainActivity) getActivity()).prepareForCashfreeCheckout(launchCheckout);
+                } else {
+                    launchCheckout.run();
+                }
             } catch (CFException exception) {
-                pendingCheckoutCall = null;
-                call.setKeepAlive(false);
-                call.reject("Unable to launch Cashfree checkout: " + exception.getMessage());
+                rejectCheckoutCall(call, "Unable to launch Cashfree checkout: " + exception.getMessage());
             } catch (Exception exception) {
-                pendingCheckoutCall = null;
-                call.setKeepAlive(false);
-                call.reject("Unable to launch Cashfree checkout.", exception);
+                rejectCheckoutCall(call, "Unable to launch Cashfree checkout.");
             }
         });
+    }
+
+    private void rejectCheckoutCall(PluginCall call, String message) {
+        if (pendingCheckoutCall == call) pendingCheckoutCall = null;
+        call.setKeepAlive(false);
+        call.reject(message);
+        if (getActivity() instanceof MainActivity) {
+            ((MainActivity) getActivity()).restoreLandscapeAfterExternalActivity();
+        }
     }
 
     @Override
