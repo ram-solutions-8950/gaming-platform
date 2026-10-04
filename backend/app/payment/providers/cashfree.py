@@ -2,6 +2,7 @@ import base64
 import hashlib
 import hmac
 import json
+import uuid
 from typing import Optional
 import httpx
 
@@ -54,7 +55,16 @@ class CashfreeProvider(PaymentProvider):
 
         order_amount = round(amount / 100.0, 2)
         meta = metadata or {}
-        order_id = meta.get("order_id") or f"cf_{user_id[:8]}_{int(amount)}_{int(httpx.__name__.__hash__() % 100000)}"
+        deposit_id = meta.get("deposit_id")
+        if meta.get("order_id"):
+            order_id = str(meta["order_id"])
+        elif deposit_id:
+            # A deposit UUID is unique per user attempt and stable if this exact
+            # server operation is retried. Never use Python hash(): it is
+            # process-stable and caused repeated same-amount orders to collide.
+            order_id = f"cf_{uuid.UUID(str(deposit_id)).hex}"
+        else:
+            order_id = f"cf_{uuid.uuid4().hex}"
         customer_phone = meta.get("phone") or "9999999999"
         customer_email = meta.get("email") or f"user_{user_id[:8]}@corona888.tech"
 
