@@ -91,17 +91,19 @@ def get_provider(
     if provider_key == "cashfree":
         app_id = None
         secret_key = None
+        webhook_secret = None
         is_sandbox = True
         if db is not None:
             cfg = db.query(PaymentGatewayConfig).filter(PaymentGatewayConfig.gateway_name == "cashfree").first()
             if cfg:
                 app_id = cfg.api_key
                 secret_key = cfg.api_secret
+                webhook_secret = cfg.webhook_secret
                 is_sandbox = cfg.is_sandbox
 
         logger.info("Using Cashfree payment provider (sandbox=%s, configured=%s).", is_sandbox, bool(app_id and secret_key))
         if app_id and secret_key:
-            return CashfreeProvider(app_id=app_id, secret_key=secret_key, is_sandbox=is_sandbox)
+            return CashfreeProvider(app_id=app_id, secret_key=secret_key, is_sandbox=is_sandbox, webhook_secret=webhook_secret)
         return CashfreeProvider(is_sandbox=is_sandbox)
 
     if provider_key == "razorpay":

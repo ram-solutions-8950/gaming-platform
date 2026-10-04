@@ -37,6 +37,10 @@ interface PaymentGatewayConfigItem {
   api_key?: string;
   api_key_masked: string | null;
   is_sandbox: boolean;
+  payouts_enabled?: boolean;
+  has_payout_credentials?: boolean;
+  payout_api_key_masked?: string;
+  payout_account_number_masked?: string;
   updated_at: string | null;
 }
 
@@ -54,6 +58,10 @@ export function AdminPaymentSettingsPage() {
   const [gwApiSecret, setGwApiSecret] = useState('');
   const [gwWebhookSecret, setGwWebhookSecret] = useState('');
   const [gwIsSandbox, setGwIsSandbox] = useState(true);
+  const [payoutApiKey, setPayoutApiKey] = useState('');
+  const [payoutApiSecret, setPayoutApiSecret] = useState('');
+  const [payoutAccountNumber, setPayoutAccountNumber] = useState('');
+  const [payoutsEnabled, setPayoutsEnabled] = useState(false);
   const [savingGateway, setSavingGateway] = useState(false);
 
   // Manual UPI Settings State
@@ -109,6 +117,10 @@ export function AdminPaymentSettingsPage() {
     setGwApiSecret('');
     setGwWebhookSecret('');
     setGwIsSandbox(gw.is_sandbox);
+    setPayoutApiKey('');
+    setPayoutApiSecret('');
+    setPayoutAccountNumber('');
+    setPayoutsEnabled(Boolean(gw.payouts_enabled));
   };
 
   const handleSaveGateway = async (e: React.FormEvent) => {
@@ -122,6 +134,12 @@ export function AdminPaymentSettingsPage() {
       if (gwApiKey.trim()) payload.api_key = gwApiKey.trim();
       if (gwApiSecret.trim()) payload.api_secret = gwApiSecret.trim();
       if (gwWebhookSecret.trim()) payload.webhook_secret = gwWebhookSecret.trim();
+      if (editingGateway === 'razorpay') {
+        payload.payouts_enabled = payoutsEnabled;
+        if (payoutApiKey.trim()) payload.payout_api_key = payoutApiKey.trim();
+        if (payoutApiSecret.trim()) payload.payout_api_secret = payoutApiSecret.trim();
+        if (payoutAccountNumber.trim()) payload.payout_account_number = payoutAccountNumber.trim();
+      }
 
       await adminService.updatePaymentGateway(editingGateway, payload);
       toast.success(`${editingGateway.toUpperCase()} credentials updated successfully!`);
@@ -233,7 +251,7 @@ export function AdminPaymentSettingsPage() {
             <span>Payment Gateway & Banking Controls</span>
           </h1>
           <p className="text-gray-400 text-xs mt-1">
-            Toggle switchable payment providers (Cashfree &amp; Razorpay), configure API credentials, and manage manual UPI QR codes.
+            Select Cashfree or Razorpay for deposits. Configure RazorpayX Payouts separately for admin-approved withdrawals.
           </p>
         </div>
 
@@ -276,7 +294,7 @@ export function AdminPaymentSettingsPage() {
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold uppercase tracking-wider text-gray-400">Currently Active Gateway:</span>
+                    <span className="text-xs font-bold uppercase tracking-wider text-gray-400">Deposit gateway:</span>
                     <span className="px-2.5 py-0.5 rounded-full text-xs font-black bg-emerald-500/20 text-emerald-400 border border-emerald-500/40">
                       {activeGateway ? activeGateway.display_name.toUpperCase() : 'NONE CONFIGURED'}
                     </span>
@@ -333,7 +351,7 @@ export function AdminPaymentSettingsPage() {
                           {gw.is_active ? (
                             <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 flex items-center gap-1">
                               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                              Active Gateway
+                              Active for deposits
                             </span>
                           ) : (
                             <span className="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase bg-gray-500/20 text-gray-400 border border-gray-500/30">
@@ -374,6 +392,14 @@ export function AdminPaymentSettingsPage() {
                             {gw.has_webhook_secret ? '•••••••• (Configured)' : 'Optional'}
                           </span>
                         </div>
+                        {!isCashfree && (
+                          <div className="flex items-center justify-between p-2.5 rounded-xl bg-[#141b2d] border border-[#1d273d]">
+                            <span className="text-gray-400">RazorpayX Payouts:</span>
+                            <span className={`font-bold ${gw.payouts_enabled && gw.has_payout_credentials ? 'text-emerald-300' : 'text-gray-400'}`}>
+                              {gw.payouts_enabled && gw.has_payout_credentials ? `Enabled · ${gw.payout_account_number_masked || 'Source account set'}` : 'Not enabled'}
+                            </span>
+                          </div>
+                        )}
                       </div>
                     </div>
 
@@ -394,7 +420,7 @@ export function AdminPaymentSettingsPage() {
                           className="px-4 py-2 rounded-xl text-xs font-black bg-brand-500 hover:bg-brand-400 text-black shadow-lg shadow-brand-500/20 active:scale-95 transition cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
                         >
                           <Zap size={14} />
-                          <span>{activating === gw.gateway_name ? 'Switching...' : 'Switch to this Gateway'}</span>
+                          <span>{activating === gw.gateway_name ? 'Switching...' : 'Use for deposits'}</span>
                         </button>
                       )}
                     </div>
@@ -407,7 +433,7 @@ export function AdminPaymentSettingsPage() {
           {/* Edit Gateway Credentials Modal */}
           {editingGateway && (
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
-              <div className="bg-[#0f1422] border border-[#222c44] rounded-2xl w-full max-w-md p-6 shadow-2xl space-y-4">
+              <div className="bg-[#0f1422] border border-[#222c44] rounded-2xl w-full max-w-md max-h-[90dvh] overflow-y-auto p-6 shadow-2xl space-y-4">
                 <div className="flex items-center justify-between pb-3 border-b border-[#222c44]">
                   <h3 className="text-base font-bold text-white flex items-center gap-2">
                     <Key className="text-brand-400" size={18} />
@@ -435,6 +461,45 @@ export function AdminPaymentSettingsPage() {
                     />
                     <span className="text-[10px] text-gray-500 mt-0.5 block">Leave empty to keep existing key</span>
                   </div>
+
+                  {editingGateway === 'razorpay' && (
+                    <div className="space-y-3 rounded-xl border border-amber-500/30 bg-amber-500/5 p-3">
+                      <div>
+                        <p className="text-xs font-bold text-amber-200">Separate RazorpayX Payouts setup</p>
+                        <p className="mt-1 text-[10px] leading-relaxed text-gray-400">Requires RazorpayX Payouts to be enabled on your merchant account. Do not use regular Razorpay Checkout keys here. The source account number and credentials stay server-side.</p>
+                      </div>
+                      <input
+                        type="text"
+                        placeholder="RazorpayX payout key ID"
+                        value={payoutApiKey}
+                        onChange={(e) => setPayoutApiKey(e.target.value)}
+                        className="w-full rounded-xl border border-[#222c44] bg-[#141b2d] px-3.5 py-2 font-mono text-xs text-white focus:border-brand-500 focus:outline-none"
+                      />
+                      <input
+                        type="password"
+                        placeholder="RazorpayX payout key secret (blank keeps current)"
+                        value={payoutApiSecret}
+                        onChange={(e) => setPayoutApiSecret(e.target.value)}
+                        className="w-full rounded-xl border border-[#222c44] bg-[#141b2d] px-3.5 py-2 font-mono text-xs text-white focus:border-brand-500 focus:outline-none"
+                      />
+                      <input
+                        type="password"
+                        placeholder="RazorpayX source account / customer identifier"
+                        value={payoutAccountNumber}
+                        onChange={(e) => setPayoutAccountNumber(e.target.value)}
+                        className="w-full rounded-xl border border-[#222c44] bg-[#141b2d] px-3.5 py-2 font-mono text-xs text-white focus:border-brand-500 focus:outline-none"
+                      />
+                      <label className="flex items-center justify-between gap-3 text-xs text-white">
+                        <span>{payoutsEnabled ? 'Automated RazorpayX payouts enabled' : 'Keep withdrawals in manual mode'}</span>
+                        <input
+                          type="checkbox"
+                          checked={payoutsEnabled}
+                          onChange={(e) => setPayoutsEnabled(e.target.checked)}
+                          className="h-4 w-4 accent-amber-400"
+                        />
+                      </label>
+                    </div>
+                  )}
 
                   <div>
                     <label className="block font-semibold text-gray-300 mb-1">

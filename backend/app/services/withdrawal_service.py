@@ -8,10 +8,26 @@ from ..models.withdrawal import Withdrawal, WithdrawalStatus
 from ..models.wallet import Wallet
 from ..models.transaction import WalletTransaction, WalletTransactionType, WalletTransactionStatus
 from ..models.fee_configuration import FeeConfiguration
+from ..models.payment_gateway import PaymentGatewayConfig
+from ..models.user import User
 from ..services.wallet_service import debit_wallet, credit_wallet
+from ..payment.providers.razorpayx import RazorpayXPayoutProvider
 from ..utils.logging import get_logger
 
 logger = get_logger("withdrawal")
+
+
+def _get_razorpayx_provider(db: Session, require_enabled: bool = True) -> Optional[RazorpayXPayoutProvider]:
+    config = db.query(PaymentGatewayConfig).filter(PaymentGatewayConfig.gateway_name == "razorpay").first()
+    extra = (config.extra_config or {}) if config else {}
+    if require_enabled and not extra.get("payouts_enabled"):
+        return None
+    key_id = str(extra.get("payout_api_key") or "").strip()
+    key_secret = str(extra.get("payout_api_secret") or "").strip()
+    account_number = str(extra.get("payout_account_number") or "").strip()
+    if not (key_id and key_secret and account_number):
+        raise ValueError("RazorpayX payouts are enabled but the payout credentials are incomplete.")
+    return RazorpayXPayoutProvider(key_id, key_secret, account_number)
 
 
 def create_withdrawal(
@@ -79,6 +95,11 @@ def create_withdrawal(
     # Status is PENDING until approval by admin (BUG-034)
     tx.status = WalletTransactionStatus.PENDING
 
+    withdrawal_metadata = dict(metadata or {})
+    payout_config = db.query(PaymentGatewayConfig).filter(PaymentGatewayConfig.gateway_name == "razorpay").first()
+    if payout_config and (payout_config.extra_config or {}).get("payouts_enabled"):
+        withdrawal_metadata["payout_provider"] = "razorpayx"
+
     withdrawal = Withdrawal(
         id=withdrawal_id,
         user_id=user_id,
@@ -90,7 +111,7 @@ def create_withdrawal(
         method=norm_method,
         destination=norm_dest,
         external_reference=external_reference,
-        metadata_=metadata,
+        metadata_=withdrawal_metadata,
     )
     db.add(withdrawal)
     db.commit()
@@ -110,14 +131,7 @@ def approve_withdrawal(db: Session, withdrawal_id: UUID, admin_id: UUID) -> With
     withdrawal.processed_by = admin_id
     withdrawal.processed_at = datetime.now(timezone.utc)
 
-    # Update ledger transaction to COMPLETED upon approval (BUG-034)
-    tx = db.query(WalletTransaction).filter(
-        WalletTransaction.reference_type == "withdrawal",
-        WalletTransaction.reference_id == str(withdrawal_id),
-    ).first()
-    if tx:
-        tx.status = WalletTransactionStatus.COMPLETED
-
+    # Keep the reserved wallet transaction pending until provider settlement.
     db.commit()
     db.refresh(withdrawal)
     logger.info("Approved withdrawal id=%s by admin=%s", withdrawal_id, admin_id)
@@ -130,6 +144,21 @@ def mark_payment_processing(db: Session, withdrawal_id: UUID, admin_id: UUID) ->
         raise ValueError("Withdrawal not found")
     if withdrawal.status != WithdrawalStatus.APPROVED:
         raise ValueError(f"Cannot mark payment processing for withdrawal in status '{withdrawal.status.value}'")
+
+    metadata = dict(withdrawal.metadata_ or {})
+    payout_config = _get_razorpayx_provider(db)
+    if metadata.get("payout_provider") == "razorpayx" or payout_config:
+        if not payout_config:
+            raise ValueError("RazorpayX payouts are no longer enabled. Re-enable payouts before initiating this withdrawal.")
+        user = db.query(User).filter(User.id == withdrawal.user_id).first()
+        if not user:
+            raise ValueError("Withdrawal account owner could not be found.")
+        payout = payout_config.create_payout(withdrawal, user)
+        metadata["payout_provider"] = "razorpayx"
+        metadata["payout_id"] = payout["id"]
+        metadata["payout_status"] = str(payout.get("status", "pending")).lower()
+        metadata["payout_utr"] = payout.get("utr")
+        withdrawal.metadata_ = metadata
 
     withdrawal.status = WithdrawalStatus.PROCESSING
     withdrawal.processed_by = admin_id
@@ -146,6 +175,21 @@ def complete_withdrawal(db: Session, withdrawal_id: UUID, admin_id: UUID) -> Wit
         raise ValueError("Withdrawal not found")
     if withdrawal.status != WithdrawalStatus.PROCESSING:
         raise ValueError(f"Cannot complete withdrawal in status '{withdrawal.status.value}'")
+
+    metadata = dict(withdrawal.metadata_ or {})
+    payout_id = metadata.get("payout_id")
+    if payout_id:
+        provider = _get_razorpayx_provider(db, require_enabled=False)
+        if not provider:
+            raise ValueError("RazorpayX payouts must remain enabled to verify settlement.")
+        payout = provider.get_payout(str(payout_id))
+        payout_status = str(payout.get("status", "unknown")).lower()
+        metadata["payout_status"] = payout_status
+        metadata["payout_utr"] = payout.get("utr")
+        withdrawal.metadata_ = metadata
+        if payout_status != "processed":
+            db.commit()
+            raise ValueError(f"RazorpayX payout is not settled yet (status: {payout_status}).")
 
     withdrawal.status = WithdrawalStatus.COMPLETED
     withdrawal.processed_by = admin_id
@@ -212,6 +256,20 @@ def fail_withdrawal(db: Session, withdrawal_id: UUID, admin_id: UUID, reason: Op
         raise ValueError("Withdrawal not found")
     if withdrawal.status != WithdrawalStatus.PROCESSING:
         raise ValueError(f"Cannot fail withdrawal in status '{withdrawal.status.value}'")
+
+    metadata = dict(withdrawal.metadata_ or {})
+    payout_id = metadata.get("payout_id")
+    if payout_id:
+        provider = _get_razorpayx_provider(db, require_enabled=False)
+        if not provider:
+            raise ValueError("RazorpayX payouts must remain enabled to verify a failure before refunding.")
+        payout = provider.get_payout(str(payout_id))
+        payout_status = str(payout.get("status", "unknown")).lower()
+        metadata["payout_status"] = payout_status
+        withdrawal.metadata_ = metadata
+        if payout_status not in {"failed", "reversed", "cancelled", "rejected"}:
+            db.commit()
+            raise ValueError(f"RazorpayX payout is not in a refundable state (status: {payout_status}).")
 
     withdrawal.status = WithdrawalStatus.FAILED
     withdrawal.processed_by = admin_id

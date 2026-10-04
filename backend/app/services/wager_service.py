@@ -43,7 +43,7 @@ def create_wager_requirement(
         return None
 
     if multiplier is None:
-        from ..models.system import SystemSetting
+        from ..models.system_settings import SystemSetting
         w_setting = db.query(SystemSetting).filter(SystemSetting.key == "global_wager_settings").first()
         multiplier = float(w_setting.value.get("multiplier", 1.0)) if (w_setting and w_setting.value) else 1.0
 
@@ -230,7 +230,7 @@ def sync_all_user_wagers_with_multiplier(
     """Recalculate or create wager requirements for all users based on their completed deposits and multiplier."""
     from ..models.deposit import Deposit, DepositStatus
     from ..models.user import User, UserRole
-    from ..models.system import SystemSetting
+    from ..models.system_settings import SystemSetting
 
     if multiplier is None:
         w_setting = db.query(SystemSetting).filter(SystemSetting.key == "global_wager_settings").first()

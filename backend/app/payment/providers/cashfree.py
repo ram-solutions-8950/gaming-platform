@@ -21,9 +21,11 @@ class CashfreeProvider(PaymentProvider):
         app_id: Optional[str] = None,
         secret_key: Optional[str] = None,
         is_sandbox: bool = True,
+        webhook_secret: Optional[str] = None,
     ) -> None:
         self.app_id = app_id or ""
         self.secret_key = secret_key or ""
+        self.webhook_secret = webhook_secret or ""
         self.is_sandbox = is_sandbox
         self.base_url = self.SANDBOX_BASE_URL if is_sandbox else self.PROD_BASE_URL
 
@@ -157,12 +159,13 @@ class CashfreeProvider(PaymentProvider):
         """Verify Cashfree webhook HMAC-SHA256 signature."""
         sig = headers.get("x-webhook-signature") or headers.get("X-Webhook-Signature")
         timestamp = headers.get("x-webhook-timestamp") or headers.get("X-Webhook-Timestamp")
-        if not sig or not timestamp or not self.secret_key:
+        signing_secret = self.webhook_secret or self.secret_key
+        if not sig or not timestamp or not signing_secret:
             return False
 
         message = timestamp.encode("utf-8") + raw_body
         expected = base64.b64encode(
-            hmac.new(self.secret_key.encode("utf-8"), message, hashlib.sha256).digest()
+            hmac.new(signing_secret.encode("utf-8"), message, hashlib.sha256).digest()
         ).decode("utf-8")
         return hmac.compare_digest(sig, expected)
 

@@ -99,6 +99,10 @@ class PaymentGatewayUpdateIn(BaseModel):
     webhook_secret: Optional[str] = None
     is_sandbox: Optional[bool] = None
     is_active: Optional[bool] = None
+    payouts_enabled: Optional[bool] = None
+    payout_api_key: Optional[str] = None
+    payout_api_secret: Optional[str] = None
+    payout_account_number: Optional[str] = None
 
 
 class SupportConfigUpdateIn(BaseModel):
@@ -842,6 +846,11 @@ def list_all_withdrawals(
         user_obj = db.query(User).filter(User.id == w.user_id).first()
         wd["user_name"] = user_obj.name if user_obj else "Unknown"
         wd["payment_method"] = (w.method or "Bank").upper()
+        withdrawal_meta = w.metadata_ or {}
+        wd["payout_provider"] = withdrawal_meta.get("payout_provider")
+        wd["payout_id"] = withdrawal_meta.get("payout_id")
+        wd["payout_status"] = withdrawal_meta.get("payout_status")
+        wd["payout_utr"] = withdrawal_meta.get("payout_utr")
         out_items.append(wd)
     return success_response({
         "total": total,
@@ -2274,6 +2283,9 @@ def list_payment_gateways(
         masked_sec = (sec[:4] + "*" * (len(sec) - 8) + sec[-4:]) if len(sec) > 8 else ("****" if sec else "")
         wh = g.webhook_secret or ""
         masked_wh = (wh[:4] + "*" * (len(wh) - 8) + wh[-4:]) if len(wh) > 8 else ("****" if wh else "")
+        extra = g.extra_config or {}
+        payout_key = str(extra.get("payout_api_key") or "")
+        payout_account = str(extra.get("payout_account_number") or "")
 
         result.append({
             "id": str(g.id),
@@ -2288,6 +2300,10 @@ def list_payment_gateways(
             "webhook_secret": masked_wh,
             "has_webhook_secret": bool(g.webhook_secret),
             "is_sandbox": g.is_sandbox,
+            "payouts_enabled": bool(extra.get("payouts_enabled", False)),
+            "has_payout_credentials": bool(payout_key and extra.get("payout_api_secret") and payout_account),
+            "payout_api_key_masked": (payout_key[:6] + "*" * max(0, len(payout_key) - 10) + payout_key[-4:]) if len(payout_key) > 10 else ("****" if payout_key else ""),
+            "payout_account_number_masked": ("*" * max(0, len(payout_account) - 4) + payout_account[-4:]) if payout_account else "",
             "updated_at": g.updated_at.isoformat() if g.updated_at else None,
         })
     return success_response(result)
@@ -2321,6 +2337,21 @@ def update_payment_gateway(
         g.webhook_secret = payload.webhook_secret.strip()
     if payload.is_sandbox is not None:
         g.is_sandbox = payload.is_sandbox
+    if any(value is not None for value in (payload.payouts_enabled, payload.payout_api_key, payload.payout_api_secret, payload.payout_account_number)):
+        if gname != "razorpay":
+            return error_response("INVALID_PAYOUT_GATEWAY", "RazorpayX Payouts credentials must be configured on the Razorpay gateway.", status_code=400)
+        extra = dict(g.extra_config or {})
+        if payload.payout_api_key and not payload.payout_api_key.startswith("*"):
+            extra["payout_api_key"] = payload.payout_api_key.strip()
+        if payload.payout_api_secret and not payload.payout_api_secret.startswith("*"):
+            extra["payout_api_secret"] = payload.payout_api_secret.strip()
+        if payload.payout_account_number:
+            extra["payout_account_number"] = payload.payout_account_number.strip()
+        if payload.payouts_enabled is not None:
+            if payload.payouts_enabled and not all(extra.get(key) for key in ("payout_api_key", "payout_api_secret", "payout_account_number")):
+                return error_response("PAYOUT_CREDENTIALS_REQUIRED", "Enter RazorpayX payout key, secret, and source account number before enabling automated withdrawals.", status_code=400)
+            extra["payouts_enabled"] = payload.payouts_enabled
+        g.extra_config = extra
     if payload.is_active is not None and payload.is_active:
         # Guarantee only one gateway is active
         db.query(PaymentGatewayConfig).filter(PaymentGatewayConfig.id != g.id).update({"is_active": False})

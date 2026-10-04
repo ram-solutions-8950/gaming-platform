@@ -155,7 +155,7 @@ export function ReferWinPopup({ onClose }: ReferWinPopupProps) {
                 <button
                   type="button"
                   onClick={copyLink}
-                  className="px-3 py-1.5 bg-gradient-to-r from-gold-500 to-amber-600 hover:from-gold-400 hover:to-amber-500 text-black font-extrabold text-xs rounded-lg shadow-md transition active:scale-95"
+                  className="px-3 py-1.5 bg-linear-to-r from-gold-500 to-amber-600 hover:from-gold-400 hover:to-amber-500 text-black font-extrabold text-xs rounded-lg shadow-md transition active:scale-95"
                 >
                   {copied ? '✓ Copied!' : 'Copy Link'}
                 </button>
@@ -208,7 +208,7 @@ export function ReferWinPopup({ onClose }: ReferWinPopupProps) {
             </div>
           </div>
         ) : (
-          <div className="refer-content-wrap p-3 max-h-[380px] overflow-y-auto">
+          <div className="refer-content-wrap p-3">
             {history.length === 0 ? (
               <div className="text-center py-8 text-gray-400 text-xs">
                 <p>No referrals yet.</p>

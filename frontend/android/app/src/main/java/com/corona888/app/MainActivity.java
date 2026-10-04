@@ -22,6 +22,7 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(ScreenOrientationPlugin.class);
+        registerPlugin(CashfreeCheckoutPlugin.class);
         super.onCreate(savedInstanceState);
 
         applyEdgeToEdgeAndImmersive();

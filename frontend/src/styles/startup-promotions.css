@@ -507,6 +507,7 @@
   align-items: center;
   justify-content: center;
   position: relative;
+  flex: 0 0 auto;
 }
 
 .refer-title {
@@ -551,6 +552,21 @@
   padding: 12px 18px 16px;
   display: flex;
   flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 234, 0, 0.55) rgba(0, 0, 0, 0.2);
+}
+
+.refer-content-wrap::-webkit-scrollbar {
+  width: 6px;
+}
+
+.refer-content-wrap::-webkit-scrollbar-thumb {
+  background: rgba(255, 234, 0, 0.55);
+  border-radius: 999px;
 }
 
 /* Top Status */

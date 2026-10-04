@@ -189,6 +189,15 @@ function WithdrawalDetailsModal({
             </span>
           </div>
 
+          {withdrawal.payout_provider && (
+            <div className="rounded-xl border border-cyan-500/20 bg-cyan-500/5 p-3 space-y-2">
+              <p className="text-xs font-bold uppercase tracking-wide text-cyan-300">Automated payout · {withdrawal.payout_provider}</p>
+              {withdrawal.payout_id && <div className="flex justify-between gap-3 text-xs"><span className="text-gray-400">Provider payout ID</span><span className="font-mono text-white break-all">{withdrawal.payout_id}</span></div>}
+              {withdrawal.payout_status && <div className="flex justify-between gap-3 text-xs"><span className="text-gray-400">Provider status</span><span className="font-semibold uppercase text-amber-300">{withdrawal.payout_status}</span></div>}
+              {withdrawal.payout_utr && <div className="flex justify-between gap-3 text-xs"><span className="text-gray-400">UTR</span><span className="font-mono text-white">{withdrawal.payout_utr}</span></div>}
+            </div>
+          )}
+
           {/* Account Details — one labelled row per field so long bank strings
               stay aligned and readable, each copyable on its own. */}
           <div className="py-2 border-b border-dark-800 space-y-2">
@@ -382,6 +391,7 @@ export function AdminWithdrawalsPage() {
   };
 
   const totalPages = Math.max(1, Math.ceil(totalWithdrawals / pageSize));
+  const actionWithdrawal = withdrawals.find((withdrawal) => withdrawal.id === actionId);
 
   return (
     <div className="space-y-6">
@@ -600,7 +610,7 @@ export function AdminWithdrawalsPage() {
                                 onClick={() => openActionModal(w.id, 'processing')}
                                 className="px-2 py-1 text-xs font-semibold rounded-lg bg-amber-600/20 text-amber-400 hover:bg-amber-600/40 border border-amber-500/30 transition shadow-sm cursor-pointer"
                               >
-                                Initiate
+                                {w.payout_provider ? 'Send Payout' : 'Initiate'}
                               </button>
                               <button
                                 onClick={() => openActionModal(w.id, 'reject')}
@@ -618,7 +628,7 @@ export function AdminWithdrawalsPage() {
                                 onClick={() => openActionModal(w.id, 'complete')}
                                 className="px-2 py-1 text-xs font-semibold rounded-lg bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600/40 border border-emerald-500/30 transition shadow-sm cursor-pointer"
                               >
-                                Complete
+                                {w.payout_id ? 'Check Settlement' : 'Complete'}
                               </button>
                               <button
                                 onClick={() => openActionModal(w.id, 'fail')}
@@ -707,11 +717,12 @@ export function AdminWithdrawalsPage() {
               Confirm Action: {actionType === 'processing' ? 'Payment Initiated' : actionType}
             </h3>
             <p className="text-sm text-gray-300">
-              Are you sure you want to transition this withdrawal request to{' '}
-              <span className="font-semibold text-white uppercase">
-                {actionType === 'processing' ? 'PROCESSING (Payment Initiated)' : actionType}
-              </span>
-              ?
+              {actionType === 'processing' && actionWithdrawal?.payout_provider === 'razorpayx'
+                ? `This sends a real RazorpayX payout of ₹${((actionWithdrawal.amount - (actionWithdrawal.fee_amount || 0)) / 100).toFixed(2)} to the saved ${actionWithdrawal.method === 'upi' ? 'UPI ID' : 'bank account'}. Confirm the beneficiary details before continuing.`
+                : <>Are you sure you want to transition this withdrawal request to{' '}
+                  <span className="font-semibold text-white uppercase">
+                    {actionType === 'processing' ? 'PROCESSING (Payment Initiated)' : actionType}
+                  </span>?</>}
             </p>
 
             {(actionType === 'reject' || actionType === 'fail') && (

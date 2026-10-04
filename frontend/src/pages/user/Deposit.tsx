@@ -2,8 +2,20 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { createPortal } from 'react-dom';
+import { registerPlugin } from '@capacitor/core';
 import { Card } from '../../components/common/Card';
 import api from '../../services/api';
+import { isNativePlatform } from '../../utils/platform';
+
+interface NativeCashfreeCheckoutPlugin {
+  startCheckout(options: {
+    orderId: string;
+    paymentSessionId: string;
+    mode: 'sandbox' | 'production';
+  }): Promise<{ orderId: string; status: string }>;
+}
+
+const NativeCashfreeCheckout = registerPlugin<NativeCashfreeCheckoutPlugin>('CashfreeCheckout');
 
 declare global {
   interface Window {
@@ -209,36 +221,42 @@ export function DepositPage() {
       setDeposit(depositData);
 
       if (depositData.provider === 'cashfree') {
-        // --- CASHFREE CHECKOUT FLOW ---
-        setPaymentStatus('Loading Cashfree Checkout...');
-        const cfLoaded = await loadCashfreeScript();
-        if (!cfLoaded || !(window as any).Cashfree) {
-          throw new Error('Unable to load Cashfree payment gateway.');
+        // Native Android uses Cashfree's activity SDK so control returns to the
+        // app callback, never to the configured website return URL.
+        let checkoutResult: any;
+        const environment = depositData.environment === 'production' ? 'production' : 'sandbox';
+        if (isNativePlatform()) {
+          setPaymentStatus('Opening secure Cashfree checkout...');
+          checkoutResult = await NativeCashfreeCheckout.startCheckout({
+            orderId: depositData.provider_order_id,
+            paymentSessionId: depositData.payment_session_id || '',
+            mode: environment,
+          });
+        } else {
+          setPaymentStatus('Loading Cashfree Checkout...');
+          const cfLoaded = await loadCashfreeScript();
+          if (!cfLoaded || !(window as any).Cashfree) {
+            throw new Error('Unable to load Cashfree payment gateway.');
+          }
+
+          const cashfree = (window as any).Cashfree({ mode: environment });
+          setCashfreeCheckoutOpen(true);
+          await new Promise<void>((resolve) => {
+            window.requestAnimationFrame(() => window.requestAnimationFrame(() => resolve()));
+          });
+
+          const checkoutTarget = cashfreeCheckoutRef.current;
+          if (!checkoutTarget) {
+            throw new Error('Unable to open the embedded Cashfree checkout.');
+          }
+
+          checkoutResult = await cashfree.checkout({
+            paymentSessionId: depositData.payment_session_id,
+            redirectTarget: checkoutTarget,
+            appearance: { width: '100%', height: '100%' },
+          });
+          setCashfreeCheckoutOpen(false);
         }
-
-        const cashfree = (window as any).Cashfree({
-          mode: depositData.environment === 'production' ? 'production' : 'sandbox',
-        });
-
-        setCashfreeCheckoutOpen(true);
-        await new Promise<void>((resolve) => {
-          window.requestAnimationFrame(() => window.requestAnimationFrame(() => resolve()));
-        });
-
-        const checkoutTarget = cashfreeCheckoutRef.current;
-        if (!checkoutTarget) {
-          throw new Error('Unable to open the embedded Cashfree checkout.');
-        }
-
-        const checkoutResult = await cashfree.checkout({
-          paymentSessionId: depositData.payment_session_id,
-          redirectTarget: checkoutTarget,
-          appearance: {
-            width: '100%',
-            height: '100%',
-          },
-        });
-        setCashfreeCheckoutOpen(false);
 
         if (checkoutResult?.error) {
           throw new Error(checkoutResult.error.message || 'Payment was cancelled.');

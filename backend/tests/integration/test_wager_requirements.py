@@ -4,8 +4,13 @@ Business rule: a credited deposit of Rs X must be wagered in full before the
 user may withdraw. Every GAME_ENTRY debit counts towards it, win or lose.
 """
 
+import base64
+import hashlib
+import hmac
+import json
 import pytest
 from uuid import uuid4
+from time import time
 from sqlalchemy.orm import Session
 
 from app.models.user import User, UserRole, UserStatus
@@ -13,6 +18,7 @@ from app.models.wallet import Wallet
 from app.models.deposit import Deposit, DepositStatus
 from app.models.wager import WagerRequirement
 from app.models.transaction import WalletTransactionType
+from app.models.payment_gateway import PaymentGatewayConfig
 from app.security.jwt import create_access_token
 from app.services import wallet_service, withdrawal_service
 from app.services.wager_service import (
@@ -364,7 +370,7 @@ def test_webhook_credited_deposit_creates_requirement(db, player, monkeypatch):
         "provider_payment_id": f"pay_{uuid4().hex[:12]}",
         "amount": 500_000,
     }
-    monkeypatch.setattr(webhook_module, "get_provider", lambda name: _StubProvider(event))
+    monkeypatch.setattr(webhook_module, "get_provider", lambda name, db=None: _StubProvider(event))
 
     result = webhook_module.handle_webhook(b"{}", {}, "razorpay", db=db)
     assert result["status"] == "success", result
@@ -404,10 +410,65 @@ def test_checkout_and_webhook_do_not_double_the_requirement(db, player, monkeypa
         "provider_order_id": order_id, "provider_payment_id": f"pay_{uuid4().hex[:12]}",
         "amount": 200_000,
     }
-    monkeypatch.setattr(webhook_module, "get_provider", lambda name: _StubProvider(event))
+    monkeypatch.setattr(webhook_module, "get_provider", lambda name, db=None: _StubProvider(event))
     webhook_module.handle_webhook(b"{}", {}, "razorpay", db=db)
 
     db.expire_all()
     rows = db.query(WagerRequirement).filter(WagerRequirement.user_id == user.id).all()
     assert len(rows) == 1
     assert get_remaining_wager(db, user.id) == 200_000
+
+
+def test_cashfree_webhook_uses_configured_secret_and_credits_wallet(db, player):
+    """Cashfree success webhook must credit and create wager state from DB creds."""
+    from app.payment.webhook import handle_webhook
+
+    _, user, wallet = player
+    order_id = f"cf_{uuid4().hex[:20]}"
+    deposit = Deposit(
+        id=uuid4(),
+        user_id=user.id,
+        wallet_id=wallet.id,
+        amount=125_000,
+        status=DepositStatus.PENDING,
+        provider="cashfree",
+        provider_order_id=order_id,
+        external_reference=f"dep_{uuid4().hex}",
+    )
+    db.add(deposit)
+    db.add(PaymentGatewayConfig(
+        gateway_name="cashfree",
+        display_name="Cashfree Payments",
+        is_active=True,
+        api_key="cf_test_app_id",
+        api_secret="cf_api_secret",
+        webhook_secret="cf_webhook_secret",
+        is_sandbox=True,
+    ))
+    db.commit()
+
+    raw_body = json.dumps({
+        "event_time": "2026-10-04T12:00:00Z",
+        "data": {
+            "order": {"order_id": order_id, "order_amount": 1250.0},
+            "payment": {"payment_status": "SUCCESS", "cf_payment_id": 987654321},
+        },
+    }).encode()
+    timestamp = str(int(time()))
+    signature = base64.b64encode(
+        hmac.new(b"cf_webhook_secret", timestamp.encode() + raw_body, hashlib.sha256).digest()
+    ).decode()
+
+    result = handle_webhook(
+        raw_body,
+        {"x-webhook-timestamp": timestamp, "x-webhook-signature": signature},
+        "cashfree",
+        db=db,
+    )
+
+    assert result["status"] == "success"
+    db.refresh(deposit)
+    db.refresh(wallet)
+    assert deposit.status == DepositStatus.SUCCESS
+    assert wallet.balance == 1_125_000
+    assert get_remaining_wager(db, user.id) == 125_000

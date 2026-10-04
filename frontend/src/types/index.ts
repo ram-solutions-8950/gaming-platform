@@ -65,6 +65,7 @@ export interface Withdrawal {
   id: string;
   user_id: string;
   amount: number;
+  fee_amount?: number;
   status: WithdrawalStatus;
   method: string | null;
   destination: string | null;
@@ -73,6 +74,10 @@ export interface Withdrawal {
   processed_at: string | null;
   user_name?: string;
   payment_method?: string;
+  payout_provider?: string | null;
+  payout_id?: string | null;
+  payout_status?: string | null;
+  payout_utr?: string | null;
   metadata?: Record<string, any> | null;
 }
 

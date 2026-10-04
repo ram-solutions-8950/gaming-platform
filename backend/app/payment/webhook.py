@@ -39,7 +39,7 @@ def handle_webhook(
         len(raw_body),
     )
 
-    provider = get_provider(provider_name)
+    provider = get_provider(provider_name, db=db)
 
     # 1. Verify provider signature BEFORE parsing/processing.
     if not provider.verify_webhook(raw_body, headers):
@@ -255,7 +255,7 @@ def handle_webhook(
     #
     # The DB unique constraint prevents a second credit.
     reference_type = "payment_verification"
-    reference_id = f"razorpay:{deposit.id}"
+    reference_id = f"{normalized_provider}:{deposit.id}"
 
     try:
         credit_wallet(
