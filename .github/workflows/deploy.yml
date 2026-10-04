@@ -357,22 +357,38 @@ jobs:
             fi
 
             echo "===================================="
-            echo "17. TESTING APK DOWNLOAD"
+            echo "17. TESTING APK DOWNLOAD PAGE & FILE"
             echo "===================================="
 
-            DOWNLOAD_STATUS=0
+            DOWNLOAD_PAGE_STATUS=0
             for i in $(seq 1 5); do
-              DOWNLOAD_STATUS=$(curl -k -s -o /dev/null -w '%{http_code}' -H 'Host: polandexim.com' https://127.0.0.1/download || true)
-              if [ "$DOWNLOAD_STATUS" = "200" ]; then
+              DOWNLOAD_PAGE_STATUS=$(curl -k -s -o /dev/null -w '%{http_code}' -H 'Host: polandexim.com' https://127.0.0.1/download || true)
+              if [ "$DOWNLOAD_PAGE_STATUS" = "200" ]; then
                 break
               fi
               sleep 1
             done
 
-            echo "Download status: $DOWNLOAD_STATUS"
+            echo "Download page status: $DOWNLOAD_PAGE_STATUS"
 
-            if [ "$DOWNLOAD_STATUS" != "200" ]; then
-              echo "ERROR: APK download failed"
+            if [ "$DOWNLOAD_PAGE_STATUS" != "200" ]; then
+              echo "ERROR: APK download page failed"
+              exit 1
+            fi
+
+            APK_FILE_STATUS=0
+            for i in $(seq 1 5); do
+              APK_FILE_STATUS=$(curl -k -s -o /dev/null -w '%{http_code}' -H 'Host: polandexim.com' https://127.0.0.1/Corona888.apk || true)
+              if [ "$APK_FILE_STATUS" = "200" ]; then
+                break
+              fi
+              sleep 1
+            done
+
+            echo "APK file status: $APK_FILE_STATUS"
+
+            if [ "$APK_FILE_STATUS" != "200" ]; then
+              echo "ERROR: APK file download failed"
               exit 1
             fi
 
