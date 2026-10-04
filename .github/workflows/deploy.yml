@@ -152,7 +152,7 @@ jobs:
             echo "4. STARTING DOCKER SERVICES"
             echo "===================================="
 
-            docker compose up -d --build backend db redis
+            docker compose up -d --build backend db redis payment
 
             echo "===================================="
             echo "5. BUILDING FRONTEND"
@@ -334,6 +334,15 @@ jobs:
             echo "===================================="
             echo "16. TESTING MAIN WEBSITE"
             echo "===================================="
+
+            echo "Waiting for payment service on port 3000..."
+            for i in $(seq 1 15); do
+              if curl -fsS http://127.0.0.1:3000/ > /dev/null 2>&1; then
+                echo "Payment service is online!"
+                break
+              fi
+              sleep 2
+            done
 
             ROOT_STATUS=$(curl -s \
               -o /dev/null \

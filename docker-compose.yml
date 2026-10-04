@@ -37,8 +37,15 @@ services:
     volumes:
       - ./frontend:/app
       - /app/node_modules
-    depends_on:
-      - backend
+  payment:
+    build:
+      context: ./payment
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
 
 volumes:
   postgres_data:
