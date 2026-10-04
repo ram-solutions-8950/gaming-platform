@@ -70,7 +70,7 @@ def create_deposit(
         wallet_id=wallet.id,
         amount=amount,
         status=DepositStatus.PENDING,
-        provider=provider_name,
+        provider=provider_name_final,
         external_reference=external_reference,
         metadata_=metadata,
     )
@@ -78,7 +78,7 @@ def create_deposit(
     db.add(deposit)
     db.flush()
 
-    payment_provider = get_provider(provider_name, db=db)
+    payment_provider = get_provider(provider_name_final, db=db)
 
     provider_result = payment_provider.create_payment(
         amount=amount,
@@ -102,7 +102,7 @@ def create_deposit(
         ),
         "payment_session_id": provider_result.get("payment_session_id"),
         "environment": provider_result.get("environment"),
-        "provider": provider_result.get("provider", provider_name),
+        "provider": provider_result.get("provider", provider_name_final),
     }
 
     db.commit()
