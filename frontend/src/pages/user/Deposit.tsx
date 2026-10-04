@@ -217,13 +217,13 @@ export function DepositPage() {
           mode: depositData.environment === 'production' ? 'production' : 'sandbox',
         });
 
-        setPaymentStatus('Opening secure Cashfree Checkout...');
         cashfree.checkout({
           paymentSessionId: depositData.payment_session_id,
           redirectTarget: '_modal',
         }).then(async (result: any) => {
           if (result.error) {
-            setErrorMsg(result.error.message || 'Payment was cancelled or failed.');
+            setErrorMsg(result.error.message || 'Payment was cancelled.');
+            setPaymentStatus('');
             setProcessing(false);
             return;
           }
@@ -249,10 +249,12 @@ export function DepositPage() {
               setPaymentStatus(
                 'Payment successful! Your wallet has been credited.',
               );
+              setErrorMsg('');
             } else {
-              setPaymentStatus(
-                `Payment status: ${verifiedDeposit.status}`,
+              setErrorMsg(
+                `Payment status: ${verifiedDeposit.status}. Please check wallet or try again.`,
               );
+              setPaymentStatus('');
             }
           } catch (verifyErr: any) {
             setErrorMsg(
@@ -260,6 +262,7 @@ export function DepositPage() {
               verifyErr.response?.data?.error?.message ||
               'Payment verification pending. Please check wallet in a moment.',
             );
+            setPaymentStatus('');
           } finally {
             setProcessing(false);
           }
@@ -475,30 +478,26 @@ export function DepositPage() {
           </div>
 
           {errorMsg && (
-            <div className="bg-red-900/20 border border-red-500/30 rounded-xl p-3 text-red-300 text-xs">
+            <div className="bg-red-900/30 border border-red-500/40 rounded-xl p-2 text-red-200 text-xs font-semibold text-center">
               {errorMsg}
             </div>
           )}
 
-          {paymentStatus && (
-            <div className="bg-brand-900/20 border border-brand-500/30 rounded-xl p-3 text-brand-200 text-xs font-medium">
+          {!errorMsg && paymentStatus && (
+            <div className="bg-brand-900/30 border border-brand-500/40 rounded-xl p-2 text-brand-200 text-xs font-medium text-center">
               {paymentStatus}
             </div>
           )}
 
-          {deposit && (
-            <div className="bg-dark-800 rounded-xl p-3 text-xs space-y-1.5 border border-dark-700">
+          {deposit && deposit.status === 'SUCCESS' && (
+            <div className="bg-emerald-950/60 rounded-xl p-2.5 text-xs space-y-1 border border-emerald-500/40">
               <div className="flex justify-between">
-                <span className="text-gray-400">Order ID:</span>
+                <span className="text-gray-300">Order ID:</span>
                 <span className="text-white font-mono">{deposit.id.slice(0, 12)}...</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-400">Gateway:</span>
-                <span className="text-cyan-400 font-bold uppercase">{deposit.provider}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-400">Amount:</span>
-                <span className="text-gold-400 font-bold">₹{(deposit.amount / 100).toFixed(2)}</span>
+                <span className="text-gray-300">Amount Credited:</span>
+                <span className="text-emerald-400 font-bold">₹{(deposit.amount / 100).toFixed(2)}</span>
               </div>
             </div>
           )}

@@ -468,12 +468,12 @@ body {
     padding: 4px 10px !important;
   }
 
-  /* â”€â”€ Deposit Page Mobile Landscape â”€â”€ */
+  /* ── Deposit Page Mobile Landscape ── */
   .deposit-page {
-    width: min(580px, calc(100vw - 32px)) !important;
-    max-width: 580px !important;
+    width: min(540px, calc(100vw - 32px)) !important;
+    max-width: 540px !important;
     margin: 0 auto !important;
-    padding: 0 !important;
+    padding: 0 0 6px 0 !important;
     gap: 3px !important;
     display: flex !important;
     flex-direction: column !important;
@@ -499,10 +499,10 @@ body {
   }
 
   .deposit-card {
-    padding: 8px 16px !important;
+    padding: 8px 14px 10px 14px !important;
     border-radius: 12px !important;
     margin: 0 auto !important;
-    max-height: calc(100dvh - 85px) !important;
+    max-height: calc(100dvh - 125px) !important;
     overflow-y: auto !important;
     scrollbar-width: none !important;
   }
@@ -534,9 +534,9 @@ body {
   }
 
   .deposit-amount-input {
-    height: 36px !important;
-    min-height: 36px !important;
-    padding: 3px 8px 3px 26px !important;
+    height: 34px !important;
+    min-height: 34px !important;
+    padding: 2px 8px 2px 24px !important;
     font-size: 13px !important;
     border-radius: 8px !important;
   }
@@ -567,6 +567,8 @@ body {
     font-weight: 800 !important;
     border-radius: 8px !important;
     margin-top: 3px !important;
+    margin-bottom: 2px !important;
+    flex-shrink: 0 !important;
   }
 
   /* â”€â”€ Withdrawal Page Mobile Landscape â”€â”€ */
@@ -1272,4 +1274,50 @@ html, body {
   .ludo-active-match .ludo-controls-side-panel .ludo-dice-box span {
     font-size: 8.5px !important;
   }
+}
+
+/* ============================================================
+   CASHFREE CHECKOUT MODAL RESPONSIVE STYLING
+   Fixes stretched white modal & landscape height clipping
+   ============================================================ */
+
+div[style*="2147483647"] {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  background: rgba(0, 0, 0, 0.8) !important;
+  backdrop-filter: blur(4px) !important;
+}
+
+div[style*="2147483647"] > div {
+  width: min(440px, 94vw) !important;
+  max-width: 440px !important;
+  height: min(600px, 92dvh, 92vh) !important;
+  max-height: calc(100dvh - 16px) !important;
+  background-color: #120d24 !important;
+  border-radius: 16px !important;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.9) !important;
+  border: 1px solid rgba(168, 85, 247, 0.35) !important;
+  overflow: hidden !important;
+  position: relative !important;
+  top: auto !important;
+  left: auto !important;
+  transform: none !important;
+}
+
+@media (orientation: landscape) and (max-height: 520px) {
+  div[style*="2147483647"] > div {
+    width: min(460px, 85vw) !important;
+    max-width: 460px !important;
+    height: calc(100dvh - 12px) !important;
+    max-height: calc(100dvh - 12px) !important;
+    border-radius: 12px !important;
+  }
+}
+
+div[style*="2147483647"] iframe {
+  width: 100% !important;
+  height: 100% !important;
+  border-radius: 12px !important;
+  background: #ffffff !important;
 }
