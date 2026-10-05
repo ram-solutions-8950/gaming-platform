@@ -1,7 +1,7 @@
 {
   "name": "frontend",
   "private": true,
-  "version": "0.0.108",
+  "version": "0.0.112",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -11,7 +11,8 @@
     "version:bump": "node scripts/version-bump.js",
     "download:sounds": "node scripts/download-sounds.js",
     "sync:android": "node scripts/sync-android.js",
-    "build:apk": "npm run version:bump && npm run build && npm run sync:android && cd android && ./gradlew assembleDebug && cp app/build/outputs/apk/debug/app-debug.apk ../public/Corona888.apk && cp app/build/outputs/apk/debug/app-debug.apk ../dist/Corona888.apk"
+    "build:apk": "npm run version:bump && npm run build && npm run sync:android && cd android && ./gradlew assembleDebug && cp app/build/outputs/apk/debug/app-debug.apk ../public/Corona888.apk && cp app/build/outputs/apk/debug/app-debug.apk ../dist/Corona888.apk",
+    "build:release": "npm run version:bump && npm run build && npm run sync:android && cd android && ./gradlew assembleRelease && cp app/build/outputs/apk/release/app-release.apk ../public/Corona888.apk && cp app/build/outputs/apk/release/app-release.apk ../dist/Corona888.apk"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.0",

@@ -1,14 +1,44 @@
 apply plugin: 'com.android.application'
 
+def keystorePropertiesFile = rootProject.file("keystore.properties")
+def keystoreProperties = new Properties()
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+}
+
 android {
     namespace = "com.corona888.app"
     compileSdk = rootProject.ext.compileSdkVersion
+
+    signingConfigs {
+        release {
+            def envStoreFile = System.getenv("APP_RELEASE_STORE_FILE")
+            def envStorePassword = System.getenv("APP_RELEASE_STORE_PASSWORD")
+            def envKeyAlias = System.getenv("APP_RELEASE_KEY_ALIAS")
+            def envKeyPassword = System.getenv("APP_RELEASE_KEY_PASSWORD")
+
+            def releaseStoreFile = envStoreFile ?: keystoreProperties['storeFile']
+            def releaseStorePassword = envStorePassword ?: keystoreProperties['storePassword']
+            def releaseKeyAlias = envKeyAlias ?: keystoreProperties['keyAlias']
+            def releaseKeyPassword = envKeyPassword ?: keystoreProperties['keyPassword']
+
+            if (releaseStoreFile && releaseStorePassword && releaseKeyAlias && releaseKeyPassword) {
+                storeFile rootProject.file(releaseStoreFile)
+                storePassword releaseStorePassword
+                keyAlias releaseKeyAlias
+                keyPassword releaseKeyPassword
+            } else {
+                throw new GradleException("Missing Android release signing config. Set APP_RELEASE_* env vars or create frontend/android/keystore.properties.")
+            }
+        }
+    }
+
     defaultConfig {
         applicationId "com.corona888.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 114
-        versionName "0.0.108"
+        versionCode 118
+        versionName "0.0.112"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -18,6 +48,7 @@ android {
     buildTypes {
         release {
             minifyEnabled false
+            signingConfig signingConfigs.release
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
     }
