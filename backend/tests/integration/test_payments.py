@@ -176,3 +176,56 @@ def test_deposit_api_validation(client, user_token, superadmin_token, db):
     assert res.status_code == 400
     assert "strictly positive" in res.json()["error"]["message"].lower()
 
+
+def test_manual_deposit_flow(client, user_token, superadmin_token, db):
+    # 1. Config endpoint returns manual payment details
+    cfg_res = client.get("/api/v1/deposits/config")
+    assert cfg_res.status_code == 200
+    data = cfg_res.json()["data"]
+    assert "manual_payment" in data
+    assert "manual_configs" in data
+
+    # 2. Submit manual deposit with UTR
+    test_utr = f"UTR{uuid.uuid4().hex[:8].upper()}"
+    res = client.post("/api/v1/deposits/manual", json={
+        "amount": 25000,  # ₹250
+        "transaction_id": test_utr,
+        "remarks": "Paid via Google Pay"
+    }, headers={"Authorization": f"Bearer {user_token}"})
+    assert res.status_code == 201
+    dep_id = res.json()["data"]["id"]
+    assert res.json()["data"]["status"] == "PENDING"
+    assert res.json()["data"]["transaction_id"] == test_utr
+
+    # 3. Duplicate UTR is rejected
+    dup_res = client.post("/api/v1/deposits/manual", json={
+        "amount": 25000,
+        "transaction_id": test_utr,
+    }, headers={"Authorization": f"Bearer {user_token}"})
+    assert dup_res.status_code == 409
+
+    # 4. User can see their deposit in /deposits/my
+    my_res = client.get("/api/v1/deposits/my", headers={"Authorization": f"Bearer {user_token}"})
+    assert my_res.status_code == 200
+    my_items = my_res.json()["data"]
+    assert any(item["id"] == dep_id for item in my_items)
+
+    # 5. Admin sees the deposit with UTR in list
+    admin_list = client.get(f"/api/v1/admin/deposits?search={test_utr}", headers={"Authorization": f"Bearer {superadmin_token}"})
+    assert admin_list.status_code == 200
+    admin_items = admin_list.json()["data"]["items"]
+    assert len(admin_items) >= 1
+    found_item = next(it for it in admin_items if it["id"] == dep_id)
+    assert found_item["transaction_id"] == test_utr
+
+    # 6. Admin approves deposit
+    appr_res = client.post(f"/api/v1/admin/deposits/{dep_id}/approve", headers={"Authorization": f"Bearer {superadmin_token}"})
+    assert appr_res.status_code == 200
+    assert appr_res.json()["data"]["status"] == "SUCCESS"
+
+    # 7. User wallet balance is credited
+    wallet_res = client.get("/api/v1/wallet", headers={"Authorization": f"Bearer {user_token}"})
+    assert wallet_res.status_code == 200
+    assert wallet_res.json()["data"]["balance"] >= 25000
+
+
