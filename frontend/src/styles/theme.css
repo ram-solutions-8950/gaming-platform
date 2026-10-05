@@ -470,13 +470,26 @@ body {
 
   /* ── Deposit Page Mobile Landscape ── */
   .deposit-page {
-    width: min(640px, calc(100vw - 32px)) !important;
-    max-width: 640px !important;
+    width: min(960px, calc(100vw - 20px)) !important;
+    max-width: 960px !important;
     margin: 0 auto !important;
     padding: 0 0 6px 0 !important;
     gap: 3px !important;
     display: flex !important;
     flex-direction: column !important;
+  }
+
+  .deposit-grid {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 10px !important;
+    align-items: start !important;
+    width: 100% !important;
+  }
+
+  .deposit-grid.single-card {
+    grid-template-columns: minmax(0, 500px) !important;
+    justify-content: center !important;
   }
 
   .deposit-page > * + * {
@@ -499,10 +512,11 @@ body {
   }
 
   .deposit-card {
-    padding: 8px 14px 10px 14px !important;
+    padding: 8px 12px 10px 12px !important;
     border-radius: 12px !important;
     margin: 0 auto !important;
-    max-height: min(560px, calc(100dvh - 150px)) !important;
+    width: 100% !important;
+    max-height: min(560px, calc(100dvh - 120px)) !important;
     overflow-y: auto !important;
     scrollbar-width: none !important;
   }

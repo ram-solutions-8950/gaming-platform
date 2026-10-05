@@ -200,7 +200,7 @@ export function AdminPaymentSettingsPage() {
         upi_id: formData.upi_id || null,
         minimum_deposit: (formData.minimum_deposit || 0) * 100,
         maximum_deposit: (formData.maximum_deposit || 0) * 100,
-        enabled: formData.enabled || false,
+        enabled: formData.enabled !== undefined ? formData.enabled : true,
         deposit_instructions: formData.deposit_instructions || null,
       };
 

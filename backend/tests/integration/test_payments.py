@@ -178,6 +178,26 @@ def test_deposit_api_validation(client, user_token, superadmin_token, db):
 
 
 def test_manual_deposit_flow(client, user_token, superadmin_token, db):
+    # 0. Ensure an active manual payment config exists
+    cfg = db.query(PaymentConfiguration).first()
+    if not cfg:
+        cfg = PaymentConfiguration(
+            provider="upi_direct",
+            display_name="UPI Direct Deposit",
+            upi_id="merchant@okaxis",
+            minimum_deposit=10000,
+            maximum_deposit=5000000,
+            enabled=True,
+            deposit_instructions="Pay and submit UTR",
+        )
+        db.add(cfg)
+    else:
+        cfg.enabled = True
+        cfg.upi_id = "merchant@okaxis"
+        cfg.minimum_deposit = 10000
+        cfg.maximum_deposit = 5000000
+    db.commit()
+
     # 1. Config endpoint returns manual payment details
     cfg_res = client.get("/api/v1/deposits/config")
     assert cfg_res.status_code == 200

@@ -34,6 +34,8 @@ export interface AdminDepositItem {
   provider?: string | null;
   payment_method?: string;
   provider_order_id?: string | null;
+  transaction_id?: string | null;
+  remarks?: string | null;
   status: string;
   created_at: string;
 }
@@ -168,6 +170,20 @@ function DepositDetailsModal({
             </div>
           )}
 
+          {deposit.transaction_id && (
+            <div className="flex justify-between items-center gap-3 py-2 border-b border-dark-800">
+              <span className="text-gray-400">User UTR / Transaction ID</span>
+              <span className="font-mono text-xs font-bold text-amber-300 break-all text-right">{deposit.transaction_id}</span>
+            </div>
+          )}
+
+          {deposit.remarks && (
+            <div className="py-2 border-b border-dark-800">
+              <span className="text-gray-400">Player note</span>
+              <p className="mt-1 whitespace-pre-wrap text-gray-200">{deposit.remarks}</p>
+            </div>
+          )}
+
           <div className="flex justify-between items-center py-2 border-b border-dark-800">
             <span className="text-gray-400">Date & Time</span>
             <span className="text-gray-200">{new Date(deposit.created_at).toLocaleString('en-IN')}</span>
@@ -188,6 +204,12 @@ function DepositDetailsModal({
             </span>
           </div>
         </div>
+
+        {deposit.provider === 'manual_upi' && deposit.status === 'PENDING' && (
+          <p className="rounded-lg border border-amber-500/30 bg-amber-900/20 p-2 text-center text-xs text-amber-200">
+            Verify the UTR against your UPI/bank statement before approving. Approval credits the wallet.
+          </p>
+        )}
 
         {deposit.status === 'PENDING' && (
           <div className="flex items-center gap-3 pt-2">
@@ -275,7 +297,8 @@ export function AdminDepositsPage() {
   };
 
   const handleQuickApprove = async (d: AdminDepositItem) => {
-    if (!window.confirm(`Approve deposit of ₹${(d.amount / 100).toFixed(2)} for ${d.user_name || 'player'}?\n\nWallet will be credited immediately.`)) return;
+    const utrText = d.transaction_id ? `\nUTR / Ref: ${d.transaction_id}` : '';
+    if (!window.confirm(`Approve deposit of ₹${(d.amount / 100).toFixed(2)} for ${d.user_name || 'player'}?${utrText}\n\nWallet will be credited immediately.`)) return;
     try {
       await adminService.approveDeposit(d.id);
       toast.success('Deposit approved and wallet credited!');
@@ -424,9 +447,14 @@ export function AdminDepositsPage() {
                         +₹{(d.amount / 100).toFixed(2)}
                       </td>
 
-                      {/* 4. Payment Method */}
+                      {/* 4. Payment Method & UTR */}
                       <td className="py-3 px-3 text-xs text-gray-300 whitespace-nowrap">
-                        {d.payment_method || d.provider || 'UPI'}
+                        <div className="font-medium text-white">{d.payment_method || d.provider || 'UPI'}</div>
+                        {d.transaction_id && (
+                          <div className="mt-0.5 font-mono text-[11px] text-amber-300 font-semibold" title={`UTR: ${d.transaction_id}`}>
+                            UTR: {d.transaction_id}
+                          </div>
+                        )}
                       </td>
 
                       {/* 5. Date & Time */}

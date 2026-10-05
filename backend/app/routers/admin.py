@@ -683,6 +683,7 @@ def list_all_deposits(
                 (User.username.ilike(like)) |
                 (User.email.ilike(like)) |
                 (Deposit.provider_order_id.ilike(like)) |
+                (Deposit.external_reference.ilike(like)) |
                 (cast(Deposit.id, String).ilike(like)) |
                 (cast(Deposit.user_id, String).ilike(like))
             )
@@ -693,7 +694,10 @@ def list_all_deposits(
         dd = DepositOut.model_validate(d).model_dump()
         user_obj = db.query(User).filter(User.id == d.user_id).first()
         dd["user_name"] = user_obj.name if user_obj else "Unknown"
-        dd["payment_method"] = (d.provider or "UPI").upper()
+        metadata = d.metadata_ if isinstance(d.metadata_, dict) else {}
+        dd["transaction_id"] = d.external_reference if d.provider == "manual_upi" else None
+        dd["remarks"] = metadata.get("remarks")
+        dd["payment_method"] = metadata.get("payment_method") or (d.provider or "UPI").upper()
         out_items.append(dd)
     return success_response({
         "total": total, "page": page, "page_size": page_size,

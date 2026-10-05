@@ -2,7 +2,7 @@ from typing import Optional
 from uuid import UUID
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 from ..models.deposit import DepositStatus
 
@@ -17,6 +17,24 @@ class ManualDepositCreateIn(BaseModel):
     transaction_id: str  # 12-digit UTR or transaction ID
     config_id: Optional[UUID] = None
     remarks: Optional[str] = None
+
+    @field_validator("transaction_id")
+    @classmethod
+    def transaction_id_valid(cls, value: str) -> str:
+        value = value.strip()
+        if not 4 <= len(value) <= 255:
+            raise ValueError("Transaction ID must be between 4 and 255 characters")
+        return value
+
+    @field_validator("remarks")
+    @classmethod
+    def remarks_valid(cls, value: Optional[str]) -> Optional[str]:
+        if value is not None:
+            value = value.strip()
+            if len(value) > 1000:
+                raise ValueError("Remarks must be 1000 characters or fewer")
+            return value or None
+        return value
 
 
 class DepositVerifyIn(BaseModel):
