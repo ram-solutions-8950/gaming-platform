@@ -1126,31 +1126,95 @@ async def upload_qr_code(
         return error_response("INVALID_IMAGE", "File content does not match a valid image format", status_code=400)
 
     # ---------------------------------------------------------
-    # NEW: Validate that the image actually contains a QR code
+    # Validate that the image contains a recognizable QR code
     # ---------------------------------------------------------
     try:
         import cv2
         import numpy as np
         
-        # Decode the image from memory
         nparr = np.frombuffer(content, np.uint8)
-        img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-        
-        if img is None:
+        img_raw = cv2.imdecode(nparr, cv2.IMREAD_UNCHANGED)
+        if img_raw is None:
             return error_response("INVALID_IMAGE", "Could not decode image data", status_code=400)
-            
-        # Initialize the QRCode detector
-        detector = cv2.QRCodeDetector()
-        
-        # Detect and decode the QR code
-        data, bbox, straight_qrcode = detector.detectAndDecode(img)
-        
-        if not bbox is not None or not data:
+
+        h, w = img_raw.shape[:2]
+        if h < 29 or w < 29:
+            return error_response("NO_QR_CODE", "Uploaded image does not contain a readable QR code.", status_code=400)
+
+        # Handle alpha channel (composite over white background)
+        if len(img_raw.shape) == 3 and img_raw.shape[2] == 4:
+            alpha = img_raw[:, :, 3] / 255.0
+            bgr = img_raw[:, :, :3]
+            white = np.ones_like(bgr, dtype=np.uint8) * 255
+            img = (bgr * alpha[:, :, None] + white * (1.0 - alpha[:, :, None])).astype(np.uint8)
+        elif len(img_raw.shape) == 3:
+            img = img_raw
+        else:
+            img = cv2.cvtColor(img_raw, cv2.COLOR_GRAY2BGR)
+
+        is_qr = False
+
+        # 1. Fast check with pyzbar (extremely accurate on standard and inverted QRs)
+        try:
+            import pyzbar.pyzbar as pyzbar
+            decoded = pyzbar.decode(img)
+            if decoded:
+                is_qr = True
+        except Exception:
+            pass
+
+        # 2. Multi-scale & multi-filter detection with OpenCV
+        if not is_qr:
+            detector = cv2.QRCodeDetector()
+            scales = [1.0]
+            max_dim = max(h, w)
+            if max_dim > 1000:
+                scales.append(800.0 / max_dim)
+            if max_dim > 600:
+                scales.append(500.0 / max_dim)
+
+            for s in scales:
+                c = img if s == 1.0 else cv2.resize(img, (int(w * s), int(h * s)), interpolation=cv2.INTER_AREA)
+
+                # A. detectAndDecode
+                data, bbox, _ = detector.detectAndDecode(c)
+                if (bbox is not None and len(bbox) > 0) or bool(data):
+                    is_qr = True
+                    break
+
+                # B. detect only (locates QR code pattern even with central logos)
+                ret, bbox = detector.detect(c)
+                if ret and bbox is not None and len(bbox) > 0:
+                    is_qr = True
+                    break
+
+                # C. detectMulti
+                ret_m, _, points, _ = detector.detectAndDecodeMulti(c)
+                if ret_m and points is not None and len(points) > 0:
+                    is_qr = True
+                    break
+
+                # D. Otsu thresholding for low-contrast images
+                gray = cv2.cvtColor(c, cv2.COLOR_BGR2GRAY)
+                _, thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
+                ret_t, bbox_t = detector.detect(thresh)
+                if ret_t and bbox_t is not None and len(bbox_t) > 0:
+                    is_qr = True
+                    break
+
+                # E. Adaptive thresholding
+                adapt = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
+                ret_a, bbox_a = detector.detect(adapt)
+                if ret_a and bbox_a is not None and len(bbox_a) > 0:
+                    is_qr = True
+                    break
+
+        if not is_qr:
             return error_response("NO_QR_CODE", "Uploaded image does not contain a readable QR code.", status_code=400)
             
     except ImportError:
         # Fallback if cv2 isn't installed (though we added it to requirements)
-        print("WARNING: cv2 not installed, skipping QR validation")
+        logger.warning("cv2 not installed, skipping QR validation")
         pass
     except Exception as e:
         return error_response("QR_VALIDATION_ERROR", f"Error validating QR code: {str(e)}", status_code=400)

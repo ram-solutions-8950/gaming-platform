@@ -117,6 +117,58 @@ def test_admin_upload_qr_path_traversal(client, superadmin_token, test_qr_bytes,
     assert ".." not in qr_ref
     assert qr_ref.startswith("/api/v1/uploads/qr/")
 
+def test_admin_upload_qr_with_center_logo(client, superadmin_token, db):
+    """Real-world UPI QR codes frequently have a brand logo in the center."""
+    from PIL import ImageDraw
+    qr = qrcode.QRCode(version=3, box_size=10, border=4, error_correction=qrcode.constants.ERROR_CORRECT_H)
+    qr.add_data("upi://pay?pa=6378454061-2@ybl&pn=Corona888")
+    qr.make(fit=True)
+    img = qr.make_image(fill_color="black", back_color="white").convert("RGB")
+    w, h = img.size
+    draw = ImageDraw.Draw(img)
+    logo_size = int(w * 0.25)
+    draw.rectangle([(w - logo_size) // 2, (h - logo_size) // 2, (w + logo_size) // 2, (h + logo_size) // 2], fill="red")
+    bio = io.BytesIO()
+    img.save(bio, format="PNG")
+
+    config = db.query(PaymentConfiguration).first()
+    res = client.post(f"/api/v1/admin/payment-settings/{config.id}/qr-upload",
+                      files={"file": ("logo_qr.png", bio.getvalue(), "image/png")},
+                      headers={"Authorization": f"Bearer {superadmin_token}"})
+    assert res.status_code == 200
+    assert res.json()["data"]["qr_code_reference"].startswith("/api/v1/uploads/qr/")
+
+def test_admin_upload_qr_transparent_rgba(client, superadmin_token, db):
+    """Transparent background PNGs must not turn into pure black rectangles."""
+    qr = qrcode.QRCode(version=1, box_size=10, border=4)
+    qr.add_data("upi://pay?pa=merchant@upi")
+    qr.make(fit=True)
+    img = qr.make_image(fill_color="black", back_color="transparent").convert("RGBA")
+    bio = io.BytesIO()
+    img.save(bio, format="PNG")
+
+    config = db.query(PaymentConfiguration).first()
+    res = client.post(f"/api/v1/admin/payment-settings/{config.id}/qr-upload",
+                      files={"file": ("transparent_qr.png", bio.getvalue(), "image/png")},
+                      headers={"Authorization": f"Bearer {superadmin_token}"})
+    assert res.status_code == 200
+    assert res.json()["data"]["qr_code_reference"].startswith("/api/v1/uploads/qr/")
+
+def test_admin_upload_qr_large_resolution(client, superadmin_token, test_qr_bytes, db):
+    """High-resolution phone screenshots (e.g. 2400x2400) must be accepted."""
+    from PIL import Image
+    orig = Image.open(io.BytesIO(test_qr_bytes))
+    large = orig.resize((2400, 2400))
+    bio = io.BytesIO()
+    large.save(bio, format="PNG")
+
+    config = db.query(PaymentConfiguration).first()
+    res = client.post(f"/api/v1/admin/payment-settings/{config.id}/qr-upload",
+                      files={"file": ("mobile_shot.png", bio.getvalue(), "image/png")},
+                      headers={"Authorization": f"Bearer {superadmin_token}"})
+    assert res.status_code == 200
+    assert res.json()["data"]["qr_code_reference"].startswith("/api/v1/uploads/qr/")
+
 def test_user_active_config(client, user_token, db):
     config = db.query(PaymentConfiguration).first()
     config.enabled = True

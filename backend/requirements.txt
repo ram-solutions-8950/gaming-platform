@@ -19,3 +19,4 @@ numpy
 qrcode
 pillow
 razorpay
+pyzbar
