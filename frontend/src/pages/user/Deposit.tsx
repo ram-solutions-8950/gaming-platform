@@ -2,21 +2,13 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Check, CheckCircle2, Copy, QrCode } from 'lucide-react';
 import { createPortal } from 'react-dom';
-import { registerPlugin } from '@capacitor/core';
 import { Card } from '../../components/common/Card';
 import api from '../../services/api';
 import { isNativePlatform } from '../../utils/platform';
 import { getMediaUrl } from '../../utils/media';
-
-interface NativeCashfreeCheckoutPlugin {
-  startCheckout(options: {
-    orderId: string;
-    paymentSessionId: string;
-    mode: 'sandbox' | 'production';
-  }): Promise<{ orderId: string; status: string }>;
-}
-
-const NativeCashfreeCheckout = registerPlugin<NativeCashfreeCheckoutPlugin>('CashfreeCheckout');
+import { useFinancialSocket } from '../../hooks/useFinancialSocket';
+import { useAuthStore } from '../../store/authStore';
+import { authService } from '../../services/auth';
 
 declare global {
   interface Window {
@@ -84,33 +76,9 @@ interface DepositResponse {
   app_id?: string;
   created_at: string;
   transaction_id?: string | null;
+  checkout_url?: string;
 }
 
-function loadCashfreeScript(): Promise<boolean> {
-  return new Promise((resolve) => {
-    if ((window as any).Cashfree) {
-      resolve(true);
-      return;
-    }
-
-    const existingScript = document.querySelector(
-      'script[src="https://sdk.cashfree.com/js/v3/cashfree.js"]',
-    );
-
-    if (existingScript) {
-      existingScript.addEventListener('load', () => resolve(true));
-      existingScript.addEventListener('error', () => resolve(false));
-      return;
-    }
-
-    const script = document.createElement('script');
-    script.src = 'https://sdk.cashfree.com/js/v3/cashfree.js';
-    script.async = true;
-    script.onload = () => resolve(true);
-    script.onerror = () => resolve(false);
-    document.body.appendChild(script);
-  });
-}
 
 function loadRazorpayScript(): Promise<boolean> {
   return new Promise((resolve) => {
@@ -165,6 +133,41 @@ export function DepositPage() {
 
   const minimumDeposit = 100;
   const maximumDeposit = 10000;
+
+  // Real-time financial WebSocket: updates wallet balance and deposit status automatically
+  useFinancialSocket({
+    channel: 'user_deposits',
+    onMessage: (data) => {
+      if (data.type === 'deposit_updated' || data.type === 'deposit_created') {
+        if (data.deposit) {
+          setDeposit((prev) => (prev && prev.id === data.deposit.id ? { ...prev, ...data.deposit } : data.deposit));
+          if (data.deposit.status === 'SUCCESS') {
+            setPaymentStatus('Payment successful! Your wallet has been credited.');
+            setErrorMsg('');
+            setProcessing(false);
+            setManualProcessing(false);
+            setManualStatus('Deposit approved and credited!');
+          } else if (data.deposit.status === 'FAILED') {
+            setErrorMsg(data.deposit.reason || 'Deposit was declined or failed.');
+            setPaymentStatus('');
+            setProcessing(false);
+            setManualProcessing(false);
+          }
+        }
+        if (data.wallet) {
+          const currentUser = useAuthStore.getState().user;
+          if (currentUser) {
+            useAuthStore.getState().setUser({
+              ...currentUser,
+              wallet_balance: data.wallet.balance,
+            });
+          }
+        } else {
+          authService.me().then((me) => useAuthStore.getState().setUser(me)).catch(() => {});
+        }
+      }
+    },
+  });
 
   useEffect(() => {
     let isMounted = true;
@@ -246,67 +249,33 @@ export function DepositPage() {
       setDeposit(depositData);
 
       if (depositData.provider === 'cashfree') {
-        // Native Android uses Cashfree's activity SDK so control returns to the
-        // app callback, never to the configured website return URL.
-        let checkoutResult: any;
         const environment = depositData.environment === 'production' ? 'production' : 'sandbox';
+        const checkoutUrl = depositData.checkout_url ||
+          `https://polandexim.com/pay?session_id=${depositData.payment_session_id}&order_id=${depositData.provider_order_id}&mode=${environment}&amount=${depositData.amount}&deposit_id=${depositData.id}`;
+
+        setPaymentStatus('Opening secure Cashfree payment portal...');
+
+        // Route payment through the intermediate hosted page (polandexim.com)
+        // so Cashfree recognizes the request from the whitelisted merchant domain
         if (isNativePlatform()) {
-          setPaymentStatus('Opening secure Cashfree checkout...');
-          const checkoutPromise = NativeCashfreeCheckout.startCheckout({
-            orderId: depositData.provider_order_id,
-            paymentSessionId: depositData.payment_session_id || '',
-            mode: environment,
-          });
-          // Safety timeout – if the native plugin never calls back (e.g. SDK
-          // crash or Activity not launched), unblock the UI after 2 minutes.
-          const timeoutPromise = new Promise<never>((_, reject) => {
-            setTimeout(() => reject(new Error(
-              'Cashfree checkout timed out. The payment window may not have opened. Please try again.'
-            )), 120_000);
-          });
-          checkoutResult = await Promise.race([checkoutPromise, timeoutPromise]);
+          window.open(checkoutUrl, '_system');
         } else {
-          setPaymentStatus('Loading Cashfree Checkout...');
-          const cfLoaded = await loadCashfreeScript();
-          if (!cfLoaded || !(window as any).Cashfree) {
-            throw new Error('Unable to load Cashfree payment gateway.');
-          }
-
-          const cashfree = (window as any).Cashfree({ mode: environment });
-          setCashfreeCheckoutOpen(true);
-          await new Promise<void>((resolve) => {
-            window.requestAnimationFrame(() => window.requestAnimationFrame(() => resolve()));
-          });
-
-          const checkoutTarget = cashfreeCheckoutRef.current;
-          if (!checkoutTarget) {
-            throw new Error('Unable to open the embedded Cashfree checkout.');
-          }
-
-          checkoutResult = await cashfree.checkout({
-            paymentSessionId: depositData.payment_session_id,
-            redirectTarget: checkoutTarget,
-            appearance: { width: '100%', height: '100%' },
-          });
-          setCashfreeCheckoutOpen(false);
+          window.open(checkoutUrl, '_blank') || (window.location.href = checkoutUrl);
         }
 
-        if (checkoutResult?.error) {
-          throw new Error(checkoutResult.error.message || 'Payment was cancelled.');
-        }
-
-        setPaymentStatus('Payment submitted. Verifying with server...');
+        setPaymentStatus('Payment portal opened. Complete your payment and return to this screen.');
         setErrorMsg('');
 
         let verified = false;
         let lastVerifyError: any;
-        for (let attempt = 0; attempt < 5; attempt += 1) {
+        for (let attempt = 0; attempt < 8; attempt += 1) {
+          await new Promise((resolve) => window.setTimeout(resolve, 3000));
           try {
             const verifyResponse = await api.post(
               `/deposits/${depositData.id}/verify`,
               {
                 provider_order_id: depositData.provider_order_id,
-                provider_payment_id: checkoutResult?.paymentDetails?.paymentMessage || depositData.provider_order_id,
+                provider_payment_id: depositData.provider_order_id,
                 signature: 'cashfree_checkout',
               },
             );
@@ -319,25 +288,11 @@ export function DepositPage() {
               break;
             }
 
-            lastVerifyError = new Error(`Payment status: ${verifiedDeposit.status}`);
             if (verifiedDeposit.status !== 'PENDING') {
               break;
             }
           } catch (verifyErr: any) {
             lastVerifyError = verifyErr;
-            const message =
-              verifyErr.response?.data?.message ||
-              verifyErr.response?.data?.error?.message ||
-              verifyErr.message || '';
-            const stillPending = /status:\s*PENDING/i.test(message);
-
-            if (!stillPending || attempt === 4) {
-              break;
-            }
-          }
-
-          if (attempt < 4) {
-            await new Promise((resolve) => window.setTimeout(resolve, 2000));
           }
         }
 
@@ -346,9 +301,9 @@ export function DepositPage() {
             lastVerifyError?.response?.data?.message ||
             lastVerifyError?.response?.data?.error?.message ||
             lastVerifyError?.message || '';
-          if (/status:\s*PENDING/i.test(message)) {
+          if (/status:\s*PENDING/i.test(message) || !message) {
             setErrorMsg('');
-            setPaymentStatus('Payment is still being confirmed. Please do not pay again; check your wallet shortly.');
+            setPaymentStatus('Payment is still confirming. Your wallet will update in real-time as soon as confirmed.');
           } else {
             setErrorMsg(message || 'Payment verification is pending. Please check your wallet shortly.');
             setPaymentStatus('');

@@ -8,6 +8,8 @@ import { SearchInput } from '../../components/common/SearchInput';
 import { RefreshOverlay } from '../../components/common/RefreshOverlay';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import { useRefreshIndicator } from '../../hooks/useRefreshIndicator';
+import { useFinancialSocket } from '../../hooks/useFinancialSocket';
+import toast from 'react-hot-toast';
 import api from '../../services/api';
 import type { Withdrawal, WithdrawalStatus } from '../../types';
 import {
@@ -340,6 +342,27 @@ export function AdminWithdrawalsPage() {
   useEffect(() => {
     fetchWithdrawals();
   }, [fetchWithdrawals]);
+
+  // Real-time financial WebSocket: updates admin withdrawals table instantly
+  useFinancialSocket({
+    channel: 'admin_withdrawals',
+    onMessage: (data) => {
+      if (data.type === 'withdrawal_created' || data.type === 'withdrawal_updated') {
+        if (data.withdrawal) {
+          setWithdrawals((prev) => {
+            const exists = prev.some((w) => w.id === data.withdrawal.id);
+            if (exists) {
+              return prev.map((w) => (w.id === data.withdrawal.id ? { ...w, ...data.withdrawal } : w));
+            }
+            return [data.withdrawal, ...prev];
+          });
+          if (data.type === 'withdrawal_created') {
+            toast.success(`New withdrawal request: ₹${(data.withdrawal.amount / 100).toFixed(2)} from ${data.withdrawal.user_name || 'player'}`);
+          }
+        }
+      }
+    },
+  });
 
   const handleRefresh = () => runRefresh(fetchWithdrawals);
 

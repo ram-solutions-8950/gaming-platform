@@ -8,6 +8,9 @@ import api from '../../services/api';
 import { walletService, type WagerStatus } from '../../services/wallet';
 import { getApiErrorMessage } from '../../utils/apiError';
 import type { Wallet, Withdrawal, WithdrawalStatus } from '../../types';
+import { useFinancialSocket } from '../../hooks/useFinancialSocket';
+import { useAuthStore } from '../../store/authStore';
+import { authService } from '../../services/auth';
 
 interface FeeConfig {
   withdrawal_fee_percent: number;
@@ -82,6 +85,39 @@ export function WithdrawalPage() {
   useEffect(() => {
     fetchData();
   }, []);
+
+  // Real-time financial WebSocket: updates wallet balance and withdrawal list automatically
+  useFinancialSocket({
+    channel: 'user_withdrawals',
+    onMessage: (data) => {
+      if (data.type === 'withdrawal_updated' || data.type === 'withdrawal_created') {
+        if (data.withdrawal) {
+          setWithdrawals((prev) => {
+            const exists = prev.some((w) => w.id === data.withdrawal.id);
+            if (exists) {
+              return prev.map((w) => (w.id === data.withdrawal.id ? { ...w, ...data.withdrawal } : w));
+            }
+            return [data.withdrawal, ...prev];
+          });
+        }
+        if (data.wallet) {
+          setWallet((prev) => (prev ? { ...prev, balance: data.wallet.balance, balance_inr: data.wallet.balance_inr } : prev));
+          const currentUser = useAuthStore.getState().user;
+          if (currentUser) {
+            useAuthStore.getState().setUser({
+              ...currentUser,
+              wallet_balance: data.wallet.balance,
+            });
+          }
+        } else {
+          walletService.getWallet().then((w) => setWallet(w)).catch(() => {});
+          authService.me().then((me) => useAuthStore.getState().setUser(me)).catch(() => {});
+        }
+        // Also refresh wager status in case withdrawal fulfillment changed
+        walletService.getWagerStatus().then((w) => setWagerStatus(w)).catch(() => {});
+      }
+    },
+  });
 
   if (loading) return <Loader />;
 

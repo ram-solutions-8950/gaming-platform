@@ -43,6 +43,7 @@ from ..schemas.reward import (
 )
 from ..security.permissions import require_admin, require_super_admin, require_permission, has_permission
 from ..utils.responses import success_response, error_response
+from ..websocket.transactions_ws import financial_ws_manager, get_user_wallet_snapshot
 from ..utils.search import normalize_search_term, as_uuid
 from ..middleware.rate_limiter import limiter
 from ..utils.logging import get_logger
@@ -760,6 +761,14 @@ def approve_deposit_endpoint(
         },
     )
     db.commit()
+    wallet_snap = get_user_wallet_snapshot(db, dep.user_id)
+    user_obj = db.query(User).filter(User.id == dep.user_id).first()
+    dep_dict = DepositOut.model_validate(dep).model_dump()
+    dep_dict["user_name"] = user_obj.name if user_obj else "Unknown"
+    dep_dict["transaction_id"] = dep.external_reference if dep.provider == "manual_upi" else None
+    dep_dict["payment_method"] = (dep.metadata_ or {}).get("payment_method") or (dep.provider or "UPI").upper()
+    financial_ws_manager.notify_deposit(dep.user_id, dep_dict, wallet_data=wallet_snap)
+
     return success_response({
         "message": f"Deposit of ₹{dep.amount / 100:.2f} approved and credited successfully",
         "deposit_id": str(dep.id),
@@ -799,6 +808,14 @@ def reject_deposit_endpoint(
         },
     )
     db.commit()
+    user_obj = db.query(User).filter(User.id == dep.user_id).first()
+    dep_dict = DepositOut.model_validate(dep).model_dump()
+    dep_dict["user_name"] = user_obj.name if user_obj else "Unknown"
+    dep_dict["transaction_id"] = dep.external_reference if dep.provider == "manual_upi" else None
+    dep_dict["payment_method"] = (dep.metadata_ or {}).get("payment_method") or (dep.provider or "UPI").upper()
+    dep_dict["reason"] = reason
+    financial_ws_manager.notify_deposit(dep.user_id, dep_dict, wallet_data=None)
+
     return success_response({
         "message": "Deposit marked as rejected",
         "deposit_id": str(dep.id),
@@ -868,6 +885,18 @@ def list_all_withdrawals(
     })
 
 
+def _broadcast_withdrawal_update(db: Session, w: Withdrawal):
+    try:
+        wallet_snap = get_user_wallet_snapshot(db, w.user_id)
+        user_obj = db.query(User).filter(User.id == w.user_id).first()
+        wd = WithdrawalOut.model_validate(w).model_dump()
+        wd["user_name"] = user_obj.name if user_obj else "Unknown"
+        wd["payment_method"] = (w.method or "Bank").upper()
+        financial_ws_manager.notify_withdrawal(w.user_id, wd, wallet_data=wallet_snap)
+    except Exception as exc:
+        logger.warning("Failed to broadcast withdrawal update: %s", exc)
+
+
 @router.post("/withdrawals/{withdrawal_id}/approve")
 def approve_withdrawal_endpoint(
     withdrawal_id: UUID,
@@ -882,6 +911,7 @@ def approve_withdrawal_endpoint(
             metadata={"status": w.status.value},
         )
         db.commit()
+        _broadcast_withdrawal_update(db, w)
         return success_response(WithdrawalOut.model_validate(w).model_dump())
     except ValueError as e:
         return error_response("WITHDRAWAL_ACTION_ERROR", str(e), status_code=400)
@@ -901,6 +931,7 @@ def mark_payment_processing_endpoint(
             metadata={"status": w.status.value},
         )
         db.commit()
+        _broadcast_withdrawal_update(db, w)
         return success_response(WithdrawalOut.model_validate(w).model_dump())
     except ValueError as e:
         return error_response("WITHDRAWAL_ACTION_ERROR", str(e), status_code=400)
@@ -920,6 +951,7 @@ def complete_withdrawal_endpoint(
             metadata={"status": w.status.value},
         )
         db.commit()
+        _broadcast_withdrawal_update(db, w)
         return success_response(WithdrawalOut.model_validate(w).model_dump())
     except ValueError as e:
         return error_response("WITHDRAWAL_ACTION_ERROR", str(e), status_code=400)
@@ -941,6 +973,7 @@ def reject_withdrawal_endpoint(
             metadata={"status": w.status.value, "reason": reason},
         )
         db.commit()
+        _broadcast_withdrawal_update(db, w)
         return success_response(WithdrawalOut.model_validate(w).model_dump())
     except ValueError as e:
         return error_response("WITHDRAWAL_ACTION_ERROR", str(e), status_code=400)
@@ -962,6 +995,7 @@ def fail_withdrawal_endpoint(
             metadata={"status": w.status.value, "reason": reason},
         )
         db.commit()
+        _broadcast_withdrawal_update(db, w)
         return success_response(WithdrawalOut.model_validate(w).model_dump())
     except ValueError as e:
         return error_response("WITHDRAWAL_ACTION_ERROR", str(e), status_code=400)

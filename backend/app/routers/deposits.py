@@ -18,6 +18,7 @@ from ..models.user import User
 from ..models.deposit import Deposit, DepositStatus
 from ..models.payment import PaymentConfiguration
 from ..models.wallet import Wallet
+from ..websocket.transactions_ws import financial_ws_manager, get_user_wallet_snapshot
 
 router = APIRouter(prefix="/deposits", tags=["Deposits"])
 
@@ -134,6 +135,8 @@ def create_manual_deposit(
     response = DepositOut.model_validate(deposit).model_dump()
     response["transaction_id"] = deposit.external_reference
     response["payment_method"] = config.display_name
+    response["user_name"] = current_user.name or current_user.username or "Player"
+    financial_ws_manager.notify_deposit_created(current_user.id, response)
     return success_response(response, status_code=201)
 
 
@@ -201,9 +204,13 @@ def create_deposit(
             response["key_id"] = key_id
         elif provider == "cashfree":
             meta = deposit.metadata_ or {}
-            response["payment_session_id"] = meta.get("payment_session_id")
-            response["environment"] = meta.get("environment", "sandbox" if (active_gw and active_gw.is_sandbox) else "production")
+            session_id = meta.get("payment_session_id") or ""
+            order_id = deposit.provider_order_id or ""
+            environment = meta.get("environment", "sandbox" if (active_gw and active_gw.is_sandbox) else "production")
+            response["payment_session_id"] = session_id
+            response["environment"] = environment
             response["app_id"] = active_gw.api_key if active_gw else ""
+            response["checkout_url"] = f"https://polandexim.com/pay?session_id={session_id}&order_id={order_id}&mode={environment}&amount={deposit.amount}&deposit_id={deposit.id}"
 
         return success_response(
             response,
@@ -244,6 +251,15 @@ def verify_deposit(
         ).model_dump()
 
         response["currency"] = "INR"
+
+        wallet_snap = get_user_wallet_snapshot(db, current_user.id)
+        dep_dict = dict(response)
+        dep_dict["user_name"] = current_user.name or current_user.username or "Player"
+        financial_ws_manager.notify_deposit(
+            current_user.id,
+            dep_dict,
+            wallet_data=wallet_snap
+        )
 
         return success_response(response)
 

@@ -316,6 +316,27 @@ def handle_webhook(
     db.commit()
     db.refresh(deposit)
 
+    try:
+        from ..websocket.transactions_ws import financial_ws_manager, get_user_wallet_snapshot
+        wallet_snap = get_user_wallet_snapshot(db, deposit.user_id)
+        from ..models.user import User
+        user_obj = db.query(User).filter(User.id == deposit.user_id).first()
+        dep_dict = {
+            "id": str(deposit.id),
+            "user_id": str(deposit.user_id),
+            "user_name": user_obj.name if user_obj else "Player",
+            "amount": deposit.amount,
+            "status": deposit.status.value,
+            "provider": normalized_provider,
+            "provider_order_id": deposit.provider_order_id,
+            "provider_payment_id": deposit.provider_payment_id,
+            "payment_method": (deposit.metadata_ or {}).get("payment_method") or normalized_provider.upper(),
+            "created_at": deposit.created_at.isoformat() if deposit.created_at else None,
+        }
+        financial_ws_manager.notify_deposit(deposit.user_id, dep_dict, wallet_data=wallet_snap)
+    except Exception as ws_err:
+        logger.warning("Failed to emit WebSocket for webhook deposit=%s: %s", deposit.id, ws_err)
+
     logger.info(
         "Webhook successfully credited deposit=%s amount=%s",
         deposit.id,

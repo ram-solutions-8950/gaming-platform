@@ -58,6 +58,7 @@ const PokerPage = lazyPage(() => import('./pages/user/Poker'), 'PokerPage');
 const RoulettePage = lazyPage(() => import('./pages/user/Roulette'), 'RoulettePage');
 const ChickenRoadPage = lazyPage(() => import('./pages/user/ChickenRoad'), 'ChickenRoadPage');
 const Triple777Page = lazyPage(() => import('./pages/user/Triple777'), 'Triple777Page');
+const CashfreePayPage = lazyPage(() => import('./pages/user/CashfreePay'), 'CashfreePayPage');
 const GameCatalogPage = lazyPage(() => import('./pages/user/GameCatalog'), 'GameCatalogPage');
 const AdminDashboardPage = lazyPage(() => import('./pages/admin/AdminDashboard'), 'AdminDashboardPage');
 const AdminUsersPage = lazyPage(() => import('./pages/admin/AdminUsers'), 'AdminUsersPage');
@@ -323,6 +324,7 @@ function App() {
         {/* Dedicated standalone APK download routes - completely separate from game/dashboard layouts */}
         <Route path="/download-apk" element={<DownloadPage />} />
         <Route path="/download" element={<DownloadPage />} />
+        <Route path="/pay" element={<CashfreePayPage />} />
 
         <Route element={<PublicLayout />}>
           <Route element={<AuthLayout />}>

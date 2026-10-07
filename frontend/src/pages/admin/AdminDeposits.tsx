@@ -24,6 +24,7 @@ import { SearchInput } from '../../components/common/SearchInput';
 import { RefreshOverlay } from '../../components/common/RefreshOverlay';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import { useRefreshIndicator } from '../../hooks/useRefreshIndicator';
+import { useFinancialSocket } from '../../hooks/useFinancialSocket';
 import { copyToClipboard } from '../../utils/clipboard';
 
 export interface AdminDepositItem {
@@ -285,6 +286,27 @@ export function AdminDepositsPage() {
   useEffect(() => {
     fetchDeposits();
   }, [fetchDeposits]);
+
+  // Real-time financial WebSocket: updates admin deposits table instantly when requests arrive or update
+  useFinancialSocket({
+    channel: 'admin_deposits',
+    onMessage: (data) => {
+      if (data.type === 'deposit_created' || data.type === 'deposit_updated') {
+        if (data.deposit) {
+          setDeposits((prev) => {
+            const exists = prev.some((d) => d.id === data.deposit.id);
+            if (exists) {
+              return prev.map((d) => (d.id === data.deposit.id ? { ...d, ...data.deposit } : d));
+            }
+            return [data.deposit, ...prev];
+          });
+          if (data.type === 'deposit_created') {
+            toast.success(`New deposit request: ₹${(data.deposit.amount / 100).toFixed(2)} from ${data.deposit.user_name || 'player'}`);
+          }
+        }
+      }
+    },
+  });
 
   const handleRefresh = () => runRefresh(fetchDeposits);
 

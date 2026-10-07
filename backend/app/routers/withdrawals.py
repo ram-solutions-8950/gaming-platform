@@ -6,6 +6,7 @@ from ..services import withdrawal_service
 from ..security.permissions import require_user
 from ..utils.responses import success_response, error_response
 from ..models.user import User
+from ..websocket.transactions_ws import financial_ws_manager, get_user_wallet_snapshot
 
 router = APIRouter(prefix="/withdrawals", tags=["Withdrawals"])
 
@@ -16,7 +17,15 @@ def create_withdrawal(data: WithdrawalCreateIn, current_user: User = Depends(req
         w = withdrawal_service.create_withdrawal(
             db, current_user.id, data.amount, data.method, data.destination
         )
-        return success_response(WithdrawalOut.model_validate(w).model_dump(), status_code=201)
+        w_out = WithdrawalOut.model_validate(w).model_dump()
+        w_out["user_name"] = current_user.name or current_user.username or "Player"
+        wallet_snap = get_user_wallet_snapshot(db, current_user.id)
+        financial_ws_manager.notify_withdrawal_created(
+            current_user.id,
+            w_out,
+            wallet_data=wallet_snap
+        )
+        return success_response(w_out, status_code=201)
     except ValueError as e:
         return error_response("WITHDRAWAL_ERROR", str(e))
 
