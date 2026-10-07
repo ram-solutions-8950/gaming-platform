@@ -45,6 +45,9 @@ from ..security.permissions import require_admin, require_super_admin, require_p
 from ..utils.responses import success_response, error_response
 from ..utils.search import normalize_search_term, as_uuid
 from ..middleware.rate_limiter import limiter
+from ..utils.logging import get_logger
+
+logger = get_logger("admin_router")
 
 router = APIRouter(prefix="/admin", tags=["Admin"])
 
