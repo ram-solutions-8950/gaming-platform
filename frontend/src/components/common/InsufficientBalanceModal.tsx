@@ -9,6 +9,15 @@ export function InsufficientBalanceModal() {
   const { isOpen, close, requiredAmount, currentBalance } = useInsufficientBalanceStore();
   const navigate = useNavigate();
 
+  // Every hook must run on every render: React tears the whole app down with
+  // "Rendered more hooks than during the previous render" if a hook sits after
+  // this early return. Keep all hooks above it.
+  useEffect(() => {
+    if (isOpen) {
+      window.dispatchEvent(new Event('wallet-update'));
+    }
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   const handleRecharge = () => {
@@ -28,12 +37,6 @@ export function InsufficientBalanceModal() {
     currentBalance !== undefined
       ? `₹${Number(currentBalance).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
       : null;
-
-  useEffect(() => {
-    if (isOpen) {
-      window.dispatchEvent(new Event('wallet-update'));
-    }
-  }, [isOpen]);
 
   const showBalanceBox =
     (formattedRequired || formattedBalance) &&

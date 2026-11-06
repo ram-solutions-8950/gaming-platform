@@ -2,6 +2,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
+import { AppErrorBoundary } from './components/common/AppErrorBoundary'
 import { lockLandscape } from './utils/nativeOrientation'
 
 // Pages are loaded on demand (see App.tsx). After a web deploy their file names
@@ -29,6 +30,8 @@ if (window.visualViewport) {
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <App />
+    <AppErrorBoundary>
+      <App />
+    </AppErrorBoundary>
   </StrictMode>,
 )
