@@ -8,6 +8,7 @@ from ..models.deposit import Deposit, DepositStatus
 from ..models.transaction import WalletTransactionType
 from ..services.wallet_service import credit_wallet
 from ..utils.logging import get_logger
+from ..utils.locking import lock_one
 
 logger = get_logger("referral")
 
@@ -78,9 +79,7 @@ def check_and_qualify_referral(db: Session, referred_user_id: UUID):
     Called when a user performs a qualifying action (successful first deposit).
     """
     # 1. Lock the referral record to prevent race conditions during state transition
-    referral = db.query(Referral).filter(
-        Referral.referred_user_id == referred_user_id
-    ).with_for_update().first()
+    referral = lock_one(db, Referral, Referral.referred_user_id == referred_user_id)
 
     if not referral:
         return  # No referrer for this user

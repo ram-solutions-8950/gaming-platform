@@ -2,9 +2,8 @@ import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { authService } from '../services/auth';
 import { GlitterRain } from '../components/common/GlitterRain';
-import { useEffect, useState } from 'react';
-import { walletService } from '../services/wallet';
-import type { Wallet } from '../types';
+import { useEffect } from 'react';
+import { useWallet, formatBalance } from '../hooks/useWallet';
 import { LobbyHeader } from '../components/lobby/LobbyHeader';
 import { LobbyBottomNav } from '../components/lobby/LobbyBottomNav';
 import { CasinoLogo } from '../components/common/CasinoLogo';
@@ -30,28 +29,18 @@ export function UserLayout() {
   const { user, setUser } = useAuthStore();
   const navigate = useNavigate();
   const location = useLocation();
-  const [wallet, setWallet] = useState<Wallet | null>(null);
+  const { wallet, status: walletStatus, refresh: refreshWallet } = useWallet();
   const { activeModal, openModal, closeModal } = useRewardStore();
 
   const isDashboard = location.pathname === '/dashboard';
   const isLudo = location.pathname === '/games/ludo';
 
-  const refreshWallet = () => {
-    walletService.getWallet().then(setWallet).catch(() => {});
-  };
-
+  // useWallet owns the polling, focus refresh and wallet-update listener. It
+  // keeps the last known balance when a refresh fails, so a backend stall
+  // shows as stale rather than as an emptied account.
   useEffect(() => {
     refreshWallet();
-    const onFocus = () => refreshWallet();
-    window.addEventListener('focus', onFocus);
-    window.addEventListener('wallet-update', onFocus);
-    const interval = setInterval(refreshWallet, 10000);
-    return () => {
-      window.removeEventListener('focus', onFocus);
-      window.removeEventListener('wallet-update', onFocus);
-      clearInterval(interval);
-    };
-  }, [location.pathname]);
+  }, [location.pathname, refreshWallet]);
 
   const handleLogout = async () => {
     await authService.logout();
@@ -73,7 +62,15 @@ export function UserLayout() {
           <div className="bg-dark-800 rounded-xl p-4 border border-dark-700 shadow-inner">
              <p className="text-xs text-gray-400 mb-1">Total Balance</p>
              <div className="flex items-center justify-between">
-               <span className="text-2xl font-extrabold text-gold-400">₹{wallet?.balance_inr ?? '0.00'}</span>
+               <span
+               className="text-2xl font-extrabold text-gold-400"
+               title={walletStatus === 'stale' ? 'Showing last known balance — reconnecting' : undefined}
+             >
+               ₹{formatBalance(wallet, walletStatus)}
+               {walletStatus === 'stale' && (
+                 <span className="ml-1 align-middle text-xs text-amber-400" aria-label="balance may be out of date">⟳</span>
+               )}
+             </span>
                <button onClick={() => navigate('/deposit')} className="bg-gradient-to-br from-green-500 to-green-600 text-white text-xs px-4 py-1.5 rounded-lg font-bold shadow-md shadow-green-500/20 transition-transform active:scale-95">ADD</button>
              </div>
           </div>
@@ -175,7 +172,7 @@ export function UserLayout() {
       <div className={`flex-1 min-w-0 min-h-0 flex flex-col overflow-x-hidden relative h-dvh max-h-dvh ${isLudo ? 'is-ludo-page' : ''}`}>
         {/* Mobile Header */}
         <div className="2xl:hidden shrink-0 z-30">
-          <LobbyHeader user={user} wallet={wallet} />
+          <LobbyHeader user={user} wallet={wallet} walletStatus={walletStatus} />
         </div>
 
         <main className={

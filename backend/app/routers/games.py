@@ -31,6 +31,10 @@ def _resolve_engine(db: Session, game_id: _UUID | None = None, game_slug: str | 
 
 
 import hashlib
+from ..utils.async_db import in_thread
+from ..utils.logging import get_logger
+
+logger = get_logger("games")
 
 def _obfuscate_bet_id(bet_id: _UUID) -> str:
     """Generate an opaque non-reversible token for public deduplication without exposing internal database UUIDs."""
@@ -140,32 +144,55 @@ async def place_bet(
     db: Session = Depends(get_db),
 ):
     try:
-        engine = _resolve_engine(db, game_id=data.game_id)
-        bet = engine.place_bet(
-            db,
-            user_id=current_user.id,
-            round_id=data.round_id,
-            game_id=data.game_id,
-            prediction=data.prediction,
-            amount=data.amount,
-        )
-        try:
-            await game_ws_manager.broadcast({
+        # The whole blocking section runs in a worker thread: placing a bet
+        # takes a FOR UPDATE lock on the wallet, and doing that on the event
+        # loop stalls every other player's request while it waits. The
+        # response payload is built in the same thread so no lazy load is
+        # left to fire back on the loop.
+        def _place():
+            engine = _resolve_engine(db, game_id=data.game_id)
+            bet = engine.place_bet(
+                db,
+                user_id=current_user.id,
+                round_id=data.round_id,
+                game_id=data.game_id,
+                prediction=data.prediction,
+                amount=data.amount,
+            )
+            # Read every attribute while still on this thread. place_bet
+            # commits, which expires the instance, so touching bet.amount
+            # back on the event loop would issue a fresh blocking SELECT --
+            # exactly what this offload exists to avoid.
+            created = getattr(bet, "created_at", None)
+            broadcast = {
                 "type": "new_bet",
                 "game_slug": engine.slug,
-                "game_id": str(data.game_id) if data.game_id else (str(bet.game_id) if bet.game_id else None),
+                "game_id": (
+                    str(data.game_id)
+                    if data.game_id
+                    else (str(bet.game_id) if bet.game_id else None)
+                ),
                 "round_id": str(data.round_id),
                 "bet": {
                     "id": _obfuscate_bet_id(bet.id),
                     "player_token": _obfuscate_bet_id(bet.user_id),
                     "prediction": bet.prediction.value,
                     "amount": bet.amount,
-                    "created_at": bet.created_at.isoformat() if hasattr(bet, "created_at") and bet.created_at else datetime.now(timezone.utc).isoformat(),
+                    "created_at": (
+                        created.isoformat()
+                        if created
+                        else datetime.now(timezone.utc).isoformat()
+                    ),
                 },
-            })
+            }
+            return GameBetOut.model_validate(bet).model_dump(), broadcast
+
+        bet_payload, broadcast_payload = await in_thread(_place)
+        try:
+            await game_ws_manager.broadcast(broadcast_payload)
         except Exception:
-            pass
-        return success_response(GameBetOut.model_validate(bet).model_dump(), status_code=201)
+            logger.warning("new_bet broadcast failed", exc_info=True)
+        return success_response(bet_payload, status_code=201)
     except ValueError as e:
         return error_response("BET_ERROR", str(e))
 

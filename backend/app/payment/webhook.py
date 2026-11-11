@@ -11,6 +11,7 @@ from ..models.transaction import WalletTransactionType
 from ..services.payment_service import get_provider
 from ..services.wallet_service import credit_wallet
 from ..utils.logging import get_logger
+from ..utils.locking import lock_one
 
 logger = get_logger("webhook")
 
@@ -154,14 +155,11 @@ def handle_webhook(
         }
 
     # 6. Find and LOCK the deposit using Razorpay's order ID.
-    deposit = (
-        db.query(Deposit)
-        .filter(
-            Deposit.provider == normalized_provider,
-            Deposit.provider_order_id == str(provider_order_id),
-        )
-        .with_for_update()
-        .first()
+    deposit = lock_one(
+        db,
+        Deposit,
+        Deposit.provider == normalized_provider,
+        Deposit.provider_order_id == str(provider_order_id),
     )
 
     if not deposit:

@@ -36,6 +36,10 @@ const GAME_ICONS: Record<string, string> = {
 export function AdminDashboardPage() {
   const navigate = useNavigate();
   const [stats, setStats] = useState<DashboardStats | null>(null);
+  // Every tile below falls back to 0 when `stats` is null. Without this flag a
+  // failed fetch renders a dashboard of confident zeros, which reads as "the
+  // business has no players and no money" rather than "the request failed".
+  const [statsError, setStatsError] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -50,8 +54,10 @@ export function AdminDashboardPage() {
     try {
       const data = await adminService.getDashboardStats();
       setStats(data);
+      setStatsError(false);
     } catch (err) {
       console.error('Failed to load dashboard stats:', err);
+      setStatsError(true);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -113,6 +119,26 @@ export function AdminDashboardPage() {
 
   return (
     <div className="space-y-6 max-w-full">
+      {statsError && (
+        <div
+          role="alert"
+          className="flex items-center justify-between gap-4 px-4 py-3 rounded-xl bg-amber-500/10 border border-amber-500/40 text-amber-200 text-sm"
+        >
+          <span>
+            <strong className="font-bold">Could not load dashboard figures.</strong>{' '}
+            {stats
+              ? 'The numbers below are the last values that loaded successfully.'
+              : 'The numbers below are placeholders, not real values.'}
+          </span>
+          <button
+            onClick={handleRefresh}
+            className="shrink-0 px-3 py-1.5 rounded-lg bg-amber-500/20 border border-amber-400/40 font-semibold hover:bg-amber-500/30 transition"
+          >
+            Retry
+          </button>
+        </div>
+      )}
+
       {/* Top Welcome / Header Banner with View Game Analytics & Refresh */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>

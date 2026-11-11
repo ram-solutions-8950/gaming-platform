@@ -33,6 +33,7 @@ from ..services.aviator.engine import (
 )
 from ..services.aviator.models import RoundPhase, BetStatus
 from ..utils.logging import get_logger
+from ..utils.async_db import in_thread
 
 logger = get_logger("aviator_ws")
 
@@ -93,28 +94,51 @@ async def _send(ws: WebSocket, msg: dict) -> None:
 #  Game loop
 # ──────────────────────────────────────────────────────────────
 
+_engine_lock = asyncio.Lock()
+
+
+async def _engine_call(fn, *args, **kwargs):
+    """Run an engine method that needs a session: serialised, and off the loop.
+
+    Two separate hazards are handled here.
+
+    The engine keeps the live round and its bets in memory with no internal
+    locking. Until now that was safe only because every mutation ran straight
+    through on the event loop with no await in between. Once the blocking
+    database work is moved to a worker thread there *is* an await, so a
+    client's place_bet could interleave with the round loop's settlement.
+    ``_engine_lock`` restores that mutual exclusion explicitly.
+
+    The blocking work itself is psycopg2 holding wallet row locks. Left on the
+    event loop it freezes every connected player for its duration, which is
+    the stall that made the whole app look dead and read zero.
+    """
+
+    def _run():
+        db = SessionLocal()
+        try:
+            return fn(db, *args, **kwargs)
+        finally:
+            db.close()
+
+    async with _engine_lock:
+        return await in_thread(_run)
+
+
 async def _game_loop() -> None:
     """
     Infinite loop managing round lifecycle:
       BETTING (10s) → FLYING (variable) → CRASHED → SETTLED → COOLDOWN (3s) → repeat
     """
     logger.info("Aviator game loop started")
-    db = SessionLocal()
     try:
-        aviator_engine.void_unfinished_rounds(db)
+        await _engine_call(aviator_engine.void_unfinished_rounds)
     except Exception as exc:
-        db.rollback()
         logger.error("Could not void unfinished Aviator rounds: %s", exc)
-    finally:
-        db.close()
 
     while True:
         # ── 1. Create round ──
-        db = SessionLocal()
-        try:
-            rnd = aviator_engine.create_round(db)
-        finally:
-            db.close()
+        rnd = await _engine_call(aviator_engine.create_round)
 
         await _broadcast({
             "type": "round_start",
@@ -130,11 +154,7 @@ async def _game_loop() -> None:
         await asyncio.sleep(BETTING_DURATION)
 
         # ── 3. Start flight ──
-        db = SessionLocal()
-        try:
-            aviator_engine.start_flight(db)
-        finally:
-            db.close()
+        await _engine_call(aviator_engine.start_flight)
 
         flight_start_time = rnd.flight_started_at
         crash_time = time_for_multiplier(rnd.crash_point)
@@ -151,20 +171,26 @@ async def _game_loop() -> None:
         # Timed by the wall clock from the same start the multiplier uses, so
         # the loop can't drift past the crash or stop short of it.
         async def _auto_cashouts(at_crash: bool = False) -> None:
-            db = SessionLocal()
-            try:
-                for bet, mult in aviator_engine.process_auto_cashouts(db, at_crash=at_crash):
-                    await _broadcast({
-                        "type": "cashout_broadcast",
-                        "round_id": str(rnd.round_id),
-                        "user_id": str(bet.user_id),
-                        "slot": bet.slot,
-                        "multiplier": round(mult, 2),
-                        "payout": bet.payout,
-                        "auto": True,
-                    })
-            finally:
-                db.close()
+            # Pay out first, holding the engine lock, then broadcast. The
+            # payload is built from values read inside the worker thread so
+            # nothing is re-read from an expired instance afterwards.
+            cashed = await _engine_call(
+                aviator_engine.process_auto_cashouts, at_crash=at_crash
+            )
+            payloads = [
+                {
+                    "type": "cashout_broadcast",
+                    "round_id": str(rnd.round_id),
+                    "user_id": str(bet.user_id),
+                    "slot": bet.slot,
+                    "multiplier": round(mult, 2),
+                    "payout": bet.payout,
+                    "auto": True,
+                }
+                for bet, mult in cashed
+            ]
+            for payload in payloads:
+                await _broadcast(payload)
 
         while True:
             await asyncio.sleep(MULTIPLIER_TICK_INTERVAL)
@@ -191,11 +217,7 @@ async def _game_loop() -> None:
         })
 
         # ── 5. Crash ──
-        db = SessionLocal()
-        try:
-            aviator_engine.crash_round(db)
-        finally:
-            db.close()
+        await _engine_call(aviator_engine.crash_round)
 
         await _broadcast({
             "type": "crash",
@@ -208,11 +230,7 @@ async def _game_loop() -> None:
 
         # ── 6. Settle ──
         await asyncio.sleep(0.5)  # brief pause for clients to see crash
-        db = SessionLocal()
-        try:
-            aviator_engine.settle_round(db)
-        finally:
-            db.close()
+        await _engine_call(aviator_engine.settle_round)
 
         await _broadcast({
             "type": "settled",
@@ -223,7 +241,8 @@ async def _game_loop() -> None:
         })
 
         # ── 7. Cooldown ──
-        aviator_engine.rotate_seed_if_needed()
+        async with _engine_lock:
+            aviator_engine.rotate_seed_if_needed()
         await asyncio.sleep(COOLDOWN_DURATION)
 
 
@@ -307,33 +326,55 @@ async def _handle_place_bet(
         await _send(ws, {"type": "error", "message": "Invalid bet parameters"})
         return
 
-    db = SessionLocal()
     try:
-        bet = aviator_engine.place_bet(
-            db, user_id, slot, amount,
-            auto_cashout=auto_cashout,
-            action_id=action_id,
+        accepted, broadcast = await _place_bet_locked(
+            user_id, slot, amount, auto_cashout, action_id
         )
-        await _send(ws, {
-            "type": "bet_accepted",
-            "slot": bet.slot,
-            "amount": bet.amount,
-            "auto_cashout": bet.auto_cashout,
-            "action_id": action_id,
-        })
-        # Broadcast to all
-        await _broadcast({
-            "type": "new_bet",
-            "round_id": str(aviator_engine.current_round.round_id) if aviator_engine.current_round else None,
-            "user_id": str(user_id),
-            "slot": slot,
-            "amount": amount,
-            "auto_cashout": bet.auto_cashout,
-        })
     except Exception as e:
         await _send(ws, {"type": "error", "message": str(e), "action_id": action_id})
-    finally:
-        db.close()
+        return
+
+    await _send(ws, accepted)
+    await _broadcast(broadcast)
+
+
+async def _place_bet_locked(user_id, slot, amount, auto_cashout, action_id):
+    """Debit the stake and register the bet, serialised against the round loop.
+
+    The round id is captured inside the lock: read afterwards it could belong
+    to the *next* round, which would mislabel the bet for every client.
+    """
+    async with _engine_lock:
+        def _run():
+            db = SessionLocal()
+            try:
+                bet = aviator_engine.place_bet(
+                    db, user_id, slot, amount,
+                    auto_cashout=auto_cashout,
+                    action_id=action_id,
+                )
+                current = aviator_engine.current_round
+                return (
+                    {
+                        "type": "bet_accepted",
+                        "slot": bet.slot,
+                        "amount": bet.amount,
+                        "auto_cashout": bet.auto_cashout,
+                        "action_id": action_id,
+                    },
+                    {
+                        "type": "new_bet",
+                        "round_id": str(current.round_id) if current else None,
+                        "user_id": str(user_id),
+                        "slot": slot,
+                        "amount": amount,
+                        "auto_cashout": bet.auto_cashout,
+                    },
+                )
+            finally:
+                db.close()
+
+        return await in_thread(_run)
 
 
 async def _handle_cashout(
@@ -349,27 +390,50 @@ async def _handle_cashout(
         await _send(ws, {"type": "error", "message": "Invalid slot"})
         return
 
-    db = SessionLocal()
     try:
-        bet, mult = aviator_engine.cashout(db, user_id, slot, action_id=action_id)
-        await _send(ws, {
-            "type": "cashout_confirmed",
-            "slot": bet.slot,
-            "multiplier": round(mult, 2),
-            "payout": bet.payout,
-            "action_id": action_id,
-        })
-        # Broadcast to all
-        await _broadcast({
-            "type": "cashout_broadcast",
-            "round_id": str(aviator_engine.current_round.round_id) if aviator_engine.current_round else None,
-            "user_id": str(user_id),
-            "slot": slot,
-            "multiplier": round(mult, 2),
-            "payout": bet.payout,
-            "auto": False,
-        })
+        confirmed, broadcast = await _cashout_locked(user_id, slot, action_id)
     except Exception as e:
         await _send(ws, {"type": "error", "message": str(e), "action_id": action_id})
-    finally:
-        db.close()
+        return
+
+    await _send(ws, confirmed)
+    await _broadcast(broadcast)
+
+
+async def _cashout_locked(user_id, slot, action_id):
+    """Credit the payout, serialised against the round loop.
+
+    Serialisation matters most here: without it a manual cashout could be
+    granted while the loop is already crashing the round, paying out a bet
+    that should have been lost.
+    """
+    async with _engine_lock:
+        def _run():
+            db = SessionLocal()
+            try:
+                bet, mult = aviator_engine.cashout(
+                    db, user_id, slot, action_id=action_id
+                )
+                current = aviator_engine.current_round
+                return (
+                    {
+                        "type": "cashout_confirmed",
+                        "slot": bet.slot,
+                        "multiplier": round(mult, 2),
+                        "payout": bet.payout,
+                        "action_id": action_id,
+                    },
+                    {
+                        "type": "cashout_broadcast",
+                        "round_id": str(current.round_id) if current else None,
+                        "user_id": str(user_id),
+                        "slot": slot,
+                        "multiplier": round(mult, 2),
+                        "payout": bet.payout,
+                        "auto": False,
+                    },
+                )
+            finally:
+                db.close()
+
+        return await in_thread(_run)

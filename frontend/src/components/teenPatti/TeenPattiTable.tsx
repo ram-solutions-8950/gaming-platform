@@ -31,7 +31,7 @@ export const TeenPattiTable: React.FC<TeenPattiTableProps> = ({
     walletService
       .getWallet()
       .then((w) => {
-        setWalletBalance(w.balance || 0);
+        setWalletBalance(w.balance ?? null);
         window.dispatchEvent(new Event('wallet-update'));
       })
       .catch(() => {});

@@ -6,6 +6,7 @@ from ..models.wallet import Wallet
 from ..models.transaction import WalletTransaction, WalletTransactionType, WalletTransactionStatus
 from ..utils.logging import get_logger
 from ..utils.responses import error_response
+from ..utils.locking import lock_one
 
 logger = get_logger("wallet")
 
@@ -15,12 +16,16 @@ def get_balance(db: Session, user_id: UUID) -> Optional[Wallet]:
 
 
 def _lock_wallet(db: Session, user_id: UUID) -> Wallet:
-    """Acquire a row-level lock on the wallet to prevent race conditions."""
-    wallet = (
-        db.execute(
-            select(Wallet).where(Wallet.user_id == user_id).with_for_update()
-        ).scalar_one_or_none()
-    )
+    """Acquire a row-level lock on the wallet to prevent race conditions.
+
+    ``populate_existing`` is essential: callers routinely read the wallet
+    earlier in the same transaction (a balance check before placing a bet),
+    which puts it in the session's identity map. Without it SQLAlchemy takes
+    the row lock but hands back the *cached* instance, so the arithmetic below
+    runs on a balance that a concurrent settlement has already superseded and
+    the commit silently discards that credit.
+    """
+    wallet = lock_one(db, Wallet, Wallet.user_id == user_id)
     if not wallet:
         raise ValueError("Wallet not found")
     return wallet

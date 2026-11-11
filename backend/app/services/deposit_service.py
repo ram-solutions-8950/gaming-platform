@@ -10,6 +10,7 @@ from ..models.payment import PaymentConfiguration
 from ..models.transaction import WalletTransactionType
 from ..services.payment_service import get_provider, get_active_gateway_config
 from ..services.wallet_service import credit_wallet
+from ..utils.locking import lock_one
 
 
 def create_deposit(
@@ -127,14 +128,11 @@ def verify_deposit_payment(
     The order must match the server-side Deposit record.
     """
 
-    deposit = (
-        db.query(Deposit)
-        .filter(
-            Deposit.id == deposit_id,
-            Deposit.user_id == user_id,
-        )
-        .with_for_update()
-        .first()
+    deposit = lock_one(
+        db,
+        Deposit,
+        Deposit.id == deposit_id,
+        Deposit.user_id == user_id,
     )
 
     if not deposit:

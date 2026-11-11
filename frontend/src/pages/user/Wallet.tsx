@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Wallet as WalletIcon,
@@ -119,7 +119,10 @@ export function WalletPage() {
   const [activeFilter, setActiveFilter] = useState<FilterTab>('ALL');
   const [selectedTx, setSelectedTx] = useState<WalletTransaction | null>(null);
 
-  useEffect(() => {
+  const [loadFailed, setLoadFailed] = useState(false);
+
+  const loadWallet = useCallback(() => {
+    setLoadFailed(false);
     Promise.all([walletService.getWallet(), walletService.getTransactions(1, 50)])
       .then(([w, t]) => {
         setWallet(w);
@@ -127,9 +130,16 @@ export function WalletPage() {
       })
       .catch((err) => {
         console.error('Failed to load wallet data:', err);
+        // Never fall through to rendering ₹0.00 here: an unreachable backend
+        // must not be shown as an emptied wallet.
+        setLoadFailed(true);
       })
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    loadWallet();
+  }, [loadWallet]);
 
   const filteredTxs = txs.filter((tx) => {
     if (activeFilter === 'DEPOSITS') {
@@ -191,14 +201,31 @@ export function WalletPage() {
           </div>
 
           <div className="casino-balance-amount-row">
-            <span className="casino-balance-currency">₹</span>
-            <span className="casino-balance-number">
-              {wallet?.balance_inr ?? '0.00'}
-            </span>
+            {wallet ? (
+              <>
+                <span className="casino-balance-currency">₹</span>
+                <span className="casino-balance-number">{wallet.balance_inr}</span>
+              </>
+            ) : (
+              <span className="casino-balance-number">
+                {loadFailed ? '—' : '…'}
+              </span>
+            )}
           </div>
 
           <p className="casino-balance-paisa">
-            Balance in paisa: {wallet?.balance ?? 0}
+            {wallet ? (
+              <>Balance in paisa: {wallet.balance}</>
+            ) : loadFailed ? (
+              <>
+                Couldn't load your balance.{' '}
+                <button type="button" className="underline" onClick={loadWallet}>
+                  Retry
+                </button>
+              </>
+            ) : (
+              <>Loading…</>
+            )}
           </p>
         </div>
 

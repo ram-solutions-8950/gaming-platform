@@ -244,7 +244,7 @@ export default function GameTable({
     walletService
       .getWallet()
       .then((w) => {
-        setWalletBalance(w.balance || 0);
+        setWalletBalance(w.balance ?? null);
         window.dispatchEvent(new Event("wallet-update"));
       })
       .catch(() => {});
@@ -253,7 +253,7 @@ export default function GameTable({
   useEffect(() => {
     refreshWallet();
     const onWalletUpdate = () => {
-      walletService.getWallet().then((w) => setWalletBalance(w.balance || 0)).catch(() => {});
+      walletService.getWallet().then((w) => setWalletBalance(w.balance ?? null)).catch(() => {});
     };
     window.addEventListener("wallet-update", onWalletUpdate);
     const timer = setInterval(refreshWallet, 5000);

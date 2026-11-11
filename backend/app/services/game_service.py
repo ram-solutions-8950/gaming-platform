@@ -207,7 +207,7 @@ def place_bet(
     # Lock the round to verify it is still in BETTING status
     game_round = (
         db.execute(
-            select(GameRound).where(GameRound.id == round_id).with_for_update()
+            select(GameRound).where(GameRound.id == round_id).with_for_update().execution_options(populate_existing=True)
         ).scalar_one_or_none()
     )
     if not game_round:
@@ -277,7 +277,7 @@ def settle_round(db: Session, round_id: UUID) -> GameRound:
     # Lock the round row
     game_round = (
         db.execute(
-            select(GameRound).where(GameRound.id == round_id).with_for_update()
+            select(GameRound).where(GameRound.id == round_id).with_for_update().execution_options(populate_existing=True)
         ).scalar_one_or_none()
     )
     if not game_round:
@@ -352,7 +352,7 @@ def lock_round_for_calculation(db: Session, round_id: UUID) -> GameRound:
     """Transition a BETTING round to CALCULATING status."""
     game_round = (
         db.execute(
-            select(GameRound).where(GameRound.id == round_id).with_for_update()
+            select(GameRound).where(GameRound.id == round_id).with_for_update().execution_options(populate_existing=True)
         ).scalar_one_or_none()
     )
     if not game_round:

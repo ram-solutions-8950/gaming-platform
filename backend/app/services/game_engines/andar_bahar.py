@@ -282,7 +282,7 @@ class AndarBaharEngine(GameEngine):
         bet_key = pred_upper.lower()
 
         round_row = db.execute(
-            select(GameRound).where(GameRound.id == round_id).with_for_update()
+            select(GameRound).where(GameRound.id == round_id).with_for_update().execution_options(populate_existing=True)
         ).scalar_one_or_none()
         if not round_row:
             raise ValueError("Round not found")
@@ -342,7 +342,7 @@ class AndarBaharEngine(GameEngine):
 
     def lock_round_for_calculation(self, db: Session, round_id: UUID) -> GameRound:
         rd = db.execute(
-            select(GameRound).where(GameRound.id == round_id).with_for_update()
+            select(GameRound).where(GameRound.id == round_id).with_for_update().execution_options(populate_existing=True)
         ).scalar_one_or_none()
         if not rd:
             raise ValueError("Round not found")
@@ -360,7 +360,7 @@ class AndarBaharEngine(GameEngine):
         predetermined_deal: Optional[dict] = None,
     ) -> GameRound:
         rd = db.execute(
-            select(GameRound).where(GameRound.id == round_id).with_for_update()
+            select(GameRound).where(GameRound.id == round_id).with_for_update().execution_options(populate_existing=True)
         ).scalar_one_or_none()
         if not rd:
             raise ValueError("Round not found")

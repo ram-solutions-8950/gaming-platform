@@ -11,6 +11,7 @@ from pathlib import Path
 from .config import settings
 from .utils.exceptions import http_exception_handler, validation_exception_handler
 from .middleware.rate_limiter import limiter
+from .utils.logging import configure_logging, get_logger
 from .routers import auth, users, wallet, transactions, deposits, withdrawals, payments, admin, fees, games, referral, rewards
 from .services.game_engine import start_engine, stop_engine
 from .websocket.manager import game_ws_manager
@@ -19,6 +20,8 @@ from .websocket.manager import game_ws_manager
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup: initialize DB tables & default rewards, launch the game engine. Shutdown: cancel it."""
+    configure_logging()
+    logger = get_logger("startup")
     try:
         from .database import engine, SessionLocal
         from .models.reward import Base
@@ -27,6 +30,9 @@ async def lifespan(app: FastAPI):
         # pending migration also creates, making the migration fail.
         from .migrations_runner import run_migrations
         run_migrations()
+        # Alembic's fileConfig reaches into the logging tree; re-assert ours
+        # so request and error logs keep flowing after startup.
+        configure_logging()
 
         Base.metadata.create_all(bind=engine)
         from .services.reward_service import seed_default_reward_configs
@@ -82,8 +88,14 @@ async def lifespan(app: FastAPI):
                     config={"round_duration_seconds": 27, "betting_duration_seconds": 15},
                 ))
                 db.commit()
-    except Exception as e:
-        pass
+    except Exception:
+        # Never swallow this silently: a failed migration or seed leaves the
+        # service running against a schema it does not expect, and that shows
+        # up later as corrupted money rather than as a failed boot.
+        logger.critical("STARTUP FAILED - service is running degraded", exc_info=True)
+        app.state.startup_error = True
+    else:
+        app.state.startup_error = False
     start_engine(broadcast_fn=game_ws_manager.broadcast)
     yield
     stop_engine()
@@ -183,5 +195,12 @@ app.mount("/api/v1/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="api_u
 
 @app.get("/api/v1/health", tags=["Health"])
 async def health_check():
-    return {"success": True, "data": {"status": "ok", "environment": settings.ENVIRONMENT}}
+    degraded = getattr(app.state, "startup_error", False)
+    return {
+        "success": True,
+        "data": {
+            "status": "degraded" if degraded else "ok",
+            "environment": settings.ENVIRONMENT,
+        },
+    }
 

@@ -26,6 +26,7 @@ from ..models.chicken_road import ChickenRoadRound, ChickenRoadRoundStatus as Ro
 from ..services import wallet_service
 from ..services.settlement_service import calculate_winning_settlement, settle_winning_bet
 from ..utils.responses import success_response
+from ..utils.locking import lock_one
 
 router = APIRouter(prefix="/games/chicken-road", tags=["Chicken Road"])
 
@@ -73,11 +74,11 @@ def _lock_active_round(db: Session, round_id: str, user: User) -> ChickenRoadRou
         rid = uuid.UUID(str(round_id))
     except ValueError:
         raise _round_not_found()
-    rnd = (
-        db.query(ChickenRoadRound)
-        .filter(ChickenRoadRound.id == rid, ChickenRoadRound.user_id == user.id)
-        .with_for_update()
-        .first()
+    rnd = lock_one(
+        db,
+        ChickenRoadRound,
+        ChickenRoadRound.id == rid,
+        ChickenRoadRound.user_id == user.id,
     )
     if not rnd or rnd.status != RoundStatus.ACTIVE:
         raise _round_not_found()

@@ -36,6 +36,15 @@ class Settings(BaseSettings):
     AUTO_MIGRATE: bool = True
     REDIS_URL: str = "redis://localhost:6379/0"
 
+    # Connection pool. Keep (DB_POOL_SIZE + DB_MAX_OVERFLOW) x worker count
+    # comfortably under the database's max_connections.
+    DB_POOL_SIZE: int = 20
+    DB_MAX_OVERFLOW: int = 30
+    DB_POOL_TIMEOUT: int = 10     # seconds to wait for a free connection
+    DB_POOL_RECYCLE: int = 1800   # recycle connections every 30 minutes
+
+    LOG_LEVEL: str = "INFO"
+
     JWT_SECRET: str = "change-me-in-production"
     JWT_REFRESH_SECRET: str = "refresh-change-me-in-production"
     JWT_ALGORITHM: str = "HS256"

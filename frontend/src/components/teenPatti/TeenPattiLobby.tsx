@@ -31,7 +31,7 @@ export const TeenPattiLobby: React.FC<TeenPattiLobbyProps> = ({ onJoinTable }) =
   const fetchWallet = async () => {
     try {
       const w = await walletService.getWallet();
-      setWalletBalance(w.balance || 0);
+      setWalletBalance(w.balance ?? null);
     } catch (e) {
       console.error('Failed to load wallet balance', e);
     }

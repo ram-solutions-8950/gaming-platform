@@ -8,6 +8,7 @@ from ..services import user_service
 from ..security.permissions import require_user
 from ..utils.responses import success_response, error_response
 from ..models.user import User
+from ..utils.async_db import in_thread
 
 router = APIRouter(prefix="/users", tags=["Users"])
 
@@ -54,9 +55,16 @@ async def upload_my_avatar(
 
     filename = f"{current_user.id}_{uuid.uuid4().hex[:8]}{ext}"
     dest = AVATAR_DIR / filename
-    with open(dest, "wb") as f:
-        f.write(contents)
-
     avatar_url = f"/api/v1/uploads/avatars/{filename}"
-    updated = user_service.update_user_profile(db, current_user, avatar_url=avatar_url)
-    return success_response(UserOut.model_validate(updated).model_dump())
+
+    # Writing the file and updating the row both block; keep them off the
+    # event loop so an upload cannot hold up live game traffic.
+    def _persist():
+        with open(dest, "wb") as f:
+            f.write(contents)
+        updated = user_service.update_user_profile(
+            db, current_user, avatar_url=avatar_url
+        )
+        return UserOut.model_validate(updated).model_dump()
+
+    return success_response(await in_thread(_persist))

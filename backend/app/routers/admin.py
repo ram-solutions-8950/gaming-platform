@@ -47,6 +47,7 @@ from ..websocket.transactions_ws import financial_ws_manager, get_user_wallet_sn
 from ..utils.search import normalize_search_term, as_uuid
 from ..middleware.rate_limiter import limiter
 from ..utils.logging import get_logger
+from ..utils.async_db import in_thread
 
 logger = get_logger("admin_router")
 
@@ -1165,96 +1166,107 @@ async def upload_qr_code(
     # ---------------------------------------------------------
     # Validate that the image contains a recognizable QR code
     # ---------------------------------------------------------
-    try:
-        import cv2
-        import numpy as np
-        
-        nparr = np.frombuffer(content, np.uint8)
-        img_raw = cv2.imdecode(nparr, cv2.IMREAD_UNCHANGED)
-        if img_raw is None:
-            return error_response("INVALID_IMAGE", "Could not decode image data", status_code=400)
-
-        h, w = img_raw.shape[:2]
-        if h < 29 or w < 29:
-            return error_response("NO_QR_CODE", "Uploaded image does not contain a readable QR code.", status_code=400)
-
-        # Handle alpha channel (composite over white background)
-        if len(img_raw.shape) == 3 and img_raw.shape[2] == 4:
-            alpha = img_raw[:, :, 3] / 255.0
-            bgr = img_raw[:, :, :3]
-            white = np.ones_like(bgr, dtype=np.uint8) * 255
-            img = (bgr * alpha[:, :, None] + white * (1.0 - alpha[:, :, None])).astype(np.uint8)
-        elif len(img_raw.shape) == 3:
-            img = img_raw
-        else:
-            img = cv2.cvtColor(img_raw, cv2.COLOR_GRAY2BGR)
-
-        is_qr = False
-
-        # 1. Fast check with pyzbar (extremely accurate on standard and inverted QRs)
+    # OpenCV QR detection is heavy CPU work -- multi-scale resizing and
+    # several threshold passes. Running it on the event loop freezes every
+    # player's connection for the duration, so it goes to a worker thread.
+    # The helper returns a ready error response, or None when the image is
+    # a valid QR code.
+    def _validate_qr():
         try:
-            import pyzbar.pyzbar as pyzbar
-            decoded = pyzbar.decode(img)
-            if decoded:
-                is_qr = True
-        except Exception:
-            pass
+            import cv2
+            import numpy as np
+        
+            nparr = np.frombuffer(content, np.uint8)
+            img_raw = cv2.imdecode(nparr, cv2.IMREAD_UNCHANGED)
+            if img_raw is None:
+                return error_response("INVALID_IMAGE", "Could not decode image data", status_code=400)
 
-        # 2. Multi-scale & multi-filter detection with OpenCV
-        if not is_qr:
-            detector = cv2.QRCodeDetector()
-            scales = [1.0]
-            max_dim = max(h, w)
-            if max_dim > 1000:
-                scales.append(800.0 / max_dim)
-            if max_dim > 600:
-                scales.append(500.0 / max_dim)
+            h, w = img_raw.shape[:2]
+            if h < 29 or w < 29:
+                return error_response("NO_QR_CODE", "Uploaded image does not contain a readable QR code.", status_code=400)
 
-            for s in scales:
-                c = img if s == 1.0 else cv2.resize(img, (int(w * s), int(h * s)), interpolation=cv2.INTER_AREA)
+            # Handle alpha channel (composite over white background)
+            if len(img_raw.shape) == 3 and img_raw.shape[2] == 4:
+                alpha = img_raw[:, :, 3] / 255.0
+                bgr = img_raw[:, :, :3]
+                white = np.ones_like(bgr, dtype=np.uint8) * 255
+                img = (bgr * alpha[:, :, None] + white * (1.0 - alpha[:, :, None])).astype(np.uint8)
+            elif len(img_raw.shape) == 3:
+                img = img_raw
+            else:
+                img = cv2.cvtColor(img_raw, cv2.COLOR_GRAY2BGR)
 
-                # A. detectAndDecode
-                data, bbox, _ = detector.detectAndDecode(c)
-                if (bbox is not None and len(bbox) > 0) or bool(data):
+            is_qr = False
+
+            # 1. Fast check with pyzbar (extremely accurate on standard and inverted QRs)
+            try:
+                import pyzbar.pyzbar as pyzbar
+                decoded = pyzbar.decode(img)
+                if decoded:
                     is_qr = True
-                    break
+            except Exception:
+                pass
 
-                # B. detect only (locates QR code pattern even with central logos)
-                ret, bbox = detector.detect(c)
-                if ret and bbox is not None and len(bbox) > 0:
-                    is_qr = True
-                    break
+            # 2. Multi-scale & multi-filter detection with OpenCV
+            if not is_qr:
+                detector = cv2.QRCodeDetector()
+                scales = [1.0]
+                max_dim = max(h, w)
+                if max_dim > 1000:
+                    scales.append(800.0 / max_dim)
+                if max_dim > 600:
+                    scales.append(500.0 / max_dim)
 
-                # C. detectMulti
-                ret_m, _, points, _ = detector.detectAndDecodeMulti(c)
-                if ret_m and points is not None and len(points) > 0:
-                    is_qr = True
-                    break
+                for s in scales:
+                    c = img if s == 1.0 else cv2.resize(img, (int(w * s), int(h * s)), interpolation=cv2.INTER_AREA)
 
-                # D. Otsu thresholding for low-contrast images
-                gray = cv2.cvtColor(c, cv2.COLOR_BGR2GRAY)
-                _, thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
-                ret_t, bbox_t = detector.detect(thresh)
-                if ret_t and bbox_t is not None and len(bbox_t) > 0:
-                    is_qr = True
-                    break
+                    # A. detectAndDecode
+                    data, bbox, _ = detector.detectAndDecode(c)
+                    if (bbox is not None and len(bbox) > 0) or bool(data):
+                        is_qr = True
+                        break
 
-                # E. Adaptive thresholding
-                adapt = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
-                ret_a, bbox_a = detector.detect(adapt)
-                if ret_a and bbox_a is not None and len(bbox_a) > 0:
-                    is_qr = True
-                    break
+                    # B. detect only (locates QR code pattern even with central logos)
+                    ret, bbox = detector.detect(c)
+                    if ret and bbox is not None and len(bbox) > 0:
+                        is_qr = True
+                        break
 
-        if not is_qr:
-            return error_response("NO_QR_CODE", "Uploaded image does not contain a readable QR code.", status_code=400)
+                    # C. detectMulti
+                    ret_m, _, points, _ = detector.detectAndDecodeMulti(c)
+                    if ret_m and points is not None and len(points) > 0:
+                        is_qr = True
+                        break
+
+                    # D. Otsu thresholding for low-contrast images
+                    gray = cv2.cvtColor(c, cv2.COLOR_BGR2GRAY)
+                    _, thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
+                    ret_t, bbox_t = detector.detect(thresh)
+                    if ret_t and bbox_t is not None and len(bbox_t) > 0:
+                        is_qr = True
+                        break
+
+                    # E. Adaptive thresholding
+                    adapt = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
+                    ret_a, bbox_a = detector.detect(adapt)
+                    if ret_a and bbox_a is not None and len(bbox_a) > 0:
+                        is_qr = True
+                        break
+
+            if not is_qr:
+                return error_response("NO_QR_CODE", "Uploaded image does not contain a readable QR code.", status_code=400)
             
-    except ImportError:
-        # Fallback if cv2 isn't installed (though we added it to requirements)
-        logger.warning("cv2 not installed, skipping QR validation")
-        pass
-    except Exception as e:
-        return error_response("QR_VALIDATION_ERROR", f"Error validating QR code: {str(e)}", status_code=400)
+        except ImportError:
+            # Fallback if cv2 isn't installed (though we added it to requirements)
+            logger.warning("cv2 not installed, skipping QR validation")
+            return None
+        except Exception as e:
+            return error_response("QR_VALIDATION_ERROR", f"Error validating QR code: {str(e)}", status_code=400)
+        return None
+
+    qr_error = await in_thread(_validate_qr)
+    if qr_error is not None:
+        return qr_error
 
     # Generate safe filename — no user-controlled path components
     safe_name = f"qr_{secrets.token_hex(16)}{ext}"
@@ -1266,31 +1278,49 @@ async def upload_qr_code(
     if not str(dest.resolve()).startswith(str(upload_dir.resolve())):
         return error_response("SECURITY_ERROR", "Invalid file path", status_code=400)
 
-    with open(dest, "wb") as f:
-        f.write(content)
+    def _persist():
+        with open(dest, "wb") as f:
+            f.write(content)
+        _cleanup_old_qr(config.qr_code_reference, upload_dir)
+        qr_url = f"/api/v1/uploads/qr/{safe_name}"
+        config.qr_code_reference = qr_url
+        audit_service.log_action(
+            db, action="PAYMENT_QR_UPLOAD", actor_id=admin.id,
+            entity_type="payment_configuration", entity_id=str(config_id),
+            metadata={
+                "qr_url": qr_url,
+                "original_filename": original_name,
+                "size_bytes": len(content),
+            },
+        )
+        db.commit()
+        db.refresh(config)
+        return qr_url
 
-    # Delete old QR file if it exists
-    old_ref = config.qr_code_reference
-    if old_ref:
-        old_name = old_ref.split("/")[-1]
-        old_path = upload_dir / old_name
-        if old_path.exists() and str(old_path.resolve()).startswith(str(upload_dir.resolve())):
-            try:
-                old_path.unlink()
-            except OSError:
-                pass
+    return success_response({"qr_code_reference": await in_thread(_persist)})
 
-    # Store only the relative URL path, not filesystem path
-    qr_url = f"/api/v1/uploads/qr/{safe_name}"
-    config.qr_code_reference = qr_url
-    audit_service.log_action(
-        db, action="PAYMENT_QR_UPLOAD", actor_id=admin.id,
-        entity_type="payment_configuration", entity_id=str(config_id),
-        metadata={"qr_url": qr_url, "original_filename": original_name, "size_bytes": len(content)},
-    )
-    db.commit()
-    db.refresh(config)
-    return success_response({"qr_code_reference": qr_url})
+
+def _cleanup_old_qr(old_ref, upload_dir) -> None:
+    """Remove the QR image a configuration previously pointed at.
+
+    Path-checked before unlinking so a tampered reference cannot delete
+    anything outside the upload directory. Failure to delete is not fatal:
+    the new image is already written and recorded.
+    """
+    if not old_ref:
+        return
+    old_path = upload_dir / str(old_ref).split("/")[-1]
+    try:
+        resolved = old_path.resolve()
+    except OSError:
+        return
+    if not str(resolved).startswith(str(upload_dir.resolve())):
+        return
+    if resolved.exists():
+        try:
+            resolved.unlink()
+        except OSError:
+            logger.warning("could not delete old QR image %s", resolved)
 
 
 # -- Wallet Adjustments ---------------------------------------------------------

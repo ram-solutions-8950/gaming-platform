@@ -22,6 +22,7 @@ from ..models.transaction import WalletTransaction, WalletTransactionType, Walle
 from ..models.deposit import Deposit, DepositStatus
 from ..services import wallet_service, audit_service
 from ..utils.logging import get_logger
+from ..utils.locking import lock_one
 
 logger = get_logger("rewards")
 
@@ -237,7 +238,7 @@ def claim_7day_reward(db: Session, user_id: UUID, day_number: int) -> Dict[str, 
     if not check_user_qualifying_bet(db, user_id, min_bet_paisa):
         raise ValueError(f"Place at least ₹{min_bet_paisa / 100:.0f} bet in any game to unlock 7-Day Rewards.")
 
-    profile = db.query(UserRewardProfile).filter(UserRewardProfile.user_id == user_id).with_for_update().first()
+    profile = lock_one(db, UserRewardProfile, UserRewardProfile.user_id == user_id)
     if not profile:
         profile = get_or_create_user_reward_profile(db, user_id)
 
@@ -353,7 +354,7 @@ def get_lucky_spin_status(db: Session, user_id: UUID) -> Dict[str, Any]:
 
 
 def execute_lucky_spin(db: Session, user_id: UUID) -> Dict[str, Any]:
-    profile = db.query(UserRewardProfile).filter(UserRewardProfile.user_id == user_id).with_for_update().first()
+    profile = lock_one(db, UserRewardProfile, UserRewardProfile.user_id == user_id)
     if not profile:
         profile = get_or_create_user_reward_profile(db, user_id)
 

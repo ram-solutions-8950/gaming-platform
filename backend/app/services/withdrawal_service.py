@@ -13,6 +13,7 @@ from ..models.user import User
 from ..services.wallet_service import debit_wallet, credit_wallet
 from ..payment.providers.razorpayx import RazorpayXPayoutProvider
 from ..utils.logging import get_logger
+from ..utils.locking import lock_one
 
 logger = get_logger("withdrawal")
 
@@ -121,7 +122,7 @@ def create_withdrawal(
 
 
 def approve_withdrawal(db: Session, withdrawal_id: UUID, admin_id: UUID) -> Withdrawal:
-    withdrawal = db.query(Withdrawal).filter(Withdrawal.id == withdrawal_id).with_for_update().first()
+    withdrawal = lock_one(db, Withdrawal, Withdrawal.id == withdrawal_id)
     if not withdrawal:
         raise ValueError("Withdrawal not found")
     if withdrawal.status != WithdrawalStatus.PENDING:
@@ -139,7 +140,7 @@ def approve_withdrawal(db: Session, withdrawal_id: UUID, admin_id: UUID) -> With
 
 
 def mark_payment_processing(db: Session, withdrawal_id: UUID, admin_id: UUID) -> Withdrawal:
-    withdrawal = db.query(Withdrawal).filter(Withdrawal.id == withdrawal_id).with_for_update().first()
+    withdrawal = lock_one(db, Withdrawal, Withdrawal.id == withdrawal_id)
     if not withdrawal:
         raise ValueError("Withdrawal not found")
     if withdrawal.status != WithdrawalStatus.APPROVED:
@@ -170,7 +171,7 @@ def mark_payment_processing(db: Session, withdrawal_id: UUID, admin_id: UUID) ->
 
 
 def complete_withdrawal(db: Session, withdrawal_id: UUID, admin_id: UUID) -> Withdrawal:
-    withdrawal = db.query(Withdrawal).filter(Withdrawal.id == withdrawal_id).with_for_update().first()
+    withdrawal = lock_one(db, Withdrawal, Withdrawal.id == withdrawal_id)
     if not withdrawal:
         raise ValueError("Withdrawal not found")
     if withdrawal.status != WithdrawalStatus.PROCESSING:
@@ -210,7 +211,7 @@ def complete_withdrawal(db: Session, withdrawal_id: UUID, admin_id: UUID) -> Wit
 
 
 def reject_withdrawal(db: Session, withdrawal_id: UUID, admin_id: UUID, reason: Optional[str] = None) -> Withdrawal:
-    withdrawal = db.query(Withdrawal).filter(Withdrawal.id == withdrawal_id).with_for_update().first()
+    withdrawal = lock_one(db, Withdrawal, Withdrawal.id == withdrawal_id)
     if not withdrawal:
         raise ValueError("Withdrawal not found")
     if withdrawal.status not in (WithdrawalStatus.PENDING, WithdrawalStatus.APPROVED):
@@ -251,7 +252,7 @@ def reject_withdrawal(db: Session, withdrawal_id: UUID, admin_id: UUID, reason: 
 
 
 def fail_withdrawal(db: Session, withdrawal_id: UUID, admin_id: UUID, reason: Optional[str] = None) -> Withdrawal:
-    withdrawal = db.query(Withdrawal).filter(Withdrawal.id == withdrawal_id).with_for_update().first()
+    withdrawal = lock_one(db, Withdrawal, Withdrawal.id == withdrawal_id)
     if not withdrawal:
         raise ValueError("Withdrawal not found")
     if withdrawal.status != WithdrawalStatus.PROCESSING:

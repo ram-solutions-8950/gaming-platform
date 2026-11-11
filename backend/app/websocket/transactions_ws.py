@@ -21,6 +21,7 @@ from ..models.user import User, UserRole, UserStatus
 from ..models.wallet import Wallet
 from ..security.jwt import decode_access_token
 from ..utils.logging import get_logger
+from ..utils.async_db import in_thread
 
 logger = get_logger("transactions_ws")
 
@@ -302,7 +303,7 @@ async def ws_user_withdrawals(ws: WebSocket, token: str = Query(...)):
 
 @router.websocket("/ws/admin/deposits")
 async def ws_admin_deposits(ws: WebSocket, token: str = Query(...)):
-    auth = _authenticate_admin(token)
+    auth = await in_thread(_authenticate_admin, token)
     if not auth:
         await ws.close(code=status.WS_1008_POLICY_VIOLATION)
         return
@@ -322,7 +323,7 @@ async def ws_admin_deposits(ws: WebSocket, token: str = Query(...)):
 
 @router.websocket("/ws/admin/withdrawals")
 async def ws_admin_withdrawals(ws: WebSocket, token: str = Query(...)):
-    auth = _authenticate_admin(token)
+    auth = await in_thread(_authenticate_admin, token)
     if not auth:
         await ws.close(code=status.WS_1008_POLICY_VIOLATION)
         return

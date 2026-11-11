@@ -16,7 +16,12 @@ from app.models import (  # noqa: F401 - import all models so Alembic can detect
 
 config = context.config
 if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+    # disable_existing_loggers must stay False. These migrations also run
+    # in-process during application startup, and fileConfig's default of
+    # True would tear down every logger already configured by then --
+    # uvicorn's access/error loggers and all app loggers included -- leaving
+    # the running server silent for the rest of its life.
+    fileConfig(config.config_file_name, disable_existing_loggers=False)
 
 target_metadata = Base.metadata
 

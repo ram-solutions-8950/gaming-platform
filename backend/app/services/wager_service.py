@@ -16,6 +16,7 @@ from sqlalchemy import func
 
 from ..models.wager import WagerRequirement
 from ..utils.logging import get_logger
+from ..utils.locking import lock_all
 
 logger = get_logger("wager")
 
@@ -77,13 +78,24 @@ def create_wager_requirement(
 
 
 def _pending_requirements(db: Session, user_id: UUID, lock: bool = False):
-    q = db.query(WagerRequirement).filter(
-        WagerRequirement.user_id == user_id,
-        WagerRequirement.is_fulfilled.is_(False),
-    ).order_by(WagerRequirement.created_at.asc(), WagerRequirement.id.asc())
+    order = (WagerRequirement.created_at.asc(), WagerRequirement.id.asc())
     if lock:
-        q = q.with_for_update()
-    return q.all()
+        return lock_all(
+            db,
+            WagerRequirement,
+            WagerRequirement.user_id == user_id,
+            WagerRequirement.is_fulfilled.is_(False),
+            order_by=order,
+        )
+    return (
+        db.query(WagerRequirement)
+        .filter(
+            WagerRequirement.user_id == user_id,
+            WagerRequirement.is_fulfilled.is_(False),
+        )
+        .order_by(*order)
+        .all()
+    )
 
 
 def record_wager(db: Session, user_id: UUID, amount_paise: int, game_slug: str) -> int:
@@ -137,12 +149,16 @@ def reverse_wager(db: Session, user_id: UUID, amount_paise: int, game_slug: str)
     remaining = amount_paise
     reversed_total = 0
 
-    rows = db.query(WagerRequirement).filter(
+    rows = lock_all(
+        db,
+        WagerRequirement,
         WagerRequirement.user_id == user_id,
         WagerRequirement.completed_amount > 0,
-    ).order_by(
-        WagerRequirement.created_at.desc(), WagerRequirement.id.desc()
-    ).with_for_update().all()
+        order_by=(
+            WagerRequirement.created_at.desc(),
+            WagerRequirement.id.desc(),
+        ),
+    )
 
     for req in rows:
         if remaining <= 0:

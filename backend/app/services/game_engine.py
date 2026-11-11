@@ -17,6 +17,7 @@ import asyncio
 from ..database import SessionLocal
 from ..services.game_engines import list_engines
 from ..utils.logging import get_logger
+from ..utils.async_db import in_thread
 
 logger = get_logger("game_engine")
 _engine_tasks: list[asyncio.Task] = []
@@ -69,64 +70,97 @@ async def _play_one_round(engine, broadcast_fn=None) -> None:
 
     Raises on any failure; the caller sweeps up whatever was left open and
     starts a fresh round.
-    """
-    db = SessionLocal()
-    try:
-        game_round = engine.create_round(db)
-        round_id = game_round.id
-        betting_seconds = engine.get_betting_duration_seconds(db)
-        round_seconds = engine.get_round_duration_seconds(db)
-        logger.info("[%s] Round %s started", engine.slug, round_id)
 
-        if broadcast_fn:
-            await broadcast_fn({
-                "type": "round_start",
-                "game_slug": engine.slug,
+    Every database phase runs in a worker thread. Settlement credits each
+    winner's wallet under a row lock, and doing that on the event loop stalls
+    every player's HTTP request and websocket for its duration. Scalars are
+    also copied out of the ORM objects before their session closes: the
+    instances are detached afterwards, and reaching for an attribute that was
+    never loaded would raise instead of merely blocking.
+    """
+
+    def _open_round():
+        db = SessionLocal()
+        try:
+            game_round = engine.create_round(db)
+            return {
+                "round_id": game_round.id,
                 "game_id": str(game_round.game_id),
-                "round_id": str(round_id),
-                "status": "BETTING",
                 "started_at": game_round.started_at.isoformat(),
                 "betting_closes_at": game_round.betting_closes_at.isoformat(),
-                "seconds_remaining": betting_seconds,
-            })
-    finally:
-        db.close()
+                "betting_seconds": engine.get_betting_duration_seconds(db),
+                "round_seconds": engine.get_round_duration_seconds(db),
+            }
+        finally:
+            db.close()
+
+    info = await in_thread(_open_round)
+    round_id = info["round_id"]
+    betting_seconds = info["betting_seconds"]
+    round_seconds = info["round_seconds"]
+    logger.info("[%s] Round %s started", engine.slug, round_id)
+
+    if broadcast_fn:
+        await broadcast_fn({
+            "type": "round_start",
+            "game_slug": engine.slug,
+            "game_id": info["game_id"],
+            "round_id": str(round_id),
+            "status": "BETTING",
+            "started_at": info["started_at"],
+            "betting_closes_at": info["betting_closes_at"],
+            "seconds_remaining": betting_seconds,
+        })
 
     await asyncio.sleep(betting_seconds)
 
-    db = SessionLocal()
-    try:
-        engine.lock_round_for_calculation(db, round_id)
-        if broadcast_fn:
-            await broadcast_fn({
-                "type": "betting_locked",
-                "game_slug": engine.slug,
-                "game_id": str(game_round.game_id),
-                "round_id": str(round_id),
-                "status": "CALCULATING",
-                "seconds_remaining": round_seconds - betting_seconds,
-            })
-    finally:
-        db.close()
+    def _lock_round():
+        db = SessionLocal()
+        try:
+            engine.lock_round_for_calculation(db, round_id)
+        finally:
+            db.close()
+
+    await in_thread(_lock_round)
+    if broadcast_fn:
+        await broadcast_fn({
+            "type": "betting_locked",
+            "game_slug": engine.slug,
+            "game_id": info["game_id"],
+            "round_id": str(round_id),
+            "status": "CALCULATING",
+            "seconds_remaining": round_seconds - betting_seconds,
+        })
 
     await asyncio.sleep(round_seconds - betting_seconds)
 
-    db = SessionLocal()
-    try:
-        settled = engine.settle_round(db, round_id)
-        if broadcast_fn:
-            await broadcast_fn({
-                "type": "round_result",
-                "game_slug": engine.slug,
+    def _settle():
+        db = SessionLocal()
+        try:
+            settled = engine.settle_round(db, round_id)
+            return {
                 "game_id": str(settled.game_id),
-                "round_id": str(round_id),
-                "status": "COMPLETED",
-                "result_color": settled.result_color.value if settled.result_color else None,
+                "result_color": (
+                    settled.result_color.value if settled.result_color else None
+                ),
                 "result_number": settled.result_number,
                 "result_data": settled.result_data,
-            })
-    finally:
-        db.close()
+            }
+        finally:
+            db.close()
+
+    result = await in_thread(_settle)
+    if broadcast_fn:
+        await broadcast_fn({
+            "type": "round_result",
+            "game_slug": engine.slug,
+            "game_id": result["game_id"],
+            "round_id": str(round_id),
+            "status": "COMPLETED",
+            "result_color": result["result_color"],
+            "result_number": result["result_number"],
+            "result_data": result["result_data"],
+        })
 
     await asyncio.sleep(engine.result_display_seconds)
 

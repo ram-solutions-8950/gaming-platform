@@ -8,6 +8,7 @@ from ..schemas.payment import ActivePaymentConfigOut
 from ..security.permissions import require_user
 from ..models.user import User
 from ..utils.responses import success_response, error_response
+from ..utils.async_db import in_thread
 
 router = APIRouter(prefix="/payments", tags=["Payments"])
 
@@ -22,7 +23,11 @@ async def payment_webhook(
     headers = dict(request.headers)
 
     try:
-        result = handle_webhook(
+        # Crediting a deposit locks the deposit row and the wallet row. Run it
+        # in a worker thread so a slow or contended webhook cannot stall the
+        # event loop for every player on the site.
+        result = await in_thread(
+            handle_webhook,
             raw_body,
             headers,
             provider,

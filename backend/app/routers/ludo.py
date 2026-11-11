@@ -23,6 +23,7 @@ from ..services.ludo.rules import get_legal_token_indices
 from ..websocket.ludo import ludo_ws_manager
 from ..websocket.ludo_matchmaking import ludo_mm_manager
 from ..utils.logging import get_logger
+from ..utils.async_db import in_thread
 
 logger = get_logger("ludo_router")
 
@@ -41,7 +42,10 @@ async def join_matchmaking(
 ):
     service = LudoMatchmakingService(db)
     try:
-        result = service.join_queue(
+        # join_queue debits the entry fee under a wallet row lock and locks
+        # the matchmaking queue, so it must not run on the event loop.
+        result = await in_thread(
+            service.join_queue,
             user_id=current_user.id,
             player_count=req.player_count,
             entry_fee=req.entry_fee,
@@ -193,9 +197,14 @@ async def roll_dice(
     async with ludo_ws_manager.get_lock(match_str):
         engine = LudoEngine(db)
         try:
-            res = engine.roll_dice(match_id=match_id, user_id=current_user.id)
-            match = engine.get_match(match_id)
-            state = _format_match_state(match)
+            # The engine commits, which expires the match and its players.
+            # Formatting the state in the same worker thread keeps the
+            # resulting lazy loads off the event loop.
+            def _roll():
+                res = engine.roll_dice(match_id=match_id, user_id=current_user.id)
+                return res, _format_match_state(engine.get_match(match_id))
+
+            res, state = await in_thread(_roll)
             await ludo_ws_manager.broadcast(match_str, {
                 "type": "DICE_ROLLED",
                 "data": res,
@@ -216,13 +225,15 @@ async def move_token(
     async with ludo_ws_manager.get_lock(match_str):
         engine = LudoEngine(db)
         try:
-            res = engine.move_token(
-                match_id=match_id,
-                user_id=current_user.id,
-                token_index=req.token_index,
-            )
-            match = engine.get_match(match_id)
-            state = _format_match_state(match)
+            def _move():
+                res = engine.move_token(
+                    match_id=match_id,
+                    user_id=current_user.id,
+                    token_index=req.token_index,
+                )
+                return res, _format_match_state(engine.get_match(match_id))
+
+            res, state = await in_thread(_move)
             await ludo_ws_manager.broadcast(match_str, {
                 "type": "TOKEN_MOVED",
                 "data": res,
@@ -240,10 +251,15 @@ async def force_timeout(
     match_str = str(match_id)
     async with ludo_ws_manager.get_lock(match_str):
         engine = LudoEngine(db)
-        res = engine.handle_timeout(match_id)
-        if res.get("status") == "TIMEOUT":
-            match = engine.get_match(match_id)
-            state = _format_match_state(match)
+
+        def _timeout():
+            res = engine.handle_timeout(match_id)
+            if res.get("status") != "TIMEOUT":
+                return res, None
+            return res, _format_match_state(engine.get_match(match_id))
+
+        res, state = await in_thread(_timeout)
+        if state is not None:
             await ludo_ws_manager.broadcast(match_str, {
                 "type": "TIMEOUT",
                 "data": res,
@@ -260,49 +276,71 @@ async def leave_match(
     match_str = str(match_id)
     async with ludo_ws_manager.get_lock(match_str):
         engine = LudoEngine(db)
-        match = engine.get_match(match_id)
-        if not match:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Match not found")
 
-        player = engine.get_player_for_user(match, current_user.id)
-        if not player:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="User not in match")
+        # Forfeiting can settle the match, which credits the winner's wallet
+        # under a row lock. All of it -- including reading player.color and
+        # formatting the state, both of which re-query after the commit
+        # expires the instances -- happens in one worker thread.
+        def _forfeit():
+            match = engine.get_match(match_id)
+            if not match:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Match not found",
+                )
 
-        # Leaving active match marks player as forfeited
-        player.rank = 99
-        player.consecutive_timeouts = 3
+            player = engine.get_player_for_user(match, current_user.id)
+            if not player:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="User not in match",
+                )
 
-        active_remaining = [p for p in match.players if p.rank is None or p.rank == 0]
-        game_over = False
-        winner_id = None
+            # Leaving active match marks player as forfeited
+            player.rank = 99
+            player.consecutive_timeouts = 3
+            player_color = player.color.value
 
-        if len(active_remaining) <= 1:
-            winner = active_remaining[0] if active_remaining else None
-            if winner:
-                winner.rank = 1
-                winner.finished_at = datetime.now(timezone.utc)
-                winner_id = str(winner.user_id)
-                engine._settle_match(match, winner.user_id)
-            match.status = LudoMatchStatus.COMPLETED
-            match.completed_at = datetime.now(timezone.utc)
-            game_over = True
-        else:
-            if match.current_turn_color == player.color:
-                engine._advance_to_next_turn(match)
+            active_remaining = [
+                p for p in match.players if p.rank is None or p.rank == 0
+            ]
+            game_over = False
+            winner_id = None
 
-        db.commit()
-        state = _format_match_state(match)
+            if len(active_remaining) <= 1:
+                winner = active_remaining[0] if active_remaining else None
+                if winner:
+                    winner.rank = 1
+                    winner.finished_at = datetime.now(timezone.utc)
+                    winner_id = str(winner.user_id)
+                    engine._settle_match(match, winner.user_id)
+                match.status = LudoMatchStatus.COMPLETED
+                match.completed_at = datetime.now(timezone.utc)
+                game_over = True
+            else:
+                if match.current_turn_color == player.color:
+                    engine._advance_to_next_turn(match)
+
+            db.commit()
+            return {
+                "color": player_color,
+                "game_over": game_over,
+                "winner_id": winner_id,
+                "state": _format_match_state(match),
+            }
+
+        outcome = await in_thread(_forfeit)
         await ludo_ws_manager.broadcast(match_str, {
             "type": "PLAYER_FORFEITED",
             "data": {
                 "user_id": str(current_user.id),
-                "color": player.color.value,
-                "game_over": game_over,
-                "winner_user_id": winner_id,
+                "color": outcome["color"],
+                "game_over": outcome["game_over"],
+                "winner_user_id": outcome["winner_id"],
             },
-            "state": state,
+            "state": outcome["state"],
         })
-        return {"status": "FORFEITED", "game_over": game_over}
+        return {"status": "FORFEITED", "game_over": outcome["game_over"]}
 
 # ----------------- Game WebSocket Endpoint -----------------
 

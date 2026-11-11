@@ -233,7 +233,7 @@ class DragonTigerEngine(GameEngine):
         prediction_enum = _parse_prediction(prediction)
         bet_key = prediction_enum.value.lower()
 
-        round_row = db.execute(select(GameRound).where(GameRound.id == round_id).with_for_update()).scalar_one_or_none()
+        round_row = db.execute(select(GameRound).where(GameRound.id == round_id).with_for_update().execution_options(populate_existing=True)).scalar_one_or_none()
         if not round_row:
             raise ValueError("Round not found")
 
@@ -288,7 +288,7 @@ class DragonTigerEngine(GameEngine):
         return bet
 
     def lock_round_for_calculation(self, db: Session, round_id: UUID) -> GameRound:
-        rd = db.execute(select(GameRound).where(GameRound.id == round_id).with_for_update()).scalar_one_or_none()
+        rd = db.execute(select(GameRound).where(GameRound.id == round_id).with_for_update().execution_options(populate_existing=True)).scalar_one_or_none()
         if not rd:
             raise ValueError("Round not found")
         if rd.status != GameRoundStatus.BETTING:
@@ -306,7 +306,7 @@ class DragonTigerEngine(GameEngine):
         tiger_card: Optional[str] = None,
         card_drawer: Optional[CardDrawer] = None,
     ) -> GameRound:
-        rd = db.execute(select(GameRound).where(GameRound.id == round_id).with_for_update()).scalar_one_or_none()
+        rd = db.execute(select(GameRound).where(GameRound.id == round_id).with_for_update().execution_options(populate_existing=True)).scalar_one_or_none()
         if not rd:
             raise ValueError("Round not found")
         if rd.status == GameRoundStatus.COMPLETED:

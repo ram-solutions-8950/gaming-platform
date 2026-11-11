@@ -22,6 +22,7 @@ from ...models.wallet import Wallet
 from ...models.transaction import WalletTransactionType
 from ..wallet_service import debit_wallet, get_balance
 from ...utils.logging import get_logger
+from ...utils.locking import lock_all
 
 logger = get_logger("ludo_matchmaking")
 
@@ -175,19 +176,23 @@ class LudoMatchmakingService:
             f"queue_key={player_count}:{entry_fee}"
         )
 
-        candidates = (
-            self.db.query(LudoMatchmakingQueue)
-            .filter(
-                LudoMatchmakingQueue.player_count == player_count,
-                LudoMatchmakingQueue.entry_fee == entry_fee,
-                LudoMatchmakingQueue.status == QueueStatus.SEARCHING,
-                LudoMatchmakingQueue.user_id != user_id,
-            )
-            .order_by(LudoMatchmakingQueue.queued_at.asc())
-            .limit(needed)
-            .with_for_update()  # PostgreSQL SELECT FOR UPDATE
-            .all()
+        candidates = lock_all(
+            self.db,
+            LudoMatchmakingQueue,
+            LudoMatchmakingQueue.player_count == player_count,
+            LudoMatchmakingQueue.entry_fee == entry_fee,
+            LudoMatchmakingQueue.status == QueueStatus.SEARCHING,
+            LudoMatchmakingQueue.user_id != user_id,
+            order_by=LudoMatchmakingQueue.queued_at.asc(),
+            limit=needed,
         )
+        # Re-assert the status now that the rows are locked and refreshed: a
+        # concurrent matchmaker may have claimed one of these players between
+        # the scan and the lock, and pulling an already-matched player in
+        # would seat them at two tables with one entry fee.
+        candidates = [
+            c for c in candidates if c.status == QueueStatus.SEARCHING
+        ]
 
         queue_size_before = len(candidates)
         logger.info(

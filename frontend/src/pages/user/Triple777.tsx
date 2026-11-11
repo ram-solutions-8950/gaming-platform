@@ -39,6 +39,10 @@ export function Triple777Page() {
   const [config, setConfig] = useState<api.Triple777Config | null>(null);
   const [jackpot, setJackpot] = useState<number>(50000);
   const [balance, setBalance] = useState<number>(0);
+  // `balance` starts at 0 and feeds the stake arithmetic, so it has to stay a
+  // number. This tracks whether that number was ever actually read, so a
+  // failed wallet fetch is shown as unknown rather than as an empty account.
+  const [balanceKnown, setBalanceKnown] = useState(false);
   const [stake, setStake] = useState<number>(10);
   const [turbo, setTurbo] = useState<boolean>(false);
   const [autoSpinsLeft, setAutoSpinsLeft] = useState<number | null>(null);
@@ -279,6 +283,7 @@ export function Triple777Page() {
           setStake(cfg.min_bet || 10);
           if (walletData) {
             setBalance(walletData.balance / 100);
+            setBalanceKnown(true);
           }
         }
       } catch (err) {
@@ -329,6 +334,7 @@ export function Triple777Page() {
         setJackpot(response.jackpot_amount);
         setBalance(response.balance);
         balanceRef.current = response.balance;
+        setBalanceKnown(true);
         window.dispatchEvent(new Event('wallet-update'));
         setSpinning(false);
         spinLockRef.current = false;
@@ -531,7 +537,9 @@ export function Triple777Page() {
 
             <div className="t777-balance-pill">
               <span className="text-[10px] text-gray-400 uppercase font-bold">₹</span>
-              <span className="t777-balance-text">{balance.toFixed(2)}</span>
+              <span className="t777-balance-text">
+                {balanceKnown ? balance.toFixed(2) : '—'}
+              </span>
             </div>
           </div>
         </header>

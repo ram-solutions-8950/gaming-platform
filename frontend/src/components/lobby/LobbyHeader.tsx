@@ -7,11 +7,14 @@ import { useAuthStore } from '../../store/authStore';
 
 import { useRewardStore } from '../../store/rewardStore';
 import { getMediaUrl } from '../../utils/media';
+import { formatBalance, type WalletStatus } from '../../hooks/useWallet';
 import { APP_VERSION } from '../../version';
 
 interface Props {
   user: User | null;
   wallet: Wallet | null;
+  /** Freshness of `wallet`; 'stale'/'error' must not be drawn as ₹0.00. */
+  walletStatus?: WalletStatus;
 }
 
 const headerShortcuts = [
@@ -20,7 +23,7 @@ const headerShortcuts = [
   { label: '7-Days', emoji: '📅', action: '7days' as const },
 ];
 
-export const LobbyHeader: React.FC<Props> = ({ user, wallet }) => {
+export const LobbyHeader: React.FC<Props> = ({ user, wallet, walletStatus = 'ready' }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { setUser } = useAuthStore();
@@ -89,7 +92,12 @@ export const LobbyHeader: React.FC<Props> = ({ user, wallet }) => {
       <div className="flex items-center gap-1.5 shrink-0">
         <div className="bg-[#0f0426]/90 border border-amber-400/60 px-2 py-0.5 rounded-full flex items-center gap-1 text-[11px] font-black shadow-inner">
           <span className="w-3.5 h-3.5 rounded-full bg-gradient-to-br from-amber-300 to-amber-500 flex items-center justify-center text-[9px] text-amber-950 font-black shadow-sm">₹</span>
-          <span className="text-white font-mono text-[11px]">{wallet?.balance_inr ?? '0.00'}</span>
+          <span
+            className="text-white font-mono text-[11px]"
+            title={walletStatus === 'stale' ? 'Showing last known balance — reconnecting' : undefined}
+          >
+            {formatBalance(wallet, walletStatus)}
+          </span>
         </div>
         <button
           type="button"
