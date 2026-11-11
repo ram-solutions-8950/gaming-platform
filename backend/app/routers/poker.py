@@ -9,6 +9,12 @@ from ..security.permissions import require_user
 from ..models.user import User
 from ..models.poker import PokerTable, PokerHand, PokerPlayer
 from ..services.poker.game_manager import poker_manager
+from ..websocket.poker_ws import (
+    poker_ws_manager,
+    run_bot_turns,
+    state_outbox,
+    table_lock,
+)
 from ..services.poker.cashout import cash_out_stack
 from ..services.wallet_service import credit_wallet, debit_wallet
 from ..models.transaction import WalletTransactionType
@@ -123,12 +129,17 @@ async def join_poker_table(
     current_user: User = Depends(require_user),
     db: Session = Depends(get_db)
 ):
-    # Blocking database work is pushed to worker threads, but the in-memory
-    # poker engine is only ever touched from the event loop: it has no
-    # internal locking and relies on that single-threaded access to stay
-    # consistent. Scalars are copied out of the ORM objects up front because
-    # a later commit expires those instances, and re-reading an expired
-    # attribute would issue a fresh blocking query from the loop.
+    # Blocking database work is pushed to worker threads. The in-memory poker
+    # engine has no internal locking, so every mutation below happens under
+    # the table lock -- otherwise two joins landing together could be handed
+    # the same seat, and a join could land in the middle of a hand being dealt
+    # by the websocket's bot loop. `_announce_seat` takes the lock itself, so
+    # it is always called after this one is released: asyncio locks are not
+    # reentrant and a nested acquire would wedge the table for good.
+    #
+    # Scalars are copied out of the ORM objects up front because a later
+    # commit expires those instances, and re-reading an expired attribute
+    # would issue a fresh blocking query from the loop.
     username = current_user.username or current_user.email.split('@')[0]
     user_id_str = str(current_user.id)
 
@@ -169,29 +180,43 @@ async def join_poker_table(
         max_players=info["max_players"],
     )
 
-    if engine.get_player_by_id(user_id_str):
-        return {"message": "Already seated at table", "table_id": info["id"]}
+    async with table_lock(info["id"]):
+        if engine.get_player_by_id(user_id_str):
+            return {"message": "Already seated at table", "table_id": info["id"]}
 
-    # A seat record without a live seat means the table was restarted while the
-    # player sat at it: give them that seat back instead of charging again.
-    if info["lingering_stack"] is not None and not info["is_practice"]:
-        ok, msg = engine.add_player(
-            user_id=user_id_str,
-            username=username,
-            buy_in_amount=info["lingering_stack"],
-        )
-        if not ok:
-            raise HTTPException(status_code=400, detail=msg)
-        await _announce_seat(engine)
+        # A seat record without a live seat means the table was restarted while
+        # the player sat at it: give them that seat back instead of charging
+        # again.
+        if info["lingering_stack"] is not None and not info["is_practice"]:
+            ok, msg = engine.add_player(
+                user_id=user_id_str,
+                username=username,
+                buy_in_amount=info["lingering_stack"],
+            )
+            if not ok:
+                raise HTTPException(status_code=400, detail=msg)
+            restored = True
+        else:
+            restored = False
+            await _buy_in_locked(
+                engine, db, current_user, info, req.buy_in_amount, username, user_id_str
+            )
+
+    await _announce_seat(engine)
+    if restored:
         return {"message": "Seat restored", "table_id": info["id"]}
+    return {"message": "Successfully joined table", "table_id": info["id"]}
 
+
+async def _buy_in_locked(engine, db, current_user, info, buy_in_amount, username, user_id_str):
+    """Charge the buy-in and seat the player. The table lock must be held."""
     # Real-money wallet debit via WalletService
     if not info["is_practice"]:
         def _debit():
             debit_wallet(
                 db=db,
                 user_id=current_user.id,
-                amount=req.buy_in_amount,
+                amount=buy_in_amount,
                 tx_type=WalletTransactionType.GAME_ENTRY,
                 reference_type="poker_buyin",
                 reference_id=f"poker_buyin_{uuid.uuid4()}"
@@ -206,7 +231,7 @@ async def join_poker_table(
     ok, msg = engine.add_player(
         user_id=user_id_str,
         username=username,
-        buy_in_amount=req.buy_in_amount
+        buy_in_amount=buy_in_amount
     )
 
     if not ok:
@@ -216,7 +241,7 @@ async def join_poker_table(
                 credit_wallet(
                     db=db,
                     user_id=current_user.id,
-                    amount=req.buy_in_amount,
+                    amount=buy_in_amount,
                     tx_type=WalletTransactionType.REFUND,
                     reference_type="poker_refund",
                     reference_id=f"poker_refund_{uuid.uuid4()}"
@@ -224,7 +249,7 @@ async def join_poker_table(
                 # The buy-in was never played, so it must not count as
                 # play-through.
                 from ..services.wager_service import reverse_wager
-                reverse_wager(db, current_user.id, req.buy_in_amount, "poker")
+                reverse_wager(db, current_user.id, buy_in_amount, "poker")
                 db.commit()
 
             try:
@@ -234,7 +259,7 @@ async def join_poker_table(
                 # stuck buy-in can be reconciled rather than vanishing.
                 logger.critical(
                     "poker buy-in refund FAILED user=%s table=%s amount=%s",
-                    user_id_str, info["id"], req.buy_in_amount, exc_info=True,
+                    user_id_str, info["id"], buy_in_amount, exc_info=True,
                 )
         raise HTTPException(status_code=400, detail=msg)
 
@@ -245,14 +270,11 @@ async def join_poker_table(
             table_id=info["id"],
             user_id=current_user.id,
             seat_index=seat_index,
-            stack=req.buy_in_amount,
+            stack=buy_in_amount,
         ))
         db.commit()
 
     await in_thread(_seat)
-
-    await _announce_seat(engine)
-    return {"message": "Successfully joined table", "table_id": info["id"]}
 
 
 async def _announce_seat(engine) -> None:
@@ -272,31 +294,56 @@ async def leave_poker_table(
     if not engine:
         raise HTTPException(status_code=404, detail="Table not found")
 
-    ok, msg, remaining_stack = engine.remove_player(str(current_user.id))
-    if not ok:
-        raise HTTPException(status_code=400, detail=msg)
+    # Unseating the player and returning their chips is one step as far as the
+    # rest of the table is concerned, so it is done under the table lock: a
+    # bot turn or a deal must not land between the two and act on a seat whose
+    # chips are already on their way back to a wallet.
+    async with table_lock(table_id):
+        ok, msg, remaining_stack = engine.remove_player(str(current_user.id))
+        if not ok:
+            raise HTTPException(status_code=400, detail=msg)
 
-    # Cashing the stack back out locks the wallet row, so it runs off the
-    # event loop. is_practice is read inside the thread: cash_out_stack
-    # commits, which would expire `table` and force a blocking re-read here.
-    def _cash_out():
-        table = db.query(PokerTable).filter(PokerTable.id == table_id).first()
-        is_practice = bool(table and table.is_practice)
-        credited = cash_out_stack(
-            db, table, table_id, current_user.id, remaining_stack
-        )
-        return remaining_stack if is_practice else credited
+        # Cashing the stack back out locks the wallet row, so it runs off the
+        # event loop. is_practice is read inside the thread: cash_out_stack
+        # commits, which would expire `table` and force a blocking re-read here.
+        def _cash_out():
+            table = db.query(PokerTable).filter(PokerTable.id == table_id).first()
+            is_practice = bool(table and table.is_practice)
+            credited = cash_out_stack(
+                db, table, table_id, current_user.id, remaining_stack
+            )
+            return remaining_stack if is_practice else credited
 
-    returned_stack = await in_thread(_cash_out)
+        try:
+            returned_stack = await in_thread(_cash_out)
+        except Exception:
+            # The chips only existed in memory, so put the player back rather
+            # than destroying the stack when the wallet credit fails.
+            reseated, reason = engine.add_player(
+                user_id=str(current_user.id),
+                username=current_user.username or current_user.email.split('@')[0],
+                buy_in_amount=remaining_stack,
+            )
+            logger.critical(
+                "poker leave cash-out FAILED table=%s user=%s stack=%s reseated=%s (%s)",
+                table_id, current_user.id, remaining_stack, reseated, reason,
+                exc_info=True,
+            )
+            raise HTTPException(
+                status_code=500,
+                detail="Could not return your chips. Nothing was lost — please try again.",
+            )
 
-    # Notify remaining table players via WebSocket
+        snapshot = state_outbox(engine)
+        keep_bots_running = engine.phase != 'WAITING'
+
+    # Notify remaining table players via WebSocket, with the lock released.
     try:
-        from ..websocket.poker_ws import poker_ws_manager, run_bot_turns
-        await poker_ws_manager.broadcast_table_state(engine)
+        await poker_ws_manager.deliver(table_id, snapshot)
         # If leaving ended the hand (or passed the turn to a bot), run the usual
         # settlement cooldown so the table moves on to the next hand, or back to
         # WAITING with the pot cleared when nobody is left to play.
-        if engine.phase != 'WAITING':
+        if keep_bots_running:
             asyncio.create_task(run_bot_turns(engine))
     except Exception:
         logger.warning("poker leave broadcast failed table=%s", table_id, exc_info=True)

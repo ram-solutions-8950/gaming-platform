@@ -1,9 +1,11 @@
 import asyncio
 import json
-from typing import Dict, List, Optional
+from datetime import datetime, timezone
+from typing import Dict, List
 from uuid import UUID
 from fastapi import WebSocket
 from ..utils.logging import get_logger
+from ..utils.async_db import in_thread
 from ..database import SessionLocal
 from ..services.ludo.engine import LudoEngine
 from ..models.ludo import LudoMatch, LudoMatchStatus
@@ -59,6 +61,14 @@ class LudoConnectionManager:
         """
         Authoritative server turn timer worker.
         Checks every 1 second if the active player exceeded 10 seconds.
+
+        The whole check runs in a worker thread on a session opened *inside*
+        the match lock, which matters for two reasons. psycopg2 is synchronous,
+        so querying here on the event loop would stall every other match and
+        request once a second. And a session opened before the lock could hand
+        back an identity-mapped match row loaded before a dice roll committed
+        on another session -- a stale ``turn_started_at`` would time out a
+        player who in fact acted in time.
         """
         logger.info(f"Started timer loop for Ludo match {match_id}")
         match_uuid = UUID(match_id)
@@ -66,42 +76,56 @@ class LudoConnectionManager:
         try:
             while True:
                 await asyncio.sleep(1.0)
-                if match_id not in self.rooms or not self.rooms[match_id]:
-                    # Keep running for at least 60s even if all disconnected
-                    pass
 
-                db = SessionLocal()
-                try:
-                    match = db.query(LudoMatch).filter(LudoMatch.id == match_uuid).first()
-                    if not match or match.status != LudoMatchStatus.IN_PROGRESS:
+                async with self.get_lock(match_id):
+                    outcome = await in_thread(_check_turn_timeout, match_uuid)
+
+                if outcome["stop"]:
+                    break
+                if outcome["result"] is not None:
+                    logger.info(f"Turn timed out in match {match_id}: {outcome['result']}")
+                    await self.broadcast(match_id, {
+                        "type": "TIMEOUT",
+                        "data": outcome["result"],
+                        "state": outcome["state"],
+                    })
+                    if outcome["result"].get("game_over"):
                         break
-
-                    # Check if 10 seconds passed
-                    if match.turn_started_at:
-                        from datetime import datetime, timezone
-                        elapsed = (datetime.now(timezone.utc) - match.turn_started_at).total_seconds()
-                        if elapsed >= match.turn_timeout_seconds:
-                            async with self.get_lock(match_id):
-                                engine = LudoEngine(db)
-                                result = engine.handle_timeout(match_uuid)
-                                if result.get("status") == "TIMEOUT":
-                                    logger.info(f"Turn timed out in match {match_id}: {result}")
-                                    match = engine.get_match(match_uuid)
-                                    state = engine.format_match_state(match) if match else None
-                                    await self.broadcast(match_id, {
-                                        "type": "TIMEOUT",
-                                        "data": result,
-                                        "state": state,
-                                    })
-                                    if result.get("game_over"):
-                                        break
-                finally:
-                    db.close()
         except asyncio.CancelledError:
             logger.info(f"Timer loop cancelled for match {match_id}")
         except Exception as e:
-            logger.error(f"Error in Ludo timer loop: {e}")
+            logger.error(f"Error in Ludo timer loop: {e}", exc_info=True)
         finally:
             self.timer_tasks.pop(match_id, None)
+
+
+def _check_turn_timeout(match_uuid: UUID) -> dict:
+    """Time out the active player's turn if their clock has run out.
+
+    Runs in a worker thread with the match lock held. Returns ``stop`` when the
+    match is over or gone, and a ``result`` only when a turn actually expired
+    -- ``handle_timeout`` re-validates the elapsed time itself and reports
+    ``TOO_EARLY`` if the player got their move in first.
+    """
+    with SessionLocal() as db:
+        match = db.query(LudoMatch).filter(LudoMatch.id == match_uuid).first()
+        if not match or match.status != LudoMatchStatus.IN_PROGRESS:
+            return {"stop": True, "result": None, "state": None}
+        if not match.turn_started_at:
+            return {"stop": False, "result": None, "state": None}
+
+        elapsed = (datetime.now(timezone.utc) - match.turn_started_at).total_seconds()
+        if elapsed < match.turn_timeout_seconds:
+            return {"stop": False, "result": None, "state": None}
+
+        engine = LudoEngine(db)
+        result = engine.handle_timeout(match_uuid)
+        if result.get("status") != "TIMEOUT":
+            return {"stop": False, "result": None, "state": None}
+
+        # handle_timeout commits, so re-read before formatting the state.
+        match = engine.get_match(match_uuid)
+        state = engine.format_match_state(match) if match else None
+        return {"stop": False, "result": result, "state": state}
 
 ludo_ws_manager = LudoConnectionManager()

@@ -212,12 +212,13 @@ def _player_to_act(engine):
     return next(p for p in engine.players if p.seat_index == engine.current_turn_seat_idx)
 
 def _run_bot_turns_fast(monkeypatch, engine):
-    async def skip_persist(*args, **kwargs):
+    # _persist_hand is handed to in_thread, so the stand-in must be sync.
+    def skip_persist(*args, **kwargs):
         return None
-    monkeypatch.setattr(poker_ws, "persist_hand_result", skip_persist)
+    monkeypatch.setattr(poker_ws, "_persist_hand", skip_persist)
     monkeypatch.setattr(poker_ws, "_SETTLEMENT_COOLDOWN_SECONDS", 0)
     monkeypatch.setattr(poker_ws, "_BOT_THINK_SECONDS", (0, 0))
-    asyncio.run(asyncio.wait_for(poker_ws.run_bot_turns(engine, db=MagicMock()), timeout=10))
+    asyncio.run(asyncio.wait_for(poker_ws.run_bot_turns(engine), timeout=10))
 
 def test_poker_opponent_leaving_mid_hand_awards_pot_and_clears_table(monkeypatch):
     engine = PokerEngine("test_table_9", small_blind=100, big_blind=200)
@@ -534,7 +535,7 @@ def _silence_table_io(monkeypatch, sent=None):
     async def no_broadcast(engine):
         return None
 
-    async def no_bots(engine, db=None):
+    async def no_bots(engine):
         return None
 
     monkeypatch.setattr(poker_ws.poker_ws_manager, "send_to_user", record)
@@ -590,17 +591,18 @@ def test_busted_player_loses_the_seat_and_is_offered_a_rebuy(client, db, monkeyp
     u1, _ = _poker_user(client, db, "bust1@example.com", "bust1")
     u2, _ = _poker_user(client, db, "bust2@example.com", "bust2")
     table, engine = _cash_table(db, u1, u2)
-    sent = []
-    _silence_table_io(monkeypatch, sent)
+    _silence_table_io(monkeypatch)
+    # The cash-out runs in a worker thread on its own session.
+    monkeypatch.setattr(poker_ws, "SessionLocal", sessionmaker(autocommit=False, autoflush=False, bind=db.get_bind()))
     monkeypatch.setattr(poker_ws.poker_ws_manager, "is_connected", lambda t, u: True)
     engine.get_player_by_id(str(u2.id)).stack = 0
     engine.phase = 'SETTLEMENT'
 
-    asyncio.run(poker_ws.tidy_seats(engine, db))
+    outbox = asyncio.run(poker_ws.tidy_seats_locked(engine))
 
     assert engine.get_player_by_id(str(u2.id)) is None
     assert db.query(PokerPlayer).filter(PokerPlayer.table_id == table.id, PokerPlayer.user_id == u2.id).count() == 0
-    assert [(uid, msg["type"], msg["min_buy_in"]) for uid, msg in sent] == [(str(u2.id), "busted", 2000)]
+    assert [(uid, msg["type"], msg["min_buy_in"]) for uid, msg in outbox] == [(str(u2.id), "busted", 2000)]
     # The player with chips keeps their seat
     assert engine.get_player_by_id(str(u1.id)) is not None
 
@@ -613,7 +615,7 @@ def test_disconnected_players_sit_out_between_hands(monkeypatch):
     engine.add_player("third", "Third", 2000)
     monkeypatch.setattr(poker_ws.poker_ws_manager, "is_connected", lambda t, u: u != "gone")
 
-    asyncio.run(poker_ws.tidy_seats(engine, None))
+    asyncio.run(poker_ws.tidy_seats_locked(engine))
     engine.start_hand()
 
     gone = engine.get_player_by_id("gone")

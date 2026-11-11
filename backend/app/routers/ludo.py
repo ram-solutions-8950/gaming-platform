@@ -163,15 +163,18 @@ async def ludo_matchmaking_ws_endpoint(
         await ludo_mm_manager.disconnect(user_id)
 
         # Cancel SEARCHING queue entry on disconnect
-        # (but NOT if already MATCHED or in a game)
-        db = SessionLocal()
+        # (but NOT if already MATCHED or in a game).
+        # cancel_queue locks the queue row and may refund the entry fee under a
+        # wallet row lock, so it never runs on the event loop.
         try:
-            service = LudoMatchmakingService(db)
-            service.cancel_queue(UUID(user_id))
+            await in_thread(_cancel_queue_entry, UUID(user_id))
         except Exception as e:
             logger.error(f"[LUDO-MM-WS] Queue cleanup error user={user_id}: {e}")
-        finally:
-            db.close()
+
+
+def _cancel_queue_entry(user_id: UUID) -> bool:
+    with SessionLocal() as db:
+        return LudoMatchmakingService(db).cancel_queue(user_id=user_id)
 
 # ----------------- In-Game Endpoints -----------------
 
@@ -352,18 +355,19 @@ async def ludo_websocket_endpoint(
 ):
     await ludo_ws_manager.connect(match_id, websocket)
 
-    # Initial state push
-    db = SessionLocal()
+    # Initial state push. Both the query and formatting the state (which lazy
+    # loads the match's players) happen in one worker thread, so a player
+    # opening a board never stalls the loop for every other match.
     try:
-        match = db.query(LudoMatch).filter(LudoMatch.id == UUID(match_id)).first()
-        if match:
-            state = _format_match_state(match)
-            await websocket.send_text(json.dumps({
-                "type": "MATCH_STATE",
-                "state": state,
-            }, default=str))
-    finally:
-        db.close()
+        state = await in_thread(_load_match_state, UUID(match_id))
+    except Exception:
+        logger.error(f"[LUDO-WS] Initial state load failed match={match_id}", exc_info=True)
+        state = None
+    if state is not None:
+        await websocket.send_text(json.dumps({
+            "type": "MATCH_STATE",
+            "state": state,
+        }, default=str))
 
     try:
         while True:
@@ -393,6 +397,16 @@ async def ludo_websocket_endpoint(
             except json.JSONDecodeError:
                 pass
     except WebSocketDisconnect:
-        ludo_ws_manager.disconnect(match_id, websocket)
+        logger.info(f"[LUDO-WS] Disconnected match={match_id}")
     except Exception as e:
+        logger.error(f"[LUDO-WS] WS error match={match_id}: {e}")
+    finally:
+        # In a `finally`, so a cancelled task cannot leave a dead socket in the
+        # room to be broadcast to forever.
         ludo_ws_manager.disconnect(match_id, websocket)
+
+
+def _load_match_state(match_uuid: UUID) -> Optional[Dict[str, Any]]:
+    with SessionLocal() as db:
+        match = db.query(LudoMatch).filter(LudoMatch.id == match_uuid).first()
+        return _format_match_state(match) if match else None
