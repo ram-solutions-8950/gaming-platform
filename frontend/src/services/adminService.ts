@@ -256,6 +256,27 @@ export const adminService = {
   },
 
   // Notifications
+  sendNotification: async (payload: {
+    title: string;
+    message: string;
+    category?: string;
+    audience: 'ALL' | 'SELECTED';
+    user_ids?: string[];
+  }) => {
+    const res = await api.post('/admin/notifications/send', payload);
+    return res.data.data;
+  },
+
+  getSentNotifications: async (limit = 50) => {
+    const res = await api.get(`/admin/notifications/sent?limit=${limit}`);
+    return res.data.data?.items ?? [];
+  },
+
+  retractNotification: async (id: string) => {
+    const res = await api.delete(`/admin/notifications/sent/${id}`);
+    return res.data.data;
+  },
+
   getNotifications: async (limit = 20) => {
     try {
       const res = await api.get(`/admin/notifications?limit=${limit}`);

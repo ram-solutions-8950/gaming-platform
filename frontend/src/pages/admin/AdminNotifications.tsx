@@ -17,6 +17,7 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { SendNotificationPanel } from './SendNotificationPanel';
 
 interface AdminNotification {
   id: string;
@@ -34,6 +35,10 @@ export function AdminNotificationsPage() {
   const navigate = useNavigate();
   const [notifications, setNotifications] = useState<AdminNotification[]>([]);
   const [unreadCount, setUnreadCount] = useState<number>(0);
+  // 'alerts' is the inbound action feed; 'send' composes outbound
+  // notifications to players. They are different directions, so they
+  // get separate tabs rather than sharing one list.
+  const [view, setView] = useState<'alerts' | 'send'>('alerts');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeFilter, setActiveFilter] = useState<'ALL' | 'HIGH' | 'WITHDRAWAL' | 'DEPOSIT' | 'SYSTEM'>('ALL');
@@ -185,11 +190,34 @@ export function AdminNotificationsPage() {
             )}
           </div>
           <p className="text-gray-400 text-sm mt-1">
-            Real-time feed of player withdrawals, high-value deposit verifications, and audit alerts.
+            {view === 'alerts'
+              ? 'Real-time feed of player withdrawals, deposit verifications, and audit alerts.'
+              : 'Send an in-app notification to every player, or to selected players.'}
           </p>
+
+          <div className="flex items-center gap-2 p-1 mt-3 bg-dark-900 border border-dark-700 rounded-xl w-fit">
+            <button
+              type="button"
+              onClick={() => setView('alerts')}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                view === 'alerts' ? 'bg-brand-500 text-black' : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              Action feed
+            </button>
+            <button
+              type="button"
+              onClick={() => setView('send')}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                view === 'send' ? 'bg-brand-500 text-black' : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              Send to players
+            </button>
+          </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className={`flex items-center gap-3 ${view === 'send' ? 'hidden' : ''}`}>
           <button
             onClick={handleMarkAllRead}
             disabled={unreadCount === 0}
@@ -209,8 +237,10 @@ export function AdminNotificationsPage() {
         </div>
       </div>
 
+      {view === 'send' && <SendNotificationPanel />}
+
       {/* Filter Tabs */}
-      <div className="flex flex-wrap gap-2 border-b border-dark-800 pb-3">
+      <div className={`flex flex-wrap gap-2 border-b border-dark-800 pb-3 ${view === 'send' ? 'hidden' : ''}`}>
         {[
           { key: 'ALL', label: 'All Alerts' },
           { key: 'HIGH', label: 'Actionable / Critical' },
@@ -233,7 +263,7 @@ export function AdminNotificationsPage() {
       </div>
 
       {/* Notifications List */}
-      <Card className="!p-0 bg-dark-900 border-dark-800 divide-y divide-dark-800/80 overflow-hidden">
+      <Card className={`!p-0 bg-dark-900 border-dark-800 divide-y divide-dark-800/80 overflow-hidden ${view === 'send' ? 'hidden' : ''}`}>
         {loading ? (
           <div className="py-20">
             <Loader size="lg" />

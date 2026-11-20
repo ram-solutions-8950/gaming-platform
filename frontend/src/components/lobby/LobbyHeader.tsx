@@ -9,6 +9,7 @@ import { useRewardStore } from '../../store/rewardStore';
 import { getMediaUrl } from '../../utils/media';
 import { formatBalance, type WalletStatus } from '../../hooks/useWallet';
 import { APP_VERSION } from '../../version';
+import { NotificationBell } from '../notifications/NotificationBell';
 
 interface Props {
   user: User | null;
@@ -90,6 +91,8 @@ export const LobbyHeader: React.FC<Props> = ({ user, wallet, walletStatus = 'rea
 
       {/* Center: Wallet + Actions */}
       <div className="flex items-center gap-1.5 shrink-0">
+        {/* Mounted once here so one websocket serves the whole app. */}
+        <NotificationBell />
         <div className="bg-[#0f0426]/90 border border-amber-400/60 px-2 py-0.5 rounded-full flex items-center gap-1 text-[11px] font-black shadow-inner">
           <span className="w-3.5 h-3.5 rounded-full bg-gradient-to-br from-amber-300 to-amber-500 flex items-center justify-center text-[9px] text-amber-950 font-black shadow-sm">₹</span>
           <span

@@ -28,6 +28,8 @@ from ..models.audit_log import AuditLog
 from ..models.support import SupportTicket, SupportTicketStatus
 from ..models.payment_gateway import PaymentGatewayConfig
 from ..config import settings
+from ..services import notification_service
+from ..websocket.notifications_ws import notification_ws_manager
 from ..models.system_settings import SystemSetting
 from ..app_version import LATEST_APP_VERSION
 from ..models.refresh_token import RefreshToken
@@ -134,6 +136,15 @@ def _gateway_display_name(gateway_name: str) -> str:
     return SUPPORTED_GATEWAYS.get(gateway_name, {}).get(
         "display_name", gateway_name.title()
     )
+
+
+class NotificationSendIn(BaseModel):
+    title: str
+    message: str
+    category: Optional[str] = "GENERAL"
+    # "ALL" broadcasts to every player; "SELECTED" sends only to user_ids.
+    audience: Optional[str] = "ALL"
+    user_ids: Optional[List[str]] = None
 
 
 class SupportConfigUpdateIn(BaseModel):
@@ -2266,12 +2277,23 @@ def get_admin_notifications(
     notifications = []
 
     # 1. Pending withdrawals (High Priority Action)
+    #
+    # These are action items: a withdrawal that never appears here is a
+    # payout an admin may never make. They were previously capped at 10
+    # regardless of the requested limit, so with 11+ pending the oldest
+    # silently vanished from the feed. The true count is always reported
+    # separately, so the page can say so even when the list is trimmed.
+    pending_total = (
+        db.query(Withdrawal)
+        .filter(Withdrawal.status == WithdrawalStatus.PENDING)
+        .count()
+    )
     pending_wds = (
         db.query(Withdrawal, User)
         .join(User, Withdrawal.user_id == User.id)
         .filter(Withdrawal.status == WithdrawalStatus.PENDING)
         .order_by(Withdrawal.created_at.desc())
-        .limit(10)
+        .limit(limit)
         .all()
     )
     for wd, u in pending_wds:
@@ -2287,12 +2309,12 @@ def get_admin_notifications(
             "is_read": False,
         })
 
-    # 2. Recent Large Deposits
+    # 2. Recent deposits (any size; priority reflects the amount)
     recent_deps = (
         db.query(Deposit, User)
         .join(User, Deposit.user_id == User.id)
         .order_by(Deposit.created_at.desc())
-        .limit(10)
+        .limit(limit)
         .all()
     )
     for dep, u in recent_deps:
@@ -2315,7 +2337,7 @@ def get_admin_notifications(
         db.query(AuditLog, User)
         .outerjoin(User, AuditLog.actor_id == User.id)
         .order_by(AuditLog.created_at.desc())
-        .limit(10)
+        .limit(limit)
         .all()
     )
     for log, actor in recent_audits:
@@ -2333,12 +2355,151 @@ def get_admin_notifications(
         })
 
     notifications.sort(key=lambda x: x["created_at"], reverse=True)
+
+    # Trim to the requested size, but never at the cost of an action item:
+    # a busy day of deposits must not push pending withdrawals out of the
+    # feed just because their timestamps are newer.
+    high = [n for n in notifications if n["priority"] == "HIGH"]
+    rest = [n for n in notifications if n["priority"] != "HIGH"]
+    items = high[:limit] + rest[: max(0, limit - len(high[:limit]))]
+    items.sort(key=lambda x: x["created_at"], reverse=True)
+
     unread_count = sum(1 for n in notifications if not n["is_read"])
 
     return success_response({
-        "items": notifications[:limit],
+        "items": items,
         "unread_count": unread_count,
+        # The real number of outstanding payouts, independent of how many
+        # rows fit in the feed.
+        "pending_withdrawal_count": pending_total,
+        # True when anything is being hidden. Comparing fetched-vs-shown
+        # alone would under-report, because each source query is itself
+        # capped at `limit` -- so the authoritative pending count is what
+        # decides whether action items are missing from this page.
+        "truncated": (
+            pending_total > len([i for i in items if i["type"] == "WITHDRAWAL"])
+            or len(notifications) > len(items)
+        ),
     })
+
+
+@router.post("/notifications/send")
+def send_notification(
+    payload: NotificationSendIn,
+    admin: User = Depends(require_permission(AdminPermission.USERS.value)),
+    db: Session = Depends(get_db),
+):
+    """Send an in-app notification to every player, or to selected players.
+
+    The notification is persisted first, then pushed over the websocket to
+    whoever is online. Delivery is best-effort on purpose: the inbox is the
+    source of truth, so a player who is offline sees it on next load.
+    """
+    try:
+        user_uuids = None
+        if payload.user_ids:
+            try:
+                user_uuids = [UUID(str(uid)) for uid in payload.user_ids]
+            except ValueError:
+                return error_response(
+                    "INVALID_RECIPIENT", "One of the selected players is invalid.", status_code=400
+                )
+
+        notification = notification_service.create_notification(
+            db,
+            title=payload.title,
+            message=payload.message,
+            category=payload.category or "GENERAL",
+            audience=payload.audience or "ALL",
+            user_ids=user_uuids,
+            created_by=admin.id,
+        )
+    except ValueError as exc:
+        return error_response("INVALID_NOTIFICATION", str(exc), status_code=400)
+
+    targets = notification_service.recipient_user_ids(db, notification)
+
+    delivered_live = 0
+    try:
+        notification_ws_manager.notify(
+            targets,
+            {
+                "id": str(notification.id),
+                "title": notification.title,
+                "message": notification.message,
+                "category": notification.category.value,
+                "created_at": notification.created_at.isoformat()
+                if notification.created_at
+                else None,
+                "is_read": False,
+            },
+        )
+        delivered_live = len(targets)
+    except Exception:  # noqa: BLE001
+        # The notification is already saved; a push failure must not make the
+        # admin think the send failed and send it twice.
+        logger.warning("Live notification push failed", exc_info=True)
+
+    audit_service.log_action(
+        db,
+        action="NOTIFICATION_SENT",
+        actor_id=admin.id,
+        entity_type="notification",
+        entity_id=str(notification.id),
+        metadata={
+            "audience": notification.audience.value,
+            "recipients": len(targets),
+            "title": notification.title,
+        },
+    )
+    db.commit()
+
+    return success_response(
+        {
+            "id": str(notification.id),
+            "audience": notification.audience.value,
+            "recipients": len(targets),
+            "pushed_to": delivered_live,
+            "message": "Notification sent.",
+        },
+        status_code=201,
+    )
+
+
+@router.get("/notifications/sent")
+def list_sent_notifications(
+    admin: User = Depends(require_permission(AdminPermission.USERS.value)),
+    db: Session = Depends(get_db),
+    limit: int = Query(default=50, ge=1, le=100),
+):
+    """History of notifications sent, with how many players have read each."""
+    return success_response({"items": notification_service.list_sent(db, limit=limit)})
+
+
+@router.delete("/notifications/sent/{notification_id}")
+def retract_notification(
+    notification_id: UUID,
+    admin: User = Depends(require_permission(AdminPermission.USERS.value)),
+    db: Session = Depends(get_db),
+):
+    """Remove a notification from every player's inbox.
+
+    A soft delete: the row stays for the audit trail, but it stops being
+    visible to players, including those who already read it.
+    """
+    if not notification_service.retract(db, notification_id):
+        return error_response("NOTIFICATION_NOT_FOUND", "Notification not found.", status_code=404)
+
+    audit_service.log_action(
+        db,
+        action="NOTIFICATION_RETRACTED",
+        actor_id=admin.id,
+        entity_type="notification",
+        entity_id=str(notification_id),
+        metadata={},
+    )
+    db.commit()
+    return success_response({"message": "Notification withdrawn from all inboxes."})
 
 
 # -- Support Channels & Contact Config -----------------------------------------

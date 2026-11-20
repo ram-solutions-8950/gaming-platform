@@ -155,11 +155,12 @@ app.include_router(fees.router, prefix=PREFIX)
 app.include_router(games.router, prefix=PREFIX)
 app.include_router(referral.router, prefix=PREFIX)
 app.include_router(rewards.router, prefix=PREFIX)
-from .routers import support, system
+from .routers import support, system, notifications
 app.include_router(support.router, prefix=PREFIX)
 app.include_router(system.router, prefix=PREFIX)
+app.include_router(notifications.router, prefix=PREFIX)
 from .routers import ludo, rummy, teen_patti, aviator, poker, chicken_road, triple_777, roulette
-from .websocket import teen_patti_ws, aviator_ws, poker_ws, transactions_ws
+from .websocket import teen_patti_ws, aviator_ws, poker_ws, transactions_ws, notifications_ws
 app.include_router(ludo.router, prefix=PREFIX)
 app.include_router(rummy.router, prefix=PREFIX)
 app.include_router(teen_patti.router, prefix=PREFIX)
@@ -173,6 +174,7 @@ app.include_router(triple_777.router, prefix=PREFIX)
 app.include_router(roulette.router, prefix=PREFIX)
 app.include_router(transactions_ws.router, prefix=PREFIX)
 app.include_router(transactions_ws.router)
+app.include_router(notifications_ws.router, prefix=PREFIX)
 
 # Static file serving — QR code and Avatar uploads
 UPLOAD_DIR = Path(__file__).resolve().parent.parent / "uploads"

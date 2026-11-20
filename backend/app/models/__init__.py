@@ -21,6 +21,13 @@ from .wager import WagerRequirement
 from .winning import UserWinningControl, WinMode
 from .role import AdminPermission, DEFAULT_ROLE_PERMISSIONS
 from .support import SupportTicket, SupportTicketStatus
+from .notification import (
+    Notification,
+    NotificationAudience,
+    NotificationCategory,
+    NotificationRecipient,
+    NotificationRead,
+)
 from .payment_gateway import PaymentGatewayConfig
 from .system_settings import SystemSetting
 from .reward import (
@@ -59,6 +66,8 @@ __all__ = [
     "Referral", "ReferralSettings", "ReferralStatus",
     "WagerRequirement",
     "SupportTicket", "SupportTicketStatus",
+    "Notification", "NotificationAudience", "NotificationCategory",
+    "NotificationRecipient", "NotificationRead",
     "SystemSetting",
     "DailyRewardConfig", "DailyRewardSettings", "UserRewardProfile", "UserDailyRewardClaim",
     "LuckySpinSegmentConfig", "UserLuckySpinLog", "BonusConfig", "UserBonusClaim",
