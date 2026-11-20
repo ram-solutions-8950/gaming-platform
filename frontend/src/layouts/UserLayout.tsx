@@ -17,6 +17,7 @@ import { ServiceModal } from '../components/modals/ServiceModal';
 import { ReferWinPopup } from '../components/modals/ReferWinPopup';
 import { getMediaUrl } from '../utils/media';
 import { APP_VERSION } from '../version';
+import { NotificationBell } from '../components/notifications/NotificationBell';
 
 const navItems = [
   { to: '/dashboard', label: 'Dashboard', icon: '📊' },
@@ -54,8 +55,13 @@ export function UserLayout() {
 
       {/* ─── DESKTOP SIDEBAR (Large Desktop only) ─── */}
       <aside className="hidden 2xl:flex w-64 shrink-0 bg-dark-900 border-r border-dark-700 flex-col z-10 shadow-2xl">
-        <div className="p-6 border-b border-dark-700">
+        <div className="p-6 border-b border-dark-700 flex items-center justify-between gap-3">
           <CasinoLogo size="md" />
+          {/* LobbyHeader (which also carries a bell) is 2xl:hidden, so the
+              desktop sidebar needs its own, or large screens get none. Only
+              one of the two is ever mounted at a time, so there is still a
+              single notification socket. */}
+          <NotificationBell />
         </div>
 
         <div className="p-4">
