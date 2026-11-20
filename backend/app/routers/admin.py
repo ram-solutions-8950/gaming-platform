@@ -138,6 +138,9 @@ def _gateway_display_name(gateway_name: str) -> str:
 
 class SupportConfigUpdateIn(BaseModel):
     whatsapp_vip: Optional[str] = None
+    telegram_url: Optional[str] = None
+    instagram_url: Optional[str] = None
+    facebook_url: Optional[str] = None
     whatsapp_url: Optional[str] = None
     support_email: Optional[str] = None
     helpline_number: Optional[str] = None
@@ -2354,9 +2357,14 @@ def update_support_config_endpoint(
     admin: User = Depends(require_permission(AdminPermission.SUPPORT.value)),
     db: Session = Depends(get_db),
 ):
-    """Update customer support channels, WhatsApp number, email, and FAQs."""
+    """Update customer support channels, social links, email, and FAQs."""
     update_data = data.model_dump(exclude_none=True)
-    cfg = support_service.update_support_config(db, update_data, admin.id)
+    try:
+        cfg = support_service.update_support_config(db, update_data, admin.id)
+    except ValueError as exc:
+        # A rejected link is admin input, not a server fault: answer with the
+        # reason so the panel can show it, rather than a 500.
+        return error_response("INVALID_SUPPORT_CONFIG", str(exc), status_code=400)
     return success_response(cfg)
 
 

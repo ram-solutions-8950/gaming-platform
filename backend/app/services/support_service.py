@@ -21,6 +21,11 @@ DEFAULT_SUPPORT_CONFIG = {
     "support_email": "support@corona888.tech",
     "helpline_number": "1800-888-2026",
     "working_hours": "24/7 Live VIP Support",
+    # Social channels. Empty by default: the player UI hides a channel with
+    # no link rather than showing a button that goes nowhere.
+    "telegram_url": "",
+    "instagram_url": "",
+    "facebook_url": "",
     "faqs": [
         {
             "id": "faq-1",
@@ -41,6 +46,35 @@ DEFAULT_SUPPORT_CONFIG = {
 }
 
 
+#: Config keys that are rendered as links in the player app.
+SOCIAL_LINK_KEYS = ("telegram_url", "instagram_url", "facebook_url", "whatsapp_url")
+
+
+def sanitize_link(value: Optional[str]) -> str:
+    """Accept only a plain http(s) link, or empty.
+
+    These values are typed by an admin and end up in an ``href`` served to
+    every player, so a ``javascript:`` or ``data:`` URL here would be stored
+    XSS against the whole player base. An admin is trusted to run the
+    platform, not to never paste something they were sent, so the check is
+    cheap insurance rather than a statement about them.
+    """
+    text = (value or "").strip()
+    if not text:
+        return ""
+    lowered = text.lower()
+    if not (lowered.startswith("http://") or lowered.startswith("https://")):
+        raise ValueError(
+            "Links must start with http:// or https:// . "
+            f"Received: {text[:60]}"
+        )
+    # Defend against "https://\njavascript:..." style smuggling through
+    # whitespace or control characters.
+    if any(ch in text for ch in ("\n", "\r", "\t", " ", "\x00")):
+        raise ValueError("Links must not contain spaces or line breaks.")
+    return text
+
+
 def get_support_config(db: Session) -> dict:
     """Retrieve dynamic support config from database or return default."""
     row = db.query(SystemSetting).filter(SystemSetting.key == "support_config").first()
@@ -58,6 +92,14 @@ def update_support_config(db: Session, update_data: dict, admin_id: UUID) -> dic
     current = DEFAULT_SUPPORT_CONFIG.copy()
     if row and row.value:
         current.update(row.value)
+
+    # Validate before anything is written, so a bad link leaves the stored
+    # config untouched rather than half-applied.
+    update_data = dict(update_data)
+    for key in SOCIAL_LINK_KEYS:
+        if key in update_data:
+            update_data[key] = sanitize_link(update_data[key])
+
     current.update(update_data)
 
     # Automatically synchronize whatsapp_url if whatsapp_vip was updated and whatsapp_url wasn't customized

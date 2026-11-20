@@ -26,13 +26,17 @@ def get_contact_info(response: Response, db: Session = Depends(get_db)):
     response.headers["Pragma"] = "no-cache"
     response.headers["Expires"] = "0"
     cfg = support_service.get_support_config(db)
-    # Ensure Telegram is completely omitted from the public support response
     return success_response({
         "whatsapp_vip": cfg.get("whatsapp_vip", "+91 98765 43210"),
         "whatsapp_url": cfg.get("whatsapp_url", "https://wa.me/919876543210"),
         "support_email": cfg.get("support_email", "support@corona888.tech"),
         "helpline_number": cfg.get("helpline_number", "1800-888-2026"),
         "working_hours": cfg.get("working_hours", "24/7 Live Support"),
+        # Social channels. Each is "" until an admin sets it, and the player
+        # UI hides a channel with no link rather than showing a dead button.
+        "telegram_url": cfg.get("telegram_url", ""),
+        "instagram_url": cfg.get("instagram_url", ""),
+        "facebook_url": cfg.get("facebook_url", ""),
         "faqs": cfg.get("faqs", []),
     })
 

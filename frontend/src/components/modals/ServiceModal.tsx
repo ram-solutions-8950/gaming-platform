@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { soundManager } from '../../services/soundManager';
 import { copyToClipboard } from '../../utils/clipboard';
 import { supportService, type SupportContactInfo, type UserSupportTicket } from '../../services/supportService';
+import { TelegramIcon, InstagramIcon, FacebookIcon, safeExternalUrl } from '../common/BrandIcons';
 import toast from 'react-hot-toast';
 import { Clock, RefreshCw, Send, CheckCircle, AlertCircle } from 'lucide-react';
 
@@ -34,6 +35,13 @@ export const ServiceModal: React.FC<Props> = ({ onClose }) => {
   const [loadingTickets, setLoadingTickets] = useState(false);
 
   const [copiedChannel, setCopiedChannel] = useState<string | null>(null);
+
+  // Admin-managed social links. Each is validated before it reaches an href,
+  // and a channel the admin has not configured is hidden rather than shown as
+  // a button that goes nowhere.
+  const telegramUrl = safeExternalUrl(contactInfo.telegram_url);
+  const instagramUrl = safeExternalUrl(contactInfo.instagram_url);
+  const facebookUrl = safeExternalUrl(contactInfo.facebook_url);
 
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
@@ -214,7 +222,7 @@ export const ServiceModal: React.FC<Props> = ({ onClose }) => {
 
         {/* Content Body */}
         <div className="p-4 overflow-y-auto space-y-3.5 flex-1 min-h-0 text-xs">
-          {/* TAB 1: DIRECT CHANNELS (WhatsApp Only - Telegram Removed) */}
+          {/* TAB 1: DIRECT CHANNELS */}
           {activeTab === 'channels' && (
             <div className="space-y-3 animate-fade-in">
               {/* WhatsApp Card */}
@@ -277,6 +285,79 @@ export const ServiceModal: React.FC<Props> = ({ onClose }) => {
                   {copiedChannel === 'email' ? '✓ Copied' : 'Copy Email'}
                 </button>
               </div>
+
+              {/* Telegram channel + signup bonus instructions */}
+              {telegramUrl && (
+                <div className="p-4 rounded-xl bg-gradient-to-r from-[#0b2e45] to-[#061a28] border-2 border-sky-400/50 shadow-xl space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 rounded-full bg-sky-500/20 flex items-center justify-center text-sky-400 shrink-0">
+                        <TelegramIcon className="w-7 h-7" title="Telegram" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-extrabold text-sm text-sky-300">Official Telegram Channel</span>
+                          <span className="text-[9px] bg-sky-400/20 text-sky-200 px-1.5 py-0.5 rounded font-bold uppercase">
+                            Bonus Desk
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-sky-300/80 mt-0.5">
+                          Announcements, bonus drops and claim support
+                        </p>
+                      </div>
+                    </div>
+                    <a
+                      href={telegramUrl}
+                      target="_blank"
+                      rel="noreferrer noopener"
+                      className="px-4 py-2 bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-400 hover:to-blue-500 text-white rounded-xl text-xs font-black shadow-lg shadow-sky-600/30 active:scale-95 transition flex items-center justify-center gap-1.5 cursor-pointer self-end sm:self-center shrink-0"
+                    >
+                      <TelegramIcon className="w-4 h-4" />
+                      <span>Join Telegram</span>
+                    </a>
+                  </div>
+
+                  <div className="p-2.5 rounded-lg bg-sky-950/50 border border-sky-400/30 flex items-start gap-2">
+                    <span className="text-sky-300 text-sm shrink-0">🎁</span>
+                    <p className="text-[11px] text-sky-100 leading-relaxed">
+                      <strong>After sign up, upload your screenshot to our Telegram to get the bonus.</strong>{' '}
+                      Send a screenshot of your completed registration to the channel above and our team will credit your
+                      welcome bonus.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Follow us on social media */}
+              {(instagramUrl || facebookUrl) && (
+                <div className="p-3.5 rounded-xl bg-gradient-to-r from-[#241038] to-[#140821] border border-fuchsia-400/30 shadow-lg">
+                  <p className="text-[11px] font-bold text-fuchsia-200 mb-2.5">Follow us for giveaways &amp; updates</p>
+                  <div className="flex items-center gap-2.5 flex-wrap">
+                    {instagramUrl && (
+                      <a
+                        href={instagramUrl}
+                        target="_blank"
+                        rel="noreferrer noopener"
+                        className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-white text-xs font-bold shadow-lg active:scale-95 transition cursor-pointer bg-gradient-to-r from-[#833AB4] via-[#E4405F] to-[#F77737] hover:opacity-90"
+                      >
+                        <InstagramIcon className="w-4 h-4" title="Instagram" />
+                        <span>Instagram</span>
+                      </a>
+                    )}
+                    {facebookUrl && (
+                      <a
+                        href={facebookUrl}
+                        target="_blank"
+                        rel="noreferrer noopener"
+                        className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-white text-xs font-bold shadow-lg active:scale-95 transition cursor-pointer bg-[#1877F2] hover:bg-[#0d6ae0]"
+                      >
+                        <FacebookIcon className="w-4 h-4" title="Facebook" />
+                        <span>Facebook</span>
+                      </a>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {/* Working Hours Banner */}
               <div className="p-3 bg-purple-950/40 border border-purple-500/30 rounded-xl flex items-center gap-2.5 text-xs text-purple-200">

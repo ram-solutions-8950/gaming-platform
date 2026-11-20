@@ -6,6 +6,10 @@ export interface SupportContactInfo {
   support_email: string;
   helpline_number: string;
   working_hours: string;
+  /** Social channels. Empty string until an admin sets them. */
+  telegram_url?: string;
+  instagram_url?: string;
+  facebook_url?: string;
   faqs: Array<{ id: string; question: string; answer: string }>;
 }
 
