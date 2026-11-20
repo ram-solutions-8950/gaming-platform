@@ -112,7 +112,43 @@ export const Footer: React.FC = () => {
                   className="hover:text-[#0284C7] transition-colors flex items-center gap-1.5"
                 >
                   <span className="text-[#0284C7] font-bold">›</span>
-                  Terms & Conditions (Warranty & Returns)
+                  Terms &amp; Conditions
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/privacy"
+                  className="hover:text-[#0284C7] transition-colors flex items-center gap-1.5"
+                >
+                  <span className="text-[#0284C7] font-bold">›</span>
+                  Privacy Policy
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/refund"
+                  className="hover:text-[#0284C7] transition-colors flex items-center gap-1.5"
+                >
+                  <span className="text-[#0284C7] font-bold">›</span>
+                  Refund &amp; Cancellation Policy
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/returns"
+                  className="hover:text-[#0284C7] transition-colors flex items-center gap-1.5"
+                >
+                  <span className="text-[#0284C7] font-bold">›</span>
+                  Return Policy
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/shipping"
+                  className="hover:text-[#0284C7] transition-colors flex items-center gap-1.5"
+                >
+                  <span className="text-[#0284C7] font-bold">›</span>
+                  Shipping Policy
                 </Link>
               </li>
               <li>
@@ -172,7 +208,23 @@ export const Footer: React.FC = () => {
           </p>
           <div className="flex items-center gap-4 sm:gap-6 flex-wrap justify-center font-medium">
             <Link href="/terms" className="hover:text-[#0284C7] transition-colors">
-              Terms & Conditions
+              Terms &amp; Conditions
+            </Link>
+            <span className="text-slate-300">|</span>
+            <Link href="/privacy" className="hover:text-[#0284C7] transition-colors">
+              Privacy
+            </Link>
+            <span className="text-slate-300">|</span>
+            <Link href="/refund" className="hover:text-[#0284C7] transition-colors">
+              Refunds
+            </Link>
+            <span className="text-slate-300">|</span>
+            <Link href="/returns" className="hover:text-[#0284C7] transition-colors">
+              Returns
+            </Link>
+            <span className="text-slate-300">|</span>
+            <Link href="/shipping" className="hover:text-[#0284C7] transition-colors">
+              Shipping
             </Link>
             <span className="text-slate-300">|</span>
             <Link href="/payment-issues" className="hover:text-[#0284C7] transition-colors">
