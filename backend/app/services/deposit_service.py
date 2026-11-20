@@ -102,6 +102,9 @@ def create_deposit(
             "INR",
         ),
         "payment_session_id": provider_result.get("payment_session_id"),
+        # Gateways that hand back a ready-made hosted-checkout link (Easebuzz)
+        # rather than a session id the client SDK opens (Cashfree, Razorpay).
+        "payment_url": provider_result.get("payment_url"),
         "environment": provider_result.get("environment"),
         "provider": provider_result.get("provider", provider_name_final),
     }

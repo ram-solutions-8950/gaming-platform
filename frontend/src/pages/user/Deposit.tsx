@@ -80,6 +80,16 @@ interface DepositResponse {
 }
 
 
+// Gateways whose checkout is a hosted page we redirect to, rather than an
+// in-page SDK like Razorpay Checkout.
+const HOSTED_CHECKOUT_PROVIDERS = ['cashfree', 'easebuzz'];
+
+const GATEWAY_LABELS: Record<string, string> = {
+  cashfree: 'Cashfree',
+  easebuzz: 'Easebuzz',
+};
+
+
 function loadRazorpayScript(): Promise<boolean> {
   return new Promise((resolve) => {
     if (window.Razorpay) {
@@ -248,15 +258,30 @@ export function DepositPage() {
 
       setDeposit(depositData);
 
-      if (depositData.provider === 'cashfree') {
+      // Gateways that hand back a hosted checkout URL: the player is sent to
+      // the gateway's own page and the deposit is confirmed by the webhook,
+      // so the client only has to open the link and then poll.
+      if (HOSTED_CHECKOUT_PROVIDERS.includes(depositData.provider)) {
+        const gatewayLabel = GATEWAY_LABELS[depositData.provider] || 'payment';
         const environment = depositData.environment === 'production' ? 'production' : 'sandbox';
+
+        // Only Cashfree's link can be rebuilt client-side, from its payment
+        // session id. Easebuzz's URL embeds a server-issued access key, so if
+        // the server did not send one there is nothing to fall back to.
         const checkoutUrl = depositData.checkout_url ||
-          `https://polandexim.com/pay?session_id=${depositData.payment_session_id}&order_id=${depositData.provider_order_id}&mode=${environment}&amount=${depositData.amount}&deposit_id=${depositData.id}`;
+          (depositData.provider === 'cashfree'
+            ? `https://polandexim.com/pay?session_id=${depositData.payment_session_id}&order_id=${depositData.provider_order_id}&mode=${environment}&amount=${depositData.amount}&deposit_id=${depositData.id}`
+            : '');
 
-        setPaymentStatus('Opening secure Cashfree payment portal...');
+        if (!checkoutUrl) {
+          throw new Error(
+            'The payment gateway did not return a checkout link. Please try again.',
+          );
+        }
 
-        // Route payment through the intermediate hosted page (polandexim.com)
-        // so Cashfree recognizes the request from the whitelisted merchant domain
+        setPaymentStatus(`Opening secure ${gatewayLabel} payment portal...`);
+
+        // Open the gateway's hosted checkout page on the whitelisted domain.
         if (isNativePlatform()) {
           window.open(checkoutUrl, '_system');
         } else {
@@ -276,7 +301,7 @@ export function DepositPage() {
               {
                 provider_order_id: depositData.provider_order_id,
                 provider_payment_id: depositData.provider_order_id,
-                signature: 'cashfree_checkout',
+                signature: `${depositData.provider}_checkout`,
               },
             );
 

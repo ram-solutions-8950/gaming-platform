@@ -51,12 +51,30 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 10080  # 7 days for seamless gaming sessions
     REFRESH_TOKEN_EXPIRE_DAYS: int = 90
 
-    PAYMENT_PROVIDER: str = ""
     PAYMENT_API_KEY: str = ""
     PAYMENT_SECRET: str = ""
     PAYMENT_WEBHOOK_SECRET: str = ""
     CASHFREE_RETURN_URL: str = "https://polandexim.com/wallet?status={order_status}&order_id={order_id}"
     CASHFREE_NOTIFY_URL: str = "https://polandexim.com/api/v1/payments/webhook?provider=cashfree"
+
+    # Easebuzz sends the player's BROWSER to these with a form POST carrying
+    # the signed result, so they must point at the return endpoint (which
+    # verifies, credits and then redirects) and not at the JSON webhook.
+    # Both are mandatory in the initiateLink request; a gateway row may
+    # override them via extra_config.
+    EASEBUZZ_SURL: str = "https://polandexim.com/api/v1/payments/easebuzz/return"
+    EASEBUZZ_FURL: str = "https://polandexim.com/api/v1/payments/easebuzz/return"
+
+    # Gateway credentials are NOT configured here. Every gateway's keys,
+    # secrets and sandbox flag live in payment_gateway_configs and are
+    # entered in Admin Panel > Payment Gateways, so that rotating a key
+    # never needs a redeploy and a stale environment variable can never
+    # quietly take over from what an admin set.
+    #
+    # Deposit gateway fallback, used only when no gateway row is marked
+    # active yet: "easebuzz", "cashfree" or "razorpay". The active row in
+    # the admin panel overrides it.
+    PAYMENT_PROVIDER: str = ""
 
 settings = Settings()
 

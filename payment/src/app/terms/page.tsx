@@ -1,5 +1,6 @@
 import React from "react";
 import Link from "next/link";
+import { COMPANY } from "@/data/company";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 
@@ -43,7 +44,7 @@ export default function TermsPage() {
                 1. General Overview & Agreement
               </h2>
               <p className="text-slate-600 leading-relaxed">
-                By purchasing through the <strong>AquaSan</strong> checkout portal, you agree to be bound by these Terms and Conditions. AquaSan supplies premium sanitaryware, bathroom furniture, mixer taps, and plumbing accessories conforming to Indian and international quality standards.
+                By purchasing through the <strong>AquaSan</strong> checkout portal, operated by <strong>{COMPANY.legalName}</strong> (registered office: {COMPANY.addressLine}), you agree to be bound by these Terms and Conditions. AquaSan supplies premium sanitaryware, bathroom furniture, mixer taps, and plumbing accessories conforming to Indian and international quality standards.
               </p>
             </section>
 
@@ -112,7 +113,7 @@ export default function TermsPage() {
                 6. Governing Law & Jurisdiction
               </h2>
               <p className="text-slate-600 leading-relaxed">
-                These conditions are governed by and construed in accordance with the laws of the Republic of India. Any legal dispute or claims arising out of or in connection with the purchase of AquaSan products shall be subject to the exclusive jurisdiction of the competent courts in <strong>Jaipur, Rajasthan, India</strong>.
+                These conditions are governed by and construed in accordance with the laws of the Republic of India. Any legal dispute or claims arising out of or in connection with the purchase of AquaSan products shall be subject to the exclusive jurisdiction of the competent courts in <strong>{COMPANY.jurisdiction}</strong>.
               </p>
             </section>
           </div>

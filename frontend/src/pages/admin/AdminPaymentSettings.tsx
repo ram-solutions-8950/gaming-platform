@@ -41,8 +41,88 @@ interface PaymentGatewayConfigItem {
   has_payout_credentials?: boolean;
   payout_api_key_masked?: string;
   payout_account_number_masked?: string;
+  // Capability flags from the backend's gateway registry.
+  supports_deposits?: boolean;
+  supports_payouts?: boolean;
+  has_payout_token?: boolean;
+  payout_token_masked?: string;
+  surl?: string;
+  furl?: string;
   updated_at: string | null;
 }
+
+type PayoutStyle = 'none' | 'razorpayx' | 'token';
+
+interface GatewayMeta {
+  badge: string;
+  badgeClass: string;
+  keyLabel: string;
+  keyPlaceholder: string;
+  secretLabel: string;
+  secretPlaceholder: string;
+  payoutStyle: PayoutStyle;
+  /** Easebuzz needs success/failure return URLs on every request. */
+  needsReturnUrls?: boolean;
+  note?: string;
+}
+
+// Per-gateway presentation and field shape. Adding a gateway here plus in the
+// backend's SUPPORTED_GATEWAYS is all it takes -- the form below is driven
+// entirely off this, rather than branching on the gateway name inline.
+const GATEWAY_META: Record<string, GatewayMeta> = {
+  cashfree: {
+    badge: 'CF',
+    badgeClass: 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/40',
+    keyLabel: 'Cashfree App ID (Client ID)',
+    keyPlaceholder: 'e.g. TEST10048...',
+    secretLabel: 'Cashfree Secret Key',
+    secretPlaceholder: 'Enter secret key...',
+    payoutStyle: 'none',
+  },
+  razorpay: {
+    badge: 'RZ',
+    badgeClass: 'bg-blue-500/20 text-blue-400 border border-blue-500/40',
+    keyLabel: 'Razorpay Key ID',
+    keyPlaceholder: 'e.g. rzp_test_... or rzp_live_...',
+    secretLabel: 'Razorpay Key Secret',
+    secretPlaceholder: 'Enter secret key...',
+    payoutStyle: 'razorpayx',
+  },
+  easebuzz: {
+    badge: 'EB',
+    badgeClass: 'bg-violet-500/20 text-violet-300 border border-violet-500/40',
+    keyLabel: 'Easebuzz Merchant Key',
+    keyPlaceholder: 'From Easebuzz dashboard > Settings > API keys',
+    secretLabel: 'Easebuzz Salt',
+    secretPlaceholder: 'Enter the Salt value...',
+    payoutStyle: 'none',
+    needsReturnUrls: true,
+    note: 'Register the Success and Failure URLs below in the Easebuzz dashboard. Easebuzz does not send payment results anywhere else.',
+  },
+  airpay: {
+    badge: 'AP',
+    badgeClass: 'bg-orange-500/20 text-orange-300 border border-orange-500/40',
+    keyLabel: 'Airpay Merchant ID (optional)',
+    keyPlaceholder: 'mercid',
+    secretLabel: 'Airpay Secret (optional)',
+    secretPlaceholder: 'Not used for payouts',
+    payoutStyle: 'token',
+    note: 'Payouts only — Airpay cannot be used for deposits here. Confirm the payout API token, whether UPI-only transfers are allowed, and the full status list with your Airpay account manager before going live.',
+  },
+};
+
+const FALLBACK_META: GatewayMeta = {
+  badge: '??',
+  badgeClass: 'bg-gray-500/20 text-gray-300 border border-gray-500/40',
+  keyLabel: 'API Key',
+  keyPlaceholder: 'API key',
+  secretLabel: 'API Secret',
+  secretPlaceholder: 'API secret',
+  payoutStyle: 'none',
+};
+
+const metaFor = (gatewayName: string): GatewayMeta =>
+  GATEWAY_META[gatewayName] ?? FALLBACK_META;
 
 export function AdminPaymentSettingsPage() {
   const [activeTab, setActiveTab] = useState<'gateways' | 'manual'>('gateways');
@@ -62,6 +142,9 @@ export function AdminPaymentSettingsPage() {
   const [payoutApiSecret, setPayoutApiSecret] = useState('');
   const [payoutAccountNumber, setPayoutAccountNumber] = useState('');
   const [payoutsEnabled, setPayoutsEnabled] = useState(false);
+  const [payoutToken, setPayoutToken] = useState('');
+  const [gwSurl, setGwSurl] = useState('');
+  const [gwFurl, setGwFurl] = useState('');
   const [savingGateway, setSavingGateway] = useState(false);
 
   // Manual UPI Settings State
@@ -121,6 +204,9 @@ export function AdminPaymentSettingsPage() {
     setPayoutApiSecret('');
     setPayoutAccountNumber('');
     setPayoutsEnabled(Boolean(gw.payouts_enabled));
+    setPayoutToken('');
+    setGwSurl(gw.surl || '');
+    setGwFurl(gw.furl || '');
   };
 
   const handleSaveGateway = async (e: React.FormEvent) => {
@@ -134,11 +220,21 @@ export function AdminPaymentSettingsPage() {
       if (gwApiKey.trim()) payload.api_key = gwApiKey.trim();
       if (gwApiSecret.trim()) payload.api_secret = gwApiSecret.trim();
       if (gwWebhookSecret.trim()) payload.webhook_secret = gwWebhookSecret.trim();
-      if (editingGateway === 'razorpay') {
+      const meta = metaFor(editingGateway);
+
+      if (meta.payoutStyle === 'razorpayx') {
         payload.payouts_enabled = payoutsEnabled;
         if (payoutApiKey.trim()) payload.payout_api_key = payoutApiKey.trim();
         if (payoutApiSecret.trim()) payload.payout_api_secret = payoutApiSecret.trim();
         if (payoutAccountNumber.trim()) payload.payout_account_number = payoutAccountNumber.trim();
+      } else if (meta.payoutStyle === 'token') {
+        payload.payouts_enabled = payoutsEnabled;
+        if (payoutToken.trim()) payload.payout_token = payoutToken.trim();
+      }
+
+      if (meta.needsReturnUrls) {
+        if (gwSurl.trim()) payload.surl = gwSurl.trim();
+        if (gwFurl.trim()) payload.furl = gwFurl.trim();
       }
 
       await adminService.updatePaymentGateway(editingGateway, payload);
@@ -251,7 +347,7 @@ export function AdminPaymentSettingsPage() {
             <span>Payment Gateway & Banking Controls</span>
           </h1>
           <p className="text-gray-400 text-xs mt-1">
-            Select Cashfree or Razorpay for deposits. Configure RazorpayX Payouts separately for admin-approved withdrawals.
+            Pick one gateway for deposits and, independently, one for withdrawal payouts. Credentials are stored server-side.
           </p>
         </div>
 
@@ -282,7 +378,7 @@ export function AdminPaymentSettingsPage() {
         </div>
       </div>
 
-      {/* TAB 1: AUTOMATED GATEWAYS (CASHFREE & RAZORPAY) */}
+      {/* TAB 1: AUTOMATED GATEWAYS */}
       {activeTab === 'gateways' && (
         <div className="space-y-6 animate-fade-in">
           {/* Active Gateway Status Banner */}
@@ -322,7 +418,12 @@ export function AdminPaymentSettingsPage() {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {gateways.map((gw) => {
-                const isCashfree = gw.gateway_name === 'cashfree';
+                const meta = metaFor(gw.gateway_name);
+                // Default true so a gateway the backend has not labelled yet
+                // keeps its deposit controls rather than losing them.
+                const canCollect = gw.supports_deposits !== false;
+                const canPayout = Boolean(gw.supports_payouts);
+                const payoutConfigured = Boolean(gw.has_payout_credentials);
                 const borderColor = gw.is_active
                   ? 'border-brand-500/80 shadow-[0_0_30px_rgba(234,179,8,0.15)]'
                   : 'border-[#1d273d]';
@@ -336,10 +437,8 @@ export function AdminPaymentSettingsPage() {
                     <div>
                       <div className="flex items-center justify-between pb-3 border-b border-[#1d273d]">
                         <div className="flex items-center gap-2.5">
-                          <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-black text-sm ${
-                            isCashfree ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/40' : 'bg-blue-500/20 text-blue-400 border border-blue-500/40'
-                          }`}>
-                            {isCashfree ? 'CF' : 'RZ'}
+                          <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-black text-sm ${meta.badgeClass}`}>
+                            {meta.badge}
                           </div>
                           <div>
                             <h3 className="font-bold text-white text-base">{gw.display_name}</h3>
@@ -353,9 +452,13 @@ export function AdminPaymentSettingsPage() {
                               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
                               Active for deposits
                             </span>
-                          ) : (
+                          ) : canCollect ? (
                             <span className="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase bg-gray-500/20 text-gray-400 border border-gray-500/30">
                               Standby
+                            </span>
+                          ) : (
+                            <span className="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                              Payouts only
                             </span>
                           )}
                         </div>
@@ -392,11 +495,21 @@ export function AdminPaymentSettingsPage() {
                             {gw.has_webhook_secret ? '•••••••• (Configured)' : 'Optional'}
                           </span>
                         </div>
-                        {!isCashfree && (
+                        {canPayout && (
                           <div className="flex items-center justify-between p-2.5 rounded-xl bg-[#141b2d] border border-[#1d273d]">
-                            <span className="text-gray-400">RazorpayX Payouts:</span>
-                            <span className={`font-bold ${gw.payouts_enabled && gw.has_payout_credentials ? 'text-emerald-300' : 'text-gray-400'}`}>
-                              {gw.payouts_enabled && gw.has_payout_credentials ? `Enabled · ${gw.payout_account_number_masked || 'Source account set'}` : 'Not enabled'}
+                            <span className="text-gray-400">Withdrawal payouts:</span>
+                            <span className={`font-bold ${gw.payouts_enabled && payoutConfigured ? 'text-emerald-300' : 'text-gray-400'}`}>
+                              {gw.payouts_enabled && payoutConfigured
+                                ? `Enabled · ${gw.payout_account_number_masked || gw.payout_token_masked || 'Credentials set'}`
+                                : 'Not enabled'}
+                            </span>
+                          </div>
+                        )}
+                        {meta.needsReturnUrls && (
+                          <div className="flex items-center justify-between gap-3 p-2.5 rounded-xl bg-[#141b2d] border border-[#1d273d]">
+                            <span className="text-gray-400 shrink-0">Return URL:</span>
+                            <span className="font-mono text-[10px] text-gray-200 truncate">
+                              {gw.surl || 'Using server default'}
                             </span>
                           </div>
                         )}
@@ -413,7 +526,7 @@ export function AdminPaymentSettingsPage() {
                         <span>Edit Credentials</span>
                       </button>
 
-                      {!gw.is_active && (
+                      {!gw.is_active && canCollect && (
                         <button
                           onClick={() => handleActivateGateway(gw.gateway_name)}
                           disabled={activating === gw.gateway_name}
@@ -448,13 +561,19 @@ export function AdminPaymentSettingsPage() {
                 </div>
 
                 <form onSubmit={handleSaveGateway} className="space-y-4 text-xs">
+                  {metaFor(editingGateway).note && (
+                    <p className="rounded-xl border border-sky-500/30 bg-sky-500/5 p-3 text-[10px] leading-relaxed text-sky-200">
+                      {metaFor(editingGateway).note}
+                    </p>
+                  )}
+
                   <div>
                     <label className="block font-semibold text-gray-300 mb-1">
-                      {editingGateway === 'cashfree' ? 'Cashfree App ID (Client ID)' : 'Razorpay Key ID'}
+                      {metaFor(editingGateway).keyLabel}
                     </label>
                     <input
                       type="text"
-                      placeholder={editingGateway === 'cashfree' ? 'e.g. TEST10048...' : 'e.g. rzp_test_... or rzp_live_...'}
+                      placeholder={metaFor(editingGateway).keyPlaceholder}
                       value={gwApiKey}
                       onChange={(e) => setGwApiKey(e.target.value)}
                       className="w-full bg-[#141b2d] border border-[#222c44] rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-brand-500 font-mono"
@@ -462,7 +581,37 @@ export function AdminPaymentSettingsPage() {
                     <span className="text-[10px] text-gray-500 mt-0.5 block">Leave empty to keep existing key</span>
                   </div>
 
-                  {editingGateway === 'razorpay' && (
+                  {metaFor(editingGateway).payoutStyle === 'token' && (
+                    <div className="space-y-3 rounded-xl border border-orange-500/30 bg-orange-500/5 p-3">
+                      <div>
+                        <p className="text-xs font-bold text-orange-200">Payout API token</p>
+                        <p className="mt-1 text-[10px] leading-relaxed text-gray-400">
+                          The token issued for the payout (disbursal) product, which is separate from any collection credentials. It is stored server-side and never returned to this screen.
+                        </p>
+                      </div>
+                      <input
+                        type="password"
+                        placeholder="Payout API token (blank keeps current)"
+                        value={payoutToken}
+                        onChange={(e) => setPayoutToken(e.target.value)}
+                        className="w-full rounded-xl border border-[#222c44] bg-[#141b2d] px-3.5 py-2 font-mono text-xs text-white focus:border-brand-500 focus:outline-none"
+                      />
+                      <label className="flex items-center justify-between gap-3 text-xs text-white">
+                        <span>{payoutsEnabled ? 'Automated payouts enabled' : 'Keep withdrawals in manual mode'}</span>
+                        <input
+                          type="checkbox"
+                          checked={payoutsEnabled}
+                          onChange={(e) => setPayoutsEnabled(e.target.checked)}
+                          className="h-4 w-4 accent-orange-400"
+                        />
+                      </label>
+                      <p className="text-[10px] leading-relaxed text-amber-200/80">
+                        Enabling this here switches automated payouts off on every other gateway, so withdrawals only ever have one destination.
+                      </p>
+                    </div>
+                  )}
+
+                  {metaFor(editingGateway).payoutStyle === 'razorpayx' && (
                     <div className="space-y-3 rounded-xl border border-amber-500/30 bg-amber-500/5 p-3">
                       <div>
                         <p className="text-xs font-bold text-amber-200">Separate RazorpayX Payouts setup</p>
@@ -503,11 +652,11 @@ export function AdminPaymentSettingsPage() {
 
                   <div>
                     <label className="block font-semibold text-gray-300 mb-1">
-                      {editingGateway === 'cashfree' ? 'Cashfree Secret Key' : 'Razorpay Key Secret'}
+                      {metaFor(editingGateway).secretLabel}
                     </label>
                     <input
                       type="password"
-                      placeholder="Enter secret key..."
+                      placeholder={metaFor(editingGateway).secretPlaceholder}
                       value={gwApiSecret}
                       onChange={(e) => setGwApiSecret(e.target.value)}
                       className="w-full bg-[#141b2d] border border-[#222c44] rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-brand-500 font-mono"
@@ -527,6 +676,31 @@ export function AdminPaymentSettingsPage() {
                       className="w-full bg-[#141b2d] border border-[#222c44] rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-brand-500 font-mono"
                     />
                   </div>
+
+                  {metaFor(editingGateway).needsReturnUrls && (
+                    <div className="space-y-3 rounded-xl border border-violet-500/30 bg-violet-500/5 p-3">
+                      <div>
+                        <p className="text-xs font-bold text-violet-200">Success &amp; failure return URLs</p>
+                        <p className="mt-1 text-[10px] leading-relaxed text-gray-400">
+                          Both must match what is registered in the gateway dashboard. Leave blank to use the server default.
+                        </p>
+                      </div>
+                      <input
+                        type="text"
+                        placeholder="Success URL (surl)"
+                        value={gwSurl}
+                        onChange={(e) => setGwSurl(e.target.value)}
+                        className="w-full rounded-xl border border-[#222c44] bg-[#141b2d] px-3.5 py-2 font-mono text-[11px] text-white focus:border-brand-500 focus:outline-none"
+                      />
+                      <input
+                        type="text"
+                        placeholder="Failure URL (furl)"
+                        value={gwFurl}
+                        onChange={(e) => setGwFurl(e.target.value)}
+                        className="w-full rounded-xl border border-[#222c44] bg-[#141b2d] px-3.5 py-2 font-mono text-[11px] text-white focus:border-brand-500 focus:outline-none"
+                      />
+                    </div>
+                  )}
 
                   <div className="p-3 bg-[#141b2d] rounded-xl border border-[#222c44] flex items-center justify-between">
                     <div>

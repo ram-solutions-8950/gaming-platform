@@ -27,6 +27,7 @@ from ..models.wager import WagerRequirement
 from ..models.audit_log import AuditLog
 from ..models.support import SupportTicket, SupportTicketStatus
 from ..models.payment_gateway import PaymentGatewayConfig
+from ..config import settings
 from ..models.system_settings import SystemSetting
 from ..app_version import LATEST_APP_VERSION
 from ..models.refresh_token import RefreshToken
@@ -109,6 +110,30 @@ class PaymentGatewayUpdateIn(BaseModel):
     payout_api_key: Optional[str] = None
     payout_api_secret: Optional[str] = None
     payout_account_number: Optional[str] = None
+    # Airpay issues a single payout API token instead of a key/secret/account
+    # triple.
+    payout_token: Optional[str] = None
+    # Easebuzz requires success/failure return URLs in every payment request.
+    surl: Optional[str] = None
+    furl: Optional[str] = None
+
+
+#: Gateways the admin panel can configure, and what each one can do.
+#: "collect" = can take deposits; "payout" = can settle withdrawals.
+#: Deposits follow the is_active row, payouts follow
+#: extra_config["payouts_enabled"], so the two can be different gateways.
+SUPPORTED_GATEWAYS: Dict[str, Dict[str, Any]] = {
+    "cashfree": {"display_name": "Cashfree Payments", "collect": True, "payout": False},
+    "razorpay": {"display_name": "Razorpay Standard PG", "collect": True, "payout": True},
+    "easebuzz": {"display_name": "Easebuzz Payment Gateway", "collect": True, "payout": False},
+    "airpay": {"display_name": "Airpay Payouts", "collect": False, "payout": True},
+}
+
+
+def _gateway_display_name(gateway_name: str) -> str:
+    return SUPPORTED_GATEWAYS.get(gateway_name, {}).get(
+        "display_name", gateway_name.title()
+    )
 
 
 class SupportConfigUpdateIn(BaseModel):
@@ -2388,28 +2413,36 @@ def list_payment_gateways(
 ):
     """List online payment gateways (Cashfree & Razorpay) with active status and settings."""
     gateways = db.query(PaymentGatewayConfig).all()
-    if not gateways:
-        cf = PaymentGatewayConfig(
-            gateway_name="cashfree",
-            display_name="Cashfree Payments",
-            is_active=False,
-            api_key="",
-            api_secret="",
-            webhook_secret="",
-            is_sandbox=True,
-        )
-        rz = PaymentGatewayConfig(
-            gateway_name="razorpay",
-            display_name="Razorpay Standard PG",
-            is_active=True,
-            api_key="",
-            api_secret="",
-            webhook_secret="",
-            is_sandbox=True,
-        )
-        db.add_all([cf, rz])
+    existing_names = {str(g.gateway_name).strip().lower() for g in gateways}
+
+    # Create a row for any supported gateway that has none yet. This also
+    # backfills gateways added after the platform was first configured, so a
+    # new one appears in the panel without a migration.
+    missing = [name for name in SUPPORTED_GATEWAYS if name not in existing_names]
+    if missing:
+        # On a brand-new install, honour PAYMENT_PROVIDER from the
+        # environment. Hardcoding razorpay active here would silently
+        # override an env-configured deposit gateway the first time an
+        # admin opened this page.
+        env_provider = (settings.PAYMENT_PROVIDER or "").strip().lower()
+        default_active = env_provider if env_provider in SUPPORTED_GATEWAYS else "razorpay"
+
+        for name in missing:
+            db.add(
+                PaymentGatewayConfig(
+                    gateway_name=name,
+                    # Only ever on a fresh install: backfilling a gateway into
+                    # a running platform must not move live deposit traffic.
+                    is_active=(name == default_active and not existing_names),
+                    display_name=_gateway_display_name(name),
+                    api_key="",
+                    api_secret="",
+                    webhook_secret="",
+                    is_sandbox=True,
+                )
+            )
         db.commit()
-        gateways = [cf, rz]
+        gateways = db.query(PaymentGatewayConfig).all()
 
     result = []
     for g in gateways:
@@ -2423,11 +2456,23 @@ def list_payment_gateways(
         payout_key = str(extra.get("payout_api_key") or "")
         payout_account = str(extra.get("payout_account_number") or "")
 
+        gname = str(g.gateway_name).strip().lower()
+        capability = SUPPORTED_GATEWAYS.get(gname, {})
+        payout_token = str(extra.get("payout_token") or "")
+
         result.append({
             "id": str(g.id),
             "gateway_name": g.gateway_name,
             "display_name": g.display_name,
             "is_active": g.is_active,
+            # Lets the panel grey out what a gateway cannot do, rather than
+            # letting an admin set a payout-only gateway as active.
+            "supports_deposits": bool(capability.get("collect")),
+            "supports_payouts": bool(capability.get("payout")),
+            "has_payout_token": bool(payout_token),
+            "payout_token_masked": ("*" * max(0, len(payout_token) - 4) + payout_token[-4:]) if payout_token else "",
+            "surl": str(extra.get("surl") or ""),
+            "furl": str(extra.get("furl") or ""),
             "api_key": key,
             "api_key_masked": masked_key,
             "has_key": bool(key),
@@ -2437,7 +2482,11 @@ def list_payment_gateways(
             "has_webhook_secret": bool(g.webhook_secret),
             "is_sandbox": g.is_sandbox,
             "payouts_enabled": bool(extra.get("payouts_enabled", False)),
-            "has_payout_credentials": bool(payout_key and extra.get("payout_api_secret") and payout_account),
+            "has_payout_credentials": bool(
+                payout_token
+                if gname == "airpay"
+                else (payout_key and extra.get("payout_api_secret") and payout_account)
+            ),
             "payout_api_key_masked": (payout_key[:6] + "*" * max(0, len(payout_key) - 10) + payout_key[-4:]) if len(payout_key) > 10 else ("****" if payout_key else ""),
             "payout_account_number_masked": ("*" * max(0, len(payout_account) - 4) + payout_account[-4:]) if payout_account else "",
             "updated_at": g.updated_at.isoformat() if g.updated_at else None,
@@ -2456,9 +2505,15 @@ def update_payment_gateway(
     gname = gateway_name.lower().strip()
     g = db.query(PaymentGatewayConfig).filter(PaymentGatewayConfig.gateway_name == gname).first()
     if not g:
+        if gname not in SUPPORTED_GATEWAYS:
+            return error_response(
+                "UNKNOWN_GATEWAY",
+                f"'{gateway_name}' is not a supported payment gateway.",
+                status_code=400,
+            )
         g = PaymentGatewayConfig(
             gateway_name=gname,
-            display_name="Cashfree Payments" if gname == "cashfree" else "Razorpay Standard PG",
+            display_name=_gateway_display_name(gname),
             is_active=False,
         )
         db.add(g)
@@ -2473,9 +2528,36 @@ def update_payment_gateway(
         g.webhook_secret = payload.webhook_secret.strip()
     if payload.is_sandbox is not None:
         g.is_sandbox = payload.is_sandbox
-    if any(value is not None for value in (payload.payouts_enabled, payload.payout_api_key, payload.payout_api_secret, payload.payout_account_number)):
-        if gname != "razorpay":
-            return error_response("INVALID_PAYOUT_GATEWAY", "RazorpayX Payouts credentials must be configured on the Razorpay gateway.", status_code=400)
+    if payload.surl is not None or payload.furl is not None:
+        if gname != "easebuzz":
+            return error_response(
+                "INVALID_RETURN_URLS",
+                "Success and failure return URLs only apply to the Easebuzz gateway.",
+                status_code=400,
+            )
+        extra = dict(g.extra_config or {})
+        if payload.surl is not None:
+            extra["surl"] = payload.surl.strip()
+        if payload.furl is not None:
+            extra["furl"] = payload.furl.strip()
+        g.extra_config = extra
+    if any(
+        value is not None
+        for value in (
+            payload.payouts_enabled,
+            payload.payout_api_key,
+            payload.payout_api_secret,
+            payload.payout_account_number,
+            payload.payout_token,
+        )
+    ):
+        if not SUPPORTED_GATEWAYS.get(gname, {}).get("payout"):
+            return error_response(
+                "INVALID_PAYOUT_GATEWAY",
+                f"{_gateway_display_name(gname)} cannot settle withdrawals. "
+                "Configure payouts on a payout-capable gateway.",
+                status_code=400,
+            )
         extra = dict(g.extra_config or {})
         if payload.payout_api_key and not payload.payout_api_key.startswith("*"):
             extra["payout_api_key"] = payload.payout_api_key.strip()
@@ -2483,9 +2565,46 @@ def update_payment_gateway(
             extra["payout_api_secret"] = payload.payout_api_secret.strip()
         if payload.payout_account_number:
             extra["payout_account_number"] = payload.payout_account_number.strip()
+        if payload.payout_token and not payload.payout_token.startswith("*"):
+            extra["payout_token"] = payload.payout_token.strip()
+
         if payload.payouts_enabled is not None:
-            if payload.payouts_enabled and not all(extra.get(key) for key in ("payout_api_key", "payout_api_secret", "payout_account_number")):
-                return error_response("PAYOUT_CREDENTIALS_REQUIRED", "Enter RazorpayX payout key, secret, and source account number before enabling automated withdrawals.", status_code=400)
+            # Each gateway's payout product has its own credential shape, so
+            # validate against that rather than one hardcoded triple.
+            if gname == "airpay":
+                required = ("payout_token",)
+                guidance = (
+                    "Enter the Airpay payout API token before enabling "
+                    "automated withdrawals."
+                )
+            else:
+                required = (
+                    "payout_api_key",
+                    "payout_api_secret",
+                    "payout_account_number",
+                )
+                guidance = (
+                    "Enter RazorpayX payout key, secret, and source account "
+                    "number before enabling automated withdrawals."
+                )
+            if payload.payouts_enabled and not all(extra.get(k) for k in required):
+                return error_response(
+                    "PAYOUT_CREDENTIALS_REQUIRED", guidance, status_code=400
+                )
+
+            # Payouts are resolved by finding the single gateway with this
+            # flag set, so turning it on here must turn it off elsewhere --
+            # otherwise withdrawals would silently go to whichever gateway
+            # wins the tie-break.
+            if payload.payouts_enabled:
+                for other in db.query(PaymentGatewayConfig).filter(
+                    PaymentGatewayConfig.id != g.id
+                ).all():
+                    other_extra = dict(other.extra_config or {})
+                    if other_extra.get("payouts_enabled"):
+                        other_extra["payouts_enabled"] = False
+                        other.extra_config = other_extra
+
             extra["payouts_enabled"] = payload.payouts_enabled
         g.extra_config = extra
     if payload.is_active is not None and payload.is_active:
@@ -2525,16 +2644,48 @@ def activate_payment_gateway(
     admin: User = Depends(require_permission(AdminPermission.PAYMENT_GATEWAYS.value)),
     db: Session = Depends(get_db),
 ):
-    """Switch the platform's active payment gateway to Cashfree or Razorpay."""
+    """Switch the gateway that collects deposits.
+
+    This is the deposit gateway only. Payouts are selected separately, by
+    ``payouts_enabled`` on a gateway row, so switching the deposit gateway
+    leaves withdrawal settlement exactly where it was.
+    """
     gname = gateway_name.lower().strip()
+
+    if gname not in SUPPORTED_GATEWAYS:
+        return error_response(
+            "UNKNOWN_GATEWAY",
+            f"'{gateway_name}' is not a supported payment gateway.",
+            status_code=400,
+        )
+
+    # A payout-only gateway cannot take deposits. Activating one would fail
+    # every player's deposit, so refuse here rather than at checkout.
+    if not SUPPORTED_GATEWAYS[gname].get("collect"):
+        return error_response(
+            "GATEWAY_CANNOT_COLLECT",
+            f"{_gateway_display_name(gname)} cannot accept deposits. It can "
+            "only be used to settle withdrawals.",
+            status_code=400,
+        )
+
     target = db.query(PaymentGatewayConfig).filter(PaymentGatewayConfig.gateway_name == gname).first()
     if not target:
         target = PaymentGatewayConfig(
             gateway_name=gname,
-            display_name="Cashfree Payments" if gname == "cashfree" else "Razorpay Standard PG",
+            display_name=_gateway_display_name(gname),
             is_active=True,
         )
         db.add(target)
+
+    # Switching to a gateway with no credentials would take deposits offline.
+    if not (target.api_key and target.api_secret):
+        return error_response(
+            "GATEWAY_NOT_CONFIGURED",
+            f"Enter the {_gateway_display_name(gname)} API credentials before "
+            "making it the active deposit gateway.",
+            status_code=400,
+        )
 
     # Deactivate all and activate target
     db.query(PaymentGatewayConfig).update({"is_active": False})

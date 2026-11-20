@@ -107,10 +107,29 @@ def handle_webhook(
             event_id,
         )
 
+        # Report where the deposit actually ended up. A caller that renders a
+        # page for the player (the Easebuzz browser return, which races the
+        # server-to-server webhook for the same event) otherwise has no way to
+        # tell an already-credited payment from an already-failed one, and
+        # would have to guess.
+        duplicate_status = None
+        if provider_order_id:
+            prior = (
+                db.query(Deposit)
+                .filter(
+                    Deposit.provider == normalized_provider,
+                    Deposit.provider_order_id == str(provider_order_id),
+                )
+                .first()
+            )
+            if prior:
+                duplicate_status = prior.status.value
+
         return {
             "status": "duplicate",
             "provider": normalized_provider,
             "event_id": event_id,
+            "deposit_status": duplicate_status,
         }
 
     # 4. Record the event.

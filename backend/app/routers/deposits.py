@@ -211,6 +211,16 @@ def create_deposit(
             response["environment"] = environment
             response["app_id"] = active_gw.api_key if active_gw else ""
             response["checkout_url"] = f"https://polandexim.com/pay?session_id={session_id}&order_id={order_id}&mode={environment}&amount={deposit.amount}&deposit_id={deposit.id}"
+        elif provider == "easebuzz":
+            meta = deposit.metadata_ or {}
+            # Easebuzz returns a complete hosted-checkout URL, so the client
+            # just navigates to it -- there is no SDK to open and no session
+            # id to hand over.
+            response["checkout_url"] = meta.get("payment_url") or ""
+            response["environment"] = meta.get(
+                "environment",
+                "sandbox" if (active_gw and active_gw.is_sandbox) else "production",
+            )
 
         return success_response(
             response,

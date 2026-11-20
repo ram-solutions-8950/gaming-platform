@@ -1,5 +1,6 @@
 import React from "react";
 import Link from "next/link";
+import { COMPANY } from "@/data/company";
 import {
   DropletLogoIcon,
   PhoneIcon,
@@ -34,6 +35,10 @@ export const Footer: React.FC = () => {
 
             <p className="text-xs sm:text-sm text-slate-500 leading-relaxed max-w-sm">
               Premium sanitary and bath fittings for modern homes. Engineered for durability, luxury, and unmatched hygiene.
+            </p>
+
+            <p className="text-xs text-slate-500 leading-relaxed max-w-sm">
+              A brand of <strong className="font-semibold text-slate-700">{COMPANY.legalName}</strong>, {COMPANY.address.city}, {COMPANY.address.state}.
             </p>
 
             {/* Social Icons */}
@@ -132,29 +137,29 @@ export const Footer: React.FC = () => {
                 <span className="text-[#0284C7] shrink-0">
                   <PhoneIcon className="w-4 h-4" />
                 </span>
-                <a href="tel:+919876543210" className="hover:text-[#0284C7] font-semibold text-slate-800">
-                  +91 98765 43210
+                <a href={`tel:${COMPANY.phone}`} className="hover:text-[#0284C7] font-semibold text-slate-800">
+                  {COMPANY.phoneDisplay}
                 </a>
               </li>
               <li className="flex items-center gap-2.5">
                 <span className="text-[#0284C7] shrink-0">
                   <MailIcon className="w-4 h-4" />
                 </span>
-                <a href="mailto:support@aquasan.com" className="hover:text-[#0284C7] font-medium text-slate-700">
-                  support@aquasan.com
+                <a href={`mailto:${COMPANY.email}`} className="hover:text-[#0284C7] font-medium text-slate-700 break-all">
+                  {COMPANY.email}
                 </a>
               </li>
               <li className="flex items-start gap-2.5">
                 <span className="text-[#0284C7] shrink-0 mt-0.5">
                   <MapPinIcon className="w-4 h-4" />
                 </span>
-                <span className="text-slate-600">Industrial Area, Sitapura, Jaipur, Rajasthan 302022</span>
+                <span className="text-slate-600">{COMPANY.addressLine}</span>
               </li>
               <li className="flex items-center gap-2.5">
                 <span className="text-[#0284C7] shrink-0">
                   <ClockIcon className="w-4 h-4" />
                 </span>
-                <span className="text-slate-600">Mon - Sat: 9:00 AM - 7:00 PM</span>
+                <span className="text-slate-600">{COMPANY.supportHours}</span>
               </li>
             </ul>
           </div>
@@ -162,7 +167,9 @@ export const Footer: React.FC = () => {
 
         {/* Lower Bottom Copyright Bar */}
         <div className="pt-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
-          <p>© 2026 AquaSan. All rights reserved.</p>
+          <p>
+            © 2026 {COMPANY.legalName}. All rights reserved.
+          </p>
           <div className="flex items-center gap-4 sm:gap-6 flex-wrap justify-center font-medium">
             <Link href="/terms" className="hover:text-[#0284C7] transition-colors">
               Terms & Conditions

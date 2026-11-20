@@ -5,7 +5,9 @@ from sqlalchemy.orm import Session
 from ..payment.base import PaymentProvider
 from ..payment.providers.razorpay import RazorpayProvider
 from ..payment.providers.cashfree import CashfreeProvider
+from ..payment.providers.easebuzz import EasebuzzProvider
 from ..models.payment_gateway import PaymentGatewayConfig
+from ..config import settings
 from ..utils.logging import get_logger
 
 logger = get_logger("payment")
@@ -106,6 +108,44 @@ def get_provider(
             return CashfreeProvider(app_id=app_id, secret_key=secret_key, is_sandbox=is_sandbox, webhook_secret=webhook_secret)
         return CashfreeProvider(is_sandbox=is_sandbox)
 
+    if provider_key == "easebuzz":
+        # Credentials come from the admin panel only. There is deliberately
+        # no environment fallback: if an admin cleared a key to rotate it, a
+        # leftover environment value would silently take over and send money
+        # to the old account.
+        merchant_key = None
+        salt = None
+        is_sandbox = True
+        # Return URLs are deployment addresses rather than secrets, so they
+        # have an environment default that a gateway row may override.
+        surl = settings.EASEBUZZ_SURL
+        furl = settings.EASEBUZZ_FURL
+
+        if db is not None:
+            cfg = db.query(PaymentGatewayConfig).filter(PaymentGatewayConfig.gateway_name == "easebuzz").first()
+            if cfg:
+                # Easebuzz calls these the Merchant Key and Salt; they live in
+                # the same columns the other gateways use for key/secret.
+                merchant_key = cfg.api_key
+                salt = cfg.api_secret
+                is_sandbox = cfg.is_sandbox
+                extra = cfg.extra_config or {}
+                surl = extra.get("surl") or surl
+                furl = extra.get("furl") or furl
+
+        logger.info(
+            "Using Easebuzz payment provider (sandbox=%s, configured=%s).",
+            is_sandbox,
+            bool(merchant_key and salt),
+        )
+        return EasebuzzProvider(
+            merchant_key=merchant_key,
+            salt=salt,
+            is_sandbox=is_sandbox,
+            surl=surl,
+            furl=furl,
+        )
+
     if provider_key == "razorpay":
         key_id = None
         key_secret = None
@@ -133,5 +173,14 @@ def get_provider(
     }:
         logger.info("Using no-op payment provider.")
         return NoopPaymentProvider()
+
+    # Gateways that are wired for payouts only. Naming one as the deposit
+    # gateway is a configuration mistake, so say so instead of surfacing a
+    # bare "unsupported provider" on every player's deposit attempt.
+    if provider_key == "airpay":
+        raise ValueError(
+            "Airpay is configured for payouts only. Select a different gateway "
+            "as the active deposit gateway in Admin Panel > Payment Gateways."
+        )
 
     raise ValueError(f"Unsupported payment provider: '{provider_name}'")

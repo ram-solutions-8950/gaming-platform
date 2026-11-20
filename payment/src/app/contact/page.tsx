@@ -1,5 +1,6 @@
 import React from "react";
 import Link from "next/link";
+import { COMPANY } from "@/data/company";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { ContactForm } from "./ContactForm";
@@ -47,12 +48,12 @@ export default function ContactPage() {
               </div>
               <div className="flex-1">
                 <h4 className="font-bold text-slate-900 text-base">Direct Customer Helpline</h4>
-                <p className="text-xs text-slate-500 mt-0.5">Toll-free across India for orders & support</p>
+                <p className="text-xs text-slate-500 mt-0.5">For orders &amp; support, {COMPANY.supportHours}</p>
                 <a
-                  href="tel:+919876543210"
+                  href={`tel:${COMPANY.phone}`}
                   className="inline-block mt-2 font-bold text-base text-[#0284C7] hover:underline"
                 >
-                  +91 98765 43210
+                  {COMPANY.phoneDisplay}
                 </a>
               </div>
             </div>
@@ -66,10 +67,10 @@ export default function ContactPage() {
                 <h4 className="font-bold text-slate-900 text-base">Official Support Email</h4>
                 <p className="text-xs text-slate-500 mt-0.5">Send architectural drawings or order details</p>
                 <a
-                  href="mailto:support@aquasan.com"
-                  className="inline-block mt-2 font-bold text-base text-[#0284C7] hover:underline"
+                  href={`mailto:${COMPANY.email}`}
+                  className="inline-block mt-2 font-bold text-base text-[#0284C7] hover:underline break-all"
                 >
-                  support@aquasan.com
+                  {COMPANY.email}
                 </a>
               </div>
             </div>
@@ -80,13 +81,18 @@ export default function ContactPage() {
                 <MapPinIcon className="w-5 h-5" />
               </div>
               <div className="flex-1">
-                <h4 className="font-bold text-slate-900 text-base">Showroom & Warehouse</h4>
+                <h4 className="font-bold text-slate-900 text-base">Registered Office</h4>
                 <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">
-                  AquaSan Sanitaryware Ltd., Plot 42, Sitapura Industrial Complex, Jaipur, Rajasthan 302022
+                  <strong className="font-semibold text-slate-700">{COMPANY.legalName}</strong>
+                  <br />
+                  {COMPANY.address.line1}, {COMPANY.address.line2},{" "}
+                  {COMPANY.address.line3}, {COMPANY.address.city},{" "}
+                  {COMPANY.address.state} {COMPANY.address.postalCode},{" "}
+                  {COMPANY.address.country}
                 </p>
                 <div className="flex items-center gap-2 text-xs text-slate-600 mt-2">
                   <ClockIcon className="w-3.5 h-3.5 text-slate-400" />
-                  <span>Mon – Sat: 9:00 AM – 7:00 PM</span>
+                  <span>{COMPANY.supportHours}</span>
                 </div>
               </div>
             </div>
@@ -98,7 +104,7 @@ export default function ContactPage() {
                 Connect with our product technicians right away for installation guidance or invoice copies.
               </p>
               <a
-                href="https://wa.me/919876543210"
+                href={`https://wa.me/${COMPANY.phone.replace("+", "")}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="mt-4 inline-flex items-center gap-2 bg-white text-emerald-700 hover:bg-emerald-50 font-bold text-xs sm:text-sm px-4 py-2.5 rounded-xl transition shadow-xs"

@@ -1,5 +1,6 @@
 import React from "react";
 import Link from "next/link";
+import { COMPANY } from "@/data/company";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { PaymentTicketLookup } from "./PaymentTicketLookup";
@@ -135,14 +136,14 @@ export default function PaymentIssuesPage() {
 
           <div className="flex flex-col sm:flex-row items-center gap-3 shrink-0">
             <a
-              href="tel:+919876543210"
+              href={`tel:${COMPANY.phone}`}
               className="w-full sm:w-auto px-5 py-3 bg-[#0284C7] hover:bg-[#0369A1] text-white font-semibold rounded-xl text-sm transition flex items-center justify-center gap-2 shadow-sm"
             >
               <PhoneIcon className="w-4 h-4" />
               <span>Call Billing Desk</span>
             </a>
             <a
-              href="mailto:support@aquasan.com?subject=Urgent%20Payment%20Issue%20Grievance"
+              href={`mailto:${COMPANY.email}?subject=Urgent%20Payment%20Issue%20Grievance`}
               className="w-full sm:w-auto px-5 py-3 bg-white/10 hover:bg-white/20 text-white font-semibold rounded-xl text-sm transition flex items-center justify-center gap-2 border border-white/20"
             >
               <MailIcon className="w-4 h-4" />
