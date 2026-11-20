@@ -6,6 +6,37 @@ import { TelegramIcon, InstagramIcon, FacebookIcon, safeExternalUrl } from '../c
 import toast from 'react-hot-toast';
 import { Clock, RefreshCw, Send, CheckCircle, AlertCircle } from 'lucide-react';
 
+/**
+ * Render an FAQ answer, turning any http(s) URL into a tappable link.
+ *
+ * Admins routinely paste a channel or support link as the whole answer (the
+ * live config has exactly that), and a bare unclickable URL on a phone is
+ * useless. Only http and https are linked; anything else is left as plain
+ * text so a pasted `javascript:` string can never become a live link.
+ */
+function renderAnswer(answer: string): React.ReactNode {
+  const text = answer ?? '';
+  const parts = text.split(/(https?:\/\/[^\s<>"']+)/g);
+
+  return parts.map((part, i) => {
+    if (/^https?:\/\//i.test(part)) {
+      return (
+        <a
+          key={i}
+          href={part}
+          target="_blank"
+          rel="noreferrer noopener"
+          className="text-sky-300 underline font-semibold break-all"
+        >
+          {part}
+        </a>
+      );
+    }
+    return <React.Fragment key={i}>{part}</React.Fragment>;
+  });
+}
+
+
 interface Props {
   onClose: () => void;
 }
@@ -35,6 +66,10 @@ export const ServiceModal: React.FC<Props> = ({ onClose }) => {
   const [loadingTickets, setLoadingTickets] = useState(false);
 
   const [copiedChannel, setCopiedChannel] = useState<string | null>(null);
+
+  // FAQs come from the admin-managed support config. They were previously
+  // hardcoded in this component, so nothing an admin typed ever appeared.
+  const faqs = contactInfo.faqs ?? [];
 
   // Admin-managed social links. Each is validated before it reaches an href,
   // and a channel the admin has not configured is hidden rather than shown as
@@ -66,7 +101,9 @@ export const ServiceModal: React.FC<Props> = ({ onClose }) => {
   }, [fetchContactConfig]);
 
   useEffect(() => {
-    if (activeTab === 'channels') {
+    // Both tabs render admin-managed config, so refresh on either, otherwise
+    // a player with the modal already open keeps seeing stale FAQs.
+    if (activeTab === 'channels' || activeTab === 'faq') {
       fetchContactConfig();
     }
   }, [activeTab, fetchContactConfig]);
@@ -543,36 +580,31 @@ export const ServiceModal: React.FC<Props> = ({ onClose }) => {
             </div>
           )}
 
-          {/* TAB 4: FAQs */}
+          {/* TAB 4: FAQs — rendered from the admin-managed support config */}
           {activeTab === 'faq' && (
             <div className="space-y-2.5 animate-fade-in">
-              <div className="p-3 bg-purple-950/50 border border-purple-400/20 rounded-xl">
-                <h4 className="font-extrabold text-amber-300 text-xs mb-1">💰 How fast are deposits credited?</h4>
-                <p className="text-[11px] text-gray-300 leading-relaxed">
-                  UPI & QR deposits are credited automatically within 60 seconds after entering the correct 12-digit UTR transaction number.
-                </p>
-              </div>
-
-              <div className="p-3 bg-purple-950/50 border border-purple-400/20 rounded-xl">
-                <h4 className="font-extrabold text-amber-300 text-xs mb-1">⚡ How long does a withdrawal take?</h4>
-                <p className="text-[11px] text-gray-300 leading-relaxed">
-                  Withdrawals are approved and transferred directly to your bank account or UPI ID usually within 15 to 30 minutes.
-                </p>
-              </div>
-
-              <div className="p-3 bg-purple-950/50 border border-purple-400/20 rounded-xl">
-                <h4 className="font-extrabold text-amber-300 text-xs mb-1">🎲 Are the games fair?</h4>
-                <p className="text-[11px] text-gray-300 leading-relaxed">
-                  Yes, all games utilize industry-standard certified Provably Fair Cryptographic Random Number Generation (RNG).
-                </p>
-              </div>
-
-              <div className="p-3 bg-purple-950/50 border border-purple-400/20 rounded-xl">
-                <h4 className="font-extrabold text-amber-300 text-xs mb-1">🎁 How do I earn from referrals?</h4>
-                <p className="text-[11px] text-gray-300 leading-relaxed">
-                  Go to your Profile tab, copy your unique referral link, and share it. You receive ₹100 instant cash reward when your friend registers and deposits!
-                </p>
-              </div>
+              {faqs.length === 0 ? (
+                <div className="px-3 py-8 text-center">
+                  <p className="text-2xl mb-1.5">❓</p>
+                  <p className="text-[11px] text-gray-400">
+                    No FAQs have been published yet.
+                  </p>
+                </div>
+              ) : (
+                faqs.map((faq, index) => (
+                  <div
+                    key={faq.id || `faq-${index}`}
+                    className="p-3 bg-purple-950/50 border border-purple-400/20 rounded-xl"
+                  >
+                    <h4 className="font-extrabold text-amber-300 text-xs mb-1">
+                      {faq.question}
+                    </h4>
+                    <p className="text-[11px] text-gray-300 leading-relaxed whitespace-pre-line break-words">
+                      {renderAnswer(faq.answer)}
+                    </p>
+                  </div>
+                ))
+              )}
             </div>
           )}
         </div>
