@@ -98,7 +98,7 @@ export const SanitaryVisual: React.FC<SanitaryVisualProps> = ({
     default:
       return (
         <div className="w-full h-full flex items-center justify-center bg-slate-100 text-slate-400 text-xs rounded-lg">
-          AquaSan
+          Poland Exim
         </div>
       );
   }

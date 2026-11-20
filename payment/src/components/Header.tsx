@@ -1,5 +1,6 @@
 import React from "react";
 import Link from "next/link";
+import { COMPANY } from "@/data/company";
 import { DropletLogoIcon, TrustShieldIcon, FastDeliveryIcon, SupportHeadsetIcon } from "./Icons";
 
 export const Header: React.FC = () => {
@@ -14,7 +15,7 @@ export const Header: React.FC = () => {
           <DropletLogoIcon className="w-8 h-8 sm:w-9 sm:h-9" />
           <div>
             <span className="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight block leading-tight group-hover:text-[#0284C7] transition-colors">
-              AquaSan
+              {COMPANY.tradeName}
             </span>
             <span className="text-[11px] text-slate-500 font-medium tracking-wide block">
               Quality Sanitary Products

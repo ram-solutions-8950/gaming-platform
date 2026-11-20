@@ -7,8 +7,8 @@ import { PaymentTicketLookup } from "./PaymentTicketLookup";
 import { PhoneIcon, MailIcon, SecureEncryptedIcon } from "@/components/Icons";
 
 export const metadata = {
-  title: "Payment Issues & Resolution Desk - AquaSan",
-  description: "Instant resolution for deducted amounts, pending UPI transactions, failed card payments, and refund tracking at AquaSan.",
+  title: "Payment Issues & Resolution Desk - Poland Exim",
+  description: "Instant resolution for deducted amounts, pending UPI transactions, failed card payments, and refund tracking at Poland Exim.",
 };
 
 export default function PaymentIssuesPage() {

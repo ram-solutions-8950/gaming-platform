@@ -126,7 +126,7 @@ function PayContent() {
           Secure Payment Gateway
         </h1>
         <p className="text-xs text-slate-500 mt-1">
-          Poland Exim &bull; AquaSan Merchant Portal
+          Poland Exim &bull; Secure Merchant Portal
         </p>
 
         {orderId && (

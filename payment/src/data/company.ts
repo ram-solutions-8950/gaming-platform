@@ -8,8 +8,10 @@
 export const COMPANY = {
   /** Registered legal / business name. */
   legalName: "Poland Exim",
-  /** Trading name used in the storefront UI. */
-  tradeName: "AquaSan",
+  /** Trading name shown in the storefront UI.
+   *  Kept identical to the legal name so the site, the browser tab and the
+   *  submitted documents all say the same thing. */
+  tradeName: "Poland Exim",
 
   /** Registered address, as a single line. */
   addressLine:

@@ -5,8 +5,8 @@ import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 
 export const metadata = {
-  title: "Terms & Conditions - AquaSan Quality Sanitaryware",
-  description: "Read the commercial terms, warranty coverage, breakage transit insurance, and replacement policies for AquaSan products.",
+  title: "Terms & Conditions - Poland Exim",
+  description: "Read the commercial terms, warranty coverage, breakage transit insurance, and replacement policies for Poland Exim products.",
 };
 
 export default function TermsPage() {
@@ -34,7 +34,7 @@ export default function TermsPage() {
             Terms & Conditions
           </h1>
           <p className="text-slate-500 text-xs sm:text-sm mt-2">
-            Last Updated: October 2026 • Effective for all orders placed through AquaSan
+            Last Updated: October 2026 • Effective for all orders placed through {COMPANY.tradeName}
           </p>
 
           <div className="mt-8 border-t border-slate-100 pt-6 prose prose-slate max-w-none text-slate-700 text-sm sm:text-base leading-relaxed space-y-8">
@@ -44,7 +44,7 @@ export default function TermsPage() {
                 1. General Overview & Agreement
               </h2>
               <p className="text-slate-600 leading-relaxed">
-                By purchasing through the <strong>AquaSan</strong> checkout portal, operated by <strong>{COMPANY.legalName}</strong> (registered office: {COMPANY.addressLine}), you agree to be bound by these Terms and Conditions. AquaSan supplies premium sanitaryware, bathroom furniture, mixer taps, and plumbing accessories conforming to Indian and international quality standards.
+                By purchasing through the <strong>{COMPANY.legalName}</strong> checkout portal (registered office: {COMPANY.addressLine}), you agree to be bound by these Terms and Conditions. {COMPANY.legalName} supplies premium sanitaryware, bathroom furniture, mixer taps, and plumbing accessories conforming to Indian and international quality standards.
               </p>
             </section>
 
@@ -74,7 +74,7 @@ export default function TermsPage() {
                 4. Safe Transit Guarantee & Breakage Claims
               </h2>
               <p className="text-slate-600 leading-relaxed">
-                Fragile sanitaryware items are shipped in multi-ply honeycomb cardboard containers reinforced with wooden pallet frames. <strong>AquaSan provides 100% Transit Breakage Insurance</strong>. In the rare event of transit damage:
+                Fragile sanitaryware items are shipped in multi-ply honeycomb cardboard containers reinforced with wooden pallet frames. <strong>{COMPANY.legalName} provides 100% Transit Breakage Insurance</strong>. In the rare event of transit damage:
               </p>
               <ul className="list-disc pl-5 mt-2 space-y-1.5 text-slate-600">
                 <li>You must record an unboxing video or capture clear photographs of the broken item within <strong>48 hours</strong> of package delivery.</li>
@@ -113,7 +113,7 @@ export default function TermsPage() {
                 6. Governing Law & Jurisdiction
               </h2>
               <p className="text-slate-600 leading-relaxed">
-                These conditions are governed by and construed in accordance with the laws of the Republic of India. Any legal dispute or claims arising out of or in connection with the purchase of AquaSan products shall be subject to the exclusive jurisdiction of the competent courts in <strong>{COMPANY.jurisdiction}</strong>.
+                These conditions are governed by and construed in accordance with the laws of the Republic of India. Any legal dispute or claims arising out of or in connection with the purchase of {COMPANY.legalName} products shall be subject to the exclusive jurisdiction of the competent courts in <strong>{COMPANY.jurisdiction}</strong>.
               </p>
             </section>
           </div>

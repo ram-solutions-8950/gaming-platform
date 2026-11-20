@@ -48,7 +48,7 @@ export const PaymentTicketLookup: React.FC = () => {
             Live Payment Status & UTR Verification
           </h3>
           <p className="text-xs text-slate-500">
-            Enter your Bank UTR (12 digits) or AquaSan Order ID to check instant gateway status
+            Enter your Bank UTR (12 digits) or Poland Exim Order ID to check instant gateway status
           </p>
         </div>
       </div>

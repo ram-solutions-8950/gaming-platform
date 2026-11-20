@@ -18,6 +18,7 @@ import {
   AmazonPayBadge,
   MobikwikBadge,
 } from "./Icons";
+import { COMPANY } from "@/data/company";
 
 declare global {
   interface Window {
@@ -130,13 +131,13 @@ export const PaymentMethodCard: React.FC<PaymentMethodCardProps> = ({
         key: razorpayKey,
         amount: Math.round(totalAmount * 100), // in paise
         currency: "INR",
-        name: "AquaSan Sanitaryware",
+        name: COMPANY.legalName,
         description: `Payment for ${productName}`,
         image: "https://cdn-icons-png.flaticon.com/512/3105/3105807.png",
         prefill: {
           name: "Customer",
-          email: "customer@aquasan.com",
-          contact: "9876543210",
+          email: COMPANY.email,
+          contact: COMPANY.phone.replace("+91", ""),
         },
         theme: {
           color: "#0284C7",

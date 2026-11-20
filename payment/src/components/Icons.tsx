@@ -1,6 +1,6 @@
 import React from "react";
 
-// AquaSan Water Droplet Brand Logo
+// Water droplet brand logo
 export const DropletLogoIcon: React.FC<{ className?: string }> = ({ className = "w-8 h-8" }) => (
   <svg viewBox="0 0 40 44" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
     <defs>

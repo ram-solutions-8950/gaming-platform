@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { PRODUCTS } from "@/data/products";
+import { COMPANY } from "@/data/company";
 
 export async function POST(req: NextRequest) {
   try {
@@ -44,9 +45,9 @@ export async function POST(req: NextRequest) {
         order_currency: "INR",
         customer_details: {
           customer_id: `CUST_${Date.now()}`,
-          customer_name: "AquaSan Shopper",
-          customer_email: "shopper@aquasan.com",
-          customer_phone: "9876543210",
+          customer_name: "Customer",
+          customer_email: COMPANY.email,
+          customer_phone: COMPANY.phone.replace("+91", ""),
         },
         order_meta: {
           return_url: `${origin}/?order_id={order_id}`,

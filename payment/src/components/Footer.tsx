@@ -25,7 +25,7 @@ export const Footer: React.FC = () => {
               <DropletLogoIcon className="w-8 h-8" />
               <div>
                 <span className="text-xl font-extrabold text-slate-900 tracking-tight block leading-tight">
-                  AquaSan
+                  {COMPANY.tradeName}
                 </span>
                 <span className="text-[11px] text-slate-500 font-medium tracking-wide block">
                   Quality Sanitary Products
@@ -38,7 +38,7 @@ export const Footer: React.FC = () => {
             </p>
 
             <p className="text-xs text-slate-500 leading-relaxed max-w-sm">
-              A brand of <strong className="font-semibold text-slate-700">{COMPANY.legalName}</strong>, {COMPANY.address.city}, {COMPANY.address.state}.
+              {COMPANY.address.city}, {COMPANY.address.state}, {COMPANY.address.country}.
             </p>
 
             {/* Social Icons */}

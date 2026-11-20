@@ -7,8 +7,8 @@ import { ContactForm } from "./ContactForm";
 import { PhoneIcon, MailIcon, MapPinIcon, ClockIcon } from "@/components/Icons";
 
 export const metadata = {
-  title: "Contact Us - AquaSan Customer Support & Showroom",
-  description: "Reach AquaSan for sanitary product consultations, order updates, warranty service, and wholesale quotes.",
+  title: "Contact Us - Poland Exim Customer Support",
+  description: "Reach Poland Exim for sanitary product consultations, order updates, warranty service, and wholesale quotes.",
 };
 
 export default function ContactPage() {
@@ -30,7 +30,7 @@ export default function ContactPage() {
         {/* Page Hero Title */}
         <div className="text-center max-w-2xl mx-auto mb-10 sm:mb-12">
           <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight">
-            Get in Touch with <span className="text-[#0284C7]">AquaSan</span>
+            Get in Touch with <span className="text-[#0284C7]">{COMPANY.tradeName}</span>
           </h1>
           <p className="text-slate-500 text-sm sm:text-base mt-2.5">
             Whether you have questions regarding fitting specifications, transit timelines, or customized bathroom layouts, our sanitary experts are ready to assist.

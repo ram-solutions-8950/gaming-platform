@@ -13,8 +13,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "AquaSan - Secure Checkout | Quality Sanitary Products",
-  description: "Select your sanitary product and proceed to 100% safe and encrypted checkout with AquaSan.",
+  title: "Poland Exim - Secure Checkout | Quality Sanitary Products",
+  description:
+    "Select your sanitary product and proceed to 100% safe and encrypted checkout with Poland Exim.",
 };
 
 export default function RootLayout({
