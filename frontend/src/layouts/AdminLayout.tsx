@@ -22,6 +22,7 @@ import {
   Calendar,
   ChevronDown,
   Crown,
+  Bell,
 } from 'lucide-react';
 
 interface NavItem {
@@ -42,14 +43,30 @@ export function AdminLayout() {
     'Users Management': true,
     'Wallet & Coins': true,
     'Games Management': true,
+    'Notifications': true,
   });
   const [adminProfile, setAdminProfile] = useState<TeamMember | null>(null);
+  const [unreadNotifs, setUnreadNotifs] = useState<number>(0);
 
   useEffect(() => {
     soundManager.stopAll();
     adminService.getCurrentAdminMe()
       .then(setAdminProfile)
       .catch(() => {});
+
+    const fetchUnreadCount = () => {
+      adminService.getNotifications(10)
+        .then((data) => {
+          if (data?.unread_count !== undefined) {
+            setUnreadNotifs(data.unread_count);
+          }
+        })
+        .catch(() => {});
+    };
+
+    fetchUnreadCount();
+    const interval = setInterval(fetchUnreadCount, 30000);
+    return () => clearInterval(interval);
   }, []);
 
   const handleLogout = async () => {
@@ -131,6 +148,16 @@ export function AdminLayout() {
       permission: 'rewards',
     },
     {
+      to: '/admin/notifications',
+      label: 'Notifications',
+      icon: Bell,
+      badge: unreadNotifs > 0 ? (unreadNotifs > 99 ? '99+' : unreadNotifs) : undefined,
+      subItems: [
+        { to: '/admin/notifications', label: 'Action Alerts Feed' },
+        { to: '/admin/notifications?tab=send', label: 'Send Notifications' },
+      ],
+    },
+    {
       to: '/admin/payment-settings',
       label: 'System Settings',
       icon: Settings,
@@ -158,7 +185,7 @@ export function AdminLayout() {
       icon: LifeBuoy,
       permission: 'support',
     },
-  ], [adminProfile, user]);
+  ], [adminProfile, user, unreadNotifs]);
 
   const filteredNav = navigationConfig.filter((item) => hasAccess(item.permission));
 
@@ -212,6 +239,20 @@ export function AdminLayout() {
           </div>
 
 
+          {/* Notification Bell */}
+          <button
+            onClick={() => navigate('/admin/notifications')}
+            className="relative p-2 rounded-xl bg-[#141b2d] border border-[#222c44] text-gray-300 hover:text-white hover:bg-[#1a233a] transition cursor-pointer"
+            title="Notifications & Action Center"
+          >
+            <Bell size={18} />
+            {unreadNotifs > 0 && (
+              <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-rose-500 text-white text-[9px] font-black rounded-full flex items-center justify-center ring-2 ring-[#0e1320] animate-pulse">
+                {unreadNotifs > 99 ? '99+' : unreadNotifs}
+              </span>
+            )}
+          </button>
+
           {/* User Profile Chip */}
           <div className="flex items-center gap-3 pl-2 border-l border-[#222c44]">
             <div className="relative">
@@ -246,7 +287,7 @@ export function AdminLayout() {
               const Icon = item.icon;
               const hasSub = item.subItems && item.subItems.length > 0;
               const isSectionExpanded = expandedSections[item.label] ?? false;
-              const isActive = location.pathname === item.to || (hasSub && item.subItems?.some((s) => location.pathname === s.to));
+              const isActive = location.pathname === item.to || (hasSub && item.subItems?.some((s) => location.pathname === s.to.split('?')[0]));
 
               return (
                 <div key={item.label} className="space-y-0.5">
@@ -289,7 +330,9 @@ export function AdminLayout() {
                   {hasSub && isSectionExpanded && (
                     <div className="pl-9 pr-2 py-1 space-y-1">
                       {item.subItems?.map((sub) => {
-                        const isSubActive = location.pathname + location.search === sub.to || location.pathname === sub.to;
+                        const isSubActive = sub.to.includes('?')
+                          ? location.pathname + location.search === sub.to
+                          : location.pathname === sub.to && (!location.search || !item.subItems?.some((s) => s.to.includes('?') && location.pathname + location.search === s.to));
                         return (
                           <NavLink
                             key={sub.to + sub.label}

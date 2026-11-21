@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { adminService } from '../../services/adminService';
 import { Card } from '../../components/common/Card';
 import { Loader } from '../../components/common/Loader';
@@ -33,16 +33,36 @@ interface AdminNotification {
 
 export function AdminNotificationsPage() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabParam = searchParams.get('tab');
   const [notifications, setNotifications] = useState<AdminNotification[]>([]);
   const [unreadCount, setUnreadCount] = useState<number>(0);
   // 'alerts' is the inbound action feed; 'send' composes outbound
   // notifications to players. They are different directions, so they
   // get separate tabs rather than sharing one list.
-  const [view, setView] = useState<'alerts' | 'send'>('alerts');
+  const [view, setView] = useState<'alerts' | 'send'>(tabParam === 'send' ? 'send' : 'alerts');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeFilter, setActiveFilter] = useState<'ALL' | 'HIGH' | 'WITHDRAWAL' | 'DEPOSIT' | 'SYSTEM'>('ALL');
   const [actionInProgress, setActionInProgress] = useState<string | null>(null);
+
+  useEffect(() => {
+    const tab = searchParams.get('tab');
+    if (tab === 'send') {
+      setView('send');
+    } else if (tab === 'alerts' || !tab) {
+      setView('alerts');
+    }
+  }, [searchParams]);
+
+  const switchView = (newView: 'alerts' | 'send') => {
+    setView(newView);
+    if (newView === 'send') {
+      setSearchParams({ tab: 'send' });
+    } else {
+      setSearchParams({});
+    }
+  };
 
   const fetchNotifications = useCallback(async (isManual = false) => {
     if (isManual) setRefreshing(true);
@@ -198,7 +218,7 @@ export function AdminNotificationsPage() {
           <div className="flex items-center gap-2 p-1 mt-3 bg-dark-900 border border-dark-700 rounded-xl w-fit">
             <button
               type="button"
-              onClick={() => setView('alerts')}
+              onClick={() => switchView('alerts')}
               className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
                 view === 'alerts' ? 'bg-brand-500 text-black' : 'text-gray-400 hover:text-white'
               }`}
@@ -207,7 +227,7 @@ export function AdminNotificationsPage() {
             </button>
             <button
               type="button"
-              onClick={() => setView('send')}
+              onClick={() => switchView('send')}
               className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
                 view === 'send' ? 'bg-brand-500 text-black' : 'text-gray-400 hover:text-white'
               }`}

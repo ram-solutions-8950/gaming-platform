@@ -17,6 +17,7 @@ interface PickedUser {
   id: string;
   username: string;
   name?: string | null;
+  role?: string | null;
 }
 
 interface SentNotification {
@@ -88,7 +89,7 @@ export const SendNotificationPanel: React.FC = () => {
       setSearching(true);
       try {
         const res = await api.get('/admin/users', {
-          params: { search: term, page: 1, page_size: 10, role: 'USER' },
+          params: { search: term, page: 1, page_size: 15 },
         });
         const items = res.data?.data?.items ?? res.data?.data ?? [];
         setResults(
@@ -96,6 +97,7 @@ export const SendNotificationPanel: React.FC = () => {
             id: String(u.id),
             username: u.username,
             name: u.name,
+            role: u.role,
           })),
         );
       } catch {
@@ -204,8 +206,8 @@ export const SendNotificationPanel: React.FC = () => {
               >
                 <Users className="w-4 h-4 shrink-0" />
                 <span>
-                  <span className="block text-xs font-bold">Everyone</span>
-                  <span className="block text-[10px] text-gray-500">Promos, maintenance notices</span>
+                  <span className="block text-xs font-bold">Bulk Broadcast (Everyone)</span>
+                  <span className="block text-[10px] text-gray-500">Send to all players in bulk</span>
                 </span>
               </button>
               <button
@@ -219,9 +221,9 @@ export const SendNotificationPanel: React.FC = () => {
               >
                 <UserIcon className="w-4 h-4 shrink-0" />
                 <span>
-                  <span className="block text-xs font-bold">Selected players</span>
+                  <span className="block text-xs font-bold">Separate / Selected Users</span>
                   <span className="block text-[10px] text-gray-500">
-                    {selected.length > 0 ? `${selected.length} chosen` : 'Search and pick'}
+                    {selected.length > 0 ? `${selected.length} user(s) selected` : 'Search and pick specific users'}
                   </span>
                 </span>
               </button>
@@ -280,9 +282,14 @@ export const SendNotificationPanel: React.FC = () => {
                           picked ? 'bg-brand-500/15 text-white' : 'text-gray-300 hover:bg-dark-800'
                         }`}
                       >
-                        <span>
+                        <span className="flex items-center gap-2">
                           <span className="font-semibold">@{u.username}</span>
-                          {u.name && <span className="text-gray-500 ml-1.5">{u.name}</span>}
+                          {u.name && <span className="text-gray-500">{u.name}</span>}
+                          {u.role && u.role !== 'USER' && (
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                              {u.role}
+                            </span>
+                          )}
                         </span>
                         <span className="text-[10px] text-gray-500">{picked ? 'Selected' : 'Add'}</span>
                       </button>
