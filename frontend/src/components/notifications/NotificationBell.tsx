@@ -1,12 +1,12 @@
 /**
  * Notification bell, inbox panel and the live-arrival popup.
  *
- * Mounted once in the lobby header so a single websocket serves the whole
- * app. Opening the panel does not mark everything read: a player should be
- * able to glance at the list and come back to it, so read state follows the
- * tap on an item (or the explicit "Mark all read").
+ * Uses createPortal directly onto document.body to escape header clipping
+ * (e.g. overflow-x-auto in mobile headers) and stacking context limits,
+ * ensuring flawless tap-to-open on both mobile APK and desktop browsers.
  */
 import React, { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useNotifications } from '../../hooks/useNotifications';
 import type { PlayerNotification } from '../../services/notificationService';
 
@@ -50,21 +50,14 @@ export const NotificationBell: React.FC<{ enabled?: boolean }> = ({ enabled = tr
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const panelRef = useRef<HTMLDivElement | null>(null);
 
-  // Close on outside click or Escape.
+  // Close on Escape key.
   useEffect(() => {
     if (!open) return undefined;
-    const onClick = (e: MouseEvent) => {
-      if (panelRef.current && !panelRef.current.contains(e.target as Node)) setOpen(false);
-    };
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setOpen(false);
     };
-    document.addEventListener('mousedown', onClick);
     window.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('mousedown', onClick);
-      window.removeEventListener('keydown', onKey);
-    };
+    return () => window.removeEventListener('keydown', onKey);
   }, [open]);
 
   // The live toast auto-dismisses, but stays long enough to read.
@@ -87,114 +80,179 @@ export const NotificationBell: React.FC<{ enabled?: boolean }> = ({ enabled = tr
 
   return (
     <>
-      <div className="relative shrink-0" ref={panelRef}>
+      <div className="relative shrink-0 flex items-center">
         <button
           type="button"
           onClick={handleOpen}
           aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : 'Notifications'}
-          className="relative flex items-center justify-center w-7 h-7 rounded-full bg-purple-950/80 hover:bg-purple-900/90 border border-purple-400/40 text-white transition shadow-md active:scale-95 cursor-pointer"
+          className="relative flex items-center justify-center w-8 h-8 rounded-full bg-purple-950/90 hover:bg-purple-900 border border-purple-400/50 text-white transition shadow-md active:scale-95 cursor-pointer touch-manipulation"
         >
-          <span className="text-[13px] leading-none">🔔</span>
+          <span className="text-sm leading-none select-none">🔔</span>
           {unreadCount > 0 && (
-            <span className="absolute -top-1 -right-1 min-w-[15px] h-[15px] px-1 rounded-full bg-red-600 border border-red-300/70 text-[9px] font-black text-white flex items-center justify-center shadow">
+            <span className="absolute -top-1 -right-1 min-w-[17px] h-[17px] px-1 rounded-full bg-red-600 border border-red-300/80 text-[10px] font-black text-white flex items-center justify-center shadow-md animate-pulse">
               {unreadCount > 99 ? '99+' : unreadCount}
             </span>
           )}
         </button>
 
-        {open && (
-          <div className="absolute right-0 mt-2 w-[min(88vw,340px)] max-h-[70vh] flex flex-col rounded-2xl bg-[#140a2b] border border-purple-400/40 shadow-2xl z-50 overflow-hidden">
-            <div className="flex items-center justify-between px-3.5 py-2.5 border-b border-purple-400/25 bg-gradient-to-r from-[#2d0c61] to-[#1e0744]">
-              <span className="text-xs font-extrabold text-white">Notifications</span>
-              {unreadCount > 0 && (
-                <button
-                  type="button"
-                  onClick={markAllRead}
-                  className="text-[10px] font-bold text-amber-300 hover:text-amber-200 transition cursor-pointer"
-                >
-                  Mark all read
-                </button>
-              )}
-            </div>
-
-            <div className="overflow-y-auto flex-1">
-              {loading && items.length === 0 ? (
-                <p className="px-3.5 py-6 text-center text-[11px] text-gray-400">Loading…</p>
-              ) : items.length === 0 ? (
-                <div className="px-3.5 py-8 text-center">
-                  <p className="text-2xl mb-1.5">🔕</p>
-                  <p className="text-[11px] text-gray-400">No notifications yet</p>
-                </div>
-              ) : (
-                items.map((n) => {
-                  const style = styleFor(n.category);
-                  const expanded = expandedId === n.id;
-                  return (
+        {open &&
+          createPortal(
+            <div
+              className="fixed inset-0 z-[10000] flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm animate-fade-in select-none"
+              onClick={(e) => {
+                if (e.target === e.currentTarget) setOpen(false);
+              }}
+            >
+              <div
+                ref={panelRef}
+                className="relative w-full max-w-sm max-h-[82vh] flex flex-col rounded-3xl bg-gradient-to-b from-[#240c49] via-[#16062d] to-[#0c021c] border border-purple-400/50 shadow-[0_0_50px_rgba(168,85,247,0.35)] overflow-hidden animate-scale-in"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* Modal Header */}
+                <div className="flex items-center justify-between px-4 py-3 border-b border-purple-400/25 bg-gradient-to-r from-[#3b0f7d] to-[#200749] shrink-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-base leading-none">🔔</span>
+                    <span className="text-sm font-black text-white tracking-wide">Notifications</span>
+                    {unreadCount > 0 && (
+                      <span className="px-1.5 py-0.2 rounded-full bg-red-600 border border-red-300/70 text-[9px] font-black text-white">
+                        {unreadCount}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {unreadCount > 0 && (
+                      <button
+                        type="button"
+                        onClick={markAllRead}
+                        className="text-[11px] font-black text-amber-300 hover:text-amber-200 px-2.5 py-1 rounded-lg bg-amber-400/10 border border-amber-400/30 transition cursor-pointer active:scale-95"
+                      >
+                        Mark all read
+                      </button>
+                    )}
                     <button
-                      key={n.id}
                       type="button"
-                      onClick={() => handleItemTap(n)}
-                      className={`w-full text-left px-3.5 py-2.5 border-b border-purple-400/15 transition cursor-pointer ${
-                        n.is_read ? 'bg-transparent hover:bg-purple-900/20' : 'bg-purple-500/10 hover:bg-purple-500/20'
-                      }`}
+                      onClick={() => setOpen(false)}
+                      className="w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 text-gray-300 hover:text-white flex items-center justify-center text-sm font-bold transition cursor-pointer"
+                      aria-label="Close"
                     >
-                      <div className="flex items-start gap-2">
-                        <span className="text-sm shrink-0 mt-0.5">{style.icon}</span>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className={`text-[8px] font-bold uppercase px-1.5 py-0.5 rounded border ${style.className}`}>
-                              {style.label}
-                            </span>
-                            {!n.is_read && <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />}
-                            <span className="text-[9px] text-gray-500 ml-auto">{timeAgo(n.created_at)}</span>
-                          </div>
-                          <p className={`text-[11px] mt-1 ${n.is_read ? 'text-gray-300 font-semibold' : 'text-white font-extrabold'}`}>
-                            {n.title}
-                          </p>
-                          <p className={`text-[10px] text-gray-400 mt-0.5 leading-relaxed ${expanded ? '' : 'line-clamp-2'}`}>
-                            {n.message}
-                          </p>
-                        </div>
-                      </div>
+                      ✕
                     </button>
-                  );
-                })
-              )}
-            </div>
-          </div>
-        )}
+                  </div>
+                </div>
+
+                {/* Notification List */}
+                <div className="overflow-y-auto flex-1 divide-y divide-purple-400/15">
+                  {loading && items.length === 0 ? (
+                    <p className="px-4 py-8 text-center text-xs text-gray-400">Loading notifications…</p>
+                  ) : items.length === 0 ? (
+                    <div className="px-4 py-10 text-center">
+                      <p className="text-3xl mb-2">🔕</p>
+                      <p className="text-xs font-bold text-gray-300">No notifications yet</p>
+                      <p className="text-[10px] text-gray-500 mt-1">Platform updates and bonuses will appear here.</p>
+                    </div>
+                  ) : (
+                    items.map((n) => {
+                      const style = styleFor(n.category);
+                      const expanded = expandedId === n.id;
+                      return (
+                        <button
+                          key={n.id}
+                          type="button"
+                          onClick={() => handleItemTap(n)}
+                          className={`w-full text-left px-4 py-3 transition cursor-pointer active:bg-purple-900/30 ${
+                            n.is_read
+                              ? 'bg-transparent hover:bg-purple-900/20'
+                              : 'bg-purple-500/15 hover:bg-purple-500/25'
+                          }`}
+                        >
+                          <div className="flex items-start gap-3">
+                            <span className="text-xl shrink-0 mt-0.5">{style.icon}</span>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span
+                                  className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded border ${style.className}`}
+                                >
+                                  {style.label}
+                                </span>
+                                {!n.is_read && (
+                                  <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0 shadow-sm shadow-amber-400 animate-pulse" />
+                                )}
+                                <span className="text-[10px] text-gray-400 ml-auto font-mono">
+                                  {timeAgo(n.created_at)}
+                                </span>
+                              </div>
+                              <p
+                                className={`text-xs mt-1 leading-snug ${
+                                  n.is_read ? 'text-gray-200 font-bold' : 'text-white font-black'
+                                }`}
+                              >
+                                {n.title}
+                              </p>
+                              <p
+                                className={`text-[11px] text-gray-300 mt-1 leading-relaxed break-words whitespace-pre-wrap ${
+                                  expanded ? '' : 'line-clamp-2'
+                                }`}
+                              >
+                                {n.message}
+                              </p>
+                              {n.message && n.message.length > 70 && (
+                                <span className="text-[9px] text-amber-300 font-extrabold mt-1 inline-block">
+                                  {expanded ? '▲ Show less' : '▼ Tap to read full message'}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            </div>,
+            document.body,
+          )}
       </div>
 
       {/* Live arrival popup, shown while the app is open */}
-      {liveArrival && (
-        <div className="fixed top-3 left-1/2 -translate-x-1/2 z-[100] w-[min(92vw,380px)] animate-fade-in">
-          <div className="rounded-2xl bg-gradient-to-r from-[#2d0c61] to-[#1b0540] border border-amber-400/50 shadow-2xl p-3.5 flex items-start gap-2.5">
-            <span className="text-lg shrink-0">{styleFor(liveArrival.category).icon}</span>
-            <div className="min-w-0 flex-1">
-              <p className="text-xs font-extrabold text-white truncate">{liveArrival.title}</p>
-              <p className="text-[11px] text-gray-300 mt-0.5 line-clamp-3 leading-relaxed">{liveArrival.message}</p>
+      {liveArrival &&
+        createPortal(
+          <div className="fixed top-3 left-1/2 -translate-x-1/2 z-[10001] w-[min(94vw,400px)] animate-fade-in pointer-events-auto">
+            <div
+              onClick={() => {
+                dismissLiveArrival();
+                setOpen(true);
+              }}
+              className="rounded-2xl bg-gradient-to-r from-[#2d0c61] via-[#1f0747] to-[#12022e] border border-amber-400/60 shadow-[0_10px_35px_rgba(0,0,0,0.85)] p-3.5 flex items-start gap-3 cursor-pointer active:scale-98 transition select-none"
+            >
+              <span className="text-2xl shrink-0 mt-0.5">{styleFor(liveArrival.category).icon}</span>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <span
+                    className={`text-[8px] font-black uppercase px-1.5 py-0.2 rounded border ${styleFor(liveArrival.category).className}`}
+                  >
+                    {styleFor(liveArrival.category).label}
+                  </span>
+                  <span className="text-[10px] font-black text-amber-300">New Notification</span>
+                  <span className="text-[9px] text-gray-400 ml-auto font-mono">Tap to open</span>
+                </div>
+                <p className="text-xs font-black text-white truncate leading-tight">{liveArrival.title}</p>
+                <p className="text-[11px] text-gray-300 mt-1 line-clamp-2 leading-relaxed">{liveArrival.message}</p>
+              </div>
               <button
                 type="button"
-                onClick={() => {
+                onClick={(e) => {
+                  e.stopPropagation();
                   dismissLiveArrival();
-                  setOpen(true);
                 }}
-                className="mt-1.5 text-[10px] font-bold text-amber-300 hover:text-amber-200 cursor-pointer"
+                aria-label="Dismiss notification"
+                className="text-gray-400 hover:text-white text-base leading-none p-1 shrink-0 cursor-pointer"
               >
-                View all
+                ×
               </button>
             </div>
-            <button
-              type="button"
-              onClick={dismissLiveArrival}
-              aria-label="Dismiss notification"
-              className="text-gray-400 hover:text-white text-sm leading-none shrink-0 cursor-pointer"
-            >
-              ×
-            </button>
-          </div>
-        </div>
-      )}
+          </div>,
+          document.body,
+        )}
     </>
   );
 };
